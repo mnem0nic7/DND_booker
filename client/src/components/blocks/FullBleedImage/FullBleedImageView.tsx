@@ -1,7 +1,9 @@
 import { useCallback } from 'react';
+import { useParams } from 'react-router-dom';
 import { NodeViewWrapper } from '@tiptap/react';
 import type { ReactNodeViewProps } from '@tiptap/react';
 import type { FullBleedImageAttrs } from './FullBleedImageExtension';
+import { ImageUploader } from '../../editor/ImageUploader';
 
 const POSITION_OPTIONS: { value: FullBleedImageAttrs['position']; label: string }[] = [
   { value: 'full', label: 'Full Width' },
@@ -15,6 +17,7 @@ export function FullBleedImageView({
   deleteNode,
   selected,
 }: ReactNodeViewProps) {
+  const { id: projectId } = useParams<{ id: string }>();
   const attrs = node.attrs as FullBleedImageAttrs;
 
   const updateAttr = useCallback(
@@ -65,11 +68,18 @@ export function FullBleedImageView({
         {selected && (
           <div className="full-bleed-image__edit-panel">
             <div className="full-bleed-image__edit-row">
-              <label>Image URL</label>
+              <label>Image</label>
+              {projectId && (
+                <ImageUploader
+                  projectId={projectId}
+                  onUpload={(url) => updateAttr('src', url)}
+                  className="mb-2"
+                />
+              )}
               <input
                 value={attrs.src}
                 onChange={(e) => updateAttr('src', e.target.value)}
-                placeholder="https://example.com/image.jpg"
+                placeholder="Or enter image URL"
               />
             </div>
             <div className="full-bleed-image__edit-row">

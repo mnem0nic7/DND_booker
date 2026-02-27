@@ -61,7 +61,7 @@ export async function processExportJob(job: Job<ExportJobData>): Promise<void> {
         content: d.content as DocumentContent | null,
         sortOrder: d.sortOrder,
       })),
-      theme: (exportJob.project.settings as Record<string, unknown>)?.theme as string || 'classic',
+      theme: (exportJob.project.settings as Record<string, unknown>)?.theme as string || 'classic-parchment',
       projectTitle: exportJob.project.title,
     });
 

@@ -2,8 +2,20 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../config/database.js';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret';
-const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'dev-refresh-secret';
+function requireEnvSecret(name: string): string {
+  const value = process.env[name];
+  if (!value || value.length < 16) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error(`FATAL: ${name} must be set to a strong secret (>=16 chars) in production.`);
+    }
+    console.warn(`[auth] WARNING: ${name} is not set. Using insecure dev fallback. DO NOT use in production.`);
+    return `insecure-dev-${name}`;
+  }
+  return value;
+}
+
+const JWT_SECRET = requireEnvSecret('JWT_SECRET');
+const JWT_REFRESH_SECRET = requireEnvSecret('JWT_REFRESH_SECRET');
 
 export function generateAccessToken(userId: string): string {
   return jwt.sign({ userId }, JWT_SECRET, { expiresIn: '15m' });

@@ -1,7 +1,9 @@
 import { useCallback } from 'react';
+import { useParams } from 'react-router-dom';
 import { NodeViewWrapper } from '@tiptap/react';
 import type { ReactNodeViewProps } from '@tiptap/react';
 import type { ChapterHeaderAttrs } from './ChapterHeaderExtension';
+import { ImageUploader } from '../../editor/ImageUploader';
 
 export function ChapterHeaderView({
   node,
@@ -9,6 +11,7 @@ export function ChapterHeaderView({
   deleteNode,
   selected,
 }: ReactNodeViewProps) {
+  const { id: projectId } = useParams<{ id: string }>();
   const attrs = node.attrs as ChapterHeaderAttrs;
 
   const updateAttr = useCallback(
@@ -91,10 +94,17 @@ export function ChapterHeaderView({
             </div>
             <div className="chapter-header__edit-row">
               <label>Background</label>
+              {projectId && (
+                <ImageUploader
+                  projectId={projectId}
+                  onUpload={(url) => updateAttr('backgroundImage', url)}
+                  className="mb-2"
+                />
+              )}
               <input
                 value={attrs.backgroundImage}
                 onChange={(e) => updateAttr('backgroundImage', e.target.value)}
-                placeholder="Image URL (optional)"
+                placeholder="Or enter image URL"
               />
             </div>
           </div>

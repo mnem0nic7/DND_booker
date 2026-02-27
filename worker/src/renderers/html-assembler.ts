@@ -14,10 +14,13 @@ export interface AssembleOptions {
   projectTitle: string;
 }
 
-/** Map theme name to CSS custom property overrides. */
+/** Map theme name to CSS custom property overrides.
+ * Theme names must match client ThemeName type:
+ * 'classic-parchment' | 'dark-tome' | 'clean-modern' | 'fey-wild' | 'infernal'
+ */
 function getThemeVariables(theme: string): string {
   switch (theme) {
-    case 'classic':
+    case 'classic-parchment':
       return `
         --color-primary: #58180d;
         --color-secondary: #c0ad8a;
@@ -30,7 +33,7 @@ function getThemeVariables(theme: string): string {
         --font-body: 'Bookinsanity', 'Noto Serif', serif;
       `;
 
-    case 'dark':
+    case 'dark-tome':
       return `
         --color-primary: #bb9f65;
         --color-secondary: #3a3a3a;
@@ -43,7 +46,7 @@ function getThemeVariables(theme: string): string {
         --font-body: 'Noto Serif', serif;
       `;
 
-    case 'modern':
+    case 'clean-modern':
       return `
         --color-primary: #2563eb;
         --color-secondary: #e5e7eb;
@@ -56,7 +59,7 @@ function getThemeVariables(theme: string): string {
         --font-body: 'Inter', sans-serif;
       `;
 
-    case 'elven':
+    case 'fey-wild':
       return `
         --color-primary: #2d5016;
         --color-secondary: #d4e0c8;
@@ -69,8 +72,21 @@ function getThemeVariables(theme: string): string {
         --font-body: 'Noto Serif', serif;
       `;
 
+    case 'infernal':
+      return `
+        --color-primary: #dc2626;
+        --color-secondary: #2a1a1a;
+        --color-bg: #1c1517;
+        --color-text: #e8d5c4;
+        --color-accent: #2a1f1f;
+        --color-heading: #dc2626;
+        --color-divider: #ea580c;
+        --font-heading: 'Libre Baskerville', serif;
+        --font-body: 'Noto Serif', serif;
+      `;
+
     default:
-      // Default to classic
+      // Default to classic-parchment
       return `
         --color-primary: #58180d;
         --color-secondary: #c0ad8a;

@@ -1,7 +1,9 @@
 import { useState, useCallback } from 'react';
+import { useParams } from 'react-router-dom';
 import { NodeViewWrapper } from '@tiptap/react';
 import type { ReactNodeViewProps } from '@tiptap/react';
 import type { TitlePageAttrs } from './TitlePageExtension';
+import { ImageUploader } from '../../editor/ImageUploader';
 
 export function TitlePageView({
   node,
@@ -9,6 +11,7 @@ export function TitlePageView({
   deleteNode,
   selected,
 }: ReactNodeViewProps) {
+  const { id: projectId } = useParams<{ id: string }>();
   const attrs = node.attrs as TitlePageAttrs;
   const [editing, setEditing] = useState(false);
 
@@ -112,11 +115,18 @@ export function TitlePageView({
               />
             </div>
             <div className="title-page__edit-row">
-              <label>Cover Image URL</label>
+              <label>Cover Image</label>
+              {projectId && (
+                <ImageUploader
+                  projectId={projectId}
+                  onUpload={(url) => updateAttr('coverImageUrl', url)}
+                  className="mb-2"
+                />
+              )}
               <input
                 value={attrs.coverImageUrl}
                 onChange={(e) => updateAttr('coverImageUrl', e.target.value)}
-                placeholder="https://..."
+                placeholder="Or enter image URL"
               />
             </div>
           </div>

@@ -1,9 +1,11 @@
 import { useState, useCallback } from 'react';
+import { useParams } from 'react-router-dom';
 import { NodeViewWrapper } from '@tiptap/react';
 import type { ReactNodeViewProps } from '@tiptap/react';
 import type { NpcProfileAttrs } from './NpcProfileExtension';
 import { AiGenerateButton } from '../../ai/AiGenerateButton';
 import { AiAutoFillButton } from '../../ai/AiAutoFillButton';
+import { ImageUploader } from '../../editor/ImageUploader';
 
 export function NpcProfileView({
   node,
@@ -11,6 +13,7 @@ export function NpcProfileView({
   deleteNode,
   selected,
 }: ReactNodeViewProps) {
+  const { id: projectId } = useParams<{ id: string }>();
   const attrs = node.attrs as NpcProfileAttrs;
   const [editing, setEditing] = useState(false);
 
@@ -155,11 +158,18 @@ export function NpcProfileView({
               />
             </div>
             <div className="npc-profile__edit-row">
-              <label>Portrait URL</label>
+              <label>Portrait</label>
+              {projectId && (
+                <ImageUploader
+                  projectId={projectId}
+                  onUpload={(url) => updateAttr('portraitUrl', url)}
+                  className="mb-2"
+                />
+              )}
               <input
                 value={attrs.portraitUrl}
                 onChange={(e) => updateAttr('portraitUrl', e.target.value)}
-                placeholder="https://..."
+                placeholder="Or enter image URL"
               />
             </div>
 

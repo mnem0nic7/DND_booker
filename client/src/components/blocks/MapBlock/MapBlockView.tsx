@@ -1,7 +1,9 @@
 import { useCallback } from 'react';
+import { useParams } from 'react-router-dom';
 import { NodeViewWrapper } from '@tiptap/react';
 import type { ReactNodeViewProps } from '@tiptap/react';
 import type { MapBlockAttrs } from './MapBlockExtension';
+import { ImageUploader } from '../../editor/ImageUploader';
 
 interface KeyEntry {
   label: string;
@@ -23,6 +25,7 @@ export function MapBlockView({
   deleteNode,
   selected,
 }: ReactNodeViewProps) {
+  const { id: projectId } = useParams<{ id: string }>();
   const attrs = node.attrs as MapBlockAttrs;
   const keyEntries = parseKeyEntries(attrs.keyEntries);
 
@@ -106,11 +109,18 @@ export function MapBlockView({
         {selected && (
           <div className="map-block__edit-panel">
             <div className="map-block__edit-row">
-              <label>Map URL</label>
+              <label>Map Image</label>
+              {projectId && (
+                <ImageUploader
+                  projectId={projectId}
+                  onUpload={(url) => updateAttr('src', url)}
+                  className="mb-2"
+                />
+              )}
               <input
                 value={attrs.src}
                 onChange={(e) => updateAttr('src', e.target.value)}
-                placeholder="https://example.com/map.jpg"
+                placeholder="Or enter image URL"
               />
             </div>
             <div className="map-block__edit-row">

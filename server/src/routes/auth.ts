@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
+import rateLimit from 'express-rate-limit';
 import {
   registerUser,
   loginUser,
@@ -10,6 +11,15 @@ import {
 } from '../services/auth.service.js';
 
 const router = Router();
+
+// Rate limiting for auth endpoints — prevent brute-force
+const authRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 20, // 20 attempts per window
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many attempts. Please try again later.' },
+});
 
 const registerSchema = z.object({
   email: z.string().email(),
@@ -27,7 +37,7 @@ const loginSchema = z.object({
   password: z.string().min(1),
 });
 
-router.post('/register', async (req: Request, res: Response) => {
+router.post('/register', authRateLimit, async (req: Request, res: Response) => {
   const parsed = registerSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: 'Validation failed', details: parsed.error.flatten() });
@@ -56,7 +66,7 @@ router.post('/register', async (req: Request, res: Response) => {
   }
 });
 
-router.post('/login', async (req: Request, res: Response) => {
+router.post('/login', authRateLimit, async (req: Request, res: Response) => {
   const parsed = loginSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: 'Validation failed' });

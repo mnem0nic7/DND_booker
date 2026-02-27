@@ -1,9 +1,11 @@
 import { useState, useCallback } from 'react';
+import { useParams } from 'react-router-dom';
 import { NodeViewWrapper } from '@tiptap/react';
 import type { ReactNodeViewProps } from '@tiptap/react';
 import type { BackCoverAttrs } from './BackCoverExtension';
 import { AiGenerateButton } from '../../ai/AiGenerateButton';
 import { AiAutoFillButton } from '../../ai/AiAutoFillButton';
+import { ImageUploader } from '../../editor/ImageUploader';
 
 export function BackCoverView({
   node,
@@ -11,6 +13,7 @@ export function BackCoverView({
   deleteNode,
   selected,
 }: ReactNodeViewProps) {
+  const { id: projectId } = useParams<{ id: string }>();
   const attrs = node.attrs as BackCoverAttrs;
   const [editing, setEditing] = useState(false);
 
@@ -128,11 +131,18 @@ export function BackCoverView({
               />
             </div>
             <div className="back-cover__edit-row">
-              <label>Author Image URL</label>
+              <label>Author Image</label>
+              {projectId && (
+                <ImageUploader
+                  projectId={projectId}
+                  onUpload={(url) => updateAttr('authorImageUrl', url)}
+                  className="mb-2"
+                />
+              )}
               <input
                 value={attrs.authorImageUrl}
                 onChange={(e) => updateAttr('authorImageUrl', e.target.value)}
-                placeholder="https://..."
+                placeholder="Or enter image URL"
               />
             </div>
           </div>

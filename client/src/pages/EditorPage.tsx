@@ -2,8 +2,10 @@ import { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useDocumentStore } from '../stores/documentStore';
 import { useAuthStore } from '../stores/authStore';
+import { useThemeStore } from '../stores/themeStore';
 import { EditorLayout } from '../components/editor/EditorLayout';
 import { DocumentList } from '../components/editor/DocumentList';
+import api from '../lib/api';
 
 export default function EditorPage() {
   const { id: projectId } = useParams<{ id: string }>();
@@ -22,14 +24,19 @@ export default function EditorPage() {
     reorderDocuments,
   } = useDocumentStore();
 
+  const { loadProjectTheme } = useThemeStore();
   const [showNewDocInput, setShowNewDocInput] = useState(false);
   const [newDocTitle, setNewDocTitle] = useState('');
 
   useEffect(() => {
     if (projectId) {
       fetchDocuments(projectId);
+      // Load project settings (including theme) from server
+      api.get(`/projects/${projectId}`).then(({ data }) => {
+        loadProjectTheme(projectId, data.settings);
+      }).catch(() => {/* theme will use local fallback */});
     }
-  }, [projectId, fetchDocuments]);
+  }, [projectId, fetchDocuments, loadProjectTheme]);
 
   const activeDocument = documents.find((d) => d.id === activeDocumentId);
 

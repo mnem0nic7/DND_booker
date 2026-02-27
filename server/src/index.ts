@@ -1,6 +1,7 @@
 import express from 'express';
 import path from 'path';
 import cors from 'cors';
+import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import authRoutes from './routes/auth.js';
 import projectRoutes from './routes/projects.js';
@@ -13,6 +14,10 @@ import { aiSettingsRoutes, aiGenerateRoutes, aiChatRoutes } from './routes/ai.js
 const app = express();
 const PORT = process.env.PORT || 4000;
 
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+  contentSecurityPolicy: false, // CSP managed by Vite/client
+}));
 app.use(cors({ origin: process.env.CLIENT_URL || 'http://localhost:3000', credentials: true }));
 app.use(express.json({ limit: '10mb' }));
 app.use(cookieParser());
