@@ -1,0 +1,212 @@
+.handout {
+  position: relative;
+  margin: 1.5rem 0;
+  padding: 1.5rem;
+  border-radius: 4px;
+}
+
+/* Selected ring */
+.handout--selected {
+  outline: 2px solid #d97706;
+  outline-offset: 2px;
+}
+
+/* Drag handle area */
+.handout__drag-handle {
+  cursor: grab;
+}
+
+/* ---------- Letter style ---------- */
+.handout--letter {
+  background: #fffef8;
+  border: 1px solid #d4c4a8;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+  font-family: 'Crimson Text', 'Libre Baskerville', serif;
+}
+
+.handout--letter .handout__title {
+  font-family: 'Crimson Text', 'Libre Baskerville', serif;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid #e5ddd0;
+}
+
+.handout--letter .handout__content {
+  font-size: 0.95rem;
+  line-height: 1.7;
+  color: #444;
+  white-space: pre-wrap;
+}
+
+/* ---------- Scroll style ---------- */
+.handout--scroll {
+  background: linear-gradient(180deg, #e8d5a3 0%, #f5e6c0 8%, #f5e6c0 92%, #e8d5a3 100%);
+  border: none;
+  border-top: 6px solid #c4a462;
+  border-bottom: 6px solid #c4a462;
+  font-family: 'Cinzel', 'Georgia', serif;
+  padding: 2rem 2.5rem;
+}
+
+.handout--scroll .handout__title {
+  font-family: 'Cinzel', 'Georgia', serif;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #58180d;
+  text-align: center;
+  margin-bottom: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.handout--scroll .handout__content {
+  font-family: 'Crimson Text', 'Libre Baskerville', serif;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: #3a2f1f;
+  text-align: center;
+  white-space: pre-wrap;
+}
+
+/* ---------- Poster style ---------- */
+.handout--poster {
+  background: #f5f0e1;
+  border: 3px solid #333;
+  box-shadow: 2px 2px 0 #333;
+  font-family: 'Georgia', serif;
+  text-align: center;
+  padding: 2rem;
+}
+
+.handout--poster .handout__title {
+  font-family: 'Cinzel', 'Georgia', serif;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #1a1a1a;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-bottom: 1rem;
+  border-bottom: 3px double #333;
+  padding-bottom: 0.75rem;
+}
+
+.handout--poster .handout__content {
+  font-size: 1rem;
+  line-height: 1.5;
+  color: #222;
+  white-space: pre-wrap;
+}
+
+/* Content placeholder */
+.handout__content-placeholder {
+  color: #aaa;
+  font-style: italic;
+}
+
+/* Delete button */
+.handout__delete-btn {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  background: #dc2626;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 0.15rem 0.4rem;
+  font-size: 0.7rem;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s;
+  z-index: 10;
+}
+
+.handout:hover .handout__delete-btn {
+  opacity: 1;
+}
+
+/* Edit panel */
+.handout__edit-panel {
+  background: #fff8ee;
+  border: 1px solid #e69a28;
+  border-radius: 4px;
+  padding: 0.75rem;
+  margin-top: 1rem;
+  font-family: system-ui, sans-serif;
+  font-size: 0.8rem;
+  text-align: left;
+}
+
+.handout__edit-row {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-bottom: 0.35rem;
+}
+
+.handout__edit-row--full {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.handout__edit-row label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #333;
+  min-width: 4rem;
+}
+
+.handout__edit-row input {
+  flex: 1;
+  padding: 0.2rem 0.35rem;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  font-size: 0.75rem;
+  background: white;
+}
+
+.handout__edit-row textarea {
+  width: 100%;
+  padding: 0.35rem;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  font-size: 0.75rem;
+  background: white;
+  resize: vertical;
+  font-family: 'Crimson Text', 'Libre Baskerville', serif;
+}
+
+/* Style selector */
+.handout__style-selector {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.handout__style-btn {
+  padding: 0.2rem 0.5rem;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  background: white;
+  font-size: 0.7rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.handout__style-btn:hover {
+  background: #f3f4f6;
+}
+
+.handout__style-btn--active {
+  background: #58180d;
+  color: white;
+  border-color: #58180d;
+}
+
+@media print {
+  .handout__delete-btn,
+  .handout__edit-panel {
+    display: none;
+  }
+}

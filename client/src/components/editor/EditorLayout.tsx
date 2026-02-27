@@ -12,6 +12,12 @@ import { NpcProfile } from '../blocks/NpcProfile/NpcProfileExtension';
 import { EncounterTable } from '../blocks/EncounterTable/EncounterTableExtension';
 import { ClassFeature } from '../blocks/ClassFeature/ClassFeatureExtension';
 import { RaceBlock } from '../blocks/RaceBlock/RaceBlockExtension';
+import { FullBleedImage } from '../blocks/FullBleedImage/FullBleedImageExtension';
+import { MapBlock } from '../blocks/MapBlock/MapBlockExtension';
+import { Handout } from '../blocks/Handout/HandoutExtension';
+import { PageBorder } from '../blocks/PageBorder/PageBorderExtension';
+import { PageBreak } from '../blocks/PageBreak/PageBreakExtension';
+import { ColumnBreak } from '../blocks/ColumnBreak/ColumnBreakExtension';
 import { Toolbar } from './Toolbar';
 import { BlockPalette } from '../sidebar/BlockPalette';
 
@@ -25,7 +31,7 @@ export function EditorLayout({ content, onUpdate }: EditorLayoutProps) {
   const [showProperties, setShowProperties] = useState(false);
 
   const editor = useEditor({
-    extensions: [StarterKit, StatBlock, ReadAloudBox, SidebarCallout, ChapterHeader, SpellCard, MagicItem, RandomTable, NpcProfile, EncounterTable, ClassFeature, RaceBlock],
+    extensions: [StarterKit, StatBlock, ReadAloudBox, SidebarCallout, ChapterHeader, SpellCard, MagicItem, RandomTable, NpcProfile, EncounterTable, ClassFeature, RaceBlock, FullBleedImage, MapBlock, Handout, PageBorder, PageBreak, ColumnBreak],
     content,
     immediatelyRender: false,
     onUpdate: ({ editor: ed }) => {

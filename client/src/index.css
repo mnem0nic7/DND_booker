@@ -10,3 +10,9 @@
 @import './styles/blocks/encounter-table.css';
 @import './styles/blocks/class-feature.css';
 @import './styles/blocks/race-block.css';
+@import './styles/blocks/full-bleed-image.css';
+@import './styles/blocks/map-block.css';
+@import './styles/blocks/handout.css';
+@import './styles/blocks/page-border.css';
+@import './styles/blocks/page-break.css';
+@import './styles/blocks/column-break.css';
