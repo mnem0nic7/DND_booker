@@ -145,56 +145,62 @@ export function BlockPalette({ editor }: BlockPaletteProps) {
           <button
             onMouseDown={(e) => {
               e.preventDefault();
-              editor
-                .chain()
-                .focus()
-                .insertContent({
-                  type: 'readAloudBox',
-                  content: [{ type: 'paragraph' }],
-                })
-                .run();
+              editor.chain().focus().insertContent({ type: 'readAloudBox', content: [{ type: 'paragraph' }] }).run();
             }}
             className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 rounded hover:bg-gray-200 transition-colors"
           >
-            <span className="w-6 h-6 flex items-center justify-center bg-amber-100 text-amber-800 rounded text-xs font-mono">
-              RA
-            </span>
+            <span className="w-6 h-6 flex items-center justify-center bg-amber-100 text-amber-800 rounded text-xs font-mono">RA</span>
             Read Aloud
           </button>
           <button
             onMouseDown={(e) => {
               e.preventDefault();
-              editor
-                .chain()
-                .focus()
-                .insertContent({
-                  type: 'sidebarCallout',
-                  content: [{ type: 'paragraph' }],
-                })
-                .run();
+              editor.chain().focus().insertContent({ type: 'sidebarCallout', content: [{ type: 'paragraph' }] }).run();
             }}
             className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 rounded hover:bg-gray-200 transition-colors"
           >
-            <span className="w-6 h-6 flex items-center justify-center bg-amber-100 text-amber-800 rounded text-xs font-mono">
-              SC
-            </span>
+            <span className="w-6 h-6 flex items-center justify-center bg-amber-100 text-amber-800 rounded text-xs font-mono">SC</span>
             Sidebar Callout
           </button>
           <button
             onMouseDown={(e) => {
               e.preventDefault();
-              editor
-                .chain()
-                .focus()
-                .insertContent({ type: 'chapterHeader' })
-                .run();
+              editor.chain().focus().insertContent({ type: 'chapterHeader' }).run();
             }}
             className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 rounded hover:bg-gray-200 transition-colors"
           >
-            <span className="w-6 h-6 flex items-center justify-center bg-amber-100 text-amber-800 rounded text-xs font-mono">
-              CH
-            </span>
+            <span className="w-6 h-6 flex items-center justify-center bg-amber-100 text-amber-800 rounded text-xs font-mono">CH</span>
             Chapter Header
+          </button>
+          <button
+            onMouseDown={(e) => {
+              e.preventDefault();
+              editor.chain().focus().insertContent({ type: 'spellCard' }).run();
+            }}
+            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 rounded hover:bg-gray-200 transition-colors"
+          >
+            <span className="w-6 h-6 flex items-center justify-center bg-indigo-100 text-indigo-800 rounded text-xs font-mono">SP</span>
+            Spell Card
+          </button>
+          <button
+            onMouseDown={(e) => {
+              e.preventDefault();
+              editor.chain().focus().insertContent({ type: 'magicItem' }).run();
+            }}
+            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 rounded hover:bg-gray-200 transition-colors"
+          >
+            <span className="w-6 h-6 flex items-center justify-center bg-emerald-100 text-emerald-800 rounded text-xs font-mono">MI</span>
+            Magic Item
+          </button>
+          <button
+            onMouseDown={(e) => {
+              e.preventDefault();
+              editor.chain().focus().insertContent({ type: 'randomTable' }).run();
+            }}
+            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 rounded hover:bg-gray-200 transition-colors"
+          >
+            <span className="w-6 h-6 flex items-center justify-center bg-yellow-100 text-yellow-800 rounded text-xs font-mono">RT</span>
+            Random Table
           </button>
         </div>
       </div>

@@ -5,6 +5,9 @@ import { StatBlock } from '../blocks/StatBlock/StatBlockExtension';
 import { ReadAloudBox } from '../blocks/ReadAloudBox/ReadAloudBoxExtension';
 import { SidebarCallout } from '../blocks/SidebarCallout/SidebarCalloutExtension';
 import { ChapterHeader } from '../blocks/ChapterHeader/ChapterHeaderExtension';
+import { SpellCard } from '../blocks/SpellCard/SpellCardExtension';
+import { MagicItem } from '../blocks/MagicItem/MagicItemExtension';
+import { RandomTable } from '../blocks/RandomTable/RandomTableExtension';
 import { Toolbar } from './Toolbar';
 import { BlockPalette } from '../sidebar/BlockPalette';
 
@@ -18,7 +21,7 @@ export function EditorLayout({ content, onUpdate }: EditorLayoutProps) {
   const [showProperties, setShowProperties] = useState(false);
 
   const editor = useEditor({
-    extensions: [StarterKit, StatBlock, ReadAloudBox, SidebarCallout, ChapterHeader],
+    extensions: [StarterKit, StatBlock, ReadAloudBox, SidebarCallout, ChapterHeader, SpellCard, MagicItem, RandomTable],
     content,
     immediatelyRender: false,
     onUpdate: ({ editor: ed }) => {

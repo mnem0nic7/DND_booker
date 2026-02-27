@@ -3,3 +3,6 @@
 @import './styles/blocks/read-aloud-box.css';
 @import './styles/blocks/sidebar-callout.css';
 @import './styles/blocks/chapter-header.css';
+@import './styles/blocks/spell-card.css';
+@import './styles/blocks/magic-item.css';
+@import './styles/blocks/random-table.css';
