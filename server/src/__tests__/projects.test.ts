@@ -171,6 +171,28 @@ describe('Projects API', () => {
       expect(res.status).toBe(200);
     });
 
+    it('should merge settings without overwriting existing keys', async () => {
+      // First verify default settings exist
+      const getRes = await request(app)
+        .get(`/api/projects/${createdProjectId}`)
+        .set('Authorization', `Bearer ${accessToken}`);
+      const originalSettings = getRes.body.settings;
+      expect(originalSettings.pageSize).toBeDefined();
+      expect(originalSettings.columns).toBeDefined();
+
+      // Update only theme
+      const res = await request(app)
+        .put(`/api/projects/${createdProjectId}`)
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({ settings: { theme: 'fey-wild' } });
+
+      expect(res.status).toBe(200);
+      expect(res.body.settings.theme).toBe('fey-wild');
+      // Verify other settings were preserved
+      expect(res.body.settings.pageSize).toBe(originalSettings.pageSize);
+      expect(res.body.settings.columns).toBe(originalSettings.columns);
+    });
+
     it('should reject invalid theme in settings', async () => {
       const res = await request(app)
         .put(`/api/projects/${createdProjectId}`)

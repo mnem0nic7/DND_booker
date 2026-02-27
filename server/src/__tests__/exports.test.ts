@@ -114,6 +114,37 @@ describe('Export Routes', () => {
     });
   });
 
+  describe('GET /api/projects/:id/export-jobs', () => {
+    it('should list export history for a project', async () => {
+      const res = await request(app)
+        .get(`/api/projects/${projectId}/export-jobs`)
+        .set('Authorization', `Bearer ${accessToken}`);
+
+      expect(res.status).toBe(200);
+      expect(Array.isArray(res.body)).toBe(true);
+      expect(res.body.length).toBeGreaterThanOrEqual(1);
+      expect(res.body[0].projectId).toBe(projectId);
+      expect(res.body[0].format).toBeDefined();
+      expect(res.body[0].status).toBeDefined();
+    });
+
+    it('should return 404 for non-existent project', async () => {
+      const res = await request(app)
+        .get('/api/projects/00000000-0000-0000-0000-000000000000/export-jobs')
+        .set('Authorization', `Bearer ${accessToken}`);
+
+      expect(res.status).toBe(404);
+      expect(res.body.error).toBe('Project not found');
+    });
+
+    it('should return 401 without auth token', async () => {
+      const res = await request(app)
+        .get(`/api/projects/${projectId}/export-jobs`);
+
+      expect(res.status).toBe(401);
+    });
+  });
+
   describe('GET /api/export-jobs/:id', () => {
     let exportJobId: string;
 

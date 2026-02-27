@@ -221,6 +221,47 @@ describe('Documents API', () => {
     });
   });
 
+  describe('PATCH /api/documents/:id (rename)', () => {
+    it('should rename a document title', async () => {
+      const res = await request(app)
+        .patch(`/api/documents/${createdDocId}`)
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({ title: 'Renamed Chapter' });
+
+      expect(res.status).toBe(200);
+      expect(res.body.title).toBe('Renamed Chapter');
+      expect(res.body.id).toBe(createdDocId);
+    });
+
+    it('should reject empty title', async () => {
+      const res = await request(app)
+        .patch(`/api/documents/${createdDocId}`)
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({ title: '' });
+
+      expect(res.status).toBe(400);
+      expect(res.body.error).toBe('Validation failed');
+    });
+
+    it('should return 404 for non-existent document', async () => {
+      const res = await request(app)
+        .patch('/api/documents/00000000-0000-0000-0000-000000000000')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({ title: 'Ghost' });
+
+      expect(res.status).toBe(404);
+      expect(res.body.error).toBe('Document not found');
+    });
+
+    it('should return 401 without auth token', async () => {
+      const res = await request(app)
+        .patch(`/api/documents/${createdDocId}`)
+        .send({ title: 'No Auth' });
+
+      expect(res.status).toBe(401);
+    });
+  });
+
   describe('PATCH /api/documents/reorder', () => {
     it('should reorder documents', async () => {
       // Reverse the order: second doc first, then first doc
