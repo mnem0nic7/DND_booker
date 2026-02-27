@@ -67,14 +67,20 @@ export async function processExportJob(job: Job<ExportJobData>): Promise<void> {
 
     await job.updateProgress(50);
 
+    // Resolve relative /uploads/ URLs to absolute so Puppeteer can fetch them
+    const serverBaseUrl = process.env.SERVER_BASE_URL || 'http://localhost:4000';
+    const resolvedHtml = html.replace(/(?:src|href)="(\/uploads\/[^"]+)"/g, (_match, p1) => {
+      return `src="${serverBaseUrl}${p1}"`;
+    });
+
     // Generate output based on requested format
     let buffer: Buffer;
     if (format === 'pdf') {
-      buffer = await generatePdf(html);
+      buffer = await generatePdf(resolvedHtml);
     } else if (format === 'print_pdf') {
-      buffer = await generatePrintPdf(html);
+      buffer = await generatePrintPdf(resolvedHtml);
     } else if (format === 'epub') {
-      buffer = await generateEpub(html, exportJob.project.title);
+      buffer = await generateEpub(resolvedHtml, exportJob.project.title);
     } else {
       throw new Error(`Unsupported export format: ${format}`);
     }

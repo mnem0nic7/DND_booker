@@ -18,6 +18,7 @@ export default function EditorPage() {
     isLoading,
     isSaving,
     hasPendingChanges,
+    saveError,
     fetchDocuments,
     setActiveDocument,
     updateDocumentContent,
@@ -131,9 +132,13 @@ export default function EditorPage() {
           </div>
           <div className="flex items-center gap-4">
             {/* Save indicator */}
-            <span className="text-xs text-gray-400">
-              {isSaving ? 'Saving...' : 'Saved'}
-            </span>
+            {saveError ? (
+              <span className="text-xs text-red-500 font-medium">{saveError}</span>
+            ) : (
+              <span className="text-xs text-gray-400">
+                {isSaving ? 'Saving...' : hasPendingChanges ? 'Unsaved changes' : 'Saved'}
+              </span>
+            )}
             <span className="text-sm text-gray-600">{user?.displayName}</span>
             <button
               onClick={() => logout()}

@@ -12,6 +12,16 @@ import templateRoutes from './routes/templates.js';
 import { aiSettingsRoutes, aiGenerateRoutes, aiChatRoutes } from './routes/ai.js';
 import { publicRateLimit } from './middleware/ai-rate-limit.js';
 
+// Validate required env vars in production
+if (process.env.NODE_ENV === 'production') {
+  const required = ['DATABASE_URL', 'REDIS_HOST', 'AI_KEY_ENCRYPTION_SECRET'];
+  const missing = required.filter((k) => !process.env[k]);
+  if (missing.length > 0) {
+    console.error(`FATAL: Missing required env vars in production: ${missing.join(', ')}`);
+    process.exit(1);
+  }
+}
+
 const app = express();
 const PORT = process.env.PORT || 4000;
 
