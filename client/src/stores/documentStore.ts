@@ -18,6 +18,7 @@ interface DocumentState {
   isLoading: boolean;
   isSaving: boolean;
   hasPendingChanges: boolean;
+  saveError: string | null;
   fetchDocuments: (projectId: string) => Promise<void>;
   setActiveDocument: (id: string) => void;
   updateDocumentContent: (id: string, content: DocumentContent) => void;
@@ -41,6 +42,7 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
   isLoading: false,
   isSaving: false,
   hasPendingChanges: false,
+  saveError: null,
 
   fetchDocuments: async (projectId) => {
     set({ isLoading: true });
@@ -81,11 +83,12 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
       saveTimeout = null;
 
       if (!saveId || !saveContent) return;
-      set({ isSaving: true });
+      set({ isSaving: true, saveError: null });
       try {
         await api.put(`/documents/${saveId}`, { content: saveContent });
-      } finally {
         set({ isSaving: false, hasPendingChanges: false });
+      } catch {
+        set({ isSaving: false, saveError: 'Failed to save. Your changes may be lost.' });
       }
     }, 1000);
   },
@@ -101,11 +104,12 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
     pendingSaveContent = null;
 
     if (!saveId || !saveContent) return;
-    set({ isSaving: true });
+    set({ isSaving: true, saveError: null });
     try {
       await api.put(`/documents/${saveId}`, { content: saveContent });
-    } finally {
       set({ isSaving: false, hasPendingChanges: false });
+    } catch {
+      set({ isSaving: false, saveError: 'Failed to save. Your changes may be lost.' });
     }
   },
 

@@ -67,14 +67,15 @@ describe('AI Chat Service', () => {
     });
   });
 
-  describe('addMessage + getSessionMessages', () => {
+  describe('addMessage + getSessionByProject', () => {
     it('should add and retrieve messages in order', async () => {
       const session = await aiChat.getOrCreateSession(projectId, userId);
 
       await aiChat.addMessage(session.id, 'user', 'Create an orc');
       await aiChat.addMessage(session.id, 'assistant', 'Here is your orc stat block...');
 
-      const messages = await aiChat.getSessionMessages(session.id);
+      const result = await aiChat.getSessionByProject(projectId, userId);
+      const messages = result!.messages;
       expect(messages.length).toBeGreaterThanOrEqual(2);
       expect(messages[0].role).toBe('user');
       expect(messages[0].content).toBe('Create an orc');

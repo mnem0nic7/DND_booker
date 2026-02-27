@@ -80,6 +80,11 @@ export async function updateProject(id: string, userId: string, data: {
   const project = await prisma.project.findFirst({ where: { id, userId } });
   if (!project) return null;
 
+  // Merge settings with existing values to avoid overwriting unrelated keys
+  if (data.settings && typeof data.settings === 'object' && typeof project.settings === 'object' && project.settings !== null) {
+    data.settings = { ...(project.settings as Record<string, unknown>), ...(data.settings as Record<string, unknown>) } as Prisma.InputJsonValue;
+  }
+
   return prisma.project.update({ where: { id }, data });
 }
 

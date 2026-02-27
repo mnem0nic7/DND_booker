@@ -10,13 +10,6 @@ export async function getOrCreateSession(projectId: string, userId: string) {
   });
 }
 
-export async function getSessionMessages(sessionId: string) {
-  return prisma.aiChatMessage.findMany({
-    where: { sessionId },
-    orderBy: { createdAt: 'asc' },
-  });
-}
-
 export async function getRecentMessages(sessionId: string, limit: number) {
   const messages = await prisma.aiChatMessage.findMany({
     where: { sessionId },
@@ -55,18 +48,6 @@ export async function addMessage(
       blocks: blocks ?? undefined,
     },
   });
-}
-
-export async function clearSession(sessionId: string, userId: string) {
-  const session = await prisma.aiChatSession.findFirst({
-    where: { id: sessionId, userId },
-  });
-  if (!session) return null;
-
-  await prisma.aiChatMessage.deleteMany({
-    where: { sessionId },
-  });
-  return true;
 }
 
 export async function clearSessionByProject(projectId: string, userId: string) {

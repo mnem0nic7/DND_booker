@@ -15,7 +15,7 @@ const createSchema = z.object({
   title: z.string().min(1).max(200),
   description: z.string().max(2000).optional(),
   type: z.enum(['campaign', 'one_shot', 'supplement', 'sourcebook']).optional(),
-  templateId: z.string().optional(),
+  templateId: z.string().uuid().optional(),
 });
 
 const settingsSchema = z.object({

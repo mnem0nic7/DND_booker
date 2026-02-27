@@ -23,8 +23,8 @@ export async function generatePdf(html: string): Promise<Buffer> {
   try {
     const page = await browser.newPage();
     page.setDefaultTimeout(PAGE_TIMEOUT_MS);
-    await page.setContent(html, { waitUntil: 'networkidle0', timeout: PAGE_TIMEOUT_MS });
     await page.emulateMediaType('screen');
+    await page.setContent(html, { waitUntil: 'networkidle0', timeout: PAGE_TIMEOUT_MS });
 
     const pdf = await page.pdf({
       format: 'Letter',
@@ -38,6 +38,6 @@ export async function generatePdf(html: string): Promise<Buffer> {
 
     return Buffer.from(pdf);
   } finally {
-    await browser.close();
+    await browser?.close();
   }
 }

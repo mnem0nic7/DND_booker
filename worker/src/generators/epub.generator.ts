@@ -34,7 +34,8 @@ export async function generateEpub(html: string, title: string): Promise<Buffer>
     await execFileAsync('pandoc', [
       inputPath,
       '-o', outputPath,
-      '--metadata', `title=${safeTitle}`,
+      '--standalone',
+      '--metadata', `title:${safeTitle}`,
       '--embed-resources',
     ]);
 

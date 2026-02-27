@@ -13,12 +13,15 @@ const worker = new Worker('export', processExportJob, {
   concurrency: 2,
 });
 
+connection.on('error', (err) => console.error('[Redis] Connection error:', err.message));
+
 worker.on('completed', (job) => console.log(`Job ${job.id} completed`));
 worker.on('failed', (job, err) => console.error(`Job ${job?.id} failed:`, err.message));
+worker.on('error', (err) => console.error('[Worker] Error:', err.message));
 
 async function shutdown() {
   console.log('Shutting down worker...');
-  const SHUTDOWN_TIMEOUT_MS = 10_000;
+  const SHUTDOWN_TIMEOUT_MS = 70_000;
   const forceExit = setTimeout(() => {
     console.error('Worker shutdown timed out, forcing exit.');
     process.exit(1);

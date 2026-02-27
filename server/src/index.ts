@@ -69,7 +69,15 @@ app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads'), {
 
 // Global error handler — catches unhandled errors from async route handlers
 app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
-  console.error('[Error]', err.message);
+  // Handle multer-specific errors with proper status codes
+  if (err.name === 'MulterError') {
+    const status = (err as Error & { code?: string }).code === 'LIMIT_FILE_SIZE' ? 413 : 400;
+    if (!res.headersSent) {
+      res.status(status).json({ error: err.message });
+    }
+    return;
+  }
+  console.error('[Error]', err.stack ?? err.message);
   if (!res.headersSent) {
     res.status(500).json({ error: 'Internal server error' });
   }
@@ -77,9 +85,29 @@ app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
 
 // Only start listening if this file is run directly (not imported in tests)
 if (process.env.NODE_ENV !== 'test') {
-  app.listen(PORT, () => {
+  const server = app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
   });
+
+  async function gracefulShutdown(signal: string) {
+    console.log(`${signal} received. Shutting down gracefully...`);
+    server.close(() => {
+      console.log('HTTP server closed.');
+      Promise.all([
+        import('./config/database.js').then(({ prisma }) => prisma.$disconnect()),
+        import('./config/redis.js').then(({ redis }) => redis.quit()),
+      ]).then(() => {
+        console.log('All connections closed.');
+        process.exit(0);
+      }).catch((err) => {
+        console.error('Error during shutdown:', err);
+        process.exit(1);
+      });
+    });
+  }
+
+  process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+  process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 }
 
 export default app;

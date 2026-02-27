@@ -99,7 +99,6 @@ export async function generatePrintPdf(html: string): Promise<Buffer> {
     const page = await browser.newPage();
     page.setDefaultTimeout(PAGE_TIMEOUT_MS);
     await page.setContent(html, { waitUntil: 'networkidle0', timeout: PAGE_TIMEOUT_MS });
-    await page.emulateMediaType('screen');
 
     // Inject crop marks into the rendered page
     await injectCropMarks(page);
@@ -107,7 +106,7 @@ export async function generatePrintPdf(html: string): Promise<Buffer> {
     const pdf = await page.pdf({
       format: 'Letter',
       printBackground: true,
-      preferCSSPageSize: true,
+      preferCSSPageSize: false,
       scale: 1,
       margin: {
         top: `${1 + BLEED_INCHES}in`,
@@ -121,6 +120,6 @@ export async function generatePrintPdf(html: string): Promise<Buffer> {
 
     return Buffer.from(pdf);
   } finally {
-    await browser.close();
+    await browser?.close();
   }
 }

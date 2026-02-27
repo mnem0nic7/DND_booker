@@ -5,3 +5,5 @@ export const redis = new IORedis({
   port: Number(process.env.REDIS_PORT) || 6379,
   maxRetriesPerRequest: null,
 });
+
+redis.on('error', (err) => console.error('[Redis] Connection error:', err.message));
