@@ -1,4 +1,5 @@
 import type { Job } from 'bullmq';
+import type { DocumentContent } from '@dnd-booker/shared';
 import { prisma } from '../config/database.js';
 import { assembleHtml } from '../renderers/html-assembler.js';
 import { generatePdf } from '../generators/pdf.generator.js';
@@ -56,7 +57,7 @@ export async function processExportJob(job: Job<ExportJobData>): Promise<void> {
     const html = assembleHtml({
       documents: exportJob.project.documents.map((d) => ({
         title: d.title,
-        content: d.content as any,
+        content: d.content as DocumentContent | null,
         sortOrder: d.sortOrder,
       })),
       theme: (exportJob.project.settings as Record<string, unknown>)?.theme as string || 'classic',
@@ -67,10 +68,12 @@ export async function processExportJob(job: Job<ExportJobData>): Promise<void> {
 
     // Generate PDF based on requested format
     let buffer: Buffer;
-    if (format === 'print_pdf') {
+    if (format === 'pdf') {
+      buffer = await generatePdf(html);
+    } else if (format === 'print_pdf') {
       buffer = await generatePrintPdf(html);
     } else {
-      buffer = await generatePdf(html);
+      throw new Error(`Unsupported export format: ${format}`);
     }
 
     await job.updateProgress(80);
