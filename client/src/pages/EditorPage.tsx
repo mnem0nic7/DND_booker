@@ -23,7 +23,10 @@ export default function EditorPage() {
     updateDocumentContent,
     createDocument,
     deleteDocument,
+    renameDocument,
     reorderDocuments,
+    flushPendingSave,
+    cancelPendingSave,
   } = useDocumentStore();
 
   const { loadProjectTheme } = useThemeStore();
@@ -32,13 +35,18 @@ export default function EditorPage() {
 
   useEffect(() => {
     if (projectId) {
+      cancelPendingSave(); // Cancel saves for previous project
       fetchDocuments(projectId);
       // Load project settings (including theme) from server
       api.get(`/projects/${projectId}`).then(({ data }) => {
         loadProjectTheme(projectId, data.settings);
       }).catch(() => {/* theme will use local fallback */});
     }
-  }, [projectId, fetchDocuments, loadProjectTheme]);
+    return () => {
+      // Flush pending save on unmount (navigation away from editor)
+      flushPendingSave();
+    };
+  }, [projectId, fetchDocuments, loadProjectTheme, cancelPendingSave, flushPendingSave]);
 
   // Warn user about unsaved changes when closing/navigating away
   useEffect(() => {
@@ -74,6 +82,13 @@ export default function EditorPage() {
       await deleteDocument(docId);
     }
   };
+
+  const handleRename = useCallback(
+    async (docId: string, title: string) => {
+      await renameDocument(docId, title);
+    },
+    [renameDocument],
+  );
 
   const handleReorder = useCallback(
     (documentIds: string[]) => {
@@ -145,6 +160,7 @@ export default function EditorPage() {
             onAddDocument={() => setShowNewDocInput(true)}
             onReorder={handleReorder}
             onDeleteDocument={handleDeleteDocument}
+            onRenameDocument={handleRename}
           >
             {showNewDocInput && (
               <div className="p-2 border-b">

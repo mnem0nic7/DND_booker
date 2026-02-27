@@ -19,6 +19,16 @@ const exportSchema = z.object({
   format: z.enum(['pdf', 'epub', 'print_pdf']),
 });
 
+// GET /api/projects/:id/export-jobs — list export history for a project
+router.get('/projects/:id/export-jobs', validateUuid('id'), asyncHandler(async (req: AuthRequest, res: Response) => {
+  const jobs = await exportService.listExportJobs(req.params.id as string, req.userId!);
+  if (!jobs) {
+    res.status(404).json({ error: 'Project not found' });
+    return;
+  }
+  res.json(jobs);
+}));
+
 // POST /api/projects/:id/export
 router.post('/projects/:id/export', validateUuid('id'), exportRateLimit, asyncHandler(async (req: AuthRequest, res: Response) => {
   const parsed = exportSchema.safeParse(req.body);

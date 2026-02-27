@@ -19,10 +19,12 @@ interface ExportState {
   job: ExportJob | null;
   isExporting: boolean;
   error: string | null;
+  exportHistory: ExportJob[];
   openDialog: () => void;
   closeDialog: () => void;
   startExport: (projectId: string, format: string) => Promise<void>;
   pollJobStatus: (jobId: string) => Promise<void>;
+  fetchExportHistory: (projectId: string) => Promise<void>;
   reset: () => void;
 }
 
@@ -40,6 +42,7 @@ export const useExportStore = create<ExportState>((set, get) => ({
   job: null,
   isExporting: false,
   error: null,
+  exportHistory: [],
 
   openDialog: () => set({ isOpen: true }),
 
@@ -83,6 +86,15 @@ export const useExportStore = create<ExportState>((set, get) => ({
     } catch {
       clearPollTimer();
       set({ error: 'Failed to check export status' });
+    }
+  },
+
+  fetchExportHistory: async (projectId: string) => {
+    try {
+      const { data } = await api.get(`/projects/${projectId}/export-jobs`);
+      set({ exportHistory: data });
+    } catch {
+      // Non-critical: history fetch failure doesn't block export flow
     }
   },
 

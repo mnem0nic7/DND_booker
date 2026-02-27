@@ -23,3 +23,14 @@ export async function createExportJob(projectId: string, userId: string, format:
 export async function getExportJob(id: string, userId: string) {
   return prisma.exportJob.findFirst({ where: { id, userId } });
 }
+
+export async function listExportJobs(projectId: string, userId: string, limit = 20) {
+  const project = await prisma.project.findFirst({ where: { id: projectId, userId } });
+  if (!project) return null;
+
+  return prisma.exportJob.findMany({
+    where: { projectId, userId },
+    orderBy: { createdAt: 'desc' },
+    take: limit,
+  });
+}

@@ -8,6 +8,7 @@ interface DocumentListProps {
   onAddDocument: () => void;
   onReorder: (documentIds: string[]) => void;
   onDeleteDocument?: (id: string) => void;
+  onRenameDocument?: (id: string, title: string) => Promise<void>;
   children?: ReactNode;
 }
 
@@ -18,19 +19,24 @@ export function DocumentList({
   onAddDocument,
   onReorder,
   onDeleteDocument,
+  onRenameDocument,
   children,
 }: DocumentListProps) {
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameTitle, setRenameTitle] = useState('');
   const dragOverCounter = useRef<Map<string, number>>(new Map());
+  const renameInputRef = useRef<HTMLInputElement>(null);
 
   const handleDragStart = useCallback(
     (e: React.DragEvent<HTMLDivElement>, docId: string) => {
+      if (renamingId) return; // Don't drag while renaming
       setDraggedId(docId);
       e.dataTransfer.effectAllowed = 'move';
       e.dataTransfer.setData('text/plain', docId);
     },
-    [],
+    [renamingId],
   );
 
   const handleDragEnd = useCallback(() => {
@@ -102,6 +108,29 @@ export function DocumentList({
     [documents, onReorder],
   );
 
+  const startRename = useCallback((docId: string, currentTitle: string) => {
+    setRenamingId(docId);
+    setRenameTitle(currentTitle);
+    // Focus input after render
+    setTimeout(() => renameInputRef.current?.select(), 0);
+  }, []);
+
+  const commitRename = useCallback(async () => {
+    if (!renamingId || !renameTitle.trim()) {
+      setRenamingId(null);
+      return;
+    }
+    const doc = documents.find((d) => d.id === renamingId);
+    if (doc && doc.title !== renameTitle.trim() && onRenameDocument) {
+      try {
+        await onRenameDocument(renamingId, renameTitle.trim());
+      } catch {
+        // Rollback handled by store
+      }
+    }
+    setRenamingId(null);
+  }, [renamingId, renameTitle, documents, onRenameDocument]);
+
   return (
     <div className="w-56 border-r bg-white flex flex-col flex-shrink-0">
       <div className="p-3 border-b flex items-center justify-between">
@@ -139,11 +168,12 @@ export function DocumentList({
           const isDragged = doc.id === draggedId;
           const isDropTarget = doc.id === dropTargetId && doc.id !== draggedId;
           const isActive = doc.id === activeDocumentId;
+          const isRenaming = doc.id === renamingId;
 
           return (
             <div
               key={doc.id}
-              draggable
+              draggable={!isRenaming}
               onDragStart={(e) => handleDragStart(e, doc.id)}
               onDragEnd={handleDragEnd}
               onDragEnter={(e) => handleDragEnter(e, doc.id)}
@@ -156,9 +186,11 @@ export function DocumentList({
                 ${isDragged ? 'opacity-40' : 'opacity-100'}
                 ${isDropTarget ? 'border-t-2 border-t-indigo-400' : ''}
               `}
-              onClick={() => onSelectDocument(doc.id)}
+              onClick={() => {
+                if (!isRenaming) onSelectDocument(doc.id);
+              }}
             >
-              <div className="flex items-center min-w-0">
+              <div className="flex items-center min-w-0 flex-1">
                 <svg
                   className="w-3.5 h-3.5 mr-2 flex-shrink-0 text-gray-300"
                   fill="none"
@@ -172,9 +204,33 @@ export function DocumentList({
                     d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"
                   />
                 </svg>
-                <span className="truncate">{doc.title}</span>
+                {isRenaming ? (
+                  <input
+                    ref={renameInputRef}
+                    type="text"
+                    value={renameTitle}
+                    onChange={(e) => setRenameTitle(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') commitRename();
+                      if (e.key === 'Escape') setRenamingId(null);
+                    }}
+                    onBlur={commitRename}
+                    className="w-full text-sm border rounded px-1 py-0 focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white"
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                ) : (
+                  <span
+                    className="truncate"
+                    onDoubleClick={(e) => {
+                      e.stopPropagation();
+                      if (onRenameDocument) startRename(doc.id, doc.title);
+                    }}
+                  >
+                    {doc.title}
+                  </span>
+                )}
               </div>
-              {onDeleteDocument && (
+              {!isRenaming && onDeleteDocument && (
                 <button
                   onClick={(e) => {
                     e.stopPropagation();

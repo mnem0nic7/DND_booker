@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useExportStore } from '../../stores/exportStore';
 
 interface ExportDialogProps {
@@ -23,9 +23,21 @@ const FORMAT_OPTIONS = [
   },
 ] as const;
 
+function formatDate(iso: string): string {
+  return new Date(iso).toLocaleString(undefined, {
+    month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
+  });
+}
+
 export function ExportDialog({ projectId }: ExportDialogProps) {
-  const { isOpen, job, isExporting, error, closeDialog, startExport, reset } = useExportStore();
+  const { isOpen, job, isExporting, error, exportHistory, closeDialog, startExport, fetchExportHistory, reset } = useExportStore();
   const [selectedFormat, setSelectedFormat] = useState<string>('pdf');
+
+  useEffect(() => {
+    if (isOpen && projectId) {
+      fetchExportHistory(projectId);
+    }
+  }, [isOpen, projectId, fetchExportHistory]);
 
   if (!isOpen) return null;
 
@@ -183,6 +195,38 @@ export function ExportDialog({ projectId }: ExportDialogProps) {
           {error && !job && !isExporting && (
             <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
               <p className="text-sm text-red-700">{error}</p>
+            </div>
+          )}
+
+          {/* Export history */}
+          {!job && !isExporting && exportHistory.length > 0 && (
+            <div className="mt-4 border-t pt-3">
+              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Recent Exports</h3>
+              <div className="space-y-1.5 max-h-32 overflow-y-auto">
+                {exportHistory.slice(0, 5).map((historyJob) => (
+                  <div key={historyJob.id} className="flex items-center justify-between text-xs p-2 bg-gray-50 rounded">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-gray-700">
+                        {FORMAT_OPTIONS.find((f) => f.value === historyJob.format)?.label || historyJob.format}
+                      </span>
+                      <span className="text-gray-400">{formatDate(historyJob.createdAt)}</span>
+                    </div>
+                    {historyJob.status === 'completed' ? (
+                      <a
+                        href={`/api/export-jobs/${historyJob.id}/download`}
+                        download
+                        className="text-indigo-600 hover:text-indigo-800 font-medium"
+                      >
+                        Download
+                      </a>
+                    ) : (
+                      <span className={`${historyJob.status === 'failed' ? 'text-red-500' : 'text-gray-400'}`}>
+                        {historyJob.status}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>

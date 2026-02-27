@@ -23,10 +23,17 @@ interface DocumentState {
   updateDocumentContent: (id: string, content: DocumentContent) => void;
   createDocument: (projectId: string, title: string) => Promise<Document>;
   deleteDocument: (id: string) => Promise<void>;
+  renameDocument: (id: string, title: string) => Promise<void>;
   reorderDocuments: (projectId: string, documentIds: string[]) => Promise<void>;
+  /** Immediately flush the pending debounced save (call on unmount). */
+  flushPendingSave: () => Promise<void>;
+  /** Cancel any pending save without flushing (call on project switch). */
+  cancelPendingSave: () => void;
 }
 
 let saveTimeout: ReturnType<typeof setTimeout> | null = null;
+let pendingSaveId: string | null = null;
+let pendingSaveContent: DocumentContent | null = null;
 
 export const useDocumentStore = create<DocumentState>((set, get) => ({
   documents: [],
@@ -59,18 +66,57 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
       ),
     });
 
+    // Track what needs saving
+    pendingSaveId = id;
+    pendingSaveContent = content;
+
     // Debounced save to server (1 second)
     if (saveTimeout) clearTimeout(saveTimeout);
     set({ hasPendingChanges: true });
     saveTimeout = setTimeout(async () => {
+      const saveId = pendingSaveId;
+      const saveContent = pendingSaveContent;
+      pendingSaveId = null;
+      pendingSaveContent = null;
+      saveTimeout = null;
+
+      if (!saveId || !saveContent) return;
       set({ isSaving: true });
       try {
-        await api.put(`/documents/${id}`, { content });
+        await api.put(`/documents/${saveId}`, { content: saveContent });
       } finally {
         set({ isSaving: false, hasPendingChanges: false });
-        saveTimeout = null;
       }
     }, 1000);
+  },
+
+  flushPendingSave: async () => {
+    if (saveTimeout) {
+      clearTimeout(saveTimeout);
+      saveTimeout = null;
+    }
+    const saveId = pendingSaveId;
+    const saveContent = pendingSaveContent;
+    pendingSaveId = null;
+    pendingSaveContent = null;
+
+    if (!saveId || !saveContent) return;
+    set({ isSaving: true });
+    try {
+      await api.put(`/documents/${saveId}`, { content: saveContent });
+    } finally {
+      set({ isSaving: false, hasPendingChanges: false });
+    }
+  },
+
+  cancelPendingSave: () => {
+    if (saveTimeout) {
+      clearTimeout(saveTimeout);
+      saveTimeout = null;
+    }
+    pendingSaveId = null;
+    pendingSaveContent = null;
+    set({ hasPendingChanges: false });
   },
 
   createDocument: async (projectId, title) => {
@@ -93,6 +139,20 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
       await api.delete(`/documents/${id}`);
     } catch (err) {
       set({ documents: prev, activeDocumentId: prevActive });
+      throw err;
+    }
+  },
+
+  renameDocument: async (id, title) => {
+    const prev = get().documents;
+    // Optimistic update
+    set({
+      documents: prev.map((d) => (d.id === id ? { ...d, title } : d)),
+    });
+    try {
+      await api.patch(`/documents/${id}`, { title });
+    } catch (err) {
+      set({ documents: prev });
       throw err;
     }
   },
