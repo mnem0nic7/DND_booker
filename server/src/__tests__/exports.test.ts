@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import request from 'supertest';
+import fs from 'fs';
+import path from 'path';
 import app from '../index.js';
 import { prisma } from '../config/database.js';
 
@@ -218,6 +220,65 @@ describe('Export Routes', () => {
         .get(`/api/export-jobs/${pendingJobId}/download`);
 
       expect(res.status).toBe(401);
+    });
+
+    it('should download a completed export file', async () => {
+      // Create a completed job with a real output file
+      const exportJob = await prisma.exportJob.create({
+        data: {
+          projectId,
+          userId: (await prisma.user.findUnique({ where: { email: TEST_USER.email } }))!.id,
+          format: 'pdf',
+          status: 'completed',
+          progress: 100,
+          outputUrl: '/output/test-download.pdf',
+          completedAt: new Date(),
+        },
+      });
+
+      // Create the output file
+      const outputDir = process.env.EXPORT_OUTPUT_DIR || path.join(process.cwd(), '..', 'worker', 'output');
+      fs.mkdirSync(outputDir, { recursive: true });
+      const testContent = Buffer.from('%PDF-1.4 test content');
+      fs.writeFileSync(path.join(outputDir, 'test-download.pdf'), testContent);
+
+      try {
+        const res = await request(app)
+          .get(`/api/export-jobs/${exportJob.id}/download`)
+          .set('Authorization', `Bearer ${accessToken}`);
+
+        expect(res.status).toBe(200);
+        expect(res.headers['content-type']).toContain('application/pdf');
+        expect(res.headers['content-disposition']).toContain('test-download.pdf');
+      } finally {
+        // Clean up
+        try { fs.unlinkSync(path.join(outputDir, 'test-download.pdf')); } catch { /* ignore */ }
+        await prisma.exportJob.delete({ where: { id: exportJob.id } });
+      }
+    });
+
+    it('should return 404 when output file has been cleaned up', async () => {
+      const exportJob = await prisma.exportJob.create({
+        data: {
+          projectId,
+          userId: (await prisma.user.findUnique({ where: { email: TEST_USER.email } }))!.id,
+          format: 'pdf',
+          status: 'completed',
+          progress: 100,
+          outputUrl: '/output/nonexistent-file.pdf',
+          completedAt: new Date(),
+        },
+      });
+
+      try {
+        const res = await request(app)
+          .get(`/api/export-jobs/${exportJob.id}/download`)
+          .set('Authorization', `Bearer ${accessToken}`);
+
+        expect(res.status).toBe(404);
+      } finally {
+        await prisma.exportJob.delete({ where: { id: exportJob.id } });
+      }
     });
   });
 });

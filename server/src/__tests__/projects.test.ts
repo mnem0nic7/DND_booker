@@ -211,6 +211,25 @@ describe('Projects API', () => {
       expect(res.status).toBe(400);
     });
 
+    it('should strip unknown keys from settings (prevent injection)', async () => {
+      // First get the current settings to know the baseline
+      const before = await request(app)
+        .get(`/api/projects/${createdProjectId}`)
+        .set('Authorization', `Bearer ${accessToken}`);
+      const knownKeys = Object.keys(before.body.settings);
+
+      // Send settings with an injected key
+      const res = await request(app)
+        .put(`/api/projects/${createdProjectId}`)
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({ settings: { theme: 'classic-parchment', maliciousKey: 'evil-data' } });
+
+      expect(res.status).toBe(200);
+      expect(res.body.settings.theme).toBe('classic-parchment');
+      // The malicious key should have been stripped by Zod .strip()
+      expect(res.body.settings.maliciousKey).toBeUndefined();
+    });
+
     it('should return 401 without auth token', async () => {
       const res = await request(app)
         .put(`/api/projects/${createdProjectId}`)
