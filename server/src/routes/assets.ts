@@ -6,6 +6,8 @@ import { validateUuid } from '../middleware/validate-uuid.js';
 import { crudRateLimit } from '../middleware/ai-rate-limit.js';
 import * as assetService from '../services/asset.service.js';
 
+const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
@@ -13,8 +15,7 @@ const upload = multer({
   },
   fileFilter: (_req, file, cb) => {
     // SVG intentionally excluded — SVG can contain embedded scripts (XSS risk)
-    const allowed = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-    if (allowed.includes(file.mimetype)) {
+    if (ALLOWED_MIME_TYPES.includes(file.mimetype)) {
       cb(null, true);
     } else {
       cb(new Error('Only image files are allowed'));
@@ -30,6 +31,14 @@ projectAssetRoutes.use(crudRateLimit);
 projectAssetRoutes.post('/', validateUuid('projectId'), upload.single('file'), asyncHandler(async (req: AuthRequest, res: Response) => {
   if (!req.file) {
     res.status(400).json({ error: 'No file provided' });
+    return;
+  }
+
+  // Validate actual file content via magic bytes (MIME header is client-controlled and spoofable)
+  const { fileTypeFromBuffer } = await import('file-type');
+  const detectedType = await fileTypeFromBuffer(req.file.buffer);
+  if (!detectedType || !ALLOWED_MIME_TYPES.includes(detectedType.mime)) {
+    res.status(400).json({ error: 'File content does not match an allowed image type' });
     return;
   }
 

@@ -1,11 +1,13 @@
 import { Router, Response } from 'express';
 import { z } from 'zod';
+import { requireAuth } from '../middleware/auth.js';
 import { publicRateLimit } from '../middleware/ai-rate-limit.js';
 import { asyncHandler } from '../middleware/async-handler.js';
 import { validateUuid } from '../middleware/validate-uuid.js';
 import * as templateService from '../services/template.service.js';
 
 const router = Router();
+router.use(requireAuth);
 router.use(publicRateLimit);
 
 const querySchema = z.object({

@@ -9,6 +9,13 @@ const TEST_USER = {
   displayName: 'Asset Test User',
 };
 
+// Minimal valid 1x1 transparent PNG (magic bytes make file-type detect it correctly)
+const VALID_PNG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVQI12NgAAIABQAB' +
+  'Nl7BcQAAAABJRU5ErkJggg==',
+  'base64',
+);
+
 let accessToken: string;
 let projectId: string;
 
@@ -55,7 +62,7 @@ describe('Assets API', () => {
       const res = await request(app)
         .post(`/api/projects/${projectId}/assets`)
         .set('Authorization', `Bearer ${accessToken}`)
-        .attach('file', Buffer.from('fake-png-data'), {
+        .attach('file', VALID_PNG, {
           filename: 'test-image.png',
           contentType: 'image/png',
         });
@@ -79,11 +86,25 @@ describe('Assets API', () => {
       expect(res.body.error).toBe('Only image files are allowed');
     });
 
+    it('should reject file with spoofed MIME type (magic bytes mismatch)', async () => {
+      // Send HTML content but claim it is image/png
+      const res = await request(app)
+        .post(`/api/projects/${projectId}/assets`)
+        .set('Authorization', `Bearer ${accessToken}`)
+        .attach('file', Buffer.from('<html>evil</html>'), {
+          filename: 'evil.png',
+          contentType: 'image/png',
+        });
+
+      expect(res.status).toBe(400);
+      expect(res.body.error).toBe('File content does not match an allowed image type');
+    });
+
     it('should return 404 for non-existent project', async () => {
       const res = await request(app)
         .post('/api/projects/00000000-0000-0000-0000-000000000000/assets')
         .set('Authorization', `Bearer ${accessToken}`)
-        .attach('file', Buffer.from('fake-png-data'), {
+        .attach('file', VALID_PNG, {
           filename: 'test.png',
           contentType: 'image/png',
         });
@@ -132,7 +153,7 @@ describe('Assets API', () => {
       const uploadRes = await request(app)
         .post(`/api/projects/${projectId}/assets`)
         .set('Authorization', `Bearer ${accessToken}`)
-        .attach('file', Buffer.from('delete-me'), {
+        .attach('file', VALID_PNG, {
           filename: 'delete-me.png',
           contentType: 'image/png',
         });
