@@ -3,6 +3,7 @@ import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import authRoutes from './routes/auth.js';
 import projectRoutes from './routes/projects.js';
+import { projectDocumentRoutes, documentRoutes } from './routes/documents.js';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -17,6 +18,8 @@ app.get('/api/health', (_req, res) => {
 
 app.use('/api/auth', authRoutes);
 app.use('/api/projects', projectRoutes);
+app.use('/api/projects/:projectId/documents', projectDocumentRoutes);
+app.use('/api/documents', documentRoutes);
 
 // Only start listening if this file is run directly (not imported in tests)
 if (process.env.NODE_ENV !== 'test') {
