@@ -18,7 +18,7 @@ interface ProjectState {
   projects: Project[];
   isLoading: boolean;
   fetchProjects: () => Promise<void>;
-  createProject: (data: { title: string; description?: string; type: string }) => Promise<Project>;
+  createProject: (data: { title: string; description?: string; type: string; templateId?: string }) => Promise<Project>;
   deleteProject: (id: string) => Promise<void>;
 }
 

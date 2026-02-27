@@ -13,8 +13,22 @@ export async function createProject(userId: string, data: {
   title: string;
   description?: string;
   type?: 'campaign' | 'one_shot' | 'supplement' | 'sourcebook';
+  templateId?: string;
 }) {
-  return prisma.project.create({
+  let templateContent: unknown = null;
+
+  if (data.templateId) {
+    const template = await prisma.template.findUnique({ where: { id: data.templateId } });
+    if (template) {
+      templateContent = template.content;
+      // Use the template's type if the caller didn't specify one
+      if (!data.type) {
+        data.type = template.type;
+      }
+    }
+  }
+
+  const project = await prisma.project.create({
     data: {
       userId,
       title: data.title,
@@ -23,6 +37,20 @@ export async function createProject(userId: string, data: {
       settings: DEFAULT_PROJECT_SETTINGS,
     },
   });
+
+  // If a template was selected, create an initial document with the template content
+  if (templateContent) {
+    await prisma.document.create({
+      data: {
+        projectId: project.id,
+        title: data.title,
+        content: templateContent as Prisma.InputJsonValue,
+        sortOrder: 0,
+      },
+    });
+  }
+
+  return project;
 }
 
 export async function getUserProjects(userId: string) {
