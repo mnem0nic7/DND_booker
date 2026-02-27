@@ -1,2 +1,5 @@
 @import 'tailwindcss';
 @import './styles/blocks/stat-block.css';
+@import './styles/blocks/spell-card.css';
+@import './styles/blocks/magic-item.css';
+@import './styles/blocks/random-table.css';

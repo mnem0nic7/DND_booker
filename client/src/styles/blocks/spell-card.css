@@ -1,0 +1,141 @@
+.spell-card {
+  font-family: 'Crimson Text', 'Libre Baskerville', serif;
+  background: #f5f0ff;
+  padding: 1rem;
+  border: 1px solid #7c3aed;
+  box-shadow: 0 0 0.25rem #7c3aed;
+  max-width: 420px;
+  position: relative;
+}
+
+.spell-card__name {
+  font-family: 'Cinzel', 'Georgia', serif;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #4338ca;
+  margin: 0;
+  line-height: 1.2;
+}
+
+.spell-card__subtitle {
+  font-size: 0.85rem;
+  font-style: italic;
+  color: #6d28d9;
+  margin-bottom: 0.5rem;
+}
+
+.spell-card__divider {
+  height: 2px;
+  background: linear-gradient(to right, #7c3aed, transparent);
+  margin: 0.5rem 0;
+  border: none;
+}
+
+.spell-card__property {
+  font-size: 0.875rem;
+  line-height: 1.4;
+  color: #1a1a1a;
+}
+
+.spell-card__property-name {
+  font-weight: 700;
+  color: #4338ca;
+}
+
+.spell-card__description {
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: #1a1a1a;
+  margin: 0.5rem 0;
+}
+
+.spell-card__higher-levels {
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: #1a1a1a;
+  margin-top: 0.5rem;
+}
+
+.spell-card__higher-levels-label {
+  font-weight: 700;
+  font-style: italic;
+  color: #4338ca;
+}
+
+.spell-card__delete-btn {
+  position: absolute;
+  top: 0.25rem;
+  right: 0.25rem;
+  background: #dc2626;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 0.15rem 0.4rem;
+  font-size: 0.7rem;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.spell-card:hover .spell-card__delete-btn {
+  opacity: 1;
+}
+
+/* Edit panel styles */
+.spell-card__edit-panel {
+  background: #f0ebff;
+  border: 1px solid #7c3aed;
+  border-radius: 4px;
+  padding: 0.75rem;
+  margin-top: 0.75rem;
+  font-family: system-ui, sans-serif;
+  font-size: 0.8rem;
+}
+
+.spell-card__edit-panel h4 {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #4338ca;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 0.75rem 0 0.35rem;
+}
+
+.spell-card__edit-panel h4:first-child {
+  margin-top: 0;
+}
+
+.spell-card__edit-row {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-bottom: 0.25rem;
+}
+
+.spell-card__edit-row label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #333;
+  min-width: 5rem;
+}
+
+.spell-card__edit-row input,
+.spell-card__edit-row select {
+  flex: 1;
+  padding: 0.2rem 0.35rem;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  font-size: 0.75rem;
+  background: white;
+}
+
+.spell-card__edit-textarea {
+  width: 100%;
+  min-height: 3rem;
+  padding: 0.25rem 0.35rem;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  font-size: 0.75rem;
+  font-family: system-ui, sans-serif;
+  resize: vertical;
+}

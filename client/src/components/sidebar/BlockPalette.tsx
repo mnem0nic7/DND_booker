@@ -142,6 +142,54 @@ export function BlockPalette({ editor }: BlockPaletteProps) {
             </span>
             Stat Block
           </button>
+          <button
+            onMouseDown={(e) => {
+              e.preventDefault();
+              editor
+                .chain()
+                .focus()
+                .insertContent({ type: 'spellCard' })
+                .run();
+            }}
+            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 rounded hover:bg-gray-200 transition-colors"
+          >
+            <span className="w-6 h-6 flex items-center justify-center bg-indigo-100 text-indigo-800 rounded text-xs font-mono">
+              SC
+            </span>
+            Spell Card
+          </button>
+          <button
+            onMouseDown={(e) => {
+              e.preventDefault();
+              editor
+                .chain()
+                .focus()
+                .insertContent({ type: 'magicItem' })
+                .run();
+            }}
+            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 rounded hover:bg-gray-200 transition-colors"
+          >
+            <span className="w-6 h-6 flex items-center justify-center bg-emerald-100 text-emerald-800 rounded text-xs font-mono">
+              MI
+            </span>
+            Magic Item
+          </button>
+          <button
+            onMouseDown={(e) => {
+              e.preventDefault();
+              editor
+                .chain()
+                .focus()
+                .insertContent({ type: 'randomTable' })
+                .run();
+            }}
+            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 rounded hover:bg-gray-200 transition-colors"
+          >
+            <span className="w-6 h-6 flex items-center justify-center bg-yellow-100 text-yellow-800 rounded text-xs font-mono">
+              RT
+            </span>
+            Random Table
+          </button>
         </div>
       </div>
     </div>
