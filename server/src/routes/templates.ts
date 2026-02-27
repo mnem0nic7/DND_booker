@@ -20,7 +20,12 @@ router.get('/', async (req, res: Response) => {
 
 // GET /api/templates/:id
 router.get('/:id', async (req, res: Response) => {
-  const template = await templateService.getTemplate(req.params.id as string);
+  const id = req.params.id as string;
+  if (!z.string().uuid().safeParse(id).success) {
+    res.status(400).json({ error: 'Invalid template ID' });
+    return;
+  }
+  const template = await templateService.getTemplate(id);
   if (!template) {
     res.status(404).json({ error: 'Template not found' });
     return;

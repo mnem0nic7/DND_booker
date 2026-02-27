@@ -58,12 +58,17 @@ function renderMarks(text: string, marks?: TipTapNode['marks']): string {
       case 'code':
         html = `<code>${html}</code>`;
         break;
+      case 'underline':
+        html = `<u>${html}</u>`;
+        break;
       case 'link': {
         const href = safeUrl(String(mark.attrs?.href || ''));
         const target = mark.attrs?.target ? ` target="${escapeHtml(String(mark.attrs.target))}"` : '';
         html = `<a href="${href}"${target}>${html}</a>`;
         break;
       }
+      default:
+        console.warn(`[tiptap-to-html] Unknown mark type: ${mark.type}`);
     }
   }
 

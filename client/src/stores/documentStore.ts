@@ -77,12 +77,19 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
   },
 
   deleteDocument: async (id) => {
-    await api.delete(`/documents/${id}`);
-    const remaining = get().documents.filter((d) => d.id !== id);
+    const prev = get().documents;
+    const prevActive = get().activeDocumentId;
+    const remaining = prev.filter((d) => d.id !== id);
     set({
       documents: remaining,
       activeDocumentId: remaining.length > 0 ? remaining[0].id : null,
     });
+    try {
+      await api.delete(`/documents/${id}`);
+    } catch (err) {
+      set({ documents: prev, activeDocumentId: prevActive });
+      throw err;
+    }
   },
 
   reorderDocuments: async (projectId, documentIds) => {
@@ -97,7 +104,7 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
     set({ documents: reordered });
 
     try {
-      await api.post('/documents/reorder', { projectId, documentIds });
+      await api.patch('/documents/reorder', { projectId, documentIds });
     } catch {
       // Revert on failure by re-fetching
       const { data } = await api.get(`/projects/${projectId}/documents`);

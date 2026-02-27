@@ -43,7 +43,13 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   },
 
   deleteProject: async (id) => {
-    await api.delete(`/projects/${id}`);
-    set({ projects: get().projects.filter((p) => p.id !== id) });
+    const prev = get().projects;
+    set({ projects: prev.filter((p) => p.id !== id) });
+    try {
+      await api.delete(`/projects/${id}`);
+    } catch (err) {
+      set({ projects: prev });
+      throw err;
+    }
   },
 }));

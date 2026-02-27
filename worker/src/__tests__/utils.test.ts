@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { escapeHtml, safeUrl, safeCssUrl } from '../renderers/utils.js';
+import { renderNode } from '../renderers/tiptap-to-html.js';
 
 describe('Worker Renderer Utils', () => {
   describe('escapeHtml', () => {
@@ -114,5 +115,71 @@ describe('Worker Renderer Utils', () => {
     it('should escape HTML entities in output', () => {
       expect(safeCssUrl('https://example.com/a&b')).toBe('https://example.com/a&amp;b');
     });
+  });
+});
+
+describe('renderNode — inline marks', () => {
+  it('should render bold marks as <strong>', () => {
+    const html = renderNode({
+      type: 'text',
+      text: 'hello',
+      marks: [{ type: 'bold' }],
+    } as any);
+    expect(html).toBe('<strong>hello</strong>');
+  });
+
+  it('should render italic marks as <em>', () => {
+    const html = renderNode({
+      type: 'text',
+      text: 'hello',
+      marks: [{ type: 'italic' }],
+    } as any);
+    expect(html).toBe('<em>hello</em>');
+  });
+
+  it('should render underline marks as <u>', () => {
+    const html = renderNode({
+      type: 'text',
+      text: 'hello',
+      marks: [{ type: 'underline' }],
+    } as any);
+    expect(html).toBe('<u>hello</u>');
+  });
+
+  it('should render strike marks as <s>', () => {
+    const html = renderNode({
+      type: 'text',
+      text: 'hello',
+      marks: [{ type: 'strike' }],
+    } as any);
+    expect(html).toBe('<s>hello</s>');
+  });
+
+  it('should render link marks as <a>', () => {
+    const html = renderNode({
+      type: 'text',
+      text: 'click',
+      marks: [{ type: 'link', attrs: { href: 'https://example.com' } }],
+    } as any);
+    expect(html).toBe('<a href="https://example.com">click</a>');
+  });
+
+  it('should nest multiple marks correctly', () => {
+    const html = renderNode({
+      type: 'text',
+      text: 'hello',
+      marks: [{ type: 'bold' }, { type: 'italic' }, { type: 'underline' }],
+    } as any);
+    expect(html).toBe('<u><em><strong>hello</strong></em></u>');
+  });
+
+  it('should escape HTML in text content', () => {
+    const html = renderNode({
+      type: 'text',
+      text: '<script>alert("xss")</script>',
+      marks: [{ type: 'bold' }],
+    } as any);
+    expect(html).toContain('&lt;script&gt;');
+    expect(html).not.toContain('<script>');
   });
 });

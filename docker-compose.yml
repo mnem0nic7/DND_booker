@@ -38,6 +38,7 @@ services:
       - JWT_SECRET=dev-jwt-secret-change-in-production
       - JWT_REFRESH_SECRET=dev-refresh-secret-change-in-production
       - CLIENT_URL=http://localhost:3000
+      - AI_KEY_ENCRYPTION_SECRET=change-me-to-64-char-hex-in-production-0000000000000000000000
       - NODE_ENV=production
       - PORT=4000
     depends_on:
