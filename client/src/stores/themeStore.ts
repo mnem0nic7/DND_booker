@@ -28,9 +28,9 @@ export const useThemeStore = create<ThemeState>()(
       },
 
       setTheme: (theme) => {
-        set({ currentTheme: theme });
-        // Persist to server if we have a project context
+        // Capture projectId before state update to avoid race with navigation
         const projectId = get()._projectId;
+        set({ currentTheme: theme });
         if (projectId) {
           api.put(`/projects/${projectId}`, { settings: { theme } }).catch((err) => {
             console.error('[Theme] Failed to persist theme to server:', err);

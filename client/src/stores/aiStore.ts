@@ -112,8 +112,12 @@ export const useAiStore = create<AiState>((set, get) => ({
   _chatRequestId: 0,
 
   fetchChatHistory: async (projectId) => {
-    const requestId = get()._chatRequestId + 1;
-    set({ _chatRequestId: requestId, messages: [], streamingContent: '', isStreaming: false, chatError: null });
+    // Atomic increment via updater to prevent race when called rapidly
+    let requestId = 0;
+    set((s) => {
+      requestId = s._chatRequestId + 1;
+      return { _chatRequestId: requestId, messages: [], streamingContent: '', isStreaming: false, chatError: null };
+    });
     try {
       const { data } = await api.get(`/projects/${projectId}/ai/chat`);
       // Ignore stale response if project changed while fetching
