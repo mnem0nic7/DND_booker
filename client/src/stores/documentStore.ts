@@ -21,6 +21,7 @@ interface DocumentState {
   updateDocumentContent: (id: string, content: any) => void;
   createDocument: (projectId: string, title: string) => Promise<Document>;
   deleteDocument: (id: string) => Promise<void>;
+  reorderDocuments: (projectId: string, documentIds: string[]) => Promise<void>;
 }
 
 let saveTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -82,5 +83,25 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
       documents: remaining,
       activeDocumentId: remaining.length > 0 ? remaining[0].id : null,
     });
+  },
+
+  reorderDocuments: async (projectId, documentIds) => {
+    // Optimistically reorder local state
+    const docMap = new Map(get().documents.map((d) => [d.id, d]));
+    const reordered = documentIds
+      .map((id, index) => {
+        const doc = docMap.get(id);
+        return doc ? { ...doc, sortOrder: index } : null;
+      })
+      .filter((d): d is Document => d !== null);
+    set({ documents: reordered });
+
+    try {
+      await api.post('/documents/reorder', { projectId, documentIds });
+    } catch {
+      // Revert on failure by re-fetching
+      const { data } = await api.get(`/projects/${projectId}/documents`);
+      set({ documents: data });
+    }
   },
 }));

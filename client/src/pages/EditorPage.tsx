@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useDocumentStore } from '../stores/documentStore';
 import { useAuthStore } from '../stores/authStore';
 import { EditorLayout } from '../components/editor/EditorLayout';
+import { DocumentList } from '../components/editor/DocumentList';
 
 export default function EditorPage() {
   const { id: projectId } = useParams<{ id: string }>();
@@ -18,6 +19,7 @@ export default function EditorPage() {
     updateDocumentContent,
     createDocument,
     deleteDocument,
+    reorderDocuments,
   } = useDocumentStore();
 
   const [showNewDocInput, setShowNewDocInput] = useState(false);
@@ -52,6 +54,15 @@ export default function EditorPage() {
       await deleteDocument(docId);
     }
   };
+
+  const handleReorder = useCallback(
+    (documentIds: string[]) => {
+      if (projectId) {
+        reorderDocuments(projectId, documentIds);
+      }
+    },
+    [projectId, reorderDocuments],
+  );
 
   return (
     <div className="h-screen flex flex-col bg-gray-50">
@@ -101,115 +112,58 @@ export default function EditorPage() {
 
       <div className="flex flex-1 overflow-hidden">
         {/* Document sidebar */}
-        <div className="w-56 border-r bg-white flex flex-col flex-shrink-0">
-          <div className="p-3 border-b flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-gray-700">Documents</h2>
-            <button
-              onClick={() => setShowNewDocInput(true)}
-              className="text-gray-400 hover:text-indigo-600 transition-colors"
-              title="New document"
-            >
-              <svg
-                className="w-4 h-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M12 4v16m8-8H4"
+        {isLoading ? (
+          <div className="w-56 border-r bg-white flex items-center justify-center flex-shrink-0">
+            <span className="text-xs text-gray-400">Loading...</span>
+          </div>
+        ) : (
+          <DocumentList
+            projectId={projectId!}
+            documents={documents}
+            activeDocumentId={activeDocumentId}
+            onSelectDocument={setActiveDocument}
+            onAddDocument={() => setShowNewDocInput(true)}
+            onReorder={handleReorder}
+            onDeleteDocument={handleDeleteDocument}
+          >
+            {showNewDocInput && (
+              <div className="p-2 border-b">
+                <input
+                  type="text"
+                  value={newDocTitle}
+                  onChange={(e) => setNewDocTitle(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleCreateDocument();
+                    if (e.key === 'Escape') {
+                      setShowNewDocInput(false);
+                      setNewDocTitle('');
+                    }
+                  }}
+                  placeholder="Document title..."
+                  className="w-full text-sm border rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  autoFocus
                 />
-              </svg>
-            </button>
-          </div>
-
-          {/* New document input */}
-          {showNewDocInput && (
-            <div className="p-2 border-b">
-              <input
-                type="text"
-                value={newDocTitle}
-                onChange={(e) => setNewDocTitle(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleCreateDocument();
-                  if (e.key === 'Escape') {
-                    setShowNewDocInput(false);
-                    setNewDocTitle('');
-                  }
-                }}
-                placeholder="Document title..."
-                className="w-full text-sm border rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                autoFocus
-              />
-              <div className="flex gap-1 mt-1">
-                <button
-                  onClick={handleCreateDocument}
-                  className="text-xs bg-indigo-600 text-white rounded px-2 py-0.5 hover:bg-indigo-700"
-                >
-                  Create
-                </button>
-                <button
-                  onClick={() => {
-                    setShowNewDocInput(false);
-                    setNewDocTitle('');
-                  }}
-                  className="text-xs text-gray-500 hover:text-gray-700 px-2 py-0.5"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Document list */}
-          <div className="flex-1 overflow-y-auto">
-            {isLoading && (
-              <div className="p-4 text-xs text-gray-400">Loading...</div>
-            )}
-            {!isLoading && documents.length === 0 && (
-              <div className="p-4 text-xs text-gray-400 text-center">
-                No documents yet. Create one to get started.
-              </div>
-            )}
-            {documents.map((doc) => (
-              <div
-                key={doc.id}
-                className={`group flex items-center justify-between px-3 py-2 cursor-pointer border-b border-gray-50 transition-colors ${
-                  doc.id === activeDocumentId
-                    ? 'bg-indigo-50 text-indigo-700'
-                    : 'text-gray-700 hover:bg-gray-50'
-                }`}
-                onClick={() => setActiveDocument(doc.id)}
-              >
-                <span className="text-sm truncate">{doc.title}</span>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleDeleteDocument(doc.id);
-                  }}
-                  className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 transition-all"
-                  title="Delete document"
-                >
-                  <svg
-                    className="w-3.5 h-3.5"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={2}
+                <div className="flex gap-1 mt-1">
+                  <button
+                    onClick={handleCreateDocument}
+                    className="text-xs bg-indigo-600 text-white rounded px-2 py-0.5 hover:bg-indigo-700"
                   >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M6 18L18 6M6 6l12 12"
-                    />
-                  </svg>
-                </button>
+                    Create
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowNewDocInput(false);
+                      setNewDocTitle('');
+                    }}
+                    className="text-xs text-gray-500 hover:text-gray-700 px-2 py-0.5"
+                  >
+                    Cancel
+                  </button>
+                </div>
               </div>
-            ))}
-          </div>
-        </div>
+            )}
+          </DocumentList>
+        )}
 
         {/* Main editor area */}
         <div className="flex-1 overflow-hidden">
