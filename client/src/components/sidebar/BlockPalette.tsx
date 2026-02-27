@@ -120,12 +120,29 @@ export function BlockPalette({ editor }: BlockPaletteProps) {
           </div>
         </div>
       ))}
-      {/* D&D blocks will be added here in later tasks */}
+      {/* D&D blocks */}
       <div className="mt-6 pt-4 border-t">
         <h4 className="text-xs font-medium text-gray-400 uppercase mb-2">
-          D&D Blocks
+          D&D
         </h4>
-        <p className="text-xs text-gray-400 italic">Coming soon...</p>
+        <div className="space-y-1">
+          <button
+            onMouseDown={(e) => {
+              e.preventDefault();
+              editor
+                .chain()
+                .focus()
+                .insertContent({ type: 'statBlock' })
+                .run();
+            }}
+            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 rounded hover:bg-gray-200 transition-colors"
+          >
+            <span className="w-6 h-6 flex items-center justify-center bg-amber-100 text-amber-800 rounded text-xs font-mono">
+              SB
+            </span>
+            Stat Block
+          </button>
+        </div>
       </div>
     </div>
   );

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
+import { StatBlock } from '../blocks/StatBlock/StatBlockExtension';
 import { Toolbar } from './Toolbar';
 import { BlockPalette } from '../sidebar/BlockPalette';
 
@@ -14,7 +15,7 @@ export function EditorLayout({ content, onUpdate }: EditorLayoutProps) {
   const [showProperties, setShowProperties] = useState(false);
 
   const editor = useEditor({
-    extensions: [StarterKit],
+    extensions: [StarterKit, StatBlock],
     content,
     immediatelyRender: false,
     onUpdate: ({ editor: ed }) => {

@@ -1,0 +1,254 @@
+.stat-block {
+  font-family: 'Crimson Text', 'Libre Baskerville', serif;
+  background: #fdf1dc;
+  padding: 1rem;
+  border: 1px solid #e69a28;
+  box-shadow: 0 0 0.25rem #e69a28;
+  max-width: 420px;
+  position: relative;
+}
+
+.stat-block__name {
+  font-family: 'Cinzel', 'Georgia', serif;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #58180d;
+  margin: 0;
+  line-height: 1.2;
+}
+
+.stat-block__subtitle {
+  font-size: 0.85rem;
+  font-style: italic;
+  color: #58180d;
+  margin-bottom: 0.5rem;
+}
+
+.stat-block__divider {
+  height: 2px;
+  background: linear-gradient(to right, #e69a28, transparent);
+  margin: 0.5rem 0;
+  border: none;
+}
+
+.stat-block__property {
+  font-size: 0.875rem;
+  line-height: 1.4;
+  color: #1a1a1a;
+}
+
+.stat-block__property-name {
+  font-weight: 700;
+  color: #58180d;
+}
+
+.stat-block__abilities {
+  display: flex;
+  justify-content: space-around;
+  text-align: center;
+  margin: 0.5rem 0;
+}
+
+.stat-block__ability {
+  font-size: 0.8rem;
+}
+
+.stat-block__ability-name {
+  font-weight: 700;
+  color: #58180d;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+}
+
+.stat-block__ability-score {
+  font-size: 0.875rem;
+}
+
+.stat-block__section-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #58180d;
+  border-bottom: 1px solid #e69a28;
+  margin: 0.75rem 0 0.25rem;
+}
+
+.stat-block__trait-name {
+  font-weight: 700;
+  font-style: italic;
+  color: #1a1a1a;
+}
+
+.stat-block__trait {
+  font-size: 0.875rem;
+  line-height: 1.4;
+  margin-bottom: 0.35rem;
+}
+
+.stat-block__delete-btn {
+  position: absolute;
+  top: 0.25rem;
+  right: 0.25rem;
+  background: #dc2626;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 0.15rem 0.4rem;
+  font-size: 0.7rem;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.stat-block:hover .stat-block__delete-btn {
+  opacity: 1;
+}
+
+/* Edit panel styles */
+.stat-block__edit-panel {
+  background: #fff8ee;
+  border: 1px solid #e69a28;
+  border-radius: 4px;
+  padding: 0.75rem;
+  margin-top: 0.75rem;
+  font-family: system-ui, sans-serif;
+  font-size: 0.8rem;
+}
+
+.stat-block__edit-panel h4 {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #58180d;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 0.75rem 0 0.35rem;
+}
+
+.stat-block__edit-panel h4:first-child {
+  margin-top: 0;
+}
+
+.stat-block__edit-row {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-bottom: 0.25rem;
+}
+
+.stat-block__edit-row label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #333;
+  min-width: 5rem;
+}
+
+.stat-block__edit-row input,
+.stat-block__edit-row select {
+  flex: 1;
+  padding: 0.2rem 0.35rem;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  font-size: 0.75rem;
+  background: white;
+}
+
+.stat-block__edit-row input[type='number'] {
+  width: 3.5rem;
+  flex: none;
+}
+
+.stat-block__edit-abilities {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 0.25rem;
+  margin: 0.25rem 0;
+}
+
+.stat-block__edit-ability {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.1rem;
+}
+
+.stat-block__edit-ability label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: #58180d;
+  text-transform: uppercase;
+}
+
+.stat-block__edit-ability input {
+  width: 2.5rem;
+  text-align: center;
+  padding: 0.15rem;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  font-size: 0.75rem;
+}
+
+.stat-block__edit-textarea {
+  width: 100%;
+  min-height: 3rem;
+  padding: 0.25rem 0.35rem;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  font-size: 0.75rem;
+  font-family: system-ui, sans-serif;
+  resize: vertical;
+}
+
+.stat-block__entry-list {
+  margin: 0.25rem 0;
+}
+
+.stat-block__entry-item {
+  display: flex;
+  gap: 0.25rem;
+  margin-bottom: 0.25rem;
+  align-items: flex-start;
+}
+
+.stat-block__entry-item input {
+  width: 6rem;
+  padding: 0.2rem 0.35rem;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  font-size: 0.75rem;
+}
+
+.stat-block__entry-item textarea {
+  flex: 1;
+  min-height: 2rem;
+  padding: 0.2rem 0.35rem;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  font-size: 0.75rem;
+  font-family: system-ui, sans-serif;
+  resize: vertical;
+}
+
+.stat-block__entry-remove {
+  background: #dc2626;
+  color: white;
+  border: none;
+  border-radius: 3px;
+  padding: 0.15rem 0.35rem;
+  font-size: 0.65rem;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.stat-block__entry-add {
+  background: #58180d;
+  color: white;
+  border: none;
+  border-radius: 3px;
+  padding: 0.2rem 0.5rem;
+  font-size: 0.7rem;
+  cursor: pointer;
+  margin-top: 0.15rem;
+}
+
+.stat-block__entry-add:hover {
+  background: #7a2010;
+}
