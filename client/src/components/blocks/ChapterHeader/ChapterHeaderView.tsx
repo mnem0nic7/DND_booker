@@ -3,6 +3,8 @@ import { useParams } from 'react-router-dom';
 import { NodeViewWrapper } from '@tiptap/react';
 import type { ReactNodeViewProps } from '@tiptap/react';
 import type { ChapterHeaderAttrs } from './ChapterHeaderExtension';
+import { AiGenerateButton } from '../../ai/AiGenerateButton';
+import { AiAutoFillButton } from '../../ai/AiAutoFillButton';
 import { ImageUploader } from '../../editor/ImageUploader';
 
 export function ChapterHeaderView({
@@ -91,6 +93,10 @@ export function ChapterHeaderView({
                 onChange={(e) => updateAttr('subtitle', e.target.value)}
                 placeholder="Optional subtitle"
               />
+            </div>
+            <div className="chapter-header__edit-row" style={{ display: 'flex', gap: '4px' }}>
+              <AiGenerateButton blockType="chapterHeader" onGenerated={updateAttributes} />
+              <AiAutoFillButton blockType="chapterHeader" currentAttrs={{ ...attrs }} onApply={updateAttributes} />
             </div>
             <div className="chapter-header__edit-row">
               <label>Background</label>

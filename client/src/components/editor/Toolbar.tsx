@@ -1,3 +1,4 @@
+import { useCallback } from 'react';
 import { Editor } from '@tiptap/react';
 
 interface ToolbarProps {
@@ -57,11 +58,36 @@ export function Toolbar({ editor }: ToolbarProps) {
         <span className="italic">I</span>
       </ToolbarButton>
       <ToolbarButton
+        onClick={() => editor.chain().focus().toggleUnderline().run()}
+        isActive={editor.isActive('underline')}
+        title="Underline"
+      >
+        <span className="underline">U</span>
+      </ToolbarButton>
+      <ToolbarButton
         onClick={() => editor.chain().focus().toggleStrike().run()}
         isActive={editor.isActive('strike')}
         title="Strikethrough"
       >
         <span className="line-through">S</span>
+      </ToolbarButton>
+      <ToolbarButton
+        onClick={() => {
+          if (editor.isActive('link')) {
+            editor.chain().focus().unsetLink().run();
+          } else {
+            const url = window.prompt('Enter URL:');
+            if (url) {
+              editor.chain().focus().setLink({ href: url }).run();
+            }
+          }
+        }}
+        isActive={editor.isActive('link')}
+        title="Insert Link"
+      >
+        <svg className="w-4 h-4 inline" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m9.86-2.802a4.5 4.5 0 00-1.242-7.244l-4.5-4.5a4.5 4.5 0 00-6.364 6.364L4.343 8.571" />
+        </svg>
       </ToolbarButton>
 
       <ToolbarDivider />

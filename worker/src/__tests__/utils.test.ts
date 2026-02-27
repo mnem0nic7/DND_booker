@@ -1,0 +1,118 @@
+import { describe, it, expect } from 'vitest';
+import { escapeHtml, safeUrl, safeCssUrl } from '../renderers/utils.js';
+
+describe('Worker Renderer Utils', () => {
+  describe('escapeHtml', () => {
+    it('should escape ampersands', () => {
+      expect(escapeHtml('a&b')).toBe('a&amp;b');
+    });
+
+    it('should escape angle brackets', () => {
+      expect(escapeHtml('<script>')).toBe('&lt;script&gt;');
+    });
+
+    it('should escape double quotes', () => {
+      expect(escapeHtml('a"b')).toBe('a&quot;b');
+    });
+
+    it('should escape single quotes', () => {
+      expect(escapeHtml("a'b")).toBe('a&#39;b');
+    });
+
+    it('should handle multiple special characters', () => {
+      expect(escapeHtml('<div class="a" data-x=\'b\'>&')).toBe(
+        '&lt;div class=&quot;a&quot; data-x=&#39;b&#39;&gt;&amp;'
+      );
+    });
+
+    it('should pass through safe text unchanged', () => {
+      expect(escapeHtml('Hello World 123')).toBe('Hello World 123');
+    });
+  });
+
+  describe('safeUrl', () => {
+    it('should allow normal HTTP URLs', () => {
+      expect(safeUrl('https://example.com/image.png')).toBe('https://example.com/image.png');
+    });
+
+    it('should allow relative URLs', () => {
+      expect(safeUrl('/uploads/project/image.png')).toBe('/uploads/project/image.png');
+    });
+
+    it('should block javascript: URIs', () => {
+      expect(safeUrl('javascript:alert(1)')).toBe('#');
+    });
+
+    it('should block JavaScript: URIs (case insensitive)', () => {
+      expect(safeUrl('JavaScript:alert(1)')).toBe('#');
+    });
+
+    it('should block javascript: with leading whitespace', () => {
+      expect(safeUrl('  javascript:alert(1)')).toBe('#');
+    });
+
+    it('should block non-image data: URIs', () => {
+      expect(safeUrl('data:text/html,<script>alert(1)</script>')).toBe('#');
+    });
+
+    it('should allow data:image URIs', () => {
+      expect(safeUrl('data:image/png;base64,iVBOR...')).toBe('data:image/png;base64,iVBOR...');
+    });
+
+    it('should escape HTML entities in output', () => {
+      expect(safeUrl('https://example.com/a&b')).toBe('https://example.com/a&amp;b');
+    });
+  });
+
+  describe('safeCssUrl', () => {
+    it('should allow normal HTTPS URLs', () => {
+      expect(safeCssUrl('https://example.com/bg.jpg')).toBe('https://example.com/bg.jpg');
+    });
+
+    it('should allow relative URLs', () => {
+      expect(safeCssUrl('/uploads/project/bg.png')).toBe('/uploads/project/bg.png');
+    });
+
+    it('should block javascript: URIs', () => {
+      expect(safeCssUrl('javascript:void(0)')).toBeNull();
+    });
+
+    it('should block non-image data: URIs', () => {
+      expect(safeCssUrl('data:text/css,*{}')).toBeNull();
+    });
+
+    it('should block data:image URIs with semicolons (CSS safety)', () => {
+      // Semicolons in CSS url() context can be used for CSS injection,
+      // so data URIs with semicolons are blocked even if they are images
+      expect(safeCssUrl('data:image/jpeg;base64,/9j...')).toBeNull();
+    });
+
+    it('should block URLs with parentheses (CSS injection)', () => {
+      expect(safeCssUrl('https://example.com/a(b)')).toBeNull();
+    });
+
+    it('should block URLs with single quotes (CSS injection)', () => {
+      expect(safeCssUrl("https://example.com/a'b")).toBeNull();
+    });
+
+    it('should block URLs with double quotes (CSS injection)', () => {
+      expect(safeCssUrl('https://example.com/a"b')).toBeNull();
+    });
+
+    it('should block URLs with backslashes (CSS injection)', () => {
+      expect(safeCssUrl('https://example.com/a\\b')).toBeNull();
+    });
+
+    it('should block URLs with semicolons (CSS injection)', () => {
+      expect(safeCssUrl('https://example.com/a;b')).toBeNull();
+    });
+
+    it('should block URLs with braces (CSS injection)', () => {
+      expect(safeCssUrl('https://example.com/a{b}')).toBeNull();
+    });
+
+    it('should escape HTML entities in output', () => {
+      expect(safeCssUrl('https://example.com/a&b')).toBe('https://example.com/a&amp;b');
+    });
+  });
+});

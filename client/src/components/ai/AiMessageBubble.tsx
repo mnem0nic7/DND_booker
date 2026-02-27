@@ -20,6 +20,10 @@ const BLOCK_TYPE_PATTERNS: Record<string, { label: string; requiredFields: strin
   raceBlock: { label: 'Race', requiredFields: ['name', 'features'] },
   handout: { label: 'Handout', requiredFields: ['title', 'content'] },
   backCover: { label: 'Back Cover', requiredFields: ['blurb', 'authorBio'] },
+  sidebarCallout: { label: 'Sidebar', requiredFields: ['title', 'calloutType'] },
+  chapterHeader: { label: 'Chapter Header', requiredFields: ['title', 'chapterNumber'] },
+  titlePage: { label: 'Title Page', requiredFields: ['title', 'subtitle', 'author'] },
+  creditsPage: { label: 'Credits Page', requiredFields: ['credits', 'copyrightYear'] },
 };
 
 function detectBlockType(obj: Record<string, unknown>): string | null {

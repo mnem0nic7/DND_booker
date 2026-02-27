@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
+import Underline from '@tiptap/extension-underline';
+import Link from '@tiptap/extension-link';
 import { StatBlock } from '../blocks/StatBlock/StatBlockExtension';
 import { ReadAloudBox } from '../blocks/ReadAloudBox/ReadAloudBoxExtension';
 import { SidebarCallout } from '../blocks/SidebarCallout/SidebarCalloutExtension';
@@ -49,7 +51,7 @@ export function EditorLayout({ projectId, content, onUpdate }: EditorLayoutProps
   const setSettingsModalOpen = useAiStore((s) => s.setSettingsModalOpen);
 
   const editor = useEditor({
-    extensions: [StarterKit, StatBlock, ReadAloudBox, SidebarCallout, ChapterHeader, SpellCard, MagicItem, RandomTable, NpcProfile, EncounterTable, ClassFeature, RaceBlock, FullBleedImage, MapBlock, Handout, PageBorder, PageBreak, ColumnBreak, TitlePage, TableOfContents, CreditsPage, BackCover],
+    extensions: [StarterKit, Underline, Link.configure({ openOnClick: false, HTMLAttributes: { rel: 'noopener noreferrer nofollow' } }), StatBlock, ReadAloudBox, SidebarCallout, ChapterHeader, SpellCard, MagicItem, RandomTable, NpcProfile, EncounterTable, ClassFeature, RaceBlock, FullBleedImage, MapBlock, Handout, PageBorder, PageBreak, ColumnBreak, TitlePage, TableOfContents, CreditsPage, BackCover],
     content,
     immediatelyRender: false,
     onUpdate: ({ editor: ed }) => {

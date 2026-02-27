@@ -136,6 +136,37 @@ const BLOCK_SCHEMAS: Record<string, { description: string; schema: string }> = {
   "authorBio": "string — a short 1-2 sentence author bio"
 }`,
   },
+  sidebarCallout: {
+    description: 'a D&D sidebar callout box (title and type only — body is edited separately)',
+    schema: `{
+  "title": "string — a short, descriptive callout title (e.g. 'Roleplaying Strahd', 'Variant: Flanking', 'The Weave')",
+  "calloutType": "string — info/warning/lore"
+}`,
+  },
+  chapterHeader: {
+    description: 'a D&D adventure chapter header',
+    schema: `{
+  "title": "string — evocative chapter title",
+  "subtitle": "string — short subtitle or tagline for the chapter",
+  "chapterNumber": "string — chapter number (e.g. '1', '2', 'I', 'II')"
+}`,
+  },
+  titlePage: {
+    description: 'a title page for a D&D adventure module',
+    schema: `{
+  "title": "string — the adventure title",
+  "subtitle": "string — subtitle or tagline (e.g. 'A D&D 5e Adventure for Levels 3-7')",
+  "author": "string — author name or group"
+}`,
+  },
+  creditsPage: {
+    description: 'a credits page for a D&D adventure book',
+    schema: `{
+  "credits": "string — multi-line credits text (use \\n for line breaks), e.g. 'Written by Name\\nEdited by Name\\nArt by Name'",
+  "legalText": "string — copyright and legal disclaimer text",
+  "copyrightYear": "string — the copyright year (e.g. '2026')"
+}`,
+  },
 };
 
 export function buildBlockPrompt(blockType: string, userPrompt: string): string {
@@ -168,7 +199,8 @@ export function buildAutoFillPrompt(blockType: string, currentAttrs: Record<stri
     let strValue = typeof value === 'string' ? value : JSON.stringify(value);
     // Limit individual field lengths in the prompt
     if (strValue.length > 500) strValue = strValue.slice(0, 500) + '...';
-    if (strValue && strValue !== '' && strValue !== '[]' && strValue !== '0' && strValue !== 'Creature Name' && strValue !== 'Spell Name' && strValue !== 'Magic Item' && strValue !== 'NPC Name' && strValue !== 'Race Name' && strValue !== 'Feature Name' && strValue !== 'Random Table') {
+    const DEFAULT_PLACEHOLDER_VALUES = ['Creature Name', 'Spell Name', 'Magic Item', 'NPC Name', 'Race Name', 'Feature Name', 'Random Table', 'Chapter Title', 'Adventure Title', 'A D&D 5e Adventure', 'Author Name', 'Note'];
+    if (strValue && strValue !== '' && strValue !== '[]' && strValue !== '0' && !DEFAULT_PLACEHOLDER_VALUES.includes(strValue)) {
       filledFields.push(`${key}: ${strValue}`);
     } else {
       emptyFields.push(key);

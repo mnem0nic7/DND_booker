@@ -3,6 +3,8 @@ import { useParams } from 'react-router-dom';
 import { NodeViewWrapper } from '@tiptap/react';
 import type { ReactNodeViewProps } from '@tiptap/react';
 import type { TitlePageAttrs } from './TitlePageExtension';
+import { AiGenerateButton } from '../../ai/AiGenerateButton';
+import { AiAutoFillButton } from '../../ai/AiAutoFillButton';
 import { ImageUploader } from '../../editor/ImageUploader';
 
 export function TitlePageView({
@@ -92,6 +94,10 @@ export function TitlePageView({
         {/* Edit panel */}
         {selected && editing && (
           <div className="title-page__edit-panel">
+            <div style={{ display: 'flex', gap: '4px', marginBottom: '0.5rem' }}>
+              <AiGenerateButton blockType="titlePage" onGenerated={updateAttributes} />
+              <AiAutoFillButton blockType="titlePage" currentAttrs={{ ...attrs }} onApply={updateAttributes} />
+            </div>
             <h4>Title Page Details</h4>
             <div className="title-page__edit-row">
               <label>Title</label>

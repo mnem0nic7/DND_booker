@@ -2,6 +2,8 @@ import { useState, useCallback } from 'react';
 import { NodeViewWrapper } from '@tiptap/react';
 import type { ReactNodeViewProps } from '@tiptap/react';
 import type { CreditsPageAttrs } from './CreditsPageExtension';
+import { AiGenerateButton } from '../../ai/AiGenerateButton';
+import { AiAutoFillButton } from '../../ai/AiAutoFillButton';
 
 export function CreditsPageView({
   node,
@@ -85,6 +87,10 @@ export function CreditsPageView({
         {/* Edit panel */}
         {selected && editing && (
           <div className="credits-page__edit-panel">
+            <div style={{ display: 'flex', gap: '4px', marginBottom: '0.5rem' }}>
+              <AiGenerateButton blockType="creditsPage" onGenerated={updateAttributes} />
+              <AiAutoFillButton blockType="creditsPage" currentAttrs={{ ...attrs }} onApply={updateAttributes} />
+            </div>
             <h4>Credits Details</h4>
             <div className="credits-page__edit-row">
               <label>Copyright Year</label>

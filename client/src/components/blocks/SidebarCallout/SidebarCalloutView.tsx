@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { NodeViewWrapper, NodeViewContent } from '@tiptap/react';
 import type { ReactNodeViewProps } from '@tiptap/react';
 import type { CalloutType } from './SidebarCalloutExtension';
+import { AiGenerateButton } from '../../ai/AiGenerateButton';
+import { AiAutoFillButton } from '../../ai/AiAutoFillButton';
 
 const CALLOUT_TYPES: { value: CalloutType; label: string }[] = [
   { value: 'info', label: 'Info' },
@@ -59,12 +61,14 @@ export function SidebarCalloutView({
             )}
           </div>
 
-          {/* Type selector (visible when selected) */}
+          {/* AI + Type selector (visible when selected) */}
           {selected && (
             <div
               className="sidebar-callout__type-selector"
               contentEditable={false}
             >
+              <AiGenerateButton blockType="sidebarCallout" onGenerated={updateAttributes} />
+              <AiAutoFillButton blockType="sidebarCallout" currentAttrs={{ title, calloutType }} onApply={updateAttributes} />
               {CALLOUT_TYPES.map((ct) => (
                 <button
                   key={ct.value}

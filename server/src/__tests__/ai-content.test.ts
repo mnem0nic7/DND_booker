@@ -39,7 +39,7 @@ describe('AI Content Service', () => {
   });
 
   describe('getSupportedBlockTypes', () => {
-    it('should return all 10 supported block types', () => {
+    it('should return all 14 supported block types', () => {
       const types = getSupportedBlockTypes();
       expect(types).toEqual(expect.arrayContaining([
         'statBlock',
@@ -52,8 +52,12 @@ describe('AI Content Service', () => {
         'raceBlock',
         'handout',
         'backCover',
+        'sidebarCallout',
+        'chapterHeader',
+        'titlePage',
+        'creditsPage',
       ]));
-      expect(types.length).toBe(10);
+      expect(types.length).toBe(14);
     });
   });
 
