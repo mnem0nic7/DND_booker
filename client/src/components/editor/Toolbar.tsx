@@ -1,4 +1,3 @@
-import { useCallback } from 'react';
 import { Editor } from '@tiptap/react';
 
 interface ToolbarProps {

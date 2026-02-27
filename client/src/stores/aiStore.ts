@@ -38,14 +38,11 @@ interface AiState {
   isStreaming: boolean;
   streamingContent: string;
   chatError: string | null;
-  isChatPanelOpen: boolean;
   _chatRequestId: number;
   fetchChatHistory: (projectId: string) => Promise<void>;
   sendMessage: (projectId: string, message: string) => Promise<void>;
   cancelStream: () => void;
   clearChat: (projectId: string) => Promise<void>;
-  toggleChatPanel: () => void;
-  setChatPanelOpen: (open: boolean) => void;
 
   // Block generation
   _generatingCount: number;
@@ -108,7 +105,6 @@ export const useAiStore = create<AiState>((set, get) => ({
   isStreaming: false,
   streamingContent: '',
   chatError: null,
-  isChatPanelOpen: false,
   _chatRequestId: 0,
 
   fetchChatHistory: async (projectId) => {
@@ -271,9 +267,6 @@ export const useAiStore = create<AiState>((set, get) => ({
       set({ chatError: 'Failed to clear chat history.' });
     }
   },
-
-  toggleChatPanel: () => set((s) => ({ isChatPanelOpen: !s.isChatPanelOpen })),
-  setChatPanelOpen: (open) => set({ isChatPanelOpen: open }),
 
   // Block generation
   _generatingCount: 0,

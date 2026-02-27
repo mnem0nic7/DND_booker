@@ -15,6 +15,7 @@ export function AiChatPanel({ projectId, editor }: AiChatPanelProps) {
     streamingContent,
     fetchChatHistory,
     sendMessage,
+    cancelStream,
     clearChat,
     chatError,
     settings,
@@ -77,7 +78,11 @@ export function AiChatPanel({ projectId, editor }: AiChatPanelProps) {
         </h3>
         {messages.length > 0 && (
           <button
-            onClick={() => clearChat(projectId)}
+            onClick={() => {
+              if (window.confirm('Clear all chat history? This cannot be undone.')) {
+                clearChat(projectId);
+              }
+            }}
             className="text-xs text-gray-400 hover:text-red-500 transition-colors"
             title="Clear chat history"
           >
@@ -170,15 +175,27 @@ export function AiChatPanel({ projectId, editor }: AiChatPanelProps) {
               rows={2}
               className="flex-1 border border-gray-300 rounded-md px-3 py-2 text-sm resize-none focus:ring-purple-500 focus:border-purple-500"
             />
-            <button
-              onClick={handleSend}
-              disabled={!input.trim() || isStreaming}
-              className="self-end px-3 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
-              </svg>
-            </button>
+            {isStreaming ? (
+              <button
+                onClick={cancelStream}
+                className="self-end px-3 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors"
+                title="Stop generating"
+              >
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                  <rect x="6" y="6" width="12" height="12" rx="2" />
+                </svg>
+              </button>
+            ) : (
+              <button
+                onClick={handleSend}
+                disabled={!input.trim()}
+                className="self-end px-3 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
+                </svg>
+              </button>
+            )}
           </div>
         </div>
       )}
