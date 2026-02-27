@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import type { DocumentContent } from '@dnd-booker/shared';
 import api from '../lib/api';
 
 interface Document {
@@ -6,7 +7,7 @@ interface Document {
   projectId: string;
   title: string;
   sortOrder: number;
-  content: any;
+  content: DocumentContent;
   createdAt: string;
   updatedAt: string;
 }
@@ -16,9 +17,10 @@ interface DocumentState {
   activeDocumentId: string | null;
   isLoading: boolean;
   isSaving: boolean;
+  hasPendingChanges: boolean;
   fetchDocuments: (projectId: string) => Promise<void>;
   setActiveDocument: (id: string) => void;
-  updateDocumentContent: (id: string, content: any) => void;
+  updateDocumentContent: (id: string, content: DocumentContent) => void;
   createDocument: (projectId: string, title: string) => Promise<Document>;
   deleteDocument: (id: string) => Promise<void>;
   reorderDocuments: (projectId: string, documentIds: string[]) => Promise<void>;
@@ -31,6 +33,7 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
   activeDocumentId: null,
   isLoading: false,
   isSaving: false,
+  hasPendingChanges: false,
 
   fetchDocuments: async (projectId) => {
     set({ isLoading: true });
@@ -58,12 +61,14 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
 
     // Debounced save to server (1 second)
     if (saveTimeout) clearTimeout(saveTimeout);
+    set({ hasPendingChanges: true });
     saveTimeout = setTimeout(async () => {
       set({ isSaving: true });
       try {
         await api.put(`/documents/${id}`, { content });
       } finally {
-        set({ isSaving: false });
+        set({ isSaving: false, hasPendingChanges: false });
+        saveTimeout = null;
       }
     }, 1000);
   },

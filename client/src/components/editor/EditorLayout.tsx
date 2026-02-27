@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
+import type { DocumentContent } from '@dnd-booker/shared';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
 import Link from '@tiptap/extension-link';
@@ -37,8 +38,8 @@ import { AiChatPanel } from '../ai/AiChatPanel';
 
 interface EditorLayoutProps {
   projectId: string;
-  content: any;
-  onUpdate: (content: any) => void;
+  content: DocumentContent;
+  onUpdate: (content: DocumentContent) => void;
 }
 
 export function EditorLayout({ projectId, content, onUpdate }: EditorLayoutProps) {

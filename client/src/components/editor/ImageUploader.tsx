@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
+import { AxiosError } from 'axios';
 import api from '../../lib/api';
 
 interface ImageUploaderProps {
@@ -36,11 +37,12 @@ export function ImageUploader({ projectId, onUpload, className }: ImageUploaderP
         );
         setProgress(null);
         onUpload(data.url);
-      } catch (err: any) {
+      } catch (err) {
         setProgress(null);
-        const message =
-          err?.response?.data?.error || 'Upload failed. Please try again.';
-        setError(message);
+        const message = err instanceof AxiosError
+          ? err.response?.data?.error
+          : null;
+        setError(message || 'Upload failed. Please try again.');
       }
     },
     [projectId, onUpload]
@@ -130,7 +132,7 @@ export function ImageUploader({ projectId, onUpload, className }: ImageUploaderP
             Drop an image here or click to browse
           </p>
           <p className="mt-1 text-xs text-gray-400">
-            JPEG, PNG, GIF, WebP, or SVG up to 10 MB
+            JPEG, PNG, GIF, or WebP up to 10 MB
           </p>
         </div>
       )}

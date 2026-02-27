@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { AxiosError } from 'axios';
 import api from '../lib/api';
 
 interface ExportJob {
@@ -56,9 +57,9 @@ export const useExportStore = create<ExportState>((set, get) => ({
       set({ job: data, isExporting: false });
       // Start polling for status updates
       get().pollJobStatus(data.id);
-    } catch (err: any) {
-      const message = err.response?.data?.error || 'Failed to start export';
-      set({ isExporting: false, error: message });
+    } catch (err) {
+      const message = err instanceof AxiosError ? err.response?.data?.error : null;
+      set({ isExporting: false, error: message || 'Failed to start export' });
     }
   },
 
@@ -79,7 +80,7 @@ export const useExportStore = create<ExportState>((set, get) => ({
       pollTimer = setTimeout(() => {
         get().pollJobStatus(jobId);
       }, 2000);
-    } catch (err: any) {
+    } catch {
       clearPollTimer();
       set({ error: 'Failed to check export status' });
     }

@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import type { DocumentContent } from '@dnd-booker/shared';
 import { useDocumentStore } from '../stores/documentStore';
 import { useAuthStore } from '../stores/authStore';
 import { useThemeStore } from '../stores/themeStore';
@@ -16,6 +17,7 @@ export default function EditorPage() {
     activeDocumentId,
     isLoading,
     isSaving,
+    hasPendingChanges,
     fetchDocuments,
     setActiveDocument,
     updateDocumentContent,
@@ -38,10 +40,21 @@ export default function EditorPage() {
     }
   }, [projectId, fetchDocuments, loadProjectTheme]);
 
+  // Warn user about unsaved changes when closing/navigating away
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (isSaving || hasPendingChanges) {
+        e.preventDefault();
+      }
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [isSaving, hasPendingChanges]);
+
   const activeDocument = documents.find((d) => d.id === activeDocumentId);
 
   const handleContentUpdate = useCallback(
-    (content: any) => {
+    (content: DocumentContent) => {
       if (activeDocumentId) {
         updateDocumentContent(activeDocumentId, content);
       }

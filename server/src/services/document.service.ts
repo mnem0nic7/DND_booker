@@ -1,5 +1,6 @@
 import { prisma } from '../config/database.js';
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Prisma JSON fields require InputJsonValue which is incompatible with strict interfaces
 export async function createDocument(projectId: string, userId: string, data: { title: string; content?: any }) {
   // Verify project belongs to user
   const project = await prisma.project.findFirst({ where: { id: projectId, userId } });
