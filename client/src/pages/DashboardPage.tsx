@@ -6,7 +6,7 @@ import CreateProjectModal from '../components/projects/CreateProjectModal';
 
 export default function DashboardPage() {
   const { user, logout } = useAuthStore();
-  const { projects, isLoading, fetchProjects } = useProjectStore();
+  const { projects, isLoading, fetchError, fetchProjects } = useProjectStore();
   const [showCreateModal, setShowCreateModal] = useState(false);
 
   useEffect(() => {
@@ -59,8 +59,21 @@ export default function DashboardPage() {
           </div>
         )}
 
+        {/* Error state */}
+        {!isLoading && fetchError && (
+          <div className="mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-lg flex items-center justify-between">
+            <p className="text-sm text-red-700">{fetchError}</p>
+            <button
+              onClick={() => fetchProjects()}
+              className="text-sm font-medium text-red-600 hover:text-red-800"
+            >
+              Retry
+            </button>
+          </div>
+        )}
+
         {/* Empty state */}
-        {!isLoading && projects.length === 0 && (
+        {!isLoading && !fetchError && projects.length === 0 && (
           <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-gray-200 py-16 px-4">
             <div className="mb-4 rounded-full bg-indigo-50 p-4">
               <svg

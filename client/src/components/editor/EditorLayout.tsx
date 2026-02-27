@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
+import { ErrorBoundary } from '../ErrorBoundary';
 import type { DocumentContent } from '@dnd-booker/shared';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
@@ -143,7 +144,11 @@ export function EditorLayout({ projectId, content, onUpdate }: EditorLayoutProps
         {/* Editor content area */}
         <div className="flex-1 overflow-y-auto p-8" data-theme={currentTheme}>
           <div className="max-w-3xl mx-auto prose prose-lg max-w-none editor-themed-content">
-            {editor && <EditorContent editor={editor} />}
+            {editor && (
+              <ErrorBoundary fallbackMessage="A block encountered an error. Try removing the last edited block.">
+                <EditorContent editor={editor} />
+              </ErrorBoundary>
+            )}
           </div>
         </div>
       </div>

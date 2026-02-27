@@ -19,6 +19,7 @@ export default function EditorPage() {
     isSaving,
     hasPendingChanges,
     saveError,
+    fetchError,
     fetchDocuments,
     setActiveDocument,
     updateDocumentContent,
@@ -155,6 +156,16 @@ export default function EditorPage() {
         {isLoading ? (
           <div className="w-56 border-r bg-white flex items-center justify-center flex-shrink-0">
             <span className="text-xs text-gray-400">Loading...</span>
+          </div>
+        ) : fetchError ? (
+          <div className="w-56 border-r bg-white flex flex-col items-center justify-center flex-shrink-0 p-4 text-center">
+            <p className="text-xs text-red-500 mb-2">{fetchError}</p>
+            <button
+              onClick={() => projectId && fetchDocuments(projectId)}
+              className="text-xs text-indigo-600 hover:text-indigo-800 font-medium"
+            >
+              Retry
+            </button>
           </div>
         ) : (
           <DocumentList
