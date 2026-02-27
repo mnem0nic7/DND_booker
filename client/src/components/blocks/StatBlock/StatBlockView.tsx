@@ -405,8 +405,13 @@ export function StatBlockView({
                   <label>{abilityLabels[i]}</label>
                   <input
                     type="number"
+                    min={1}
+                    max={30}
                     value={attrs[key] as number}
-                    onChange={(e) => updateAttr(key, Number(e.target.value))}
+                    onChange={(e) => {
+                      const v = Math.max(1, Math.min(30, Number(e.target.value) || 1));
+                      updateAttr(key, v);
+                    }}
                   />
                 </div>
               ))}

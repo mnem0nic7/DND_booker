@@ -23,6 +23,7 @@ export function AiChatPanel({ projectId, editor }: AiChatPanelProps) {
   } = useAiStore();
 
   const [input, setInput] = useState('');
+  const [insertError, setInsertError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -43,7 +44,13 @@ export function AiChatPanel({ projectId, editor }: AiChatPanelProps) {
 
   function handleInsertBlock(blockType: string, attrs: Record<string, unknown>) {
     if (!editor) return;
-    editor.chain().focus().insertContent({ type: blockType, attrs }).run();
+    setInsertError(null);
+    try {
+      editor.chain().focus().insertContent({ type: blockType, attrs }).run();
+    } catch (err) {
+      console.error('[AI] Failed to insert block:', err);
+      setInsertError(`Failed to insert ${blockType}. The generated data may be invalid.`);
+    }
   }
 
   const isConfigured = settings?.hasApiKey;
@@ -128,9 +135,9 @@ export function AiChatPanel({ projectId, editor }: AiChatPanelProps) {
             )}
           </>
         )}
-        {chatError && (
+        {(chatError || insertError) && (
           <div className="mx-1 px-3 py-2 text-xs text-red-700 bg-red-50 border border-red-200 rounded-md">
-            {chatError}
+            {chatError || insertError}
           </div>
         )}
         <div ref={messagesEndRef} />

@@ -140,6 +140,20 @@ export default function RegisterPage() {
                 placeholder="Min 8 chars, uppercase, number, special"
                 className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-gray-900 placeholder-gray-400 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 focus:outline-none transition"
               />
+              {password.length > 0 && (
+                <div className="mt-1.5 space-y-0.5">
+                  {[
+                    { test: password.length >= 8, label: '8+ characters' },
+                    { test: /[A-Z]/.test(password), label: 'Uppercase letter' },
+                    { test: /[0-9]/.test(password), label: 'Number' },
+                    { test: /[^A-Za-z0-9]/.test(password), label: 'Special character' },
+                  ].map(({ test, label }) => (
+                    <div key={label} className={`text-xs flex items-center gap-1 ${test ? 'text-green-600' : 'text-gray-400'}`}>
+                      <span>{test ? '\u2713' : '\u2022'}</span> {label}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div>

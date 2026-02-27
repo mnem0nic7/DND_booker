@@ -162,6 +162,33 @@ describe('Projects API', () => {
       expect(res.body.error).toBe('Project not found');
     });
 
+    it('should update project settings with valid theme', async () => {
+      const res = await request(app)
+        .put(`/api/projects/${createdProjectId}`)
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({ settings: { theme: 'dark-tome' } });
+
+      expect(res.status).toBe(200);
+    });
+
+    it('should reject invalid theme in settings', async () => {
+      const res = await request(app)
+        .put(`/api/projects/${createdProjectId}`)
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({ settings: { theme: 'nonexistent-theme' } });
+
+      expect(res.status).toBe(400);
+    });
+
+    it('should reject invalid columns in settings', async () => {
+      const res = await request(app)
+        .put(`/api/projects/${createdProjectId}`)
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({ settings: { columns: 5 } });
+
+      expect(res.status).toBe(400);
+    });
+
     it('should return 401 without auth token', async () => {
       const res = await request(app)
         .put(`/api/projects/${createdProjectId}`)

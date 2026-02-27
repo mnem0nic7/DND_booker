@@ -41,24 +41,39 @@ interface DetectedBlock {
   attrs: Record<string, unknown>;
 }
 
+function tryParseBlock(jsonStr: string, blocks: DetectedBlock[]): string | null {
+  try {
+    const parsed = JSON.parse(jsonStr.trim());
+    if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+      const blockType = detectBlockType(parsed);
+      if (blockType) {
+        const label = BLOCK_TYPE_PATTERNS[blockType].label;
+        blocks.push({ type: blockType, label, attrs: parsed });
+        return `[${label}: ${parsed.name || parsed.title || 'Generated'}]`;
+      }
+    }
+  } catch {
+    // Not valid JSON
+  }
+  return null;
+}
+
 function extractBlocks(content: string): { text: string; blocks: DetectedBlock[] } {
   const blocks: DetectedBlock[] = [];
-  const text = content.replace(/```(?:json)?\s*([\s\S]*?)```/g, (match, jsonStr: string) => {
-    try {
-      const parsed = JSON.parse(jsonStr.trim());
-      if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
-        const blockType = detectBlockType(parsed);
-        if (blockType) {
-          const label = BLOCK_TYPE_PATTERNS[blockType].label;
-          blocks.push({ type: blockType, label, attrs: parsed });
-          return `[${label}: ${parsed.name || parsed.title || 'Generated'}]`;
-        }
-      }
-    } catch {
-      // Not valid JSON, leave as-is
-    }
-    return match;
+
+  // First pass: extract fenced code blocks
+  let text = content.replace(/```(?:json)?\s*([\s\S]*?)```/g, (match, jsonStr: string) => {
+    return tryParseBlock(jsonStr, blocks) ?? match;
   });
+
+  // Second pass: detect bare JSON objects (lines starting with { and ending with })
+  // Only if no blocks found from fenced detection
+  if (blocks.length === 0) {
+    text = text.replace(/^\{[\s\S]*?\n\}$/gm, (match) => {
+      return tryParseBlock(match, blocks) ?? match;
+    });
+  }
+
   return { text, blocks };
 }
 

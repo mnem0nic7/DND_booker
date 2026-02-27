@@ -111,6 +111,42 @@ describe('Documents API', () => {
 
       expect(res.status).toBe(401);
     });
+
+    it('should reject content that is not a valid TipTap object', async () => {
+      const res = await request(app)
+        .post(`/api/projects/${projectId}/documents`)
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({ title: 'Bad Content', content: 'just a string' });
+
+      expect(res.status).toBe(400);
+      expect(res.body.error).toBe('Validation failed');
+    });
+
+    it('should reject content missing required type field', async () => {
+      const res = await request(app)
+        .post(`/api/projects/${projectId}/documents`)
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({ title: 'Bad Content', content: { content: [] } });
+
+      expect(res.status).toBe(400);
+      expect(res.body.error).toBe('Validation failed');
+    });
+
+    it('should accept valid TipTap JSON content', async () => {
+      const res = await request(app)
+        .post(`/api/projects/${projectId}/documents`)
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({
+          title: 'Valid Content',
+          content: {
+            type: 'doc',
+            content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Hello world' }] }],
+          },
+        });
+
+      expect(res.status).toBe(201);
+      expect(res.body.content.type).toBe('doc');
+    });
   });
 
   describe('GET /api/projects/:projectId/documents', () => {
