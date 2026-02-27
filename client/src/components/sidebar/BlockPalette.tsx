@@ -202,6 +202,46 @@ export function BlockPalette({ editor }: BlockPaletteProps) {
             <span className="w-6 h-6 flex items-center justify-center bg-yellow-100 text-yellow-800 rounded text-xs font-mono">RT</span>
             Random Table
           </button>
+          <button
+            onMouseDown={(e) => {
+              e.preventDefault();
+              editor.chain().focus().insertContent({ type: 'npcProfile' }).run();
+            }}
+            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 rounded hover:bg-gray-200 transition-colors"
+          >
+            <span className="w-6 h-6 flex items-center justify-center bg-amber-100 text-amber-800 rounded text-xs font-mono">NP</span>
+            NPC Profile
+          </button>
+          <button
+            onMouseDown={(e) => {
+              e.preventDefault();
+              editor.chain().focus().insertContent({ type: 'encounterTable' }).run();
+            }}
+            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 rounded hover:bg-gray-200 transition-colors"
+          >
+            <span className="w-6 h-6 flex items-center justify-center bg-green-100 text-green-800 rounded text-xs font-mono">ET</span>
+            Encounter Table
+          </button>
+          <button
+            onMouseDown={(e) => {
+              e.preventDefault();
+              editor.chain().focus().insertContent({ type: 'classFeature' }).run();
+            }}
+            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 rounded hover:bg-gray-200 transition-colors"
+          >
+            <span className="w-6 h-6 flex items-center justify-center bg-red-100 text-red-800 rounded text-xs font-mono">CF</span>
+            Class Feature
+          </button>
+          <button
+            onMouseDown={(e) => {
+              e.preventDefault();
+              editor.chain().focus().insertContent({ type: 'raceBlock' }).run();
+            }}
+            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 rounded hover:bg-gray-200 transition-colors"
+          >
+            <span className="w-6 h-6 flex items-center justify-center bg-orange-100 text-orange-800 rounded text-xs font-mono">RB</span>
+            Race Block
+          </button>
         </div>
       </div>
     </div>

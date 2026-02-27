@@ -6,3 +6,7 @@
 @import './styles/blocks/spell-card.css';
 @import './styles/blocks/magic-item.css';
 @import './styles/blocks/random-table.css';
+@import './styles/blocks/npc-profile.css';
+@import './styles/blocks/encounter-table.css';
+@import './styles/blocks/class-feature.css';
+@import './styles/blocks/race-block.css';

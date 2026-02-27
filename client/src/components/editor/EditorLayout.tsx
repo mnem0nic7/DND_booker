@@ -8,6 +8,10 @@ import { ChapterHeader } from '../blocks/ChapterHeader/ChapterHeaderExtension';
 import { SpellCard } from '../blocks/SpellCard/SpellCardExtension';
 import { MagicItem } from '../blocks/MagicItem/MagicItemExtension';
 import { RandomTable } from '../blocks/RandomTable/RandomTableExtension';
+import { NpcProfile } from '../blocks/NpcProfile/NpcProfileExtension';
+import { EncounterTable } from '../blocks/EncounterTable/EncounterTableExtension';
+import { ClassFeature } from '../blocks/ClassFeature/ClassFeatureExtension';
+import { RaceBlock } from '../blocks/RaceBlock/RaceBlockExtension';
 import { Toolbar } from './Toolbar';
 import { BlockPalette } from '../sidebar/BlockPalette';
 
@@ -21,7 +25,7 @@ export function EditorLayout({ content, onUpdate }: EditorLayoutProps) {
   const [showProperties, setShowProperties] = useState(false);
 
   const editor = useEditor({
-    extensions: [StarterKit, StatBlock, ReadAloudBox, SidebarCallout, ChapterHeader, SpellCard, MagicItem, RandomTable],
+    extensions: [StarterKit, StatBlock, ReadAloudBox, SidebarCallout, ChapterHeader, SpellCard, MagicItem, RandomTable, NpcProfile, EncounterTable, ClassFeature, RaceBlock],
     content,
     immediatelyRender: false,
     onUpdate: ({ editor: ed }) => {

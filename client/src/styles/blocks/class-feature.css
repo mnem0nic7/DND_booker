@@ -1,0 +1,122 @@
+.class-feature {
+  font-family: 'Crimson Text', 'Libre Baskerville', serif;
+  background: #fdf5f5;
+  padding: 1rem;
+  border: 1px solid #991b1b;
+  border-left: 4px solid #991b1b;
+  box-shadow: 0 0 0.25rem rgba(153, 27, 27, 0.3);
+  max-width: 480px;
+  position: relative;
+}
+
+.class-feature__name {
+  font-family: 'Cinzel', 'Georgia', serif;
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: #991b1b;
+  margin: 0;
+  line-height: 1.2;
+}
+
+.class-feature__subtitle {
+  font-size: 0.8rem;
+  font-style: italic;
+  color: #b91c1c;
+  margin-top: 0.15rem;
+}
+
+.class-feature__divider {
+  height: 2px;
+  background: linear-gradient(to right, #991b1b, transparent);
+  margin: 0.5rem 0;
+  border: none;
+}
+
+.class-feature__description {
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: #1a1a1a;
+  white-space: pre-wrap;
+}
+
+.class-feature__delete-btn {
+  position: absolute;
+  top: 0.25rem;
+  right: 0.25rem;
+  background: #dc2626;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 0.15rem 0.4rem;
+  font-size: 0.7rem;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.class-feature:hover .class-feature__delete-btn {
+  opacity: 1;
+}
+
+/* Edit panel styles */
+.class-feature__edit-panel {
+  background: #fef0f0;
+  border: 1px solid #991b1b;
+  border-radius: 4px;
+  padding: 0.75rem;
+  margin-top: 0.75rem;
+  font-family: system-ui, sans-serif;
+  font-size: 0.8rem;
+}
+
+.class-feature__edit-panel h4 {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #991b1b;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 0.75rem 0 0.35rem;
+}
+
+.class-feature__edit-panel h4:first-child {
+  margin-top: 0;
+}
+
+.class-feature__edit-row {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-bottom: 0.25rem;
+}
+
+.class-feature__edit-row label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #333;
+  min-width: 5rem;
+}
+
+.class-feature__edit-row input {
+  flex: 1;
+  padding: 0.2rem 0.35rem;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  font-size: 0.75rem;
+  background: white;
+}
+
+.class-feature__edit-row input[type='number'] {
+  width: 3.5rem;
+  flex: none;
+}
+
+.class-feature__edit-textarea {
+  width: 100%;
+  min-height: 4rem;
+  padding: 0.25rem 0.35rem;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  font-size: 0.75rem;
+  font-family: system-ui, sans-serif;
+  resize: vertical;
+}
