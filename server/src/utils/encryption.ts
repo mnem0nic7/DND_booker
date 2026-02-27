@@ -21,8 +21,8 @@ function getEncryptionKey(): Buffer {
   if (!/^[0-9a-fA-F]{64}$/.test(secret)) {
     throw new Error('AI_KEY_ENCRYPTION_SECRET must contain only hexadecimal characters');
   }
-  if (new Set(secret.toLowerCase()).size < 4) {
-    throw new Error('AI_KEY_ENCRYPTION_SECRET has insufficient entropy');
+  if (new Set(secret.toLowerCase()).size < 8) {
+    throw new Error('AI_KEY_ENCRYPTION_SECRET has insufficient entropy — use a properly random hex string');
   }
   _cachedKey = Buffer.from(secret, 'hex');
   return _cachedKey;

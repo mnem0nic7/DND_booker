@@ -1,8 +1,10 @@
 import { Router, Response } from 'express';
 import { z } from 'zod';
+import { publicRateLimit } from '../middleware/ai-rate-limit.js';
 import * as templateService from '../services/template.service.js';
 
 const router = Router();
+router.use(publicRateLimit);
 
 const querySchema = z.object({
   type: z.enum(['campaign', 'one_shot', 'supplement', 'sourcebook']).optional(),

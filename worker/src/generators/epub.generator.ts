@@ -21,13 +21,20 @@ export async function generateEpub(html: string, title: string): Promise<Buffer>
   const inputPath = path.join(tmpDir, 'input.html');
   const outputPath = path.join(tmpDir, 'output.epub');
 
+  // Sanitize title: strip control chars, limit length, remove null bytes
+  const safeTitle = title
+    .replace(/[\x00-\x1f\x7f]/g, '') // strip control characters
+    .replace(/\0/g, '')               // strip null bytes
+    .slice(0, 200)                     // limit length
+    || 'Untitled';
+
   try {
     await fs.writeFile(inputPath, html, 'utf-8');
 
     await execFileAsync('pandoc', [
       inputPath,
       '-o', outputPath,
-      '--metadata', `title=${title}`,
+      '--metadata', `title=${safeTitle}`,
       '--embed-resources',
     ]);
 

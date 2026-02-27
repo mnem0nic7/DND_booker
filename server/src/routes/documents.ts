@@ -7,9 +7,19 @@ import * as documentService from '../services/document.service.js';
 export const projectDocumentRoutes = Router({ mergeParams: true });
 projectDocumentRoutes.use(requireAuth);
 
+// TipTap JSON content schema — validates structure without being overly strict
+const tiptapContentSchema = z.object({
+  type: z.string().max(50),
+  content: z.array(z.any()).optional(),
+  attrs: z.record(z.unknown()).optional(),
+}).refine(
+  (val) => JSON.stringify(val).length <= 5_000_000,
+  { message: 'Document content exceeds 5 MB limit' }
+);
+
 const createSchema = z.object({
   title: z.string().min(1).max(200),
-  content: z.any().optional(),
+  content: tiptapContentSchema.optional(),
 });
 
 projectDocumentRoutes.post('/', async (req: AuthRequest, res: Response) => {
@@ -49,7 +59,7 @@ documentRoutes.use(requireAuth);
 
 const updateSchema = z.object({
   title: z.string().min(1).max(200).optional(),
-  content: z.any().optional(),
+  content: tiptapContentSchema.optional(),
 });
 
 const reorderSchema = z.object({

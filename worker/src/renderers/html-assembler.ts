@@ -101,23 +101,36 @@ function getThemeVariables(theme: string): string {
   }
 }
 
-interface ChapterEntry {
-  chapterNumber: string;
+interface TocEntry {
+  level: number; // 1 = chapter header / h1, 2 = h2, 3 = h3
+  prefix: string; // e.g. "Chapter 3" or ""
   title: string;
 }
 
 /**
- * Recursively scan TipTap JSON for chapterHeader nodes across all documents.
+ * Recursively scan TipTap JSON for chapterHeader and heading nodes
+ * across all documents to build a hierarchical table of contents.
  */
-function extractChapterHeaders(docs: AssembleOptions['documents']): ChapterEntry[] {
-  const entries: ChapterEntry[] = [];
+function extractTocEntries(docs: AssembleOptions['documents']): TocEntry[] {
+  const entries: TocEntry[] = [];
 
   function walk(node: DocumentContent) {
     if (node.type === 'chapterHeader') {
+      const num = String(node.attrs?.chapterNumber || '');
       entries.push({
-        chapterNumber: String(node.attrs?.chapterNumber || ''),
+        level: 1,
+        prefix: num ? `${num}.` : '',
         title: String(node.attrs?.title || 'Untitled Chapter'),
       });
+    } else if (node.type === 'heading') {
+      const level = Number(node.attrs?.level ?? 2);
+      if (level >= 1 && level <= 3) {
+        // Extract text content from heading children
+        const text = extractTextContent(node);
+        if (text) {
+          entries.push({ level, prefix: '', title: text });
+        }
+      }
     }
     if (node.content) {
       for (const child of node.content) {
@@ -135,18 +148,26 @@ function extractChapterHeaders(docs: AssembleOptions['documents']): ChapterEntry
   return entries;
 }
 
+/** Extract plain text from a TipTap node and its children. */
+function extractTextContent(node: DocumentContent): string {
+  if (node.type === 'text') return node.text || '';
+  if (!node.content) return '';
+  return node.content.map((c) => extractTextContent(c)).join('');
+}
+
 /**
- * Build TOC entry HTML from extracted chapter headers.
+ * Build TOC entry HTML from extracted entries with indentation by level.
  */
-function buildTocEntriesHtml(chapters: ChapterEntry[]): string {
-  if (chapters.length === 0) {
-    return `<p class="table-of-contents__note">No chapters found.</p>`;
+function buildTocEntriesHtml(entries: TocEntry[]): string {
+  if (entries.length === 0) {
+    return `<p class="table-of-contents__note">No chapters or headings found.</p>`;
   }
 
-  return chapters.map((ch) => {
-    const prefix = ch.chapterNumber ? `${escapeHtml(ch.chapterNumber)}. ` : '';
-    return `<div class="table-of-contents__entry">
-      <span class="table-of-contents__entry-title">${prefix}${escapeHtml(ch.title)}</span>
+  return entries.map((entry) => {
+    const indent = entry.level > 1 ? ` style="padding-left: ${(entry.level - 1) * 1.2}rem"` : '';
+    const prefix = entry.prefix ? `${escapeHtml(entry.prefix)} ` : '';
+    return `<div class="table-of-contents__entry"${indent}>
+      <span class="table-of-contents__entry-title">${prefix}${escapeHtml(entry.title)}</span>
       <span class="table-of-contents__entry-leader"></span>
       <span class="table-of-contents__entry-page">&mdash;</span>
     </div>`;
@@ -162,8 +183,8 @@ export function assembleHtml(options: AssembleOptions): string {
   // Sort documents by sortOrder
   const sorted = [...documents].sort((a, b) => a.sortOrder - b.sortOrder);
 
-  // Extract chapter headers for TOC population
-  const chapters = extractChapterHeaders(sorted);
+  // Extract chapter headers and headings for TOC population
+  const tocEntries = extractTocEntries(sorted);
 
   // Render each document's TipTap JSON to HTML
   const documentHtmlParts = sorted.map((doc) => {
@@ -173,8 +194,8 @@ export function assembleHtml(options: AssembleOptions): string {
     </section>`;
   });
 
-  // Post-process: inject chapter entries into the first empty TOC entries div
-  const tocEntriesHtml = buildTocEntriesHtml(chapters);
+  // Post-process: inject entries into the first empty TOC entries div
+  const tocEntriesHtml = buildTocEntriesHtml(tocEntries);
   let tocInjected = false;
   for (let i = 0; i < documentHtmlParts.length; i++) {
     if (!tocInjected && documentHtmlParts[i].includes('<div class="table-of-contents__entries"></div>')) {

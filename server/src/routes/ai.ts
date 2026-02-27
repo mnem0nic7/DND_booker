@@ -34,7 +34,7 @@ aiSettingsRoutes.get('/settings', async (req: AuthRequest, res: Response) => {
 
 const saveSettingsSchema = z.object({
   provider: z.enum(['anthropic', 'openai']),
-  model: z.string().min(1),
+  model: z.string().min(1).max(100),
   apiKey: z.string().min(10).max(300).optional(),
 }).refine(
   (data) => SUPPORTED_MODELS[data.provider]?.includes(data.model),
@@ -49,6 +49,7 @@ aiSettingsRoutes.post('/settings', async (req: AuthRequest, res: Response) => {
   }
   try {
     await aiSettings.saveAiSettings(req.userId!, parsed.data);
+    console.log(`[AUDIT] User ${req.userId} updated AI settings (provider=${parsed.data.provider}, model=${parsed.data.model}, keyChanged=${!!parsed.data.apiKey})`);
     res.json({ success: true });
   } catch (err) {
     console.error('[AI] Failed to save settings:', err);
@@ -59,6 +60,7 @@ aiSettingsRoutes.post('/settings', async (req: AuthRequest, res: Response) => {
 aiSettingsRoutes.delete('/settings/key', async (req: AuthRequest, res: Response) => {
   try {
     await aiSettings.removeApiKey(req.userId!);
+    console.log(`[AUDIT] User ${req.userId} removed AI API key`);
     res.json({ success: true });
   } catch (err) {
     console.error('[AI] Failed to remove API key:', err);
@@ -221,7 +223,7 @@ aiChatRoutes.get('/ai/chat', async (req: AuthRequest, res: Response) => {
 });
 
 const chatMessageSchema = z.object({
-  message: z.string().min(1).max(10000),
+  message: z.string().min(1).max(5000),
 });
 
 aiChatRoutes.post('/ai/chat', chatRateLimit, async (req: AuthRequest, res: Response) => {

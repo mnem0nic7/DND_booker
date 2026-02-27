@@ -14,12 +14,18 @@ const createSchema = z.object({
   templateId: z.string().optional(),
 });
 
+const settingsSchema = z.object({
+  theme: z.enum(['classic-parchment', 'dark-tome', 'clean-modern', 'fey-wild', 'infernal']).optional(),
+  pageSize: z.enum(['letter', 'a4']).optional(),
+  columns: z.number().int().min(1).max(3).optional(),
+}).passthrough(); // allow future fields but validate known ones
+
 const updateSchema = z.object({
   title: z.string().min(1).max(200).optional(),
   description: z.string().max(2000).optional(),
   type: z.enum(['campaign', 'one_shot', 'supplement', 'sourcebook']).optional(),
   status: z.enum(['draft', 'in_progress', 'review', 'published']).optional(),
-  settings: z.record(z.unknown()).optional(),
+  settings: settingsSchema.optional(),
 });
 
 router.post('/', async (req: AuthRequest, res: Response) => {

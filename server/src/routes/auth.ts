@@ -90,6 +90,7 @@ router.post('/login', authRateLimit, async (req: Request, res: Response) => {
     res.json({ user: userResponse, accessToken });
   } catch (err: unknown) {
     if (err instanceof Error && err.message === 'INVALID_CREDENTIALS') {
+      console.warn(`[SECURITY] Failed login attempt for ${parsed.data.email} from ${req.ip}`);
       res.status(401).json({ error: 'Invalid email or password' });
       return;
     }
@@ -113,6 +114,7 @@ router.post('/refresh', async (req: Request, res: Response) => {
     }
     // Reject tokens issued before the last logout/invalidation
     if (payload.tokenVersion !== undefined && payload.tokenVersion !== user.tokenVersion) {
+      console.warn(`[SECURITY] Revoked token refresh attempt for user ${payload.userId}`);
       res.status(401).json({ error: 'Token revoked' });
       return;
     }

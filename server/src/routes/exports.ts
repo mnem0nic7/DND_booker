@@ -30,6 +30,7 @@ router.post('/projects/:id/export', async (req: AuthRequest, res: Response) => {
       res.status(404).json({ error: 'Project not found' });
       return;
     }
+    console.log(`[AUDIT] Export job ${job.id} created by user ${req.userId} (project=${req.params.id}, format=${parsed.data.format})`);
     res.status(201).json(job);
   } catch (err) {
     console.error('[Export] Failed to create export job:', err);
@@ -77,13 +78,6 @@ router.get('/export-jobs/:id/download', async (req: AuthRequest, res: Response) 
       return;
     }
 
-    try {
-      await fs.promises.access(filepath, fs.constants.R_OK);
-    } catch {
-      res.status(404).json({ error: 'Export file not found. It may have been cleaned up.' });
-      return;
-    }
-
     const ext = path.extname(filename).toLowerCase();
     const contentType = ext === '.epub' ? 'application/epub+zip' : 'application/pdf';
 
@@ -92,7 +86,21 @@ router.get('/export-jobs/:id/download', async (req: AuthRequest, res: Response) 
     const encodedFilename = encodeURIComponent(filename);
     res.setHeader('Content-Type', contentType);
     res.setHeader('Content-Disposition', `attachment; filename="${safeFilename}"; filename*=UTF-8''${encodedFilename}`);
-    fs.createReadStream(filepath).pipe(res);
+
+    // Stream directly — avoids TOCTOU between access check and read
+    const stream = fs.createReadStream(filepath);
+    stream.on('error', (err: NodeJS.ErrnoException) => {
+      if (err.code === 'ENOENT') {
+        if (!res.headersSent) {
+          res.status(404).json({ error: 'Export file not found. It may have been cleaned up.' });
+        }
+      } else {
+        if (!res.headersSent) {
+          res.status(500).json({ error: 'Failed to read export file.' });
+        }
+      }
+    });
+    stream.pipe(res);
   } catch (err) {
     console.error('[Export] Download failed:', err);
     res.status(500).json({ error: 'Failed to download export file.' });
