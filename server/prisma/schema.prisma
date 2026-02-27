@@ -1,0 +1,134 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String      @id @default(uuid())
+  email        String      @unique
+  passwordHash String      @map("password_hash")
+  displayName  String      @map("display_name")
+  avatarUrl    String?     @map("avatar_url")
+  createdAt    DateTime    @default(now()) @map("created_at")
+  updatedAt    DateTime    @updatedAt @map("updated_at")
+
+  projects     Project[]
+  exportJobs   ExportJob[]
+  assets       Asset[]
+  templates    Template[]
+
+  @@map("users")
+}
+
+enum ProjectType {
+  campaign
+  one_shot
+  supplement
+  sourcebook
+}
+
+enum ProjectStatus {
+  draft
+  in_progress
+  review
+  published
+}
+
+model Project {
+  id             String        @id @default(uuid())
+  userId         String        @map("user_id")
+  title          String
+  description    String        @default("")
+  type           ProjectType   @default(campaign)
+  status         ProjectStatus @default(draft)
+  coverImageUrl  String?       @map("cover_image_url")
+  settings       Json          @default("{}")
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  documents      Document[]
+  exportJobs     ExportJob[]
+
+  @@map("projects")
+}
+
+model Document {
+  id          String   @id @default(uuid())
+  projectId   String   @map("project_id")
+  title       String
+  sortOrder   Int      @default(0) @map("sort_order")
+  content     Json     @default("{}")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("documents")
+}
+
+model Template {
+  id            String      @id @default(uuid())
+  name          String
+  description   String      @default("")
+  type          ProjectType @default(campaign)
+  content       Json        @default("{}")
+  thumbnailUrl  String?     @map("thumbnail_url")
+  isSystem      Boolean     @default(false) @map("is_system")
+  userId        String?     @map("user_id")
+  createdAt     DateTime    @default(now()) @map("created_at")
+
+  user          User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@map("templates")
+}
+
+enum ExportFormat {
+  pdf
+  epub
+  print_pdf
+}
+
+enum ExportStatus {
+  queued
+  processing
+  completed
+  failed
+}
+
+model ExportJob {
+  id            String       @id @default(uuid())
+  projectId     String       @map("project_id")
+  userId        String       @map("user_id")
+  format        ExportFormat
+  status        ExportStatus @default(queued)
+  progress      Int          @default(0)
+  outputUrl     String?      @map("output_url")
+  errorMessage  String?      @map("error_message")
+  createdAt     DateTime     @default(now()) @map("created_at")
+  completedAt   DateTime?    @map("completed_at")
+
+  project       Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("export_jobs")
+}
+
+model Asset {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  projectId   String?  @map("project_id")
+  filename    String
+  mimeType    String   @map("mime_type")
+  url         String
+  sizeBytes   Int      @map("size_bytes")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("assets")
+}
