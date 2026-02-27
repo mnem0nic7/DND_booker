@@ -19,13 +19,15 @@ export async function getRecentMessages(sessionId: string, limit: number) {
   return messages.reverse();
 }
 
+const MAX_MESSAGES_TO_LOAD = 200;
+
 export async function getSessionByProject(projectId: string, userId: string) {
   return prisma.aiChatSession.findUnique({
     where: {
       projectId_userId: { projectId, userId },
     },
     include: {
-      messages: { orderBy: { createdAt: 'asc' } },
+      messages: { orderBy: { createdAt: 'asc' }, take: MAX_MESSAGES_TO_LOAD },
     },
   });
 }
