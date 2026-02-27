@@ -8,6 +8,12 @@ import { ChapterHeader } from '../blocks/ChapterHeader/ChapterHeaderExtension';
 import { SpellCard } from '../blocks/SpellCard/SpellCardExtension';
 import { MagicItem } from '../blocks/MagicItem/MagicItemExtension';
 import { RandomTable } from '../blocks/RandomTable/RandomTableExtension';
+import { FullBleedImage } from '../blocks/FullBleedImage/FullBleedImageExtension';
+import { MapBlock } from '../blocks/MapBlock/MapBlockExtension';
+import { Handout } from '../blocks/Handout/HandoutExtension';
+import { PageBorder } from '../blocks/PageBorder/PageBorderExtension';
+import { PageBreak } from '../blocks/PageBreak/PageBreakExtension';
+import { ColumnBreak } from '../blocks/ColumnBreak/ColumnBreakExtension';
 import { Toolbar } from './Toolbar';
 import { BlockPalette } from '../sidebar/BlockPalette';
 
@@ -21,7 +27,7 @@ export function EditorLayout({ content, onUpdate }: EditorLayoutProps) {
   const [showProperties, setShowProperties] = useState(false);
 
   const editor = useEditor({
-    extensions: [StarterKit, StatBlock, ReadAloudBox, SidebarCallout, ChapterHeader, SpellCard, MagicItem, RandomTable],
+    extensions: [StarterKit, StatBlock, ReadAloudBox, SidebarCallout, ChapterHeader, SpellCard, MagicItem, RandomTable, FullBleedImage, MapBlock, Handout, PageBorder, PageBreak, ColumnBreak],
     content,
     immediatelyRender: false,
     onUpdate: ({ editor: ed }) => {

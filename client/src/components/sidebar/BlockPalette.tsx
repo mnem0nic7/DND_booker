@@ -204,6 +204,74 @@ export function BlockPalette({ editor }: BlockPaletteProps) {
           </button>
         </div>
       </div>
+      {/* Layout blocks */}
+      <div className="mt-6 pt-4 border-t">
+        <h4 className="text-xs font-medium text-gray-400 uppercase mb-2">
+          Layout
+        </h4>
+        <div className="space-y-1">
+          <button
+            onMouseDown={(e) => {
+              e.preventDefault();
+              editor.chain().focus().insertContent({ type: 'fullBleedImage' }).run();
+            }}
+            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 rounded hover:bg-gray-200 transition-colors"
+          >
+            <span className="w-6 h-6 flex items-center justify-center bg-blue-100 text-blue-800 rounded text-xs font-mono">FI</span>
+            Full Bleed Image
+          </button>
+          <button
+            onMouseDown={(e) => {
+              e.preventDefault();
+              editor.chain().focus().insertContent({ type: 'mapBlock' }).run();
+            }}
+            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 rounded hover:bg-gray-200 transition-colors"
+          >
+            <span className="w-6 h-6 flex items-center justify-center bg-blue-100 text-blue-800 rounded text-xs font-mono">MP</span>
+            Map
+          </button>
+          <button
+            onMouseDown={(e) => {
+              e.preventDefault();
+              editor.chain().focus().insertContent({ type: 'handout' }).run();
+            }}
+            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 rounded hover:bg-gray-200 transition-colors"
+          >
+            <span className="w-6 h-6 flex items-center justify-center bg-blue-100 text-blue-800 rounded text-xs font-mono">HO</span>
+            Handout
+          </button>
+          <button
+            onMouseDown={(e) => {
+              e.preventDefault();
+              editor.chain().focus().insertContent({ type: 'pageBorder' }).run();
+            }}
+            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 rounded hover:bg-gray-200 transition-colors"
+          >
+            <span className="w-6 h-6 flex items-center justify-center bg-blue-100 text-blue-800 rounded text-xs font-mono">PB</span>
+            Page Border
+          </button>
+          <button
+            onMouseDown={(e) => {
+              e.preventDefault();
+              editor.chain().focus().insertContent({ type: 'pageBreak' }).run();
+            }}
+            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 rounded hover:bg-gray-200 transition-colors"
+          >
+            <span className="w-6 h-6 flex items-center justify-center bg-gray-100 text-gray-800 rounded text-xs font-mono">PG</span>
+            Page Break
+          </button>
+          <button
+            onMouseDown={(e) => {
+              e.preventDefault();
+              editor.chain().focus().insertContent({ type: 'columnBreak' }).run();
+            }}
+            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 rounded hover:bg-gray-200 transition-colors"
+          >
+            <span className="w-6 h-6 flex items-center justify-center bg-gray-100 text-gray-800 rounded text-xs font-mono">CB</span>
+            Column Break
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

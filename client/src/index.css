@@ -6,3 +6,9 @@
 @import './styles/blocks/spell-card.css';
 @import './styles/blocks/magic-item.css';
 @import './styles/blocks/random-table.css';
+@import './styles/blocks/full-bleed-image.css';
+@import './styles/blocks/map-block.css';
+@import './styles/blocks/handout.css';
+@import './styles/blocks/page-border.css';
+@import './styles/blocks/page-break.css';
+@import './styles/blocks/column-break.css';

@@ -1,0 +1,189 @@
+.page-border {
+  position: relative;
+  margin: 1.5rem 0;
+  padding: 0.75rem;
+}
+
+/* Selected ring */
+.page-border--selected {
+  outline: 2px solid #d97706;
+  outline-offset: 2px;
+}
+
+/* Drag handle area */
+.page-border__drag-handle {
+  cursor: grab;
+}
+
+/* Preview container */
+.page-border__preview {
+  min-height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.page-border__preview-inner {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 60px;
+}
+
+.page-border__label {
+  font-family: 'Cinzel', 'Georgia', serif;
+  font-size: 0.85rem;
+  color: #666;
+  letter-spacing: 0.05em;
+}
+
+/* ---------- Simple border ---------- */
+.page-border--simple .page-border__preview {
+  border: 3px solid #333;
+}
+
+.page-border--simple .page-border__preview-inner {
+  border: 1px solid #333;
+  margin: 4px;
+  padding: 0.5rem;
+}
+
+/* ---------- Elvish border ---------- */
+.page-border--elvish .page-border__preview {
+  border: 2px solid #2d6a4f;
+  border-radius: 8px;
+  background: linear-gradient(135deg, rgba(45, 106, 79, 0.05) 0%, transparent 50%, rgba(45, 106, 79, 0.05) 100%);
+}
+
+.page-border--elvish .page-border__preview-inner {
+  border: 1px solid #52b788;
+  border-radius: 4px;
+  margin: 6px;
+  padding: 0.5rem;
+  background: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 10px,
+    rgba(45, 106, 79, 0.03) 10px,
+    rgba(45, 106, 79, 0.03) 20px
+  );
+}
+
+.page-border--elvish .page-border__label {
+  color: #2d6a4f;
+}
+
+/* ---------- Dwarven border ---------- */
+.page-border--dwarven .page-border__preview {
+  border: 4px double #8b6914;
+  background: linear-gradient(180deg, rgba(139, 105, 20, 0.08) 0%, transparent 20%, transparent 80%, rgba(139, 105, 20, 0.08) 100%);
+}
+
+.page-border--dwarven .page-border__preview-inner {
+  border: 2px solid #b8860b;
+  margin: 4px;
+  padding: 0.5rem;
+}
+
+.page-border--dwarven .page-border__label {
+  color: #8b6914;
+  font-weight: 700;
+}
+
+/* ---------- Infernal border ---------- */
+.page-border--infernal .page-border__preview {
+  border: 3px solid #8b1a1a;
+  background: linear-gradient(135deg, rgba(139, 26, 26, 0.1) 0%, transparent 30%, transparent 70%, rgba(139, 26, 26, 0.1) 100%);
+}
+
+.page-border--infernal .page-border__preview-inner {
+  border: 1px solid #b22222;
+  margin: 4px;
+  padding: 0.5rem;
+  box-shadow: inset 0 0 20px rgba(139, 26, 26, 0.08);
+}
+
+.page-border--infernal .page-border__label {
+  color: #8b1a1a;
+}
+
+/* Delete button */
+.page-border__delete-btn {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  background: #dc2626;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 0.15rem 0.4rem;
+  font-size: 0.7rem;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s;
+  z-index: 10;
+}
+
+.page-border:hover .page-border__delete-btn {
+  opacity: 1;
+}
+
+/* Edit panel */
+.page-border__edit-panel {
+  background: #fff8ee;
+  border: 1px solid #e69a28;
+  border-radius: 4px;
+  padding: 0.75rem;
+  margin-top: 0.75rem;
+  font-family: system-ui, sans-serif;
+  font-size: 0.8rem;
+}
+
+.page-border__edit-row {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.page-border__edit-row label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #333;
+  min-width: 5rem;
+}
+
+/* Style selector */
+.page-border__style-selector {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.page-border__style-btn {
+  padding: 0.2rem 0.5rem;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  background: white;
+  font-size: 0.7rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.page-border__style-btn:hover {
+  background: #f3f4f6;
+}
+
+.page-border__style-btn--active {
+  background: #58180d;
+  color: white;
+  border-color: #58180d;
+}
+
+@media print {
+  .page-border__delete-btn,
+  .page-border__edit-panel {
+    display: none;
+  }
+}
