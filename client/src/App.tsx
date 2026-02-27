@@ -26,6 +26,16 @@ export default function App() {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/projects/:id"
+          element={
+            <ProtectedRoute>
+              <div className="min-h-screen flex items-center justify-center bg-gray-50 text-gray-500">
+                Editor coming soon...
+              </div>
+            </ProtectedRoute>
+          }
+        />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
