@@ -19,6 +19,57 @@ services:
     image: redis:7-alpine
     ports:
       - '6379:6379'
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  server:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    ports:
+      - '4000:4000'
+    environment:
+      - DATABASE_URL=postgresql://dnd_booker:dnd_booker_dev@postgres:5432/dnd_booker
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - JWT_SECRET=dev-jwt-secret-change-in-production
+      - JWT_REFRESH_SECRET=dev-refresh-secret-change-in-production
+      - CLIENT_URL=http://localhost:3000
+      - NODE_ENV=production
+      - PORT=4000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  worker:
+    build:
+      context: .
+      dockerfile: worker/Dockerfile
+    environment:
+      - DATABASE_URL=postgresql://dnd_booker:dnd_booker_dev@postgres:5432/dnd_booker
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
+      - NODE_ENV=production
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  client:
+    build:
+      context: .
+      dockerfile: client/Dockerfile
+    ports:
+      - '3000:80'
+    depends_on:
+      - server
 
 volumes:
   pgdata:

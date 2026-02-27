@@ -1,0 +1,13 @@
+node_modules
+*/node_modules
+dist
+*/dist
+build
+*/build
+.git
+.env
+*.log
+coverage
+.turbo
+.claude
+docs
