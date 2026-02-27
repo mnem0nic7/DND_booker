@@ -136,7 +136,7 @@ aiGenerateRoutes.post('/generate-block', blockGenRateLimit, async (req: AuthRequ
       maxOutputTokens: MAX_AI_RESPONSE_TOKENS,
     });
 
-    const attrs = aiContent.parseBlockResponse(text);
+    const attrs = aiContent.parseBlockResponse(text, blockType);
     if (!attrs) {
       res.status(422).json({ error: 'Failed to parse AI response into valid block data.' });
       return;
@@ -185,7 +185,7 @@ aiGenerateRoutes.post('/autofill', autoFillRateLimit, async (req: AuthRequest, r
       maxOutputTokens: MAX_AI_RESPONSE_TOKENS,
     });
 
-    const suggestions = aiContent.parseBlockResponse(text);
+    const suggestions = aiContent.parseBlockResponse(text, blockType);
     if (!suggestions) {
       res.status(422).json({ error: 'Failed to parse AI suggestions.' });
       return;

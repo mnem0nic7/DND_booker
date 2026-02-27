@@ -204,5 +204,53 @@ describe('AI Content Service', () => {
       expect(result).not.toBeNull();
       expect(result?.name).toBe('Sword of "Power"');
     });
+
+    it('should strip trailing commas', () => {
+      const result = parseBlockResponse('{"name": "Goblin", "ac": 15,}');
+      expect(result).toEqual({ name: 'Goblin', ac: 15 });
+    });
+
+    it('should strip nested trailing commas', () => {
+      const result = parseBlockResponse('{"name": "Test", "items": [1, 2, 3,],}');
+      expect(result).toEqual({ name: 'Test', items: [1, 2, 3] });
+    });
+
+    it('should unwrap array-wrapped responses', () => {
+      const result = parseBlockResponse('[{"name": "Fire Bolt", "level": 0}]');
+      expect(result).toEqual({ name: 'Fire Bolt', level: 0 });
+    });
+
+    it('should unwrap array from markdown fences', () => {
+      const result = parseBlockResponse('```json\n[{"name": "Orc", "ac": 13}]\n```');
+      expect(result).toEqual({ name: 'Orc', ac: 13 });
+    });
+
+    it('should prefer object over array when object appears first', () => {
+      const result = parseBlockResponse('{"name": "Shield"} is the result');
+      expect(result).toEqual({ name: 'Shield' });
+    });
+
+    it('should log warning for missing required fields but still return data', () => {
+      const result = parseBlockResponse('{"ac": 15, "hp": 30}', 'statBlock');
+      // Missing "name" but should still return the parsed data
+      expect(result).toEqual({ ac: 15, hp: 30 });
+    });
+
+    it('should pass validation when required fields present', () => {
+      const result = parseBlockResponse('{"name": "Goblin", "ac": 15}', 'statBlock');
+      expect(result).toEqual({ name: 'Goblin', ac: 15 });
+    });
+
+    it('should return null for array of primitives', () => {
+      const result = parseBlockResponse('[1, 2, 3]');
+      expect(result).toBeNull();
+    });
+
+    it('should handle response with conversational preamble and trailing text', () => {
+      const result = parseBlockResponse(
+        'Sure! Here is your spell:\n\n{"name": "Eldritch Blast", "level": 0, "school": "evocation"}\n\nLet me know if you need changes!'
+      );
+      expect(result).toEqual({ name: 'Eldritch Blast', level: 0, school: 'evocation' });
+    });
   });
 });

@@ -215,29 +215,110 @@ Please suggest values for these empty/default fields: ${emptyFields.join(', ')}
 Return ONLY a JSON object with just the suggested fields (only the empty ones listed above). No markdown fences, no explanation.`;
 }
 
-export function parseBlockResponse(rawText: string): Record<string, unknown> | null {
-  // Try to extract JSON from the response — handle markdown fences, leading text, etc.
+/**
+ * Strip trailing commas before closing braces/brackets — a common LLM JSON mistake.
+ * Example: `{"a": 1, "b": 2,}` → `{"a": 1, "b": 2}`
+ */
+function stripTrailingCommas(json: string): string {
+  return json.replace(/,\s*([\]}])/g, '$1');
+}
+
+/**
+ * Extract JSON from a raw AI response string. Tries multiple strategies:
+ * 1. Markdown fenced code blocks
+ * 2. First { to last } (object extraction)
+ * 3. Array unwrapping: [{ ... }] → first element
+ */
+function extractJson(rawText: string): string | null {
   let jsonStr = rawText.trim();
 
-  // Strip markdown fences
+  // Strategy 1: Extract from markdown fences
   const fenceMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
   if (fenceMatch) {
     jsonStr = fenceMatch[1].trim();
   }
 
-  // Try to find a JSON object in the text
+  // Strategy 2: If it starts with an array, try to unwrap
+  const bracketStart = jsonStr.indexOf('[');
   const braceStart = jsonStr.indexOf('{');
-  const braceEnd = jsonStr.lastIndexOf('}');
-  if (braceStart !== -1 && braceEnd > braceStart) {
-    jsonStr = jsonStr.slice(braceStart, braceEnd + 1);
+  if (bracketStart !== -1 && (braceStart === -1 || bracketStart < braceStart)) {
+    const bracketEnd = jsonStr.lastIndexOf(']');
+    if (bracketEnd > bracketStart) {
+      const arrayStr = stripTrailingCommas(jsonStr.slice(bracketStart, bracketEnd + 1));
+      try {
+        const arr = JSON.parse(arrayStr);
+        if (Array.isArray(arr) && arr.length > 0 && typeof arr[0] === 'object') {
+          return JSON.stringify(arr[0]);
+        }
+      } catch {
+        // Fall through to object extraction
+      }
+    }
   }
 
-  try {
-    return JSON.parse(jsonStr);
-  } catch (err: unknown) {
-    console.error('[AI] Failed to parse block response:', rawText.slice(0, 500), err);
+  // Strategy 3: Extract first complete JSON object
+  if (braceStart !== -1) {
+    const braceEnd = jsonStr.lastIndexOf('}');
+    if (braceEnd > braceStart) {
+      return stripTrailingCommas(jsonStr.slice(braceStart, braceEnd + 1));
+    }
+  }
+
+  return null;
+}
+
+/** Required fields per block type — used to validate AI output has the essential data. */
+const REQUIRED_FIELDS: Record<string, string[]> = {
+  statBlock: ['name'],
+  spellCard: ['name', 'school'],
+  magicItem: ['name', 'type'],
+  npcProfile: ['name'],
+  randomTable: ['title', 'entries'],
+  encounterTable: ['environment', 'entries'],
+  classFeature: ['name', 'className'],
+  raceBlock: ['name'],
+  handout: ['title', 'content'],
+  backCover: ['blurb'],
+  sidebarCallout: ['title'],
+  chapterHeader: ['title'],
+  titlePage: ['title'],
+  creditsPage: ['credits'],
+};
+
+export function parseBlockResponse(rawText: string, blockType?: string): Record<string, unknown> | null {
+  const jsonStr = extractJson(rawText);
+  if (!jsonStr) {
+    console.error('[AI] No JSON found in response:', rawText.slice(0, 300));
     return null;
   }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(jsonStr);
+  } catch (err: unknown) {
+    console.error('[AI] Failed to parse block response:', jsonStr.slice(0, 300), err);
+    return null;
+  }
+
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    console.error('[AI] Parsed result is not an object:', typeof parsed);
+    return null;
+  }
+
+  const result = parsed as Record<string, unknown>;
+
+  // Validate required fields if block type is provided
+  if (blockType && REQUIRED_FIELDS[blockType]) {
+    const missing = REQUIRED_FIELDS[blockType].filter(
+      (f) => !(f in result) || result[f] === undefined || result[f] === ''
+    );
+    if (missing.length > 0) {
+      console.warn(`[AI] Block response missing required fields for ${blockType}: ${missing.join(', ')}`);
+      // Don't reject — return what we have and let the client handle defaults
+    }
+  }
+
+  return result;
 }
 
 export function getSupportedBlockTypes(): string[] {
