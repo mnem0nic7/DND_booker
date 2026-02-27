@@ -11,6 +11,7 @@ import { prisma } from '../config/database.js';
 
 const SUPPORTED_BLOCK_TYPES = aiContent.getSupportedBlockTypes();
 const MAX_CHAT_CONTEXT_MESSAGES = 30;
+const MAX_SESSION_MESSAGES = 200; // hard cap per session
 const MAX_AI_RESPONSE_TOKENS = 4096;
 const MAX_STORED_CONTENT = 100_000;
 
@@ -252,8 +253,13 @@ aiChatRoutes.post('/ai/chat', chatRateLimit, async (req: AuthRequest, res: Respo
       return;
     }
 
-    // Get or create session, save user message
+    // Get or create session, check message limit
     const session = await aiChat.getOrCreateSession(projectId, req.userId!);
+    const messageCount = await aiChat.getMessageCount(session.id);
+    if (messageCount >= MAX_SESSION_MESSAGES) {
+      res.status(429).json({ error: 'Chat session message limit reached. Please clear chat history to continue.' });
+      return;
+    }
     const savedMsg = await aiChat.addMessage(session.id, 'user', parsed.data.message);
     savedUserMsgId = savedMsg.id;
 

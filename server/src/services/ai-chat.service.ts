@@ -37,6 +37,10 @@ export async function getSessionByProject(projectId: string, userId: string) {
   });
 }
 
+export async function getMessageCount(sessionId: string): Promise<number> {
+  return prisma.aiChatMessage.count({ where: { sessionId } });
+}
+
 export async function addMessage(
   sessionId: string,
   role: string,

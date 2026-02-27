@@ -23,6 +23,10 @@ app.use(helmet({
 }));
 
 // CORS — validate origin in production
+if (process.env.NODE_ENV === 'production' && !process.env.CLIENT_URL) {
+  console.error('FATAL: CLIENT_URL must be set in production for CORS security.');
+  process.exit(1);
+}
 const allowedOrigins = (process.env.CLIENT_URL || 'http://localhost:3000').split(',').map(o => o.trim());
 app.use(cors({
   origin: (origin, callback) => {

@@ -81,10 +81,15 @@ async function injectCropMarks(page: Page): Promise<void> {
  *  - preferCSSPageSize enabled for precise sizing
  *  - No header/footer (print shop handles pagination)
  */
+// Enable sandbox when running outside Docker (set PUPPETEER_SANDBOX=true)
+const NO_SANDBOX_ARGS = process.env.PUPPETEER_SANDBOX === 'true'
+  ? []
+  : ['--no-sandbox', '--disable-setuid-sandbox'];
+
 export async function generatePrintPdf(html: string): Promise<Buffer> {
   const browser = await puppeteer.launch({
     headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    args: NO_SANDBOX_ARGS,
   });
 
   try {

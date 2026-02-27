@@ -6,7 +6,8 @@ function requireEnvSecret(name: string): string {
   const value = process.env[name];
   if (!value || value.length < 16) {
     if (process.env.NODE_ENV === 'production') {
-      throw new Error(`FATAL: ${name} must be set to a strong secret (>=16 chars) in production.`);
+      console.error(`FATAL: ${name} must be set to a strong secret (>=16 chars) in production.`);
+      process.exit(1);
     }
     console.warn(`[auth] WARNING: ${name} is not set. Using insecure dev fallback. DO NOT use in production.`);
     return `insecure-dev-${name}`;

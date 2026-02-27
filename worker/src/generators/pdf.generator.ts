@@ -6,10 +6,15 @@ import puppeteer from 'puppeteer';
  * The resulting PDF is Letter-sized with 1-inch margins, a page-number
  * footer, and background colors/images printed.
  */
+// Enable sandbox when running outside Docker (set PUPPETEER_SANDBOX=true)
+const NO_SANDBOX_ARGS = process.env.PUPPETEER_SANDBOX === 'true'
+  ? []
+  : ['--no-sandbox', '--disable-setuid-sandbox'];
+
 export async function generatePdf(html: string): Promise<Buffer> {
   const browser = await puppeteer.launch({
     headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    args: NO_SANDBOX_ARGS,
   });
 
   try {
