@@ -4,26 +4,14 @@
  * matching the React views so theme CSS applies during PDF export.
  */
 
-interface TipTapNode {
-  type: string;
-  content?: TipTapNode[];
-  attrs?: Record<string, unknown>;
-  marks?: Array<{ type: string; attrs?: Record<string, unknown> }>;
-  text?: string;
-}
+import { DocumentContent } from '@dnd-booker/shared';
+import { escapeHtml } from './utils.js';
+
+type TipTapNode = DocumentContent;
 
 interface NameDesc {
   name: string;
   description: string;
-}
-
-function escapeHtml(text: string): string {
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
 }
 
 function getModifier(score: number): string {

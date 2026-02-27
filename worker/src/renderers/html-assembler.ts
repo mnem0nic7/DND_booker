@@ -4,10 +4,12 @@
  * stylesheet, Google Fonts, and all rendered document content.
  */
 
+import { DocumentContent } from '@dnd-booker/shared';
 import { tiptapToHtml } from './tiptap-to-html.js';
+import { escapeHtml } from './utils.js';
 
 export interface AssembleOptions {
-  documents: Array<{ title: string; content: any; sortOrder: number }>;
+  documents: Array<{ title: string; content: DocumentContent | null; sortOrder: number }>;
   theme: string;
   projectTitle: string;
 }
@@ -95,7 +97,7 @@ export function assembleHtml(options: AssembleOptions): string {
   // Render each document's TipTap JSON to HTML
   const documentHtmlParts = sorted.map((doc) => {
     const contentHtml = doc.content ? tiptapToHtml(doc.content) : '';
-    return `<section class="document" data-title="${escapeAttr(doc.title)}">
+    return `<section class="document" data-title="${escapeHtml(doc.title)}">
       ${contentHtml}
     </section>`;
   });
@@ -993,18 +995,3 @@ export function assembleHtml(options: AssembleOptions): string {
 </html>`;
 }
 
-function escapeHtml(text: string): string {
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
-
-function escapeAttr(text: string): string {
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/"/g, '&quot;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
-}
