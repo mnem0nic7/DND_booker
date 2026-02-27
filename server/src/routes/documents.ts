@@ -1,11 +1,15 @@
 import { Router, Response } from 'express';
 import { z } from 'zod';
 import { requireAuth, AuthRequest } from '../middleware/auth.js';
+import { asyncHandler } from '../middleware/async-handler.js';
+import { validateUuid } from '../middleware/validate-uuid.js';
+import { crudRateLimit } from '../middleware/ai-rate-limit.js';
 import * as documentService from '../services/document.service.js';
 
 // Routes nested under /api/projects/:projectId/documents
 export const projectDocumentRoutes = Router({ mergeParams: true });
 projectDocumentRoutes.use(requireAuth);
+projectDocumentRoutes.use(crudRateLimit);
 
 // TipTap JSON content schema — validates structure without being overly strict
 const tiptapContentSchema = z.object({
@@ -22,7 +26,7 @@ const createSchema = z.object({
   content: tiptapContentSchema.optional(),
 });
 
-projectDocumentRoutes.post('/', async (req: AuthRequest, res: Response) => {
+projectDocumentRoutes.post('/', validateUuid('projectId'), asyncHandler(async (req: AuthRequest, res: Response) => {
   const parsed = createSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: 'Validation failed' });
@@ -39,9 +43,9 @@ projectDocumentRoutes.post('/', async (req: AuthRequest, res: Response) => {
     return;
   }
   res.status(201).json(doc);
-});
+}));
 
-projectDocumentRoutes.get('/', async (req: AuthRequest, res: Response) => {
+projectDocumentRoutes.get('/', validateUuid('projectId'), asyncHandler(async (req: AuthRequest, res: Response) => {
   const docs = await documentService.getProjectDocuments(
     req.params.projectId as string,
     req.userId!
@@ -51,11 +55,12 @@ projectDocumentRoutes.get('/', async (req: AuthRequest, res: Response) => {
     return;
   }
   res.json(docs);
-});
+}));
 
 // Routes at /api/documents
 export const documentRoutes = Router();
 documentRoutes.use(requireAuth);
+documentRoutes.use(crudRateLimit);
 
 const updateSchema = z.object({
   title: z.string().min(1).max(200).optional(),
@@ -67,8 +72,12 @@ const reorderSchema = z.object({
   documentIds: z.array(z.string().uuid()),
 });
 
+const patchTitleSchema = z.object({
+  title: z.string().min(1).max(200),
+});
+
 // IMPORTANT: reorder route MUST be before /:id routes to avoid "reorder" matching as :id
-documentRoutes.patch('/reorder', async (req: AuthRequest, res: Response) => {
+documentRoutes.patch('/reorder', asyncHandler(async (req: AuthRequest, res: Response) => {
   const parsed = reorderSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: 'Validation failed' });
@@ -81,9 +90,9 @@ documentRoutes.patch('/reorder', async (req: AuthRequest, res: Response) => {
     return;
   }
   res.json({ success: true });
-});
+}));
 
-documentRoutes.put('/:id', async (req: AuthRequest, res: Response) => {
+documentRoutes.put('/:id', validateUuid('id'), asyncHandler(async (req: AuthRequest, res: Response) => {
   const parsed = updateSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: 'Validation failed' });
@@ -96,13 +105,29 @@ documentRoutes.put('/:id', async (req: AuthRequest, res: Response) => {
     return;
   }
   res.json(doc);
-});
+}));
 
-documentRoutes.delete('/:id', async (req: AuthRequest, res: Response) => {
+// PATCH /:id — title-only update (lightweight, no content payload)
+documentRoutes.patch('/:id', validateUuid('id'), asyncHandler(async (req: AuthRequest, res: Response) => {
+  const parsed = patchTitleSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'Validation failed' });
+    return;
+  }
+
+  const doc = await documentService.updateDocument(req.params.id as string, req.userId!, parsed.data);
+  if (!doc) {
+    res.status(404).json({ error: 'Document not found' });
+    return;
+  }
+  res.json(doc);
+}));
+
+documentRoutes.delete('/:id', validateUuid('id'), asyncHandler(async (req: AuthRequest, res: Response) => {
   const doc = await documentService.deleteDocument(req.params.id as string, req.userId!);
   if (!doc) {
     res.status(404).json({ error: 'Document not found' });
     return;
   }
   res.status(204).send();
-});
+}));

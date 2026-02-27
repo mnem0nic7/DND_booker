@@ -3,6 +3,9 @@ import { z } from 'zod';
 import path from 'path';
 import fs from 'fs';
 import { requireAuth, AuthRequest } from '../middleware/auth.js';
+import { asyncHandler } from '../middleware/async-handler.js';
+import { validateUuid } from '../middleware/validate-uuid.js';
+import { exportRateLimit } from '../middleware/ai-rate-limit.js';
 import * as exportService from '../services/export.service.js';
 
 const router = Router();
@@ -17,7 +20,7 @@ const exportSchema = z.object({
 });
 
 // POST /api/projects/:id/export
-router.post('/projects/:id/export', async (req: AuthRequest, res: Response) => {
+router.post('/projects/:id/export', validateUuid('id'), exportRateLimit, asyncHandler(async (req: AuthRequest, res: Response) => {
   const parsed = exportSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: 'Validation failed' });
@@ -36,10 +39,10 @@ router.post('/projects/:id/export', async (req: AuthRequest, res: Response) => {
     console.error('[Export] Failed to create export job:', err);
     res.status(500).json({ error: 'Failed to start export.' });
   }
-});
+}));
 
 // GET /api/export-jobs/:id
-router.get('/export-jobs/:id', async (req: AuthRequest, res: Response) => {
+router.get('/export-jobs/:id', validateUuid('id'), asyncHandler(async (req: AuthRequest, res: Response) => {
   try {
     const job = await exportService.getExportJob(req.params.id as string, req.userId!);
     if (!job) {
@@ -51,10 +54,10 @@ router.get('/export-jobs/:id', async (req: AuthRequest, res: Response) => {
     console.error('[Export] Failed to get export job:', err);
     res.status(500).json({ error: 'Failed to fetch export status.' });
   }
-});
+}));
 
 // GET /api/export-jobs/:id/download — authenticated file download
-router.get('/export-jobs/:id/download', async (req: AuthRequest, res: Response) => {
+router.get('/export-jobs/:id/download', validateUuid('id'), asyncHandler(async (req: AuthRequest, res: Response) => {
   try {
     const job = await exportService.getExportJob(req.params.id as string, req.userId!);
     if (!job) {
@@ -105,6 +108,6 @@ router.get('/export-jobs/:id/download', async (req: AuthRequest, res: Response) 
     console.error('[Export] Download failed:', err);
     res.status(500).json({ error: 'Failed to download export file.' });
   }
-});
+}));
 
 export default router;

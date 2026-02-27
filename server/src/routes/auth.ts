@@ -41,7 +41,7 @@ const loginSchema = z.object({
 router.post('/register', authRateLimit, async (req: Request, res: Response) => {
   const parsed = registerSchema.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: 'Validation failed', details: parsed.error.flatten() });
+    res.status(400).json({ error: 'Validation failed' });
     return;
   }
 

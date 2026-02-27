@@ -2,7 +2,9 @@ import { Router, Response } from 'express';
 import { z } from 'zod';
 import { streamText, generateText } from 'ai';
 import { requireAuth, AuthRequest } from '../middleware/auth.js';
-import { chatRateLimit, blockGenRateLimit, autoFillRateLimit } from '../middleware/ai-rate-limit.js';
+import { chatRateLimit, blockGenRateLimit, autoFillRateLimit, aiValidationRateLimit } from '../middleware/ai-rate-limit.js';
+import { asyncHandler } from '../middleware/async-handler.js';
+import { validateUuid } from '../middleware/validate-uuid.js';
 import * as aiSettings from '../services/ai-settings.service.js';
 import * as aiChat from '../services/ai-chat.service.js';
 import * as aiContent from '../services/ai-content.service.js';
@@ -19,7 +21,7 @@ const MAX_STORED_CONTENT = 100_000;
 export const aiSettingsRoutes = Router();
 aiSettingsRoutes.use(requireAuth);
 
-aiSettingsRoutes.get('/settings', async (req: AuthRequest, res: Response) => {
+aiSettingsRoutes.get('/settings', asyncHandler(async (req: AuthRequest, res: Response) => {
   try {
     const settings = await aiSettings.getAiSettings(req.userId!);
     if (!settings) {
@@ -31,7 +33,7 @@ aiSettingsRoutes.get('/settings', async (req: AuthRequest, res: Response) => {
     console.error('[AI] Failed to get settings:', err);
     res.status(500).json({ error: 'Failed to load AI settings.' });
   }
-});
+}));
 
 const saveSettingsSchema = z.object({
   provider: z.enum(['anthropic', 'openai']),
@@ -42,10 +44,10 @@ const saveSettingsSchema = z.object({
   { message: 'Unsupported model for the selected provider', path: ['model'] }
 );
 
-aiSettingsRoutes.post('/settings', async (req: AuthRequest, res: Response) => {
+aiSettingsRoutes.post('/settings', asyncHandler(async (req: AuthRequest, res: Response) => {
   const parsed = saveSettingsSchema.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: 'Validation failed', details: parsed.error.issues });
+    res.status(400).json({ error: 'Validation failed' });
     return;
   }
   try {
@@ -56,9 +58,9 @@ aiSettingsRoutes.post('/settings', async (req: AuthRequest, res: Response) => {
     console.error('[AI] Failed to save settings:', err);
     res.status(500).json({ error: 'Failed to save AI settings.' });
   }
-});
+}));
 
-aiSettingsRoutes.delete('/settings/key', async (req: AuthRequest, res: Response) => {
+aiSettingsRoutes.delete('/settings/key', asyncHandler(async (req: AuthRequest, res: Response) => {
   try {
     await aiSettings.removeApiKey(req.userId!);
     console.log(`[AUDIT] User ${req.userId} removed AI API key`);
@@ -67,14 +69,14 @@ aiSettingsRoutes.delete('/settings/key', async (req: AuthRequest, res: Response)
     console.error('[AI] Failed to remove API key:', err);
     res.status(500).json({ error: 'Failed to remove API key.' });
   }
-});
+}));
 
 const validateKeySchema = z.object({
   provider: z.enum(['anthropic', 'openai']),
   apiKey: z.string().min(10).max(300),
 });
 
-aiSettingsRoutes.post('/settings/validate', async (req: AuthRequest, res: Response) => {
+aiSettingsRoutes.post('/settings/validate', aiValidationRateLimit, asyncHandler(async (req: AuthRequest, res: Response) => {
   const parsed = validateKeySchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: 'Validation failed' });
@@ -96,7 +98,7 @@ aiSettingsRoutes.post('/settings/validate', async (req: AuthRequest, res: Respon
       res.status(500).json({ error: 'Could not validate key. Please try again.' });
     }
   }
-});
+}));
 
 // --- Block generation routes (no project context) ---
 export const aiGenerateRoutes = Router();
@@ -110,10 +112,10 @@ const generateBlockSchema = z.object({
   prompt: z.string().min(1).max(2000),
 });
 
-aiGenerateRoutes.post('/generate-block', blockGenRateLimit, async (req: AuthRequest, res: Response) => {
+aiGenerateRoutes.post('/generate-block', blockGenRateLimit, asyncHandler(async (req: AuthRequest, res: Response) => {
   const parsed = generateBlockSchema.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: 'Validation failed', details: parsed.error.issues });
+    res.status(400).json({ error: 'Validation failed' });
     return;
   }
 
@@ -147,7 +149,7 @@ aiGenerateRoutes.post('/generate-block', blockGenRateLimit, async (req: AuthRequ
     console.error('[AI] Block generation failed:', err);
     res.status(500).json({ error: 'AI generation failed. Please try again.' });
   }
-});
+}));
 
 const autoFillSchema = z.object({
   blockType: z.string().min(1).refine(
@@ -159,10 +161,10 @@ const autoFillSchema = z.object({
   ).refine((obj) => Object.keys(obj).length <= 50, 'Too many attributes'),
 });
 
-aiGenerateRoutes.post('/autofill', autoFillRateLimit, async (req: AuthRequest, res: Response) => {
+aiGenerateRoutes.post('/autofill', autoFillRateLimit, asyncHandler(async (req: AuthRequest, res: Response) => {
   const parsed = autoFillSchema.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: 'Validation failed', details: parsed.error.issues });
+    res.status(400).json({ error: 'Validation failed' });
     return;
   }
 
@@ -196,13 +198,13 @@ aiGenerateRoutes.post('/autofill', autoFillRateLimit, async (req: AuthRequest, r
     console.error('[AI] Auto-fill failed:', err);
     res.status(500).json({ error: 'AI auto-fill failed. Please try again.' });
   }
-});
+}));
 
 // --- Chat routes (project-scoped) ---
 export const aiChatRoutes = Router({ mergeParams: true });
 aiChatRoutes.use(requireAuth);
 
-aiChatRoutes.get('/ai/chat', async (req: AuthRequest, res: Response) => {
+aiChatRoutes.get('/ai/chat', validateUuid('projectId'), asyncHandler(async (req: AuthRequest, res: Response) => {
   const projectId = req.params.projectId as string;
 
   try {
@@ -221,13 +223,13 @@ aiChatRoutes.get('/ai/chat', async (req: AuthRequest, res: Response) => {
     console.error('[AI] Failed to get chat history:', err);
     res.status(500).json({ error: 'Failed to load chat history.' });
   }
-});
+}));
 
 const chatMessageSchema = z.object({
   message: z.string().min(1).max(5000),
 });
 
-aiChatRoutes.post('/ai/chat', chatRateLimit, async (req: AuthRequest, res: Response) => {
+aiChatRoutes.post('/ai/chat', validateUuid('projectId'), chatRateLimit, asyncHandler(async (req: AuthRequest, res: Response) => {
   const projectId = req.params.projectId as string;
   const parsed = chatMessageSchema.safeParse(req.body);
   if (!parsed.success) {
@@ -313,9 +315,9 @@ aiChatRoutes.post('/ai/chat', chatRateLimit, async (req: AuthRequest, res: Respo
       res.end();
     }
   }
-});
+}));
 
-aiChatRoutes.delete('/ai/chat', async (req: AuthRequest, res: Response) => {
+aiChatRoutes.delete('/ai/chat', validateUuid('projectId'), asyncHandler(async (req: AuthRequest, res: Response) => {
   const projectId = req.params.projectId as string;
   try {
     // Verify project ownership before deleting chat
@@ -332,7 +334,7 @@ aiChatRoutes.delete('/ai/chat', async (req: AuthRequest, res: Response) => {
     console.error('[AI] Failed to clear chat:', err);
     res.status(500).json({ error: 'Failed to clear chat history.' });
   }
-});
+}));
 
 // --- Shared helper ---
 async function getModelForUser(userId: string) {

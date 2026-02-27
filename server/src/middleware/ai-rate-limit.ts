@@ -28,3 +28,27 @@ export const publicRateLimit = rateLimit({
   max: 60,
   message: { error: 'Too many requests. Please wait a moment.' },
 });
+
+/** Rate limit for export endpoints (expensive: Puppeteer + file I/O). */
+export const exportRateLimit = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  keyGenerator: (req) => (req as AuthRequest).userId || req.ip || 'unknown',
+  message: { error: 'Too many export requests. Please wait a moment.' },
+});
+
+/** Rate limit for CRUD operations (projects, documents, assets). */
+export const crudRateLimit = rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,
+  keyGenerator: (req) => (req as AuthRequest).userId || req.ip || 'unknown',
+  message: { error: 'Too many requests. Please wait a moment.' },
+});
+
+/** Strict rate limit for AI key validation (prevents enumeration). */
+export const aiValidationRateLimit = rateLimit({
+  windowMs: 60 * 1000,
+  max: 5,
+  keyGenerator: (req) => (req as AuthRequest).userId || req.ip || 'unknown',
+  message: { error: 'Too many validation requests. Please wait a moment.' },
+});

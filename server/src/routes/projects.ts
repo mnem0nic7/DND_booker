@@ -2,10 +2,14 @@ import { Router, Response } from 'express';
 import { z } from 'zod';
 import { Prisma } from '@prisma/client';
 import { requireAuth, AuthRequest } from '../middleware/auth.js';
+import { asyncHandler } from '../middleware/async-handler.js';
+import { validateUuid } from '../middleware/validate-uuid.js';
+import { crudRateLimit } from '../middleware/ai-rate-limit.js';
 import * as projectService from '../services/project.service.js';
 
 const router = Router();
 router.use(requireAuth);
+router.use(crudRateLimit);
 
 const createSchema = z.object({
   title: z.string().min(1).max(200),
@@ -28,32 +32,32 @@ const updateSchema = z.object({
   settings: settingsSchema.optional(),
 });
 
-router.post('/', async (req: AuthRequest, res: Response) => {
+router.post('/', asyncHandler(async (req: AuthRequest, res: Response) => {
   const parsed = createSchema.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: 'Validation failed', details: parsed.error.flatten() });
+    res.status(400).json({ error: 'Validation failed' });
     return;
   }
 
   const project = await projectService.createProject(req.userId!, parsed.data);
   res.status(201).json(project);
-});
+}));
 
-router.get('/', async (req: AuthRequest, res: Response) => {
+router.get('/', asyncHandler(async (req: AuthRequest, res: Response) => {
   const projects = await projectService.getUserProjects(req.userId!);
   res.json(projects);
-});
+}));
 
-router.get('/:id', async (req: AuthRequest, res: Response) => {
+router.get('/:id', validateUuid('id'), asyncHandler(async (req: AuthRequest, res: Response) => {
   const project = await projectService.getProject(req.params.id as string, req.userId!);
   if (!project) {
     res.status(404).json({ error: 'Project not found' });
     return;
   }
   res.json(project);
-});
+}));
 
-router.put('/:id', async (req: AuthRequest, res: Response) => {
+router.put('/:id', validateUuid('id'), asyncHandler(async (req: AuthRequest, res: Response) => {
   const parsed = updateSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: 'Validation failed' });
@@ -70,15 +74,15 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
     return;
   }
   res.json(project);
-});
+}));
 
-router.delete('/:id', async (req: AuthRequest, res: Response) => {
+router.delete('/:id', validateUuid('id'), asyncHandler(async (req: AuthRequest, res: Response) => {
   const project = await projectService.deleteProject(req.params.id as string, req.userId!);
   if (!project) {
     res.status(404).json({ error: 'Project not found' });
     return;
   }
   res.status(204).send();
-});
+}));
 
 export default router;

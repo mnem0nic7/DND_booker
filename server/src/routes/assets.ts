@@ -1,6 +1,9 @@
 import { Router, Response } from 'express';
 import multer from 'multer';
 import { requireAuth, AuthRequest } from '../middleware/auth.js';
+import { asyncHandler } from '../middleware/async-handler.js';
+import { validateUuid } from '../middleware/validate-uuid.js';
+import { crudRateLimit } from '../middleware/ai-rate-limit.js';
 import * as assetService from '../services/asset.service.js';
 
 const upload = multer({
@@ -22,8 +25,9 @@ const upload = multer({
 // Routes nested under /api/projects/:projectId/assets
 export const projectAssetRoutes = Router({ mergeParams: true });
 projectAssetRoutes.use(requireAuth);
+projectAssetRoutes.use(crudRateLimit);
 
-projectAssetRoutes.post('/', upload.single('file'), async (req: AuthRequest, res: Response) => {
+projectAssetRoutes.post('/', validateUuid('projectId'), upload.single('file'), asyncHandler(async (req: AuthRequest, res: Response) => {
   if (!req.file) {
     res.status(400).json({ error: 'No file provided' });
     return;
@@ -46,9 +50,9 @@ projectAssetRoutes.post('/', upload.single('file'), async (req: AuthRequest, res
   }
 
   res.status(201).json(asset);
-});
+}));
 
-projectAssetRoutes.get('/', async (req: AuthRequest, res: Response) => {
+projectAssetRoutes.get('/', validateUuid('projectId'), asyncHandler(async (req: AuthRequest, res: Response) => {
   const assets = await assetService.listAssets(
     req.params.projectId as string,
     req.userId!
@@ -60,17 +64,17 @@ projectAssetRoutes.get('/', async (req: AuthRequest, res: Response) => {
   }
 
   res.json(assets);
-});
+}));
 
 // Standalone route for deleting an asset by id: /api/assets/:id
 export const assetRoutes = Router();
 assetRoutes.use(requireAuth);
 
-assetRoutes.delete('/:id', async (req: AuthRequest, res: Response) => {
+assetRoutes.delete('/:id', validateUuid('id'), asyncHandler(async (req: AuthRequest, res: Response) => {
   const deleted = await assetService.deleteAsset(req.params.id as string, req.userId!);
   if (!deleted) {
     res.status(404).json({ error: 'Asset not found' });
     return;
   }
   res.status(204).send();
-});
+}));

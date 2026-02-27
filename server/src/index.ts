@@ -1,4 +1,4 @@
-import express from 'express';
+import express, { type Request, type Response, type NextFunction } from 'express';
 import path from 'path';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -66,6 +66,14 @@ app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads'), {
     res.setHeader('Content-Security-Policy', "default-src 'none'; img-src 'self'; style-src 'none'; script-src 'none'");
   },
 }));
+
+// Global error handler — catches unhandled errors from async route handlers
+app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
+  console.error('[Error]', err.message);
+  if (!res.headersSent) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
 
 // Only start listening if this file is run directly (not imported in tests)
 if (process.env.NODE_ENV !== 'test') {
