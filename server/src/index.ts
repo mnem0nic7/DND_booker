@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
+import authRoutes from './routes/auth.js';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -12,6 +13,8 @@ app.use(cookieParser());
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok' });
 });
+
+app.use('/api/auth', authRoutes);
 
 // Only start listening if this file is run directly (not imported in tests)
 if (process.env.NODE_ENV !== 'test') {
