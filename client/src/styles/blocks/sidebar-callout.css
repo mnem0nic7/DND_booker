@@ -1,0 +1,154 @@
+.sidebar-callout {
+  position: relative;
+  padding: 1rem 1.25rem;
+  margin: 1rem 0;
+  border-radius: 4px;
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+/* Info style */
+.sidebar-callout--info {
+  background: #e8edf3;
+  border-left: 4px solid #4a6fa5;
+  color: #1a2a3a;
+}
+
+/* Warning style */
+.sidebar-callout--warning {
+  background: #fef3cd;
+  border-left: 4px solid #dc2626;
+  color: #3a2a0a;
+}
+
+/* Lore style */
+.sidebar-callout--lore {
+  background: #e8f0e8;
+  border-left: 4px solid #2d5a2d;
+  color: #1a2a1a;
+}
+
+/* Selected ring */
+.sidebar-callout--selected {
+  outline: 2px solid #d97706;
+  outline-offset: 2px;
+}
+
+/* Header / drag handle */
+.sidebar-callout__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+  cursor: grab;
+  user-select: none;
+}
+
+/* Title area */
+.sidebar-callout__title-area {
+  flex: 1;
+  min-width: 0;
+}
+
+.sidebar-callout__title {
+  font-weight: 700;
+  font-size: 1rem;
+  cursor: text;
+}
+
+.sidebar-callout--info .sidebar-callout__title {
+  color: #4a6fa5;
+}
+
+.sidebar-callout--warning .sidebar-callout__title {
+  color: #b91c1c;
+}
+
+.sidebar-callout--lore .sidebar-callout__title {
+  color: #2d5a2d;
+}
+
+.sidebar-callout__title-input {
+  font-weight: 700;
+  font-size: 1rem;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  padding: 0.1rem 0.3rem;
+  background: white;
+  width: 100%;
+  max-width: 200px;
+  font-family: inherit;
+}
+
+/* Type selector */
+.sidebar-callout__type-selector {
+  display: flex;
+  gap: 0.2rem;
+  flex-shrink: 0;
+  margin-left: 0.5rem;
+}
+
+.sidebar-callout__type-btn {
+  background: transparent;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  padding: 0.1rem 0.4rem;
+  font-size: 0.65rem;
+  cursor: pointer;
+  color: #555;
+  transition: background 0.15s, color 0.15s;
+}
+
+.sidebar-callout__type-btn:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.sidebar-callout__type-btn--active {
+  background: #4a6fa5;
+  color: white;
+  border-color: #4a6fa5;
+}
+
+.sidebar-callout--warning .sidebar-callout__type-btn--active {
+  background: #dc2626;
+  border-color: #dc2626;
+}
+
+.sidebar-callout--lore .sidebar-callout__type-btn--active {
+  background: #2d5a2d;
+  border-color: #2d5a2d;
+}
+
+/* Delete button */
+.sidebar-callout__delete-btn {
+  position: absolute;
+  top: 0.25rem;
+  right: 0.25rem;
+  background: #dc2626;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 0.15rem 0.4rem;
+  font-size: 0.7rem;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.sidebar-callout:hover .sidebar-callout__delete-btn {
+  opacity: 1;
+}
+
+/* Content area */
+.sidebar-callout__content {
+  min-height: 1.5em;
+}
+
+.sidebar-callout__content p {
+  margin: 0 0 0.5rem;
+}
+
+.sidebar-callout__content p:last-child {
+  margin-bottom: 0;
+}

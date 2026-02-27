@@ -142,6 +142,60 @@ export function BlockPalette({ editor }: BlockPaletteProps) {
             </span>
             Stat Block
           </button>
+          <button
+            onMouseDown={(e) => {
+              e.preventDefault();
+              editor
+                .chain()
+                .focus()
+                .insertContent({
+                  type: 'readAloudBox',
+                  content: [{ type: 'paragraph' }],
+                })
+                .run();
+            }}
+            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 rounded hover:bg-gray-200 transition-colors"
+          >
+            <span className="w-6 h-6 flex items-center justify-center bg-amber-100 text-amber-800 rounded text-xs font-mono">
+              RA
+            </span>
+            Read Aloud
+          </button>
+          <button
+            onMouseDown={(e) => {
+              e.preventDefault();
+              editor
+                .chain()
+                .focus()
+                .insertContent({
+                  type: 'sidebarCallout',
+                  content: [{ type: 'paragraph' }],
+                })
+                .run();
+            }}
+            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 rounded hover:bg-gray-200 transition-colors"
+          >
+            <span className="w-6 h-6 flex items-center justify-center bg-amber-100 text-amber-800 rounded text-xs font-mono">
+              SC
+            </span>
+            Sidebar Callout
+          </button>
+          <button
+            onMouseDown={(e) => {
+              e.preventDefault();
+              editor
+                .chain()
+                .focus()
+                .insertContent({ type: 'chapterHeader' })
+                .run();
+            }}
+            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 rounded hover:bg-gray-200 transition-colors"
+          >
+            <span className="w-6 h-6 flex items-center justify-center bg-amber-100 text-amber-800 rounded text-xs font-mono">
+              CH
+            </span>
+            Chapter Header
+          </button>
         </div>
       </div>
     </div>

@@ -1,2 +1,5 @@
 @import 'tailwindcss';
 @import './styles/blocks/stat-block.css';
+@import './styles/blocks/read-aloud-box.css';
+@import './styles/blocks/sidebar-callout.css';
+@import './styles/blocks/chapter-header.css';
