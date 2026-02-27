@@ -4,19 +4,30 @@ import type { ReactNodeViewProps } from '@tiptap/react';
 import type { TableOfContentsAttrs } from './TableOfContentsExtension';
 
 interface TocEntry {
+  level: number; // 1 = chapter header / h1, 2 = h2, 3 = h3
   title: string;
-  chapterNumber: string;
+  prefix: string; // e.g. "Chapter 3" or ""
 }
 
-function extractChapterEntries(editor: ReactNodeViewProps['editor']): TocEntry[] {
+function extractTocEntries(editor: ReactNodeViewProps['editor']): TocEntry[] {
   if (!editor) return [];
   const entries: TocEntry[] = [];
   editor.state.doc.descendants((node) => {
     if (node.type.name === 'chapterHeader') {
+      const num = String(node.attrs.chapterNumber || '');
       entries.push({
+        level: 1,
+        prefix: num ? `${num}.` : '',
         title: node.attrs.title || 'Untitled Chapter',
-        chapterNumber: node.attrs.chapterNumber || '',
       });
+    } else if (node.type.name === 'heading') {
+      const level = Number(node.attrs.level ?? 2);
+      if (level >= 1 && level <= 3) {
+        const text = node.textContent;
+        if (text) {
+          entries.push({ level, prefix: '', title: text });
+        }
+      }
     }
   });
   return entries;
@@ -39,9 +50,9 @@ export function TableOfContentsView({
     [updateAttributes],
   );
 
-  // Re-scan chapters whenever the document changes
+  // Re-scan chapters and headings whenever the document changes
   const entries = useMemo(() => {
-    return extractChapterEntries(editor);
+    return extractTocEntries(editor);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editor, editor?.state.doc]);
 
@@ -72,9 +83,13 @@ export function TableOfContentsView({
         <div className="table-of-contents__entries">
           {hasEntries ? (
             entries.map((entry, i) => (
-              <div key={i} className="table-of-contents__entry">
+              <div
+                key={i}
+                className="table-of-contents__entry"
+                style={entry.level > 1 ? { paddingLeft: `${(entry.level - 1) * 1.2}rem` } : undefined}
+              >
                 <span className="table-of-contents__entry-title">
-                  {entry.chapterNumber ? `${entry.chapterNumber}. ` : ''}
+                  {entry.prefix ? `${entry.prefix} ` : ''}
                   {entry.title}
                 </span>
                 <span className="table-of-contents__entry-leader" />
@@ -83,7 +98,7 @@ export function TableOfContentsView({
             ))
           ) : (
             <p className="table-of-contents__note">
-              Add Chapter Header blocks to populate this table of contents.
+              Add Chapter Header blocks or headings (H1-H3) to populate this table of contents.
               Page numbers are generated on export.
             </p>
           )}

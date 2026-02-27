@@ -4,3 +4,4 @@ export * from './types/document';
 export * from './types/export';
 export * from './types/template';
 export * from './constants';
+export * from './renderers';

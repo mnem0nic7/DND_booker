@@ -38,17 +38,15 @@ export async function createProject(userId: string, data: {
     },
   });
 
-  // If a template was selected, create an initial document with the template content
-  if (templateContent) {
-    await prisma.document.create({
-      data: {
-        projectId: project.id,
-        title: data.title,
-        content: templateContent as Prisma.InputJsonValue,
-        sortOrder: 0,
-      },
-    });
-  }
+  // Create an initial document — either from template or blank
+  await prisma.document.create({
+    data: {
+      projectId: project.id,
+      title: templateContent ? data.title : 'Untitled',
+      content: (templateContent as Prisma.InputJsonValue) ?? { type: 'doc', content: [{ type: 'paragraph' }] },
+      sortOrder: 0,
+    },
+  });
 
   return project;
 }

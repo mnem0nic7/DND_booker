@@ -56,7 +56,8 @@ describe('Documents API', () => {
       expect(res.status).toBe(201);
       expect(res.body.title).toBe('Chapter 1');
       expect(res.body.projectId).toBe(projectId);
-      expect(res.body.sortOrder).toBe(0);
+      // sortOrder 1 because project auto-creates an initial "Untitled" document at sortOrder 0
+      expect(res.body.sortOrder).toBe(1);
       expect(res.body.content).toBeDefined();
       createdDocId = res.body.id;
     });
@@ -69,7 +70,7 @@ describe('Documents API', () => {
 
       expect(res.status).toBe(201);
       expect(res.body.title).toBe('Chapter 2');
-      expect(res.body.sortOrder).toBe(1);
+      expect(res.body.sortOrder).toBe(2);
       secondDocId = res.body.id;
     });
 

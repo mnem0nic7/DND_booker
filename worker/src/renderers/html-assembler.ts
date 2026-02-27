@@ -18,87 +18,158 @@ export interface AssembleOptions {
  * Theme names must match client ThemeName type:
  * 'classic-parchment' | 'dark-tome' | 'clean-modern' | 'fey-wild' | 'infernal'
  */
+/**
+ * Returns CSS custom properties for the given theme.
+ *
+ * Variable names match the client-side theme CSS (client/src/styles/themes/*.css)
+ * so that exported HTML renders identically to the editor preview.
+ *
+ * Core layout vars: --page-bg, --text-color, --heading-font, --body-font,
+ *   --accent-color, --accent-secondary
+ * Block-specific vars: --stat-block-bg, --stat-block-border, --callout-bg,
+ *   --read-aloud-bg, --read-aloud-border, --sidebar-bg,
+ *   --table-header-bg, --table-stripe-bg, --border-decoration
+ *
+ * Additionally emits the worker-side aliases (--color-primary, --color-bg, etc.)
+ * for backward compatibility with the inline block CSS below.
+ */
 function getThemeVariables(theme: string): string {
-  switch (theme) {
-    case 'classic-parchment':
-      return `
-        --color-primary: #58180d;
-        --color-secondary: #c0ad8a;
-        --color-bg: #fdf1dc;
-        --color-text: #1a1a1a;
-        --color-accent: #e0cda9;
-        --color-heading: #58180d;
-        --color-divider: #9c2b1b;
-        --font-heading: 'MrEaves', 'Libre Baskerville', serif;
-        --font-body: 'Bookinsanity', 'Noto Serif', serif;
-      `;
+  const themes: Record<string, string> = {
+    'classic-parchment': `
+      /* Client theme vars */
+      --page-bg: #f4e4c1;
+      --text-color: #1a1a1a;
+      --heading-font: 'Cinzel', serif;
+      --body-font: 'Crimson Text', serif;
+      --accent-color: #58180d;
+      --accent-secondary: #c9ad6a;
+      --stat-block-bg: #fdf1dc;
+      --stat-block-border: #e69a28;
+      --callout-bg: #e0d6c2;
+      --read-aloud-bg: #e8dcc8;
+      --read-aloud-border: #5c3a1e;
+      --sidebar-bg: #e8edf3;
+      --table-header-bg: #78350f;
+      --table-stripe-bg: #fef3c7;
+      --border-decoration: #8b1a1a;
+      /* Worker aliases */
+      --color-primary: #58180d;
+      --color-secondary: #c9ad6a;
+      --color-bg: #fdf1dc;
+      --color-text: #1a1a1a;
+      --color-accent: #e0d6c2;
+      --color-heading: #58180d;
+      --color-divider: #8b1a1a;
+      --font-heading: 'Cinzel', serif;
+      --font-body: 'Crimson Text', serif;
+    `,
+    'dark-tome': `
+      --page-bg: #1a1a2e;
+      --text-color: #e0d6c2;
+      --heading-font: 'Uncial Antiqua', serif;
+      --body-font: 'EB Garamond', serif;
+      --accent-color: #c9a84c;
+      --accent-secondary: #7b68ae;
+      --stat-block-bg: #252545;
+      --stat-block-border: #c9a84c;
+      --callout-bg: #2a2a4a;
+      --read-aloud-bg: #2a2a3e;
+      --read-aloud-border: #c9a84c;
+      --sidebar-bg: #252540;
+      --table-header-bg: #3d2e6b;
+      --table-stripe-bg: #22223a;
+      --border-decoration: #7b68ae;
+      --color-primary: #c9a84c;
+      --color-secondary: #7b68ae;
+      --color-bg: #252545;
+      --color-text: #e0d6c2;
+      --color-accent: #2a2a4a;
+      --color-heading: #c9a84c;
+      --color-divider: #7b68ae;
+      --font-heading: 'Uncial Antiqua', serif;
+      --font-body: 'EB Garamond', serif;
+    `,
+    'clean-modern': `
+      --page-bg: #ffffff;
+      --text-color: #1f2937;
+      --heading-font: 'Inter', sans-serif;
+      --body-font: 'Merriweather', serif;
+      --accent-color: #2563eb;
+      --accent-secondary: #64748b;
+      --stat-block-bg: #f1f5f9;
+      --stat-block-border: #2563eb;
+      --callout-bg: #eff6ff;
+      --read-aloud-bg: #f8fafc;
+      --read-aloud-border: #2563eb;
+      --sidebar-bg: #f1f5f9;
+      --table-header-bg: #1e40af;
+      --table-stripe-bg: #f1f5f9;
+      --border-decoration: #2563eb;
+      --color-primary: #2563eb;
+      --color-secondary: #64748b;
+      --color-bg: #f1f5f9;
+      --color-text: #1f2937;
+      --color-accent: #eff6ff;
+      --color-heading: #1e40af;
+      --color-divider: #2563eb;
+      --font-heading: 'Inter', sans-serif;
+      --font-body: 'Merriweather', serif;
+    `,
+    'fey-wild': `
+      --page-bg: #f0f7ee;
+      --text-color: #1a2e1a;
+      --heading-font: 'Dancing Script', cursive;
+      --body-font: 'Lora', serif;
+      --accent-color: #166534;
+      --accent-secondary: #ca8a04;
+      --stat-block-bg: #e8f5e2;
+      --stat-block-border: #22c55e;
+      --callout-bg: #dcfce7;
+      --read-aloud-bg: #ecfdf5;
+      --read-aloud-border: #166534;
+      --sidebar-bg: #fefce8;
+      --table-header-bg: #166534;
+      --table-stripe-bg: #f0fdf4;
+      --border-decoration: #22c55e;
+      --color-primary: #166534;
+      --color-secondary: #ca8a04;
+      --color-bg: #e8f5e2;
+      --color-text: #1a2e1a;
+      --color-accent: #dcfce7;
+      --color-heading: #166534;
+      --color-divider: #22c55e;
+      --font-heading: 'Dancing Script', cursive;
+      --font-body: 'Lora', serif;
+    `,
+    'infernal': `
+      --page-bg: #1c1517;
+      --text-color: #e8d5c4;
+      --heading-font: 'Pirata One', cursive;
+      --body-font: 'Bitter', serif;
+      --accent-color: #dc2626;
+      --accent-secondary: #ea580c;
+      --stat-block-bg: #2a1f1f;
+      --stat-block-border: #dc2626;
+      --callout-bg: #2a1a1a;
+      --read-aloud-bg: #2e1c1c;
+      --read-aloud-border: #dc2626;
+      --sidebar-bg: #2a1a1a;
+      --table-header-bg: #7f1d1d;
+      --table-stripe-bg: #231515;
+      --border-decoration: #ea580c;
+      --color-primary: #dc2626;
+      --color-secondary: #ea580c;
+      --color-bg: #2a1f1f;
+      --color-text: #e8d5c4;
+      --color-accent: #2a1a1a;
+      --color-heading: #dc2626;
+      --color-divider: #ea580c;
+      --font-heading: 'Pirata One', cursive;
+      --font-body: 'Bitter', serif;
+    `,
+  };
 
-    case 'dark-tome':
-      return `
-        --color-primary: #bb9f65;
-        --color-secondary: #3a3a3a;
-        --color-bg: #1e1e1e;
-        --color-text: #d4d4d4;
-        --color-accent: #2d2d2d;
-        --color-heading: #bb9f65;
-        --color-divider: #bb9f65;
-        --font-heading: 'Libre Baskerville', serif;
-        --font-body: 'Noto Serif', serif;
-      `;
-
-    case 'clean-modern':
-      return `
-        --color-primary: #2563eb;
-        --color-secondary: #e5e7eb;
-        --color-bg: #ffffff;
-        --color-text: #1f2937;
-        --color-accent: #f3f4f6;
-        --color-heading: #1e40af;
-        --color-divider: #3b82f6;
-        --font-heading: 'Inter', sans-serif;
-        --font-body: 'Inter', sans-serif;
-      `;
-
-    case 'fey-wild':
-      return `
-        --color-primary: #2d5016;
-        --color-secondary: #d4e0c8;
-        --color-bg: #f0f5e8;
-        --color-text: #1a2e0a;
-        --color-accent: #c8d9b8;
-        --color-heading: #2d5016;
-        --color-divider: #4a7a28;
-        --font-heading: 'Libre Baskerville', serif;
-        --font-body: 'Noto Serif', serif;
-      `;
-
-    case 'infernal':
-      return `
-        --color-primary: #dc2626;
-        --color-secondary: #2a1a1a;
-        --color-bg: #1c1517;
-        --color-text: #e8d5c4;
-        --color-accent: #2a1f1f;
-        --color-heading: #dc2626;
-        --color-divider: #ea580c;
-        --font-heading: 'Libre Baskerville', serif;
-        --font-body: 'Noto Serif', serif;
-      `;
-
-    default:
-      // Default to classic-parchment
-      return `
-        --color-primary: #58180d;
-        --color-secondary: #c0ad8a;
-        --color-bg: #fdf1dc;
-        --color-text: #1a1a1a;
-        --color-accent: #e0cda9;
-        --color-heading: #58180d;
-        --color-divider: #9c2b1b;
-        --font-heading: 'Libre Baskerville', serif;
-        --font-body: 'Noto Serif', serif;
-      `;
-  }
+  return themes[theme] || themes['classic-parchment'];
 }
 
 interface TocEntry {
@@ -217,7 +288,7 @@ export function assembleHtml(options: AssembleOptions): string {
   <title>${escapeHtml(projectTitle)}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Noto+Serif:ital,wght@0,400;0,700;1,400&family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Crimson+Text:ital,wght@0,400;0,700;1,400&family=Uncial+Antiqua&family=EB+Garamond:ital,wght@0,400;0,700;1,400&family=Inter:wght@400;600;700&family=Merriweather:ital,wght@0,400;0,700;1,400&family=Dancing+Script:wght@400;700&family=Lora:ital,wght@0,400;0,700;1,400&family=Pirata+One&family=Bitter:ital,wght@0,400;0,700;1,400&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet" />
   <style>
     /* Theme CSS variables */
     :root {
@@ -234,7 +305,7 @@ export function assembleHtml(options: AssembleOptions): string {
       padding: 0;
       font-family: var(--font-body);
       color: var(--color-text);
-      background: var(--color-bg);
+      background: var(--page-bg);
       line-height: 1.6;
     }
 
@@ -267,8 +338,8 @@ export function assembleHtml(options: AssembleOptions): string {
 
     th {
       font-family: var(--font-heading);
-      color: var(--color-heading);
-      background: var(--color-accent);
+      color: white;
+      background: var(--table-header-bg);
     }
 
     hr {
@@ -299,8 +370,8 @@ export function assembleHtml(options: AssembleOptions): string {
 
     /* Stat Block */
     .stat-block {
-      background: var(--color-bg);
-      border: 2px solid var(--color-primary);
+      background: var(--stat-block-bg);
+      border: 2px solid var(--stat-block-border);
       padding: 1rem;
       margin: 1rem 0;
       page-break-inside: avoid;
@@ -375,12 +446,13 @@ export function assembleHtml(options: AssembleOptions): string {
     .read-aloud-box {
       padding: 1rem;
       margin: 1rem 0;
-      border-left: 4px solid var(--color-primary);
+      border-left: 4px solid var(--read-aloud-border);
+      background: var(--read-aloud-bg);
       page-break-inside: avoid;
     }
 
     .read-aloud-box--parchment {
-      background: var(--color-accent);
+      background: var(--read-aloud-bg);
     }
 
     .read-aloud-box--dark {
@@ -401,6 +473,7 @@ export function assembleHtml(options: AssembleOptions): string {
     .sidebar-callout {
       padding: 1rem;
       margin: 1rem 0;
+      background: var(--callout-bg);
       border: 1px solid var(--color-accent);
       border-radius: 4px;
       page-break-inside: avoid;
@@ -460,7 +533,7 @@ export function assembleHtml(options: AssembleOptions): string {
 
     /* Spell Card */
     .spell-card {
-      background: var(--color-bg);
+      background: var(--stat-block-bg);
       border: 2px solid #4338ca;
       padding: 1rem;
       margin: 1rem 0;
@@ -511,7 +584,7 @@ export function assembleHtml(options: AssembleOptions): string {
 
     /* Magic Item */
     .magic-item {
-      background: var(--color-bg);
+      background: var(--stat-block-bg);
       border: 2px solid #16a34a;
       border-top: 4px solid #16a34a;
       padding: 1rem;
@@ -577,7 +650,7 @@ export function assembleHtml(options: AssembleOptions): string {
 
     /* NPC Profile */
     .npc-profile {
-      background: var(--color-bg);
+      background: var(--stat-block-bg);
       border: 2px solid var(--color-primary);
       padding: 1rem;
       margin: 1rem 0;
@@ -671,7 +744,7 @@ export function assembleHtml(options: AssembleOptions): string {
 
     /* Class Feature */
     .class-feature {
-      background: var(--color-bg);
+      background: var(--stat-block-bg);
       border: 2px solid #991b1b;
       padding: 1rem;
       margin: 1rem 0;
@@ -701,7 +774,7 @@ export function assembleHtml(options: AssembleOptions): string {
 
     /* Race Block */
     .race-block {
-      background: var(--color-bg);
+      background: var(--stat-block-bg);
       border: 2px solid var(--color-primary);
       padding: 1rem;
       margin: 1rem 0;

@@ -24,6 +24,11 @@ const BLOCK_TYPE_PATTERNS: Record<string, { label: string; requiredFields: strin
   chapterHeader: { label: 'Chapter Header', requiredFields: ['title', 'chapterNumber'] },
   titlePage: { label: 'Title Page', requiredFields: ['title', 'subtitle', 'author'] },
   creditsPage: { label: 'Credits Page', requiredFields: ['credits', 'copyrightYear'] },
+  readAloudBox: { label: 'Read Aloud', requiredFields: ['style'] },
+  mapBlock: { label: 'Map', requiredFields: ['src'] },
+  fullBleedImage: { label: 'Image', requiredFields: ['src', 'position'] },
+  tableOfContents: { label: 'Table of Contents', requiredFields: ['title'] },
+  pageBorder: { label: 'Page Border', requiredFields: ['borderStyle'] },
 };
 
 function detectBlockType(obj: Record<string, unknown>): string | null {

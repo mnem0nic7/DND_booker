@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Editor } from '@tiptap/react';
+import { tiptapToHtml } from '@dnd-booker/shared';
+import type { DocumentContent } from '@dnd-booker/shared';
 import { PreviewRenderer } from './PreviewRenderer';
 
 interface PreviewPanelProps {
@@ -13,7 +15,8 @@ const ZOOM_OPTIONS: ZoomLevel[] = [50, 75, 100];
 
 /**
  * Side panel that shows a scaled-down, real-time preview of the document
- * with the selected theme applied. Includes zoom controls and page-like styling.
+ * with the selected theme applied. Uses the shared tiptapToHtml renderer
+ * so custom D&D blocks (stat blocks, spell cards, etc.) render fully.
  */
 export function PreviewPanel({ editor, theme }: PreviewPanelProps) {
   const [zoom, setZoom] = useState<ZoomLevel>(75);
@@ -21,7 +24,10 @@ export function PreviewPanel({ editor, theme }: PreviewPanelProps) {
 
   const updateHtml = useCallback(() => {
     if (editor) {
-      setHtml(editor.getHTML());
+      // Use the shared JSON-to-HTML renderer instead of editor.getHTML()
+      // so custom atom blocks render their full content
+      const json = editor.getJSON() as DocumentContent;
+      setHtml(tiptapToHtml(json));
     }
   }, [editor]);
 
