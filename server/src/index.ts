@@ -87,6 +87,13 @@ app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
     }
     return;
   }
+  // Handle fileFilter rejections (plain Error from multer's callback)
+  if (err.message === 'Only image files are allowed') {
+    if (!res.headersSent) {
+      res.status(400).json({ error: err.message });
+    }
+    return;
+  }
   console.error('[Error]', err.stack ?? err.message);
   if (!res.headersSent) {
     res.status(500).json({ error: 'Internal server error' });

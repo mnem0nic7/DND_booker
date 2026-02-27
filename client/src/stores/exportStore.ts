@@ -29,12 +29,15 @@ interface ExportState {
 }
 
 let pollTimer: ReturnType<typeof setTimeout> | null = null;
+let pollCount = 0;
+const MAX_POLL_COUNT = 150; // 150 * 2s = 5 minutes max
 
 function clearPollTimer() {
   if (pollTimer !== null) {
     clearTimeout(pollTimer);
     pollTimer = null;
   }
+  pollCount = 0;
 }
 
 export const useExportStore = create<ExportState>((set, get) => ({
@@ -76,6 +79,14 @@ export const useExportStore = create<ExportState>((set, get) => ({
         if (data.status === 'failed') {
           set({ error: data.errorMessage || 'Export failed' });
         }
+        return;
+      }
+
+      // Stop after MAX_POLL_COUNT to avoid infinite polling on stuck jobs
+      pollCount++;
+      if (pollCount >= MAX_POLL_COUNT) {
+        clearPollTimer();
+        set({ error: 'Export timed out — please try again' });
         return;
       }
 

@@ -31,6 +31,16 @@ export function AiChatPanel({ projectId, editor }: AiChatPanelProps) {
     fetchChatHistory(projectId);
   }, [projectId, fetchSettings, fetchChatHistory]);
 
+  // Abort any in-flight AI stream when the panel unmounts
+  useEffect(() => {
+    return () => {
+      const store = useAiStore.getState();
+      if (store.isStreaming) {
+        store.cancelStream();
+      }
+    };
+  }, []);
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, streamingContent]);

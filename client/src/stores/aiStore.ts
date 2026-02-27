@@ -42,6 +42,7 @@ interface AiState {
   _chatRequestId: number;
   fetchChatHistory: (projectId: string) => Promise<void>;
   sendMessage: (projectId: string, message: string) => Promise<void>;
+  cancelStream: () => void;
   clearChat: (projectId: string) => Promise<void>;
   toggleChatPanel: () => void;
   setChatPanelOpen: (open: boolean) => void;
@@ -249,6 +250,12 @@ export const useAiStore = create<AiState>((set, get) => ({
         _streamAbortController = null;
       }
     }
+  },
+
+  cancelStream: () => {
+    _streamAbortController?.abort();
+    _streamAbortController = null;
+    set({ isStreaming: false, streamingContent: '' });
   },
 
   clearChat: async (projectId) => {

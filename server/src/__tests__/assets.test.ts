@@ -75,7 +75,8 @@ describe('Assets API', () => {
           contentType: 'image/svg+xml',
         });
 
-      expect(res.status).toBe(500); // multer fileFilter rejects it
+      expect(res.status).toBe(400);
+      expect(res.body.error).toBe('Only image files are allowed');
     });
 
     it('should return 404 for non-existent project', async () => {

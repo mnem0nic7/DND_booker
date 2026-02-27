@@ -22,7 +22,7 @@ const settingsSchema = z.object({
   theme: z.enum(['classic-parchment', 'dark-tome', 'clean-modern', 'fey-wild', 'infernal']).optional(),
   pageSize: z.enum(['letter', 'a4']).optional(),
   columns: z.number().int().min(1).max(3).optional(),
-}).passthrough(); // allow future fields but validate known ones
+}).strip(); // strip unknown fields to prevent arbitrary key injection into settings JSON
 
 const updateSchema = z.object({
   title: z.string().min(1).max(200).optional(),
