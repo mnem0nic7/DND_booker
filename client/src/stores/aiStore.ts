@@ -21,6 +21,9 @@ interface AiSettings {
 
 const STREAM_ERROR_SENTINEL = '\n\n[Response interrupted. Please try again.]';
 
+/** Active stream abort controller — allows cancelling in-flight SSE requests. */
+let _streamAbortController: AbortController | null = null;
+
 interface AiState {
   // Settings
   settings: AiSettings | null;
@@ -124,6 +127,11 @@ export const useAiStore = create<AiState>((set, get) => ({
   },
 
   sendMessage: async (projectId, message) => {
+    // Abort any in-flight stream before starting a new one
+    _streamAbortController?.abort();
+    const abortController = new AbortController();
+    _streamAbortController = abortController;
+
     const userMessage: ChatMessage = {
       id: `temp-${Date.now()}`,
       role: 'user',
@@ -149,8 +157,11 @@ export const useAiStore = create<AiState>((set, get) => ({
         },
         credentials: 'include',
         body: JSON.stringify({ message }),
+        signal: abortController.signal,
       });
     }
+
+    let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
 
     try {
       let response = await doFetch();
@@ -181,18 +192,22 @@ export const useAiStore = create<AiState>((set, get) => ({
         throw new Error(errorMsg);
       }
 
-      const reader = response.body?.getReader();
+      reader = response.body?.getReader();
       if (!reader) throw new Error('No response body');
 
       const decoder = new TextDecoder();
       let fullContent = '';
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        const chunk = decoder.decode(value, { stream: true });
-        fullContent += chunk;
-        set({ streamingContent: fullContent });
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          const chunk = decoder.decode(value, { stream: true });
+          fullContent += chunk;
+          set({ streamingContent: fullContent });
+        }
+      } finally {
+        reader.releaseLock();
       }
 
       // Detect mid-stream error sentinel from server
@@ -218,6 +233,10 @@ export const useAiStore = create<AiState>((set, get) => ({
         streamingContent: '',
       }));
     } catch (err) {
+      // Don't show error for intentional aborts (user navigated away or sent new message)
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        return;
+      }
       console.error('[AI] sendMessage failed:', err);
       set((s) => ({
         messages: s.messages.filter((m) => m.id !== userMessage.id),
@@ -225,6 +244,10 @@ export const useAiStore = create<AiState>((set, get) => ({
         streamingContent: '',
         chatError: err instanceof Error ? err.message : 'Chat failed. Please try again.',
       }));
+    } finally {
+      if (_streamAbortController === abortController) {
+        _streamAbortController = null;
+      }
     }
   },
 

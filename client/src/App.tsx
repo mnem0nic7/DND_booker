@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useEffect } from 'react';
 import { useAuthStore } from './stores/authStore';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import DashboardPage from './pages/DashboardPage';
@@ -21,7 +22,9 @@ export default function App() {
           path="/"
           element={
             <ProtectedRoute>
-              <DashboardPage />
+              <ErrorBoundary>
+                <DashboardPage />
+              </ErrorBoundary>
             </ProtectedRoute>
           }
         />
@@ -29,7 +32,9 @@ export default function App() {
           path="/projects/:id"
           element={
             <ProtectedRoute>
-              <EditorPage />
+              <ErrorBoundary fallbackMessage="The editor encountered an error. Your recent changes were auto-saved.">
+                <EditorPage />
+              </ErrorBoundary>
             </ProtectedRoute>
           }
         />
