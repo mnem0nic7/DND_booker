@@ -18,6 +18,10 @@ import { Handout } from '../blocks/Handout/HandoutExtension';
 import { PageBorder } from '../blocks/PageBorder/PageBorderExtension';
 import { PageBreak } from '../blocks/PageBreak/PageBreakExtension';
 import { ColumnBreak } from '../blocks/ColumnBreak/ColumnBreakExtension';
+import { TitlePage } from '../blocks/TitlePage/TitlePageExtension';
+import { TableOfContents } from '../blocks/TableOfContents/TableOfContentsExtension';
+import { CreditsPage } from '../blocks/CreditsPage/CreditsPageExtension';
+import { BackCover } from '../blocks/BackCover/BackCoverExtension';
 import { Toolbar } from './Toolbar';
 import { BlockPalette } from '../sidebar/BlockPalette';
 
@@ -31,7 +35,7 @@ export function EditorLayout({ content, onUpdate }: EditorLayoutProps) {
   const [showProperties, setShowProperties] = useState(false);
 
   const editor = useEditor({
-    extensions: [StarterKit, StatBlock, ReadAloudBox, SidebarCallout, ChapterHeader, SpellCard, MagicItem, RandomTable, NpcProfile, EncounterTable, ClassFeature, RaceBlock, FullBleedImage, MapBlock, Handout, PageBorder, PageBreak, ColumnBreak],
+    extensions: [StarterKit, StatBlock, ReadAloudBox, SidebarCallout, ChapterHeader, SpellCard, MagicItem, RandomTable, NpcProfile, EncounterTable, ClassFeature, RaceBlock, FullBleedImage, MapBlock, Handout, PageBorder, PageBreak, ColumnBreak, TitlePage, TableOfContents, CreditsPage, BackCover],
     content,
     immediatelyRender: false,
     onUpdate: ({ editor: ed }) => {

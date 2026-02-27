@@ -1,0 +1,154 @@
+.credits-page {
+  font-family: 'Crimson Text', 'Libre Baskerville', serif;
+  background: #fdf1dc;
+  border: 1px solid #c9ad6a;
+  position: relative;
+}
+
+.credits-page__content {
+  padding: 2rem;
+}
+
+.credits-page__heading {
+  font-family: 'Cinzel', 'Georgia', serif;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #58180d;
+  text-align: center;
+  margin: 0 0 1.5rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.credits-page__credits-text {
+  text-align: center;
+  margin-bottom: 1.5rem;
+}
+
+.credits-page__credits-text p {
+  font-size: 0.85rem;
+  color: #333;
+  margin: 0.2rem 0;
+  line-height: 1.5;
+}
+
+.credits-page__divider {
+  height: 1px;
+  background: #c9ad6a;
+  border: none;
+  margin: 1.5rem 2rem;
+}
+
+.credits-page__legal-section {
+  margin-bottom: 1.5rem;
+}
+
+.credits-page__legal-heading {
+  font-family: 'Cinzel', 'Georgia', serif;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #58180d;
+  margin: 0 0 0.5rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.credits-page__legal-text {
+  font-size: 0.7rem;
+  color: #555;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.credits-page__copyright {
+  font-size: 0.75rem;
+  color: #777;
+  text-align: center;
+  margin: 0;
+  font-style: italic;
+}
+
+.credits-page__delete-btn {
+  position: absolute;
+  top: 0.25rem;
+  right: 0.25rem;
+  background: #dc2626;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 0.15rem 0.4rem;
+  font-size: 0.7rem;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.credits-page:hover .credits-page__delete-btn {
+  opacity: 1;
+}
+
+/* Edit panel styles */
+.credits-page__edit-panel {
+  background: #fff8ee;
+  border: 1px solid #e69a28;
+  border-radius: 4px;
+  padding: 0.75rem;
+  margin: 0 1rem 1rem;
+  font-family: system-ui, sans-serif;
+  font-size: 0.8rem;
+}
+
+.credits-page__edit-panel h4 {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #58180d;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 0 0 0.5rem;
+}
+
+.credits-page__edit-row {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-bottom: 0.5rem;
+}
+
+.credits-page__edit-row label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #333;
+  min-width: 7rem;
+}
+
+.credits-page__edit-row input {
+  padding: 0.2rem 0.35rem;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  font-size: 0.75rem;
+  background: white;
+}
+
+.credits-page__edit-row-col {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-bottom: 0.5rem;
+}
+
+.credits-page__edit-row-col label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #333;
+}
+
+.credits-page__edit-textarea {
+  width: 100%;
+  min-height: 3rem;
+  padding: 0.25rem 0.35rem;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  font-size: 0.75rem;
+  font-family: system-ui, sans-serif;
+  resize: vertical;
+}

@@ -312,6 +312,54 @@ export function BlockPalette({ editor }: BlockPaletteProps) {
           </button>
         </div>
       </div>
+      {/* Structure blocks */}
+      <div className="mt-6 pt-4 border-t">
+        <h4 className="text-xs font-medium text-gray-400 uppercase mb-2">
+          Structure
+        </h4>
+        <div className="space-y-1">
+          <button
+            onMouseDown={(e) => {
+              e.preventDefault();
+              editor.chain().focus().insertContent({ type: 'titlePage' }).run();
+            }}
+            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 rounded hover:bg-gray-200 transition-colors"
+          >
+            <span className="w-6 h-6 flex items-center justify-center bg-rose-100 text-rose-800 rounded text-xs font-mono">TP</span>
+            Title Page
+          </button>
+          <button
+            onMouseDown={(e) => {
+              e.preventDefault();
+              editor.chain().focus().insertContent({ type: 'tableOfContents' }).run();
+            }}
+            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 rounded hover:bg-gray-200 transition-colors"
+          >
+            <span className="w-6 h-6 flex items-center justify-center bg-rose-100 text-rose-800 rounded text-xs font-mono">TC</span>
+            Table of Contents
+          </button>
+          <button
+            onMouseDown={(e) => {
+              e.preventDefault();
+              editor.chain().focus().insertContent({ type: 'creditsPage' }).run();
+            }}
+            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 rounded hover:bg-gray-200 transition-colors"
+          >
+            <span className="w-6 h-6 flex items-center justify-center bg-rose-100 text-rose-800 rounded text-xs font-mono">CR</span>
+            Credits Page
+          </button>
+          <button
+            onMouseDown={(e) => {
+              e.preventDefault();
+              editor.chain().focus().insertContent({ type: 'backCover' }).run();
+            }}
+            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 rounded hover:bg-gray-200 transition-colors"
+          >
+            <span className="w-6 h-6 flex items-center justify-center bg-rose-100 text-rose-800 rounded text-xs font-mono">BC</span>
+            Back Cover
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

@@ -16,3 +16,7 @@
 @import './styles/blocks/page-border.css';
 @import './styles/blocks/page-break.css';
 @import './styles/blocks/column-break.css';
+@import './styles/blocks/title-page.css';
+@import './styles/blocks/table-of-contents.css';
+@import './styles/blocks/credits-page.css';
+@import './styles/blocks/back-cover.css';
