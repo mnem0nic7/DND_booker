@@ -1,0 +1,133 @@
+.table-of-contents {
+  font-family: 'Crimson Text', 'Libre Baskerville', serif;
+  background: #fdf1dc;
+  padding: 2rem;
+  border: 1px solid #c9ad6a;
+  position: relative;
+  max-width: 500px;
+}
+
+.table-of-contents__heading {
+  font-family: 'Cinzel', 'Georgia', serif;
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: #58180d;
+  text-align: center;
+  margin: 0 0 0.5rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.table-of-contents__note {
+  font-size: 0.75rem;
+  font-style: italic;
+  color: #a08050;
+  text-align: center;
+  margin: 0 0 1.5rem;
+}
+
+.table-of-contents__entries {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.table-of-contents__entry {
+  display: flex;
+  align-items: baseline;
+  font-size: 0.95rem;
+  color: #1a1a1a;
+  line-height: 1.5;
+}
+
+.table-of-contents__entry-title {
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.table-of-contents__entry-leader {
+  flex: 1;
+  border-bottom: 1px dotted #999;
+  margin: 0 0.35rem;
+  min-width: 1rem;
+  position: relative;
+  top: -0.2em;
+}
+
+.table-of-contents__entry-page {
+  white-space: nowrap;
+  flex-shrink: 0;
+  font-weight: 600;
+  color: #58180d;
+}
+
+.table-of-contents__delete-btn {
+  position: absolute;
+  top: 0.25rem;
+  right: 0.25rem;
+  background: #dc2626;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 0.15rem 0.4rem;
+  font-size: 0.7rem;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.table-of-contents:hover .table-of-contents__delete-btn {
+  opacity: 1;
+}
+
+/* Edit panel styles */
+.table-of-contents__edit-panel {
+  background: #fff8ee;
+  border: 1px solid #e69a28;
+  border-radius: 4px;
+  padding: 0.75rem;
+  margin-top: 0.75rem;
+  font-family: system-ui, sans-serif;
+  font-size: 0.8rem;
+}
+
+.table-of-contents__edit-panel h4 {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #58180d;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 0 0 0.5rem;
+}
+
+.table-of-contents__edit-row {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-bottom: 0.25rem;
+}
+
+.table-of-contents__edit-row label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #333;
+  min-width: 5rem;
+}
+
+.table-of-contents__edit-row input {
+  flex: 1;
+  padding: 0.2rem 0.35rem;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  font-size: 0.75rem;
+  background: white;
+}
+
+/* Print styles for dotted leaders */
+@media print {
+  .table-of-contents__entry-leader {
+    border-bottom-style: dotted;
+    border-bottom-width: 1px;
+    border-bottom-color: #666;
+  }
+}

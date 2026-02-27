@@ -6,3 +6,7 @@
 @import './styles/blocks/spell-card.css';
 @import './styles/blocks/magic-item.css';
 @import './styles/blocks/random-table.css';
+@import './styles/blocks/title-page.css';
+@import './styles/blocks/table-of-contents.css';
+@import './styles/blocks/credits-page.css';
+@import './styles/blocks/back-cover.css';

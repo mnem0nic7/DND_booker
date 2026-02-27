@@ -8,6 +8,10 @@ import { ChapterHeader } from '../blocks/ChapterHeader/ChapterHeaderExtension';
 import { SpellCard } from '../blocks/SpellCard/SpellCardExtension';
 import { MagicItem } from '../blocks/MagicItem/MagicItemExtension';
 import { RandomTable } from '../blocks/RandomTable/RandomTableExtension';
+import { TitlePage } from '../blocks/TitlePage/TitlePageExtension';
+import { TableOfContents } from '../blocks/TableOfContents/TableOfContentsExtension';
+import { CreditsPage } from '../blocks/CreditsPage/CreditsPageExtension';
+import { BackCover } from '../blocks/BackCover/BackCoverExtension';
 import { Toolbar } from './Toolbar';
 import { BlockPalette } from '../sidebar/BlockPalette';
 
@@ -21,7 +25,7 @@ export function EditorLayout({ content, onUpdate }: EditorLayoutProps) {
   const [showProperties, setShowProperties] = useState(false);
 
   const editor = useEditor({
-    extensions: [StarterKit, StatBlock, ReadAloudBox, SidebarCallout, ChapterHeader, SpellCard, MagicItem, RandomTable],
+    extensions: [StarterKit, StatBlock, ReadAloudBox, SidebarCallout, ChapterHeader, SpellCard, MagicItem, RandomTable, TitlePage, TableOfContents, CreditsPage, BackCover],
     content,
     immediatelyRender: false,
     onUpdate: ({ editor: ed }) => {

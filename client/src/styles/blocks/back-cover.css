@@ -1,0 +1,198 @@
+.back-cover {
+  font-family: 'Crimson Text', 'Libre Baskerville', serif;
+  background: #1a1a2e;
+  border: 2px solid #333;
+  position: relative;
+  color: #e0d8c8;
+  min-height: 400px;
+}
+
+.back-cover__content {
+  padding: 2.5rem 2rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.back-cover__blurb {
+  max-width: 400px;
+  margin-bottom: 1.5rem;
+}
+
+.back-cover__blurb p {
+  font-size: 1rem;
+  line-height: 1.6;
+  font-style: italic;
+  margin: 0;
+  color: #e0d8c8;
+}
+
+.back-cover__ornament {
+  font-size: 1rem;
+  color: #c9ad6a;
+  margin: 0.5rem 0 1.5rem;
+  letter-spacing: 0.75rem;
+}
+
+.back-cover__author-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 2rem;
+  gap: 0.75rem;
+}
+
+.back-cover__author-image {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid #c9ad6a;
+}
+
+.back-cover__author-image-placeholder {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  border: 2px dashed #555;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.back-cover__author-image-placeholder span {
+  font-size: 0.65rem;
+  color: #777;
+}
+
+.back-cover__author-bio {
+  font-size: 0.85rem;
+  color: #bbb;
+  line-height: 1.4;
+  margin: 0;
+  max-width: 350px;
+}
+
+.back-cover__barcode-area {
+  margin-top: auto;
+  padding-top: 1rem;
+}
+
+.back-cover__barcode-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.back-cover__barcode-lines {
+  display: flex;
+  align-items: flex-end;
+  gap: 1px;
+  height: 40px;
+  padding: 4px 8px;
+  background: white;
+  border-radius: 2px;
+}
+
+.back-cover__barcode-line {
+  height: 100%;
+  background: #1a1a2e;
+}
+
+.back-cover__barcode-text {
+  font-size: 0.6rem;
+  color: #666;
+  font-family: system-ui, sans-serif;
+}
+
+.back-cover__delete-btn {
+  position: absolute;
+  top: 0.25rem;
+  right: 0.25rem;
+  background: #dc2626;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 0.15rem 0.4rem;
+  font-size: 0.7rem;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s;
+  z-index: 1;
+}
+
+.back-cover:hover .back-cover__delete-btn {
+  opacity: 1;
+}
+
+/* Edit panel styles */
+.back-cover__edit-panel {
+  background: #fff8ee;
+  border: 1px solid #e69a28;
+  border-radius: 4px;
+  padding: 0.75rem;
+  margin: 0 1rem 1rem;
+  font-family: system-ui, sans-serif;
+  font-size: 0.8rem;
+  color: #333;
+  text-align: left;
+}
+
+.back-cover__edit-panel h4 {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #58180d;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 0 0 0.5rem;
+}
+
+.back-cover__edit-row {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-bottom: 0.5rem;
+}
+
+.back-cover__edit-row label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #333;
+  min-width: 7rem;
+}
+
+.back-cover__edit-row input {
+  flex: 1;
+  padding: 0.2rem 0.35rem;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  font-size: 0.75rem;
+  background: white;
+}
+
+.back-cover__edit-row-col {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-bottom: 0.5rem;
+}
+
+.back-cover__edit-row-col label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #333;
+}
+
+.back-cover__edit-textarea {
+  width: 100%;
+  min-height: 3rem;
+  padding: 0.25rem 0.35rem;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  font-size: 0.75rem;
+  font-family: system-ui, sans-serif;
+  resize: vertical;
+}
