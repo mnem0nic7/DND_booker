@@ -1,0 +1,80 @@
+import { prisma } from '../config/database.js';
+
+export async function getOrCreateSession(projectId: string, userId: string) {
+  return prisma.aiChatSession.upsert({
+    where: {
+      projectId_userId: { projectId, userId },
+    },
+    create: { projectId, userId },
+    update: {},
+  });
+}
+
+export async function getSessionMessages(sessionId: string) {
+  return prisma.aiChatMessage.findMany({
+    where: { sessionId },
+    orderBy: { createdAt: 'asc' },
+  });
+}
+
+export async function getRecentMessages(sessionId: string, limit: number) {
+  const messages = await prisma.aiChatMessage.findMany({
+    where: { sessionId },
+    orderBy: { createdAt: 'desc' },
+    take: limit,
+  });
+  return messages.reverse();
+}
+
+export async function getSessionByProject(projectId: string, userId: string) {
+  return prisma.aiChatSession.findUnique({
+    where: {
+      projectId_userId: { projectId, userId },
+    },
+    include: {
+      messages: { orderBy: { createdAt: 'asc' } },
+    },
+  });
+}
+
+export async function addMessage(
+  sessionId: string,
+  role: string,
+  content: string,
+  blocks?: unknown,
+) {
+  return prisma.aiChatMessage.create({
+    data: {
+      sessionId,
+      role,
+      content,
+      blocks: blocks ?? undefined,
+    },
+  });
+}
+
+export async function clearSession(sessionId: string, userId: string) {
+  const session = await prisma.aiChatSession.findFirst({
+    where: { id: sessionId, userId },
+  });
+  if (!session) return null;
+
+  await prisma.aiChatMessage.deleteMany({
+    where: { sessionId },
+  });
+  return true;
+}
+
+export async function clearSessionByProject(projectId: string, userId: string) {
+  const session = await prisma.aiChatSession.findUnique({
+    where: {
+      projectId_userId: { projectId, userId },
+    },
+  });
+  if (!session) return null;
+
+  await prisma.aiChatMessage.deleteMany({
+    where: { sessionId: session.id },
+  });
+  return true;
+}

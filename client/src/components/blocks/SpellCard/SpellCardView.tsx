@@ -2,6 +2,8 @@ import { useState, useCallback } from 'react';
 import { NodeViewWrapper } from '@tiptap/react';
 import type { ReactNodeViewProps } from '@tiptap/react';
 import type { SpellCardAttrs } from './SpellCardExtension';
+import { AiGenerateButton } from '../../ai/AiGenerateButton';
+import { AiAutoFillButton } from '../../ai/AiAutoFillButton';
 
 const SCHOOLS = [
   'abjuration',
@@ -98,9 +100,18 @@ export function SpellCardView({
           </div>
         )}
 
-        {/* Edit toggle */}
+        {/* Edit toggle + AI buttons */}
         {selected && (
-          <div style={{ textAlign: 'right', marginTop: '0.5rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.35rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
+            <AiGenerateButton
+              blockType="spellCard"
+              onGenerated={(attrs) => updateAttributes(attrs)}
+            />
+            <AiAutoFillButton
+              blockType="spellCard"
+              currentAttrs={node.attrs as Record<string, unknown>}
+              onApply={(suggestions) => updateAttributes(suggestions)}
+            />
             <button
               onClick={() => setEditing((v) => !v)}
               type="button"

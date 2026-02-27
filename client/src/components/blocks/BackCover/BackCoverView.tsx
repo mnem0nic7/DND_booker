@@ -2,6 +2,8 @@ import { useState, useCallback } from 'react';
 import { NodeViewWrapper } from '@tiptap/react';
 import type { ReactNodeViewProps } from '@tiptap/react';
 import type { BackCoverAttrs } from './BackCoverExtension';
+import { AiGenerateButton } from '../../ai/AiGenerateButton';
+import { AiAutoFillButton } from '../../ai/AiAutoFillButton';
 
 export function BackCoverView({
   node,
@@ -78,9 +80,11 @@ export function BackCoverView({
           </div>
         </div>
 
-        {/* Edit toggle */}
+        {/* Edit toggle + AI buttons */}
         {selected && (
-          <div style={{ textAlign: 'right', marginTop: '0.5rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.25rem', marginTop: '0.5rem' }}>
+            <AiGenerateButton blockType="backCover" onGenerated={updateAttributes} />
+            <AiAutoFillButton blockType="backCover" currentAttrs={{ ...attrs }} onApply={updateAttributes} />
             <button
               onClick={() => setEditing((v) => !v)}
               type="button"

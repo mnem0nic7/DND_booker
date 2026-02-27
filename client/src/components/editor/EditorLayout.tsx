@@ -29,6 +29,9 @@ import { ExportDialog } from './ExportDialog';
 import { PreviewPanel } from '../preview/PreviewPanel';
 import { useThemeStore } from '../../stores/themeStore';
 import { useExportStore } from '../../stores/exportStore';
+import { useAiStore } from '../../stores/aiStore';
+import { AiSettingsModal } from '../ai/AiSettingsModal';
+import { AiChatPanel } from '../ai/AiChatPanel';
 
 interface EditorLayoutProps {
   projectId: string;
@@ -40,8 +43,10 @@ export function EditorLayout({ projectId, content, onUpdate }: EditorLayoutProps
   const [showBlockPalette, setShowBlockPalette] = useState(true);
   const [showProperties, setShowProperties] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  const [showAiChat, setShowAiChat] = useState(false);
   const currentTheme = useThemeStore((s) => s.currentTheme);
   const openExportDialog = useExportStore((s) => s.openDialog);
+  const setSettingsModalOpen = useAiStore((s) => s.setSettingsModalOpen);
 
   const editor = useEditor({
     extensions: [StarterKit, StatBlock, ReadAloudBox, SidebarCallout, ChapterHeader, SpellCard, MagicItem, RandomTable, NpcProfile, EncounterTable, ClassFeature, RaceBlock, FullBleedImage, MapBlock, Handout, PageBorder, PageBreak, ColumnBreak, TitlePage, TableOfContents, CreditsPage, BackCover],
@@ -84,6 +89,29 @@ export function EditorLayout({ projectId, content, onUpdate }: EditorLayoutProps
             Export
           </button>
           <button
+            onClick={() => setShowAiChat((v) => !v)}
+            title={showAiChat ? 'Hide AI assistant' : 'Show AI assistant'}
+            className={`px-3 py-1.5 text-sm transition-colors rounded mr-1 flex items-center gap-1 ${
+              showAiChat
+                ? 'text-purple-700 bg-purple-50'
+                : 'text-gray-600 hover:text-purple-700 hover:bg-purple-50'
+            }`}
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 00-2.455 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z" />
+            </svg>
+            AI
+          </button>
+          <button
+            onClick={() => setSettingsModalOpen(true)}
+            title="AI Settings"
+            className="px-2 py-1.5 text-gray-400 hover:text-purple-600 transition-colors rounded mr-1"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12a7.5 7.5 0 0015 0m-15 0a7.5 7.5 0 1115 0m-15 0H3m16.5 0H21m-1.5 0H12m-8.457 3.077l1.41-.513m14.095-5.13l1.41-.513M5.106 17.785l1.15-.964m11.49-9.642l1.149-.964M7.501 19.795l.75-1.3m7.5-12.99l.75-1.3m-6.063 16.658l.26-1.477m2.605-14.772l.26-1.477m0 17.726l-.26-1.477M10.698 4.614l-.26-1.477M16.5 19.794l-.75-1.299M7.5 4.205L12 12m6.894 5.785l-1.149-.964M6.256 7.178l-1.15-.964m15.352 8.864l-1.41-.513M4.954 9.435l-1.41-.514M12.002 12l-3.75 6.495" />
+            </svg>
+          </button>
+          <button
             onClick={() => setShowPreview((v) => !v)}
             title={showPreview ? 'Hide preview' : 'Show preview'}
             className={`px-3 py-1.5 text-sm transition-colors rounded mr-1 flex items-center gap-1 ${
@@ -117,6 +145,13 @@ export function EditorLayout({ projectId, content, onUpdate }: EditorLayoutProps
         </div>
       </div>
 
+      {/* Right sidebar: AI Chat panel */}
+      {showAiChat && !showPreview && (
+        <div className="w-[380px] min-w-[300px] border-l">
+          <AiChatPanel projectId={projectId} editor={editor} />
+        </div>
+      )}
+
       {/* Right sidebar: Preview panel */}
       {showPreview && (
         <div className="w-[480px] min-w-[320px]">
@@ -125,7 +160,7 @@ export function EditorLayout({ projectId, content, onUpdate }: EditorLayoutProps
       )}
 
       {/* Right sidebar: Properties panel */}
-      {showProperties && !showPreview && (
+      {showProperties && !showPreview && !showAiChat && (
         <div className="w-64 border-l bg-gray-50 p-4 overflow-y-auto">
           <ThemePicker />
           <hr className="my-4 border-gray-200" />
@@ -140,6 +175,7 @@ export function EditorLayout({ projectId, content, onUpdate }: EditorLayoutProps
 
       {/* Export Dialog */}
       <ExportDialog projectId={projectId} />
+      <AiSettingsModal />
     </div>
   );
 }

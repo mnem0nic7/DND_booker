@@ -2,6 +2,8 @@ import { useCallback } from 'react';
 import { NodeViewWrapper } from '@tiptap/react';
 import type { ReactNodeViewProps } from '@tiptap/react';
 import type { HandoutAttrs } from './HandoutExtension';
+import { AiGenerateButton } from '../../ai/AiGenerateButton';
+import { AiAutoFillButton } from '../../ai/AiAutoFillButton';
 
 const STYLE_OPTIONS: { value: HandoutAttrs['style']; label: string }[] = [
   { value: 'letter', label: 'Letter' },
@@ -54,6 +56,14 @@ export function HandoutView({
             )}
           </div>
         </div>
+
+        {/* Edit toggle + AI buttons */}
+        {selected && (
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.25rem', marginTop: '0.5rem' }}>
+            <AiGenerateButton blockType="handout" onGenerated={updateAttributes} />
+            <AiAutoFillButton blockType="handout" currentAttrs={{ ...attrs }} onApply={updateAttributes} />
+          </div>
+        )}
 
         {/* Edit panel when selected */}
         {selected && (

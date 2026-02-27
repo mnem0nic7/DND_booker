@@ -2,6 +2,8 @@ import { useState, useCallback } from 'react';
 import { NodeViewWrapper } from '@tiptap/react';
 import type { ReactNodeViewProps } from '@tiptap/react';
 import type { ClassFeatureAttrs } from './ClassFeatureExtension';
+import { AiGenerateButton } from '../../ai/AiGenerateButton';
+import { AiAutoFillButton } from '../../ai/AiAutoFillButton';
 
 export function ClassFeatureView({
   node,
@@ -49,9 +51,18 @@ export function ClassFeatureView({
         {/* Description */}
         <div className="class-feature__description">{attrs.description}</div>
 
-        {/* Edit toggle */}
+        {/* Edit toggle + AI buttons */}
         {selected && (
-          <div style={{ textAlign: 'right', marginTop: '0.5rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.35rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
+            <AiGenerateButton
+              blockType="classFeature"
+              onGenerated={(attrs) => updateAttributes(attrs)}
+            />
+            <AiAutoFillButton
+              blockType="classFeature"
+              currentAttrs={node.attrs as Record<string, unknown>}
+              onApply={(suggestions) => updateAttributes(suggestions)}
+            />
             <button
               onClick={() => setEditing((v) => !v)}
               type="button"

@@ -30,6 +30,9 @@
 @import './styles/blocks/credits-page.css';
 @import './styles/blocks/back-cover.css';
 
+/* AI Assistant */
+@import './styles/ai-chat.css';
+
 /* Base theme-aware styles for the editor content area */
 [data-theme] {
   background-color: var(--page-bg);

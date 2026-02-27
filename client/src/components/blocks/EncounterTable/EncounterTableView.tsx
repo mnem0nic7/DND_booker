@@ -5,6 +5,8 @@ import type {
   EncounterTableAttrs,
   EncounterEntry,
 } from './EncounterTableExtension';
+import { AiGenerateButton } from '../../ai/AiGenerateButton';
+import { AiAutoFillButton } from '../../ai/AiAutoFillButton';
 
 function parseEntries(json: string): EncounterEntry[] {
   try {
@@ -123,9 +125,18 @@ export function EncounterTableView({
           </tbody>
         </table>
 
-        {/* Edit toggle */}
+        {/* Edit toggle + AI buttons */}
         {selected && (
-          <div style={{ textAlign: 'right', marginTop: '0.5rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.35rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
+            <AiGenerateButton
+              blockType="encounterTable"
+              onGenerated={(attrs) => updateAttributes(attrs)}
+            />
+            <AiAutoFillButton
+              blockType="encounterTable"
+              currentAttrs={node.attrs as Record<string, unknown>}
+              onApply={(suggestions) => updateAttributes(suggestions)}
+            />
             <button
               onClick={() => setEditing((v) => !v)}
               type="button"

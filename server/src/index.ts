@@ -8,6 +8,7 @@ import { projectDocumentRoutes, documentRoutes } from './routes/documents.js';
 import { projectAssetRoutes, assetRoutes } from './routes/assets.js';
 import exportRoutes from './routes/exports.js';
 import templateRoutes from './routes/templates.js';
+import { aiSettingsRoutes, aiGenerateRoutes, aiChatRoutes } from './routes/ai.js';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -28,6 +29,9 @@ app.use('/api/documents', documentRoutes);
 app.use('/api/assets', assetRoutes);
 app.use('/api', exportRoutes);
 app.use('/api/templates', templateRoutes);
+app.use('/api/ai', aiSettingsRoutes);
+app.use('/api/ai', aiGenerateRoutes);
+app.use('/api/projects/:projectId', aiChatRoutes);
 
 // Serve uploaded files statically
 app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')));

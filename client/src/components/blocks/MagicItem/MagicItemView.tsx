@@ -2,6 +2,8 @@ import { useState, useCallback } from 'react';
 import { NodeViewWrapper } from '@tiptap/react';
 import type { ReactNodeViewProps } from '@tiptap/react';
 import type { MagicItemAttrs } from './MagicItemExtension';
+import { AiGenerateButton } from '../../ai/AiGenerateButton';
+import { AiAutoFillButton } from '../../ai/AiAutoFillButton';
 
 const ITEM_TYPES = [
   'weapon',
@@ -108,9 +110,18 @@ export function MagicItemView({
           <div className="magic-item__properties">{attrs.properties}</div>
         )}
 
-        {/* Edit toggle */}
+        {/* Edit toggle + AI buttons */}
         {selected && (
-          <div style={{ textAlign: 'right', marginTop: '0.5rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.35rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
+            <AiGenerateButton
+              blockType="magicItem"
+              onGenerated={(attrs) => updateAttributes(attrs)}
+            />
+            <AiAutoFillButton
+              blockType="magicItem"
+              currentAttrs={node.attrs as Record<string, unknown>}
+              onApply={(suggestions) => updateAttributes(suggestions)}
+            />
             <button
               onClick={() => setEditing((v) => !v)}
               type="button"

@@ -13,6 +13,11 @@ model User {
   passwordHash String      @map("password_hash")
   displayName  String      @map("display_name")
   avatarUrl    String?     @map("avatar_url")
+  aiProvider   String?     @map("ai_provider")
+  aiModel      String?     @map("ai_model")
+  aiApiKeyEnc  String?     @map("ai_api_key_enc")
+  aiApiKeyIv   String?     @map("ai_api_key_iv")
+  aiApiKeyTag  String?     @map("ai_api_key_tag")
   createdAt    DateTime    @default(now()) @map("created_at")
   updatedAt    DateTime    @updatedAt @map("updated_at")
 
@@ -20,6 +25,7 @@ model User {
   exportJobs   ExportJob[]
   assets       Asset[]
   templates    Template[]
+  chatSessions AiChatSession[]
 
   @@map("users")
 }
@@ -53,6 +59,7 @@ model Project {
   user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   documents      Document[]
   exportJobs     ExportJob[]
+  chatSessions   AiChatSession[]
 
   @@map("projects")
 }
@@ -131,4 +138,31 @@ model Asset {
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("assets")
+}
+
+model AiChatSession {
+  id        String          @id @default(uuid())
+  projectId String          @map("project_id")
+  userId    String          @map("user_id")
+  createdAt DateTime        @default(now()) @map("created_at")
+
+  project   Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages  AiChatMessage[]
+
+  @@unique([projectId, userId])
+  @@map("ai_chat_sessions")
+}
+
+model AiChatMessage {
+  id        String        @id @default(uuid())
+  sessionId String        @map("session_id")
+  role      String
+  content   String
+  blocks    Json?
+  createdAt DateTime      @default(now()) @map("created_at")
+
+  session   AiChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@map("ai_chat_messages")
 }
