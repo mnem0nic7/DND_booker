@@ -26,6 +26,7 @@ import { Toolbar } from './Toolbar';
 import { BlockPalette } from '../sidebar/BlockPalette';
 import { ThemePicker } from './ThemePicker';
 import { ExportDialog } from './ExportDialog';
+import { PreviewPanel } from '../preview/PreviewPanel';
 import { useThemeStore } from '../../stores/themeStore';
 import { useExportStore } from '../../stores/exportStore';
 
@@ -38,6 +39,7 @@ interface EditorLayoutProps {
 export function EditorLayout({ projectId, content, onUpdate }: EditorLayoutProps) {
   const [showBlockPalette, setShowBlockPalette] = useState(true);
   const [showProperties, setShowProperties] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
   const currentTheme = useThemeStore((s) => s.currentTheme);
   const openExportDialog = useExportStore((s) => s.openDialog);
 
@@ -82,6 +84,21 @@ export function EditorLayout({ projectId, content, onUpdate }: EditorLayoutProps
             Export
           </button>
           <button
+            onClick={() => setShowPreview((v) => !v)}
+            title={showPreview ? 'Hide preview' : 'Show preview'}
+            className={`px-3 py-1.5 text-sm transition-colors rounded mr-1 flex items-center gap-1 ${
+              showPreview
+                ? 'text-indigo-700 bg-indigo-50'
+                : 'text-gray-600 hover:text-indigo-700 hover:bg-indigo-50'
+            }`}
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+            Preview
+          </button>
+          <button
             onClick={() => setShowProperties((v) => !v)}
             title={showProperties ? 'Hide properties' : 'Show properties'}
             className="px-2 py-2 text-gray-400 hover:text-gray-600 transition-colors border-l"
@@ -100,8 +117,15 @@ export function EditorLayout({ projectId, content, onUpdate }: EditorLayoutProps
         </div>
       </div>
 
+      {/* Right sidebar: Preview panel */}
+      {showPreview && (
+        <div className="w-[480px] min-w-[320px]">
+          <PreviewPanel editor={editor} theme={currentTheme} />
+        </div>
+      )}
+
       {/* Right sidebar: Properties panel */}
-      {showProperties && (
+      {showProperties && !showPreview && (
         <div className="w-64 border-l bg-gray-50 p-4 overflow-y-auto">
           <ThemePicker />
           <hr className="my-4 border-gray-200" />
