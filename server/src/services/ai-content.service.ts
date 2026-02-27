@@ -156,7 +156,9 @@ IMPORTANT: Fields marked as "JSON string of array" must be a JSON-encoded string
 
 export function buildAutoFillPrompt(blockType: string, currentAttrs: Record<string, unknown>): string {
   const spec = BLOCK_SCHEMAS[blockType];
-  if (!spec) return '';
+  if (!spec) {
+    throw new Error(`Unsupported block type for auto-fill: ${blockType}`);
+  }
 
   const filledFields: string[] = [];
   const emptyFields: string[] = [];

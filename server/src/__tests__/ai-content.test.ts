@@ -143,9 +143,8 @@ describe('AI Content Service', () => {
       expect(prompt.length).toBeLessThan(2000);
     });
 
-    it('should return empty string for unsupported block type', () => {
-      const prompt = buildAutoFillPrompt('invalidBlock', { foo: 'bar' });
-      expect(prompt).toBe('');
+    it('should throw for unsupported block type', () => {
+      expect(() => buildAutoFillPrompt('invalidBlock', { foo: 'bar' })).toThrow('Unsupported block type');
     });
   });
 

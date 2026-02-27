@@ -57,7 +57,12 @@ export async function getDecryptedApiKey(userId: string): Promise<string | null>
     return null;
   }
 
-  return decryptApiKey(user.aiApiKeyEnc, user.aiApiKeyIv, user.aiApiKeyTag);
+  try {
+    return decryptApiKey(user.aiApiKeyEnc, user.aiApiKeyIv, user.aiApiKeyTag);
+  } catch (err) {
+    console.error('[AI] Failed to decrypt API key for user', userId, '— key may need re-entry:', err);
+    return null;
+  }
 }
 
 export async function removeApiKey(userId: string) {

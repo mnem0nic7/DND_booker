@@ -68,18 +68,28 @@ export const useAiStore = create<AiState>((set, get) => ({
       set({ settings: data, isLoadingSettings: false });
     } catch (err) {
       console.error('[AI] Failed to fetch settings:', err);
-      set({ isLoadingSettings: false });
+      set({ isLoadingSettings: false, chatError: 'Failed to load AI settings.' });
     }
   },
 
   saveSettings: async (provider, model, apiKey?) => {
-    await api.post('/ai/settings', { provider, model, apiKey });
-    await get().fetchSettings();
+    try {
+      await api.post('/ai/settings', { provider, model, apiKey });
+      await get().fetchSettings();
+    } catch (err) {
+      console.error('[AI] Failed to save settings:', err);
+      throw err; // Re-throw so the modal can show the error
+    }
   },
 
   removeApiKey: async () => {
-    await api.delete('/ai/settings/key');
-    await get().fetchSettings();
+    try {
+      await api.delete('/ai/settings/key');
+      await get().fetchSettings();
+    } catch (err) {
+      console.error('[AI] Failed to remove API key:', err);
+      throw err; // Re-throw so the modal can show the error
+    }
   },
 
   validateKey: async (provider, apiKey) => {
@@ -106,7 +116,7 @@ export const useAiStore = create<AiState>((set, get) => ({
     } catch (err) {
       console.error('[AI] Failed to fetch chat history:', err);
       if (get()._chatRequestId === requestId) {
-        set({ messages: [] });
+        set({ messages: [], chatError: 'Failed to load chat history.' });
       }
     }
   },
@@ -219,10 +229,10 @@ export const useAiStore = create<AiState>((set, get) => ({
   clearChat: async (projectId) => {
     try {
       await api.delete(`/projects/${projectId}/ai/chat`);
-      set({ messages: [] });
+      set({ messages: [], chatError: null });
     } catch (err) {
       console.error('[AI] clearChat failed:', err);
-      // Don't clear local state since server still has messages
+      set({ chatError: 'Failed to clear chat history.' });
     }
   },
 

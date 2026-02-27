@@ -76,9 +76,13 @@ export function AiSettingsModal() {
   }
 
   async function handleRemoveKey() {
-    await removeApiKey();
-    setApiKey('');
-    setValidationResult(null);
+    try {
+      await removeApiKey();
+      setApiKey('');
+      setValidationResult(null);
+    } catch {
+      setError('Failed to remove API key.');
+    }
   }
 
   return (

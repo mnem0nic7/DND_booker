@@ -80,9 +80,18 @@ aiSettingsRoutes.post('/settings/validate', async (req: AuthRequest, res: Respon
   try {
     const valid = await validateApiKey(parsed.data.provider, parsed.data.apiKey);
     res.json({ valid });
-  } catch (err) {
+  } catch (err: unknown) {
     console.error('[AI] Key validation error:', err);
-    res.json({ valid: false });
+    // Distinguish auth errors (invalid key) from infrastructure errors
+    const isAuthError = err instanceof Error && (
+      err.message.includes('401') || err.message.includes('403') ||
+      err.message.includes('Unauthorized') || err.message.includes('invalid')
+    );
+    if (isAuthError) {
+      res.json({ valid: false });
+    } else {
+      res.status(500).json({ error: 'Could not validate key. Please try again.' });
+    }
   }
 });
 
@@ -106,13 +115,14 @@ aiGenerateRoutes.post('/generate-block', blockGenRateLimit, async (req: AuthRequ
   }
 
   const { blockType, prompt } = parsed.data;
-  const model = await getModelForUser(req.userId!);
-  if (!model) {
-    res.status(400).json({ error: 'AI not configured. Please set up your API key in AI settings.' });
-    return;
-  }
 
   try {
+    const model = await getModelForUser(req.userId!);
+    if (!model) {
+      res.status(400).json({ error: 'AI not configured. Please set up your API key in AI settings.' });
+      return;
+    }
+
     const systemPrompt = aiContent.buildSystemPrompt();
     const blockPrompt = aiContent.buildBlockPrompt(blockType, prompt);
 
@@ -154,13 +164,14 @@ aiGenerateRoutes.post('/autofill', autoFillRateLimit, async (req: AuthRequest, r
   }
 
   const { blockType, currentAttrs } = parsed.data;
-  const model = await getModelForUser(req.userId!);
-  if (!model) {
-    res.status(400).json({ error: 'AI not configured. Please set up your API key in AI settings.' });
-    return;
-  }
 
   try {
+    const model = await getModelForUser(req.userId!);
+    if (!model) {
+      res.status(400).json({ error: 'AI not configured. Please set up your API key in AI settings.' });
+      return;
+    }
+
     const systemPrompt = aiContent.buildSystemPrompt();
     const autoFillPrompt = aiContent.buildAutoFillPrompt(blockType, currentAttrs);
 
@@ -221,24 +232,24 @@ aiChatRoutes.post('/ai/chat', chatRateLimit, async (req: AuthRequest, res: Respo
     return;
   }
 
-  // Verify project ownership
-  const project = await prisma.project.findFirst({
-    where: { id: projectId, userId: req.userId! },
-  });
-  if (!project) {
-    res.status(404).json({ error: 'Project not found' });
-    return;
-  }
-
-  const model = await getModelForUser(req.userId!);
-  if (!model) {
-    res.status(400).json({ error: 'AI not configured. Please set up your API key in AI settings.' });
-    return;
-  }
-
   let savedUserMsgId: string | null = null;
 
   try {
+    // Verify project ownership
+    const project = await prisma.project.findFirst({
+      where: { id: projectId, userId: req.userId! },
+    });
+    if (!project) {
+      res.status(404).json({ error: 'Project not found' });
+      return;
+    }
+
+    const model = await getModelForUser(req.userId!);
+    if (!model) {
+      res.status(400).json({ error: 'AI not configured. Please set up your API key in AI settings.' });
+      return;
+    }
+
     // Get or create session, save user message
     const session = await aiChat.getOrCreateSession(projectId, req.userId!);
     const savedMsg = await aiChat.addMessage(session.id, 'user', parsed.data.message);
@@ -283,7 +294,9 @@ aiChatRoutes.post('/ai/chat', chatRateLimit, async (req: AuthRequest, res: Respo
     if (!res.headersSent) {
       // Clean up the orphaned user message on pre-stream failure
       if (savedUserMsgId) {
-        await prisma.aiChatMessage.delete({ where: { id: savedUserMsgId } }).catch(() => {});
+        await prisma.aiChatMessage.delete({ where: { id: savedUserMsgId } }).catch((cleanupErr) => {
+          console.error('[AI] Failed to clean up orphaned user message:', cleanupErr);
+        });
       }
       res.status(500).json({ error: 'Chat failed. Please try again.' });
     } else {
