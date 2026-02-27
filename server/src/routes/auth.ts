@@ -3,6 +3,7 @@ import { z } from 'zod';
 import {
   registerUser,
   loginUser,
+  getUserById,
   generateAccessToken,
   generateRefreshToken,
   verifyRefreshToken,
@@ -93,8 +94,13 @@ router.post('/refresh', async (req: Request, res: Response) => {
 
   try {
     const payload = verifyRefreshToken(token);
+    const user = await getUserById(payload.userId);
+    if (!user) {
+      res.status(401).json({ error: 'User not found' });
+      return;
+    }
     const accessToken = generateAccessToken(payload.userId);
-    res.json({ accessToken });
+    res.json({ accessToken, user });
   } catch {
     res.status(401).json({ error: 'Invalid refresh token' });
   }

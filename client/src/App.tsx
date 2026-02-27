@@ -8,11 +8,9 @@ import DashboardPage from './pages/DashboardPage';
 import EditorPage from './pages/EditorPage';
 
 export default function App() {
-  const { refresh } = useAuthStore();
-
   useEffect(() => {
-    refresh();
-  }, [refresh]);
+    useAuthStore.getState().refresh();
+  }, []);
 
   return (
     <BrowserRouter>

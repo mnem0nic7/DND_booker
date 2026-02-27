@@ -21,6 +21,14 @@ export function verifyRefreshToken(token: string): { userId: string } {
   return jwt.verify(token, JWT_REFRESH_SECRET) as { userId: string };
 }
 
+export async function getUserById(userId: string) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true, email: true, displayName: true, avatarUrl: true },
+  });
+  return user;
+}
+
 export async function registerUser(email: string, password: string, displayName: string) {
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) {

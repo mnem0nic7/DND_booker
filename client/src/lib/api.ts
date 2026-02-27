@@ -18,7 +18,8 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (res) => res,
   async (error) => {
-    if (error.response?.status === 401 && !error.config._retry) {
+    const isRefreshRequest = error.config?.url === '/auth/refresh';
+    if (error.response?.status === 401 && !error.config._retry && !isRefreshRequest) {
       error.config._retry = true;
       try {
         const { data } = await axios.post('/api/auth/refresh', {}, { withCredentials: true });
@@ -27,7 +28,6 @@ api.interceptors.response.use(
         return api(error.config);
       } catch {
         setAccessToken(null);
-        window.location.href = '/login';
       }
     }
     return Promise.reject(error);
