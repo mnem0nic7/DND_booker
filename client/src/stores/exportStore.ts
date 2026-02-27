@@ -104,8 +104,8 @@ export const useExportStore = create<ExportState>((set, get) => ({
     try {
       const { data } = await api.get(`/projects/${projectId}/export-jobs`);
       set({ exportHistory: data });
-    } catch {
-      // Non-critical: history fetch failure doesn't block export flow
+    } catch (err) {
+      console.warn('[Export] Failed to load export history:', err);
     }
   },
 

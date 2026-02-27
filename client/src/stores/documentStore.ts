@@ -19,6 +19,7 @@ interface DocumentState {
   isSaving: boolean;
   hasPendingChanges: boolean;
   saveError: string | null;
+  fetchError: string | null;
   fetchDocuments: (projectId: string) => Promise<void>;
   setActiveDocument: (id: string) => void;
   updateDocumentContent: (id: string, content: DocumentContent) => void;
@@ -43,9 +44,10 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
   isSaving: false,
   hasPendingChanges: false,
   saveError: null,
+  fetchError: null,
 
   fetchDocuments: async (projectId) => {
-    set({ isLoading: true });
+    set({ isLoading: true, fetchError: null });
     try {
       const { data } = await api.get(`/projects/${projectId}/documents`);
       set({
@@ -54,7 +56,7 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
         isLoading: false,
       });
     } catch {
-      set({ isLoading: false });
+      set({ isLoading: false, fetchError: 'Failed to load documents' });
     }
   },
 
@@ -176,8 +178,12 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
       await api.patch('/documents/reorder', { projectId, documentIds });
     } catch {
       // Revert on failure by re-fetching
-      const { data } = await api.get(`/projects/${projectId}/documents`);
-      set({ documents: data });
+      try {
+        const { data } = await api.get(`/projects/${projectId}/documents`);
+        set({ documents: data });
+      } catch {
+        set({ fetchError: 'Failed to reorder documents. Please reload.' });
+      }
     }
   },
 }));

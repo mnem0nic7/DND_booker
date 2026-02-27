@@ -17,6 +17,7 @@ export interface Project {
 interface ProjectState {
   projects: Project[];
   isLoading: boolean;
+  fetchError: string | null;
   fetchProjects: () => Promise<void>;
   createProject: (data: { title: string; description?: string; type: string; templateId?: string }) => Promise<Project>;
   deleteProject: (id: string) => Promise<void>;
@@ -25,14 +26,15 @@ interface ProjectState {
 export const useProjectStore = create<ProjectState>((set, get) => ({
   projects: [],
   isLoading: false,
+  fetchError: null,
 
   fetchProjects: async () => {
-    set({ isLoading: true });
+    set({ isLoading: true, fetchError: null });
     try {
       const { data } = await api.get('/projects');
       set({ projects: data, isLoading: false });
     } catch {
-      set({ isLoading: false });
+      set({ isLoading: false, fetchError: 'Failed to load projects' });
     }
   },
 

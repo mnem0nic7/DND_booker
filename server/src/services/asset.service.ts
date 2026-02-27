@@ -89,8 +89,11 @@ export async function deleteAsset(assetId: string, userId: string) {
     if (filePath.startsWith(resolvedDir + path.sep)) {
       await fs.unlink(filePath);
     }
-  } catch {
-    // File may already be gone; that's fine
+  } catch (err: unknown) {
+    // Only swallow ENOENT (file already gone); log everything else
+    if (err instanceof Error && (err as NodeJS.ErrnoException).code !== 'ENOENT') {
+      console.error('[Asset] Failed to delete file from disk:', err.message);
+    }
   }
 
   return prisma.asset.delete({ where: { id: assetId } });
