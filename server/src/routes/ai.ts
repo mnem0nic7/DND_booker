@@ -310,6 +310,14 @@ aiChatRoutes.post('/ai/chat', chatRateLimit, async (req: AuthRequest, res: Respo
 aiChatRoutes.delete('/ai/chat', async (req: AuthRequest, res: Response) => {
   const projectId = req.params.projectId as string;
   try {
+    // Verify project ownership before deleting chat
+    const project = await prisma.project.findFirst({
+      where: { id: projectId, userId: req.userId! },
+    });
+    if (!project) {
+      res.status(404).json({ error: 'Project not found' });
+      return;
+    }
     await aiChat.clearSessionByProject(projectId, req.userId!);
     res.json({ success: true });
   } catch (err) {

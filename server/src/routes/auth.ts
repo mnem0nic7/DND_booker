@@ -8,6 +8,7 @@ import {
   generateAccessToken,
   generateRefreshToken,
   verifyRefreshToken,
+  incrementTokenVersion,
 } from '../services/auth.service.js';
 
 const router = Router();
@@ -47,7 +48,7 @@ router.post('/register', authRateLimit, async (req: Request, res: Response) => {
   try {
     const user = await registerUser(parsed.data.email, parsed.data.password, parsed.data.displayName);
     const accessToken = generateAccessToken(user.id);
-    const refreshToken = generateRefreshToken(user.id);
+    const refreshToken = generateRefreshToken(user.id, 0);
 
     res.cookie('refreshToken', refreshToken, {
       httpOnly: true,
@@ -76,7 +77,7 @@ router.post('/login', authRateLimit, async (req: Request, res: Response) => {
   try {
     const user = await loginUser(parsed.data.email, parsed.data.password);
     const accessToken = generateAccessToken(user.id);
-    const refreshToken = generateRefreshToken(user.id);
+    const refreshToken = generateRefreshToken(user.id, user.tokenVersion);
 
     res.cookie('refreshToken', refreshToken, {
       httpOnly: true,
@@ -85,7 +86,8 @@ router.post('/login', authRateLimit, async (req: Request, res: Response) => {
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
-    res.json({ user, accessToken });
+    const { tokenVersion: _tv, ...userResponse } = user;
+    res.json({ user: userResponse, accessToken });
   } catch (err: unknown) {
     if (err instanceof Error && err.message === 'INVALID_CREDENTIALS') {
       res.status(401).json({ error: 'Invalid email or password' });
@@ -109,15 +111,35 @@ router.post('/refresh', async (req: Request, res: Response) => {
       res.status(401).json({ error: 'User not found' });
       return;
     }
+    // Reject tokens issued before the last logout/invalidation
+    if (payload.tokenVersion !== undefined && payload.tokenVersion !== user.tokenVersion) {
+      res.status(401).json({ error: 'Token revoked' });
+      return;
+    }
     const accessToken = generateAccessToken(payload.userId);
-    res.json({ accessToken, user });
+    const { tokenVersion: _tv, ...userResponse } = user;
+    res.json({ accessToken, user: userResponse });
   } catch {
     res.status(401).json({ error: 'Invalid refresh token' });
   }
 });
 
-router.post('/logout', (_req: Request, res: Response) => {
-  res.clearCookie('refreshToken');
+router.post('/logout', async (req: Request, res: Response) => {
+  // Best-effort: invalidate refresh tokens if we can identify the user
+  const refreshTokenCookie = req.cookies?.refreshToken;
+  if (refreshTokenCookie) {
+    try {
+      const payload = verifyRefreshToken(refreshTokenCookie);
+      await incrementTokenVersion(payload.userId);
+    } catch {
+      // Token expired or invalid — no user to invalidate, that's fine
+    }
+  }
+  res.clearCookie('refreshToken', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+  });
   res.json({ message: 'Logged out' });
 });
 

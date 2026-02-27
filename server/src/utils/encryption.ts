@@ -4,7 +4,16 @@ const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 16;
 const TAG_LENGTH = 16;
 
+let _cachedKey: Buffer | null = null;
+
+/** Reset the cached encryption key (for testing only). */
+export function _resetKeyCache(): void {
+  _cachedKey = null;
+}
+
 function getEncryptionKey(): Buffer {
+  if (_cachedKey) return _cachedKey;
+
   const secret = process.env.AI_KEY_ENCRYPTION_SECRET;
   if (!secret || secret.length !== 64) {
     throw new Error('AI_KEY_ENCRYPTION_SECRET must be a 64-character hex string');
@@ -15,7 +24,8 @@ function getEncryptionKey(): Buffer {
   if (new Set(secret.toLowerCase()).size < 4) {
     throw new Error('AI_KEY_ENCRYPTION_SECRET has insufficient entropy');
   }
-  return Buffer.from(secret, 'hex');
+  _cachedKey = Buffer.from(secret, 'hex');
+  return _cachedKey;
 }
 
 export function encryptApiKey(plaintext: string): { encrypted: string; iv: string; tag: string } {

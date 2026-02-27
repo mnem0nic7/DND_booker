@@ -45,8 +45,18 @@ export async function validateApiKey(provider: AiProvider, apiKey: string): Prom
     return true;
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
-    // Log without leaking the actual key
-    console.error(`[AI] Key validation failed for ${provider}:`, message.replace(/sk-[a-zA-Z0-9\-_]+/g, '[REDACTED]'));
-    return false;
+    const redacted = message.replace(/sk-[a-zA-Z0-9\-_]+/g, '[REDACTED]');
+    console.error(`[AI] Key validation failed for ${provider}:`, redacted);
+
+    // Auth-related errors mean the key is invalid — return false
+    const isAuthError = /401|403|Unauthorized|Forbidden|Incorrect|invalid.*(key|api)|invalid_api_key/i.test(message);
+    // Also check statusCode property on AI SDK errors
+    const statusCode = (err as { statusCode?: number }).statusCode
+      ?? (err as { status?: number }).status;
+    if (isAuthError || statusCode === 401 || statusCode === 403) return false;
+
+    // Non-auth errors (network, rate-limit, server errors) — re-throw so
+    // the route can return a 500 instead of a misleading { valid: false }
+    throw err;
   }
 }

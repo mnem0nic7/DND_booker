@@ -83,8 +83,12 @@ export async function deleteAsset(assetId: string, userId: string) {
 
   // Remove file from disk (best-effort)
   try {
-    const filePath = path.join(UPLOADS_DIR, asset.url.replace('/uploads/', ''));
-    await fs.unlink(filePath);
+    const resolvedDir = path.resolve(UPLOADS_DIR);
+    const filePath = path.resolve(UPLOADS_DIR, asset.url.replace('/uploads/', ''));
+    // Verify resolved path stays within uploads directory (defense-in-depth)
+    if (filePath.startsWith(resolvedDir + path.sep)) {
+      await fs.unlink(filePath);
+    }
   } catch {
     // File may already be gone; that's fine
   }

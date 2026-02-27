@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { encryptApiKey, decryptApiKey } from '../utils/encryption.js';
+import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
+import { encryptApiKey, decryptApiKey, _resetKeyCache } from '../utils/encryption.js';
 
 // Unit tests for AES-256-GCM encryption/decryption.
 // Requires AI_KEY_ENCRYPTION_SECRET env var (64 hex chars).
@@ -14,6 +14,7 @@ describe('Encryption Utility', () => {
   });
 
   afterAll(() => {
+    _resetKeyCache();
     if (originalSecret !== undefined) {
       process.env.AI_KEY_ENCRYPTION_SECRET = originalSecret;
     } else {
@@ -93,11 +94,16 @@ describe('Encryption Utility', () => {
   });
 
   describe('encryption key validation', () => {
+    beforeEach(() => {
+      _resetKeyCache();
+    });
+
     it('should throw when secret is missing', () => {
       const saved = process.env.AI_KEY_ENCRYPTION_SECRET;
       delete process.env.AI_KEY_ENCRYPTION_SECRET;
       expect(() => encryptApiKey('test')).toThrow('AI_KEY_ENCRYPTION_SECRET');
       process.env.AI_KEY_ENCRYPTION_SECRET = saved;
+      _resetKeyCache();
     });
 
     it('should throw when secret is too short', () => {
@@ -105,6 +111,7 @@ describe('Encryption Utility', () => {
       process.env.AI_KEY_ENCRYPTION_SECRET = 'abcd1234';
       expect(() => encryptApiKey('test')).toThrow('64-character');
       process.env.AI_KEY_ENCRYPTION_SECRET = saved;
+      _resetKeyCache();
     });
 
     it('should throw when secret has non-hex characters', () => {
@@ -112,6 +119,7 @@ describe('Encryption Utility', () => {
       process.env.AI_KEY_ENCRYPTION_SECRET = 'g'.repeat(64);
       expect(() => encryptApiKey('test')).toThrow('hexadecimal');
       process.env.AI_KEY_ENCRYPTION_SECRET = saved;
+      _resetKeyCache();
     });
 
     it('should throw when secret has insufficient entropy', () => {
@@ -119,6 +127,7 @@ describe('Encryption Utility', () => {
       process.env.AI_KEY_ENCRYPTION_SECRET = 'a'.repeat(64);
       expect(() => encryptApiKey('test')).toThrow('entropy');
       process.env.AI_KEY_ENCRYPTION_SECRET = saved;
+      _resetKeyCache();
     });
   });
 });

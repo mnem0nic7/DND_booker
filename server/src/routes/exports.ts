@@ -68,15 +68,18 @@ router.get('/export-jobs/:id/download', async (req: AuthRequest, res: Response) 
 
     // outputUrl is stored as "/output/filename.ext" — extract just the filename
     const filename = path.basename(job.outputUrl);
-    // Validate filename to prevent path traversal
-    if (filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
+
+    // Resolve and verify the path stays within EXPORT_OUTPUT_DIR (defense-in-depth)
+    const resolvedDir = path.resolve(EXPORT_OUTPUT_DIR);
+    const filepath = path.resolve(EXPORT_OUTPUT_DIR, filename);
+    if (!filepath.startsWith(resolvedDir + path.sep)) {
       res.status(400).json({ error: 'Invalid file reference.' });
       return;
     }
 
-    const filepath = path.join(EXPORT_OUTPUT_DIR, filename);
-
-    if (!fs.existsSync(filepath)) {
+    try {
+      await fs.promises.access(filepath, fs.constants.R_OK);
+    } catch {
       res.status(404).json({ error: 'Export file not found. It may have been cleaned up.' });
       return;
     }
@@ -84,8 +87,11 @@ router.get('/export-jobs/:id/download', async (req: AuthRequest, res: Response) 
     const ext = path.extname(filename).toLowerCase();
     const contentType = ext === '.epub' ? 'application/epub+zip' : 'application/pdf';
 
+    // RFC 6266 compliant Content-Disposition with UTF-8 fallback
+    const safeFilename = filename.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const encodedFilename = encodeURIComponent(filename);
     res.setHeader('Content-Type', contentType);
-    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Disposition', `attachment; filename="${safeFilename}"; filename*=UTF-8''${encodedFilename}`);
     fs.createReadStream(filepath).pipe(res);
   } catch (err) {
     console.error('[Export] Download failed:', err);

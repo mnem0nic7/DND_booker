@@ -101,6 +101,58 @@ function getThemeVariables(theme: string): string {
   }
 }
 
+interface ChapterEntry {
+  chapterNumber: string;
+  title: string;
+}
+
+/**
+ * Recursively scan TipTap JSON for chapterHeader nodes across all documents.
+ */
+function extractChapterHeaders(docs: AssembleOptions['documents']): ChapterEntry[] {
+  const entries: ChapterEntry[] = [];
+
+  function walk(node: DocumentContent) {
+    if (node.type === 'chapterHeader') {
+      entries.push({
+        chapterNumber: String(node.attrs?.chapterNumber || ''),
+        title: String(node.attrs?.title || 'Untitled Chapter'),
+      });
+    }
+    if (node.content) {
+      for (const child of node.content) {
+        walk(child);
+      }
+    }
+  }
+
+  for (const doc of docs) {
+    if (doc.content) {
+      walk(doc.content);
+    }
+  }
+
+  return entries;
+}
+
+/**
+ * Build TOC entry HTML from extracted chapter headers.
+ */
+function buildTocEntriesHtml(chapters: ChapterEntry[]): string {
+  if (chapters.length === 0) {
+    return `<p class="table-of-contents__note">No chapters found.</p>`;
+  }
+
+  return chapters.map((ch) => {
+    const prefix = ch.chapterNumber ? `${escapeHtml(ch.chapterNumber)}. ` : '';
+    return `<div class="table-of-contents__entry">
+      <span class="table-of-contents__entry-title">${prefix}${escapeHtml(ch.title)}</span>
+      <span class="table-of-contents__entry-leader"></span>
+      <span class="table-of-contents__entry-page">&mdash;</span>
+    </div>`;
+  }).join('\n');
+}
+
 /**
  * Assemble a complete HTML document from project documents, theme, and title.
  */
@@ -110,6 +162,9 @@ export function assembleHtml(options: AssembleOptions): string {
   // Sort documents by sortOrder
   const sorted = [...documents].sort((a, b) => a.sortOrder - b.sortOrder);
 
+  // Extract chapter headers for TOC population
+  const chapters = extractChapterHeaders(sorted);
+
   // Render each document's TipTap JSON to HTML
   const documentHtmlParts = sorted.map((doc) => {
     const contentHtml = doc.content ? tiptapToHtml(doc.content) : '';
@@ -117,6 +172,19 @@ export function assembleHtml(options: AssembleOptions): string {
       ${contentHtml}
     </section>`;
   });
+
+  // Post-process: inject chapter entries into the first empty TOC entries div
+  const tocEntriesHtml = buildTocEntriesHtml(chapters);
+  let tocInjected = false;
+  for (let i = 0; i < documentHtmlParts.length; i++) {
+    if (!tocInjected && documentHtmlParts[i].includes('<div class="table-of-contents__entries"></div>')) {
+      documentHtmlParts[i] = documentHtmlParts[i].replace(
+        '<div class="table-of-contents__entries"></div>',
+        `<div class="table-of-contents__entries">${tocEntriesHtml}</div>`,
+      );
+      tocInjected = true;
+    }
+  }
 
   const themeVars = getThemeVariables(theme);
 

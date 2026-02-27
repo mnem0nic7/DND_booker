@@ -5,7 +5,7 @@
  */
 
 import { DocumentContent } from '@dnd-booker/shared';
-import { escapeHtml } from './utils.js';
+import { escapeHtml, safeUrl, safeCssUrl } from './utils.js';
 
 type TipTapNode = DocumentContent;
 
@@ -59,7 +59,7 @@ function renderMarks(text: string, marks?: TipTapNode['marks']): string {
         html = `<code>${html}</code>`;
         break;
       case 'link': {
-        const href = escapeHtml(String(mark.attrs?.href || ''));
+        const href = safeUrl(String(mark.attrs?.href || ''));
         const target = mark.attrs?.target ? ` target="${escapeHtml(String(mark.attrs.target))}"` : '';
         html = `<a href="${href}"${target}>${html}</a>`;
         break;
@@ -331,8 +331,9 @@ function renderChapterHeader(attrs: Record<string, unknown>): string {
   const chapterNumber = String(attrs.chapterNumber || '');
   const backgroundImage = String(attrs.backgroundImage || '');
 
-  const bgStyle = backgroundImage
-    ? ` style="background-image: url(${escapeHtml(backgroundImage)}); background-size: cover; background-position: center;"`
+  const safeBg = backgroundImage ? safeCssUrl(backgroundImage) : null;
+  const bgStyle = safeBg
+    ? ` style="background-image: url(${safeBg}); background-size: cover; background-position: center;"`
     : '';
 
   let html = `<div class="chapter-header"${bgStyle}>`;
@@ -444,7 +445,7 @@ function renderNpcProfile(attrs: Record<string, unknown>): string {
   // Header
   html += `<div class="npc-profile__header">`;
   if (portraitUrl) {
-    html += `<div class="npc-profile__portrait"><img src="${escapeHtml(portraitUrl)}" alt="${name}" class="npc-profile__portrait-img" /></div>`;
+    html += `<div class="npc-profile__portrait"><img src="${safeUrl(portraitUrl)}" alt="${name}" class="npc-profile__portrait-img" /></div>`;
   } else {
     html += `<div class="npc-profile__portrait"><div class="npc-profile__portrait-placeholder"><span>Portrait</span></div></div>`;
   }
@@ -566,7 +567,7 @@ function renderFullBleedImage(attrs: Record<string, unknown>): string {
 
   let html = `<div class="full-bleed-image full-bleed-image--${escapeHtml(position)}">`;
   if (src) {
-    html += `<img class="full-bleed-image__img" src="${escapeHtml(src)}" alt="${escapeHtml(caption || 'Full bleed image')}" />`;
+    html += `<img class="full-bleed-image__img" src="${safeUrl(src)}" alt="${escapeHtml(caption || 'Full bleed image')}" />`;
   }
   if (caption) {
     html += `<div class="full-bleed-image__caption">${escapeHtml(caption)}</div>`;
@@ -583,7 +584,7 @@ function renderMapBlock(attrs: Record<string, unknown>): string {
   let html = `<div class="map-block">`;
   html += `<div class="map-block__image-area">`;
   if (src) {
-    html += `<img class="map-block__img" src="${escapeHtml(src)}" alt="Map" />`;
+    html += `<img class="map-block__img" src="${safeUrl(src)}" alt="Map" />`;
   }
   html += `</div>`;
 
@@ -639,7 +640,7 @@ function renderTitlePage(attrs: Record<string, unknown>): string {
   html += `<div class="title-page__content">`;
 
   if (coverImageUrl) {
-    html += `<div class="title-page__cover-image"><img src="${escapeHtml(coverImageUrl)}" alt="Cover" /></div>`;
+    html += `<div class="title-page__cover-image"><img src="${safeUrl(coverImageUrl)}" alt="Cover" /></div>`;
   }
 
   html += `<h1 class="title-page__title">${title}</h1>`;
@@ -660,7 +661,7 @@ function renderTableOfContents(attrs: Record<string, unknown>): string {
 
   let html = `<div class="table-of-contents">`;
   html += `<h2 class="table-of-contents__heading">${title}</h2>`;
-  html += `<p class="table-of-contents__note">Auto-generates from chapter headers on export.</p>`;
+  // Entries div is a placeholder — assembleHtml() injects real chapter entries
   html += `<div class="table-of-contents__entries"></div>`;
   html += `</div>`;
   return html;
@@ -708,7 +709,7 @@ function renderBackCover(attrs: Record<string, unknown>): string {
 
   html += `<div class="back-cover__author-section">`;
   if (authorImageUrl) {
-    html += `<img class="back-cover__author-image" src="${escapeHtml(authorImageUrl)}" alt="Author" />`;
+    html += `<img class="back-cover__author-image" src="${safeUrl(authorImageUrl)}" alt="Author" />`;
   }
   html += `<p class="back-cover__author-bio">${authorBio}</p>`;
   html += `</div>`;

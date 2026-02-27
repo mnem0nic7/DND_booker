@@ -1,22 +1,33 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { NodeViewWrapper } from '@tiptap/react';
 import type { ReactNodeViewProps } from '@tiptap/react';
 import type { TableOfContentsAttrs } from './TableOfContentsExtension';
 
-const PLACEHOLDER_ENTRIES = [
-  { title: 'Chapter 1: Introduction', page: '1' },
-  { title: 'Chapter 2: The Adventure Begins', page: '5' },
-  { title: 'Chapter 3: The Dark Forest', page: '12' },
-  { title: 'Chapter 4: The Final Confrontation', page: '22' },
-  { title: 'Appendix A: Monsters', page: '30' },
-  { title: 'Appendix B: Magic Items', page: '35' },
-];
+interface TocEntry {
+  title: string;
+  chapterNumber: string;
+}
+
+function extractChapterEntries(editor: ReactNodeViewProps['editor']): TocEntry[] {
+  if (!editor) return [];
+  const entries: TocEntry[] = [];
+  editor.state.doc.descendants((node) => {
+    if (node.type.name === 'chapterHeader') {
+      entries.push({
+        title: node.attrs.title || 'Untitled Chapter',
+        chapterNumber: node.attrs.chapterNumber || '',
+      });
+    }
+  });
+  return entries;
+}
 
 export function TableOfContentsView({
   node,
   updateAttributes,
   deleteNode,
   selected,
+  editor,
 }: ReactNodeViewProps) {
   const attrs = node.attrs as TableOfContentsAttrs;
   const [editing, setEditing] = useState(false);
@@ -27,6 +38,14 @@ export function TableOfContentsView({
     },
     [updateAttributes],
   );
+
+  // Re-scan chapters whenever the document changes
+  const entries = useMemo(() => {
+    return extractChapterEntries(editor);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editor, editor?.state.doc]);
+
+  const hasEntries = entries.length > 0;
 
   return (
     <NodeViewWrapper>
@@ -49,20 +68,25 @@ export function TableOfContentsView({
           <h2 className="table-of-contents__heading">{attrs.title}</h2>
         </div>
 
-        {/* Auto-generation note */}
-        <p className="table-of-contents__note">
-          Auto-generates from chapter headers on export.
-        </p>
-
-        {/* Placeholder entries */}
+        {/* Dynamic entries from chapter headers */}
         <div className="table-of-contents__entries">
-          {PLACEHOLDER_ENTRIES.map((entry, i) => (
-            <div key={i} className="table-of-contents__entry">
-              <span className="table-of-contents__entry-title">{entry.title}</span>
-              <span className="table-of-contents__entry-leader" />
-              <span className="table-of-contents__entry-page">{entry.page}</span>
-            </div>
-          ))}
+          {hasEntries ? (
+            entries.map((entry, i) => (
+              <div key={i} className="table-of-contents__entry">
+                <span className="table-of-contents__entry-title">
+                  {entry.chapterNumber ? `${entry.chapterNumber}. ` : ''}
+                  {entry.title}
+                </span>
+                <span className="table-of-contents__entry-leader" />
+                <span className="table-of-contents__entry-page">&mdash;</span>
+              </div>
+            ))
+          ) : (
+            <p className="table-of-contents__note">
+              Add Chapter Header blocks to populate this table of contents.
+              Page numbers are generated on export.
+            </p>
+          )}
         </div>
 
         {/* Edit toggle */}

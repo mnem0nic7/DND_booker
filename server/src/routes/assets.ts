@@ -9,7 +9,8 @@ const upload = multer({
     fileSize: 10 * 1024 * 1024, // 10 MB
   },
   fileFilter: (_req, file, cb) => {
-    const allowed = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml'];
+    // SVG intentionally excluded — SVG can contain embedded scripts (XSS risk)
+    const allowed = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
     if (allowed.includes(file.mimetype)) {
       cb(null, true);
     } else {

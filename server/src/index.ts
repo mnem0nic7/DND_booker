@@ -38,8 +38,13 @@ app.use('/api/ai', aiSettingsRoutes);
 app.use('/api/ai', aiGenerateRoutes);
 app.use('/api/projects/:projectId', aiChatRoutes);
 
-// Serve uploaded files statically
-app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')));
+// Serve uploaded files statically with security headers
+app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads'), {
+  setHeaders: (res) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Content-Security-Policy', "default-src 'none'; img-src 'self'; style-src 'none'; script-src 'none'");
+  },
+}));
 
 // Only start listening if this file is run directly (not imported in tests)
 if (process.env.NODE_ENV !== 'test') {

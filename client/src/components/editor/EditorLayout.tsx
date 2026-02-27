@@ -24,8 +24,8 @@ import { CreditsPage } from '../blocks/CreditsPage/CreditsPageExtension';
 import { BackCover } from '../blocks/BackCover/BackCoverExtension';
 import { Toolbar } from './Toolbar';
 import { BlockPalette } from '../sidebar/BlockPalette';
-import { ThemePicker } from './ThemePicker';
 import { ExportDialog } from './ExportDialog';
+import { PropertiesPanel } from './PropertiesPanel';
 import { PreviewPanel } from '../preview/PreviewPanel';
 import { useThemeStore } from '../../stores/themeStore';
 import { useExportStore } from '../../stores/exportStore';
@@ -161,16 +161,7 @@ export function EditorLayout({ projectId, content, onUpdate }: EditorLayoutProps
 
       {/* Right sidebar: Properties panel */}
       {showProperties && !showPreview && !showAiChat && (
-        <div className="w-64 border-l bg-gray-50 p-4 overflow-y-auto">
-          <ThemePicker />
-          <hr className="my-4 border-gray-200" />
-          <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">
-            Properties
-          </h3>
-          <p className="text-xs text-gray-400 italic">
-            Select a block to edit its properties.
-          </p>
-        </div>
+        <PropertiesPanel editor={editor} />
       )}
 
       {/* Export Dialog */}

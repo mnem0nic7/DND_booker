@@ -44,10 +44,12 @@ interface AiState {
   setChatPanelOpen: (open: boolean) => void;
 
   // Block generation
+  _generatingCount: number;
   isGeneratingBlock: boolean;
   generateBlock: (blockType: string, prompt: string) => Promise<Record<string, unknown> | null>;
 
   // Auto-fill
+  _autoFillCount: number;
   isAutoFilling: boolean;
   autoFillBlock: (blockType: string, currentAttrs: Record<string, unknown>) => Promise<Record<string, unknown> | null>;
 
@@ -194,7 +196,7 @@ export const useAiStore = create<AiState>((set, get) => ({
       }
 
       // Detect mid-stream error sentinel from server
-      if (fullContent.endsWith(STREAM_ERROR_SENTINEL)) {
+      if (fullContent.trimEnd().endsWith(STREAM_ERROR_SENTINEL.trimEnd())) {
         set((s) => ({
           messages: s.messages.filter((m) => m.id !== userMessage.id),
           isStreaming: false,
@@ -240,10 +242,11 @@ export const useAiStore = create<AiState>((set, get) => ({
   setChatPanelOpen: (open) => set({ isChatPanelOpen: open }),
 
   // Block generation
+  _generatingCount: 0,
   isGeneratingBlock: false,
 
   generateBlock: async (blockType, prompt) => {
-    set({ isGeneratingBlock: true });
+    set((s) => ({ _generatingCount: s._generatingCount + 1, isGeneratingBlock: true }));
     try {
       const { data } = await api.post('/ai/generate-block', { blockType, prompt });
       return data.attrs;
@@ -251,15 +254,19 @@ export const useAiStore = create<AiState>((set, get) => ({
       console.error('[AI] generateBlock failed:', err);
       return null;
     } finally {
-      set({ isGeneratingBlock: false });
+      set((s) => {
+        const count = s._generatingCount - 1;
+        return { _generatingCount: count, isGeneratingBlock: count > 0 };
+      });
     }
   },
 
   // Auto-fill
+  _autoFillCount: 0,
   isAutoFilling: false,
 
   autoFillBlock: async (blockType, currentAttrs) => {
-    set({ isAutoFilling: true });
+    set((s) => ({ _autoFillCount: s._autoFillCount + 1, isAutoFilling: true }));
     try {
       const { data } = await api.post('/ai/autofill', { blockType, currentAttrs });
       return data.suggestions;
@@ -267,7 +274,10 @@ export const useAiStore = create<AiState>((set, get) => ({
       console.error('[AI] autoFillBlock failed:', err);
       return null;
     } finally {
-      set({ isAutoFilling: false });
+      set((s) => {
+        const count = s._autoFillCount - 1;
+        return { _autoFillCount: count, isAutoFilling: count > 0 };
+      });
     }
   },
 

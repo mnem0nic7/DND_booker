@@ -21,24 +21,33 @@ export function generateAccessToken(userId: string): string {
   return jwt.sign({ userId }, JWT_SECRET, { expiresIn: '15m' });
 }
 
-export function generateRefreshToken(userId: string): string {
-  return jwt.sign({ userId }, JWT_REFRESH_SECRET, { expiresIn: '7d' });
+export function generateRefreshToken(userId: string, tokenVersion: number): string {
+  return jwt.sign({ userId, tokenVersion }, JWT_REFRESH_SECRET, { expiresIn: '7d' });
 }
 
 export function verifyAccessToken(token: string): { userId: string } {
-  return jwt.verify(token, JWT_SECRET) as { userId: string };
+  return jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] }) as { userId: string };
 }
 
-export function verifyRefreshToken(token: string): { userId: string } {
-  return jwt.verify(token, JWT_REFRESH_SECRET) as { userId: string };
+export function verifyRefreshToken(token: string): { userId: string; tokenVersion?: number } {
+  return jwt.verify(token, JWT_REFRESH_SECRET, { algorithms: ['HS256'] }) as { userId: string; tokenVersion?: number };
 }
 
 export async function getUserById(userId: string) {
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { id: true, email: true, displayName: true, avatarUrl: true },
+    select: { id: true, email: true, displayName: true, avatarUrl: true, tokenVersion: true },
   });
   return user;
+}
+
+export async function incrementTokenVersion(userId: string): Promise<number> {
+  const user = await prisma.user.update({
+    where: { id: userId },
+    data: { tokenVersion: { increment: 1 } },
+    select: { tokenVersion: true },
+  });
+  return user.tokenVersion;
 }
 
 export async function registerUser(email: string, password: string, displayName: string) {
@@ -72,6 +81,7 @@ export async function loginUser(email: string, password: string) {
     email: user.email,
     displayName: user.displayName,
     avatarUrl: user.avatarUrl,
+    tokenVersion: user.tokenVersion,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
   };

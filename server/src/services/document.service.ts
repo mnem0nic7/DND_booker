@@ -44,6 +44,13 @@ export async function reorderDocuments(projectId: string, userId: string, docume
   const project = await prisma.project.findFirst({ where: { id: projectId, userId } });
   if (!project) return null;
 
+  // Verify all document IDs belong to this project (prevents IDOR)
+  const docs = await prisma.document.findMany({
+    where: { id: { in: documentIds }, projectId },
+    select: { id: true },
+  });
+  if (docs.length !== documentIds.length) return null;
+
   const updates = documentIds.map((id, index) =>
     prisma.document.update({ where: { id }, data: { sortOrder: index } })
   );

@@ -13,6 +13,7 @@ model User {
   passwordHash String      @map("password_hash")
   displayName  String      @map("display_name")
   avatarUrl    String?     @map("avatar_url")
+  tokenVersion Int         @default(0) @map("token_version")
   aiProvider   String?     @map("ai_provider")
   aiModel      String?     @map("ai_model")
   aiApiKeyEnc  String?     @map("ai_api_key_enc")
