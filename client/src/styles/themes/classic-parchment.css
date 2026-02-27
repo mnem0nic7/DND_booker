@@ -1,0 +1,17 @@
+[data-theme="classic-parchment"] {
+  --page-bg: #f4e4c1;
+  --text-color: #1a1a1a;
+  --heading-font: 'Cinzel', serif;
+  --body-font: 'Crimson Text', serif;
+  --accent-color: #58180d;
+  --accent-secondary: #c9ad6a;
+  --stat-block-bg: #fdf1dc;
+  --stat-block-border: #e69a28;
+  --callout-bg: #e0d6c2;
+  --read-aloud-bg: #e8dcc8;
+  --read-aloud-border: #5c3a1e;
+  --sidebar-bg: #e8edf3;
+  --table-header-bg: #78350f;
+  --table-stripe-bg: #fef3c7;
+  --border-decoration: #8b1a1a;
+}

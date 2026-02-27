@@ -1,0 +1,17 @@
+[data-theme="infernal"] {
+  --page-bg: #1c1517;
+  --text-color: #e8d5c4;
+  --heading-font: 'Pirata One', cursive;
+  --body-font: 'Bitter', serif;
+  --accent-color: #dc2626;
+  --accent-secondary: #ea580c;
+  --stat-block-bg: #2a1f1f;
+  --stat-block-border: #dc2626;
+  --callout-bg: #2a1a1a;
+  --read-aloud-bg: #2e1c1c;
+  --read-aloud-border: #dc2626;
+  --sidebar-bg: #2a1a1a;
+  --table-header-bg: #7f1d1d;
+  --table-stripe-bg: #231515;
+  --border-decoration: #ea580c;
+}

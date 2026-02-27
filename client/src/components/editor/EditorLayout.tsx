@@ -24,6 +24,8 @@ import { CreditsPage } from '../blocks/CreditsPage/CreditsPageExtension';
 import { BackCover } from '../blocks/BackCover/BackCoverExtension';
 import { Toolbar } from './Toolbar';
 import { BlockPalette } from '../sidebar/BlockPalette';
+import { ThemePicker } from './ThemePicker';
+import { useThemeStore } from '../../stores/themeStore';
 
 interface EditorLayoutProps {
   content: any;
@@ -33,6 +35,7 @@ interface EditorLayoutProps {
 export function EditorLayout({ content, onUpdate }: EditorLayoutProps) {
   const [showBlockPalette, setShowBlockPalette] = useState(true);
   const [showProperties, setShowProperties] = useState(false);
+  const currentTheme = useThemeStore((s) => s.currentTheme);
 
   const editor = useEditor({
     extensions: [StarterKit, StatBlock, ReadAloudBox, SidebarCallout, ChapterHeader, SpellCard, MagicItem, RandomTable, NpcProfile, EncounterTable, ClassFeature, RaceBlock, FullBleedImage, MapBlock, Handout, PageBorder, PageBreak, ColumnBreak, TitlePage, TableOfContents, CreditsPage, BackCover],
@@ -76,16 +79,18 @@ export function EditorLayout({ content, onUpdate }: EditorLayoutProps) {
         </div>
 
         {/* Editor content area */}
-        <div className="flex-1 overflow-y-auto p-8 bg-white">
-          <div className="max-w-3xl mx-auto prose prose-lg max-w-none">
+        <div className="flex-1 overflow-y-auto p-8" data-theme={currentTheme} style={{ backgroundColor: 'var(--page-bg)' }}>
+          <div className="max-w-3xl mx-auto prose prose-lg max-w-none editor-themed-content">
             {editor && <EditorContent editor={editor} />}
           </div>
         </div>
       </div>
 
-      {/* Right sidebar: Properties panel placeholder */}
+      {/* Right sidebar: Properties panel */}
       {showProperties && (
         <div className="w-64 border-l bg-gray-50 p-4 overflow-y-auto">
+          <ThemePicker />
+          <hr className="my-4 border-gray-200" />
           <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">
             Properties
           </h3>

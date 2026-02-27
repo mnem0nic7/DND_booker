@@ -1,4 +1,13 @@
 @import 'tailwindcss';
+
+/* Theme CSS */
+@import './styles/themes/classic-parchment.css';
+@import './styles/themes/dark-tome.css';
+@import './styles/themes/clean-modern.css';
+@import './styles/themes/fey-wild.css';
+@import './styles/themes/infernal.css';
+
+/* Block CSS */
 @import './styles/blocks/stat-block.css';
 @import './styles/blocks/read-aloud-box.css';
 @import './styles/blocks/sidebar-callout.css';
@@ -20,3 +29,17 @@
 @import './styles/blocks/table-of-contents.css';
 @import './styles/blocks/credits-page.css';
 @import './styles/blocks/back-cover.css';
+
+/* Base theme-aware styles for the editor content area */
+[data-theme] {
+  background-color: var(--page-bg);
+  color: var(--text-color);
+  font-family: var(--body-font);
+}
+
+[data-theme] .editor-themed-content h1,
+[data-theme] .editor-themed-content h2,
+[data-theme] .editor-themed-content h3 {
+  font-family: var(--heading-font);
+  color: var(--accent-color);
+}

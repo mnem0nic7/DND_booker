@@ -1,0 +1,17 @@
+[data-theme="fey-wild"] {
+  --page-bg: #f0f7ee;
+  --text-color: #1a2e1a;
+  --heading-font: 'Dancing Script', cursive;
+  --body-font: 'Lora', serif;
+  --accent-color: #166534;
+  --accent-secondary: #ca8a04;
+  --stat-block-bg: #e8f5e2;
+  --stat-block-border: #22c55e;
+  --callout-bg: #dcfce7;
+  --read-aloud-bg: #ecfdf5;
+  --read-aloud-border: #166534;
+  --sidebar-bg: #fefce8;
+  --table-header-bg: #166534;
+  --table-stripe-bg: #f0fdf4;
+  --border-decoration: #22c55e;
+}

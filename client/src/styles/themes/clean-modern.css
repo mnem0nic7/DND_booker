@@ -1,0 +1,17 @@
+[data-theme="clean-modern"] {
+  --page-bg: #ffffff;
+  --text-color: #1f2937;
+  --heading-font: 'Inter', sans-serif;
+  --body-font: 'Merriweather', serif;
+  --accent-color: #2563eb;
+  --accent-secondary: #64748b;
+  --stat-block-bg: #f1f5f9;
+  --stat-block-border: #2563eb;
+  --callout-bg: #eff6ff;
+  --read-aloud-bg: #f8fafc;
+  --read-aloud-border: #2563eb;
+  --sidebar-bg: #f1f5f9;
+  --table-header-bg: #1e40af;
+  --table-stripe-bg: #f1f5f9;
+  --border-decoration: #2563eb;
+}

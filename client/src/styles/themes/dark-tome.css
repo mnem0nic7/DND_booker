@@ -1,0 +1,17 @@
+[data-theme="dark-tome"] {
+  --page-bg: #1a1a2e;
+  --text-color: #e0d6c2;
+  --heading-font: 'Uncial Antiqua', serif;
+  --body-font: 'EB Garamond', serif;
+  --accent-color: #c9a84c;
+  --accent-secondary: #7b68ae;
+  --stat-block-bg: #252545;
+  --stat-block-border: #c9a84c;
+  --callout-bg: #2a2a4a;
+  --read-aloud-bg: #2a2a3e;
+  --read-aloud-border: #c9a84c;
+  --sidebar-bg: #252540;
+  --table-header-bg: #3d2e6b;
+  --table-stripe-bg: #22223a;
+  --border-decoration: #7b68ae;
+}
