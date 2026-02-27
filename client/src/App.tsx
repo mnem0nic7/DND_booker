@@ -5,6 +5,7 @@ import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import DashboardPage from './pages/DashboardPage';
+import EditorPage from './pages/EditorPage';
 
 export default function App() {
   const { refresh } = useAuthStore();
@@ -30,9 +31,7 @@ export default function App() {
           path="/projects/:id"
           element={
             <ProtectedRoute>
-              <div className="min-h-screen flex items-center justify-center bg-gray-50 text-gray-500">
-                Editor coming soon...
-              </div>
+              <EditorPage />
             </ProtectedRoute>
           }
         />
