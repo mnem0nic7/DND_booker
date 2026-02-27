@@ -19,6 +19,8 @@ interface AiSettings {
   supportedModels: Record<AiProvider, string[]>;
 }
 
+const STREAM_ERROR_SENTINEL = '\n\n[Response interrupted. Please try again.]';
+
 interface AiState {
   // Settings
   settings: AiSettings | null;
@@ -34,6 +36,7 @@ interface AiState {
   streamingContent: string;
   chatError: string | null;
   isChatPanelOpen: boolean;
+  _chatRequestId: number;
   fetchChatHistory: (projectId: string) => Promise<void>;
   sendMessage: (projectId: string, message: string) => Promise<void>;
   clearChat: (projectId: string) => Promise<void>;
@@ -90,16 +93,21 @@ export const useAiStore = create<AiState>((set, get) => ({
   streamingContent: '',
   chatError: null,
   isChatPanelOpen: false,
+  _chatRequestId: 0,
 
   fetchChatHistory: async (projectId) => {
-    // Clear immediately to avoid showing stale data from another project
-    set({ messages: [], streamingContent: '', isStreaming: false, chatError: null });
+    const requestId = get()._chatRequestId + 1;
+    set({ _chatRequestId: requestId, messages: [], streamingContent: '', isStreaming: false, chatError: null });
     try {
       const { data } = await api.get(`/projects/${projectId}/ai/chat`);
+      // Ignore stale response if project changed while fetching
+      if (get()._chatRequestId !== requestId) return;
       set({ messages: data.messages });
     } catch (err) {
       console.error('[AI] Failed to fetch chat history:', err);
-      set({ messages: [] });
+      if (get()._chatRequestId === requestId) {
+        set({ messages: [] });
+      }
     }
   },
 
@@ -173,6 +181,17 @@ export const useAiStore = create<AiState>((set, get) => ({
         const chunk = decoder.decode(value, { stream: true });
         fullContent += chunk;
         set({ streamingContent: fullContent });
+      }
+
+      // Detect mid-stream error sentinel from server
+      if (fullContent.endsWith(STREAM_ERROR_SENTINEL)) {
+        set((s) => ({
+          messages: s.messages.filter((m) => m.id !== userMessage.id),
+          isStreaming: false,
+          streamingContent: '',
+          chatError: 'Response interrupted. Please try again.',
+        }));
+        return;
       }
 
       const assistantMessage: ChatMessage = {

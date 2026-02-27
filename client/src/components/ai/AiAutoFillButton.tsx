@@ -10,13 +10,17 @@ interface AiAutoFillButtonProps {
 export function AiAutoFillButton({ blockType, currentAttrs, onApply }: AiAutoFillButtonProps) {
   const { autoFillBlock, isAutoFilling, settings } = useAiStore();
   const [suggestions, setSuggestions] = useState<Record<string, unknown> | null>(null);
+  const [error, setError] = useState('');
 
   if (!settings?.hasApiKey) return null;
 
   async function handleAutoFill() {
+    setError('');
     const result = await autoFillBlock(blockType, currentAttrs);
     if (result) {
       setSuggestions(result);
+    } else {
+      setError('Auto-fill failed. Try again.');
     }
   }
 
@@ -54,17 +58,20 @@ export function AiAutoFillButton({ blockType, currentAttrs, onApply }: AiAutoFil
   }
 
   return (
-    <button
-      onClick={handleAutoFill}
-      disabled={isAutoFilling}
-      type="button"
-      className="ai-autofill-btn"
-      title="Auto-fill empty fields with AI"
-    >
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
-      </svg>
-      {isAutoFilling ? 'Filling...' : 'Auto-fill'}
-    </button>
+    <>
+      <button
+        onClick={handleAutoFill}
+        disabled={isAutoFilling}
+        type="button"
+        className="ai-autofill-btn"
+        title="Auto-fill empty fields with AI"
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
+        </svg>
+        {isAutoFilling ? 'Filling...' : 'Auto-fill'}
+      </button>
+      {error && <span className="ai-generate-error">{error}</span>}
+    </>
   );
 }

@@ -1,3 +1,23 @@
+/* AI Markdown in chat bubbles */
+.ai-markdown p { margin: 0.25em 0; }
+.ai-markdown p:first-child { margin-top: 0; }
+.ai-markdown p:last-child { margin-bottom: 0; }
+.ai-markdown ul, .ai-markdown ol { margin: 0.25em 0; padding-left: 1.25em; }
+.ai-markdown li { margin: 0.1em 0; }
+.ai-markdown code { font-size: 0.8em; background: #f3f4f6; padding: 0.1em 0.3em; border-radius: 3px; }
+.ai-markdown pre { margin: 0.5em 0; padding: 0.5em; background: #f3f4f6; border-radius: 4px; overflow-x: auto; }
+.ai-markdown pre code { background: none; padding: 0; }
+.ai-markdown h1, .ai-markdown h2, .ai-markdown h3 { margin: 0.5em 0 0.25em; font-weight: 600; }
+.ai-markdown h1 { font-size: 1.1em; }
+.ai-markdown h2 { font-size: 1em; }
+.ai-markdown h3 { font-size: 0.9em; }
+.ai-markdown strong { font-weight: 600; }
+.ai-markdown blockquote { margin: 0.25em 0; padding-left: 0.75em; border-left: 3px solid #ddd6fe; color: #6b7280; }
+.ai-markdown hr { margin: 0.5em 0; border: none; border-top: 1px solid #e5e7eb; }
+.ai-markdown table { border-collapse: collapse; font-size: 0.85em; margin: 0.25em 0; }
+.ai-markdown th, .ai-markdown td { border: 1px solid #e5e7eb; padding: 0.2em 0.5em; }
+.ai-markdown th { background: #f9fafb; font-weight: 600; }
+
 /* AI Generate Button */
 .ai-generate-btn {
   display: inline-flex;

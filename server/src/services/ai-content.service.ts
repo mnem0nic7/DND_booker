@@ -65,7 +65,7 @@ const BLOCK_SCHEMAS: Record<string, { description: string; schema: string }> = {
     schema: `{
   "name": "string — item name",
   "type": "string — weapon/armor/wondrous/ring/potion/scroll/wand/rod/staff",
-  "rarity": "string — common/uncommon/rare/very rare/legendary/artifact",
+  "rarity": "string — common/uncommon/rare/very_rare/legendary/artifact",
   "requiresAttunement": "boolean",
   "attunementRequirement": "string — e.g. by a spellcaster (empty if no attunement)",
   "description": "string — full item description including mechanics",

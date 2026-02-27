@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import Markdown from 'react-markdown';
 
 interface AiMessageBubbleProps {
   role: 'user' | 'assistant';
@@ -75,7 +76,13 @@ export function AiMessageBubble({ role, content, isStreaming, onInsertBlock }: A
         }`}
       >
         {/* Message text */}
-        <div className="whitespace-pre-wrap break-words">{text}</div>
+        {isUser ? (
+          <div className="whitespace-pre-wrap break-words">{text}</div>
+        ) : (
+          <div className="ai-markdown prose prose-sm max-w-none break-words">
+            <Markdown>{text}</Markdown>
+          </div>
+        )}
 
         {/* Streaming cursor */}
         {isStreaming && (
