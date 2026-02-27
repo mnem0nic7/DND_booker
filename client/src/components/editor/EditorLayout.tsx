@@ -79,7 +79,7 @@ export function EditorLayout({ content, onUpdate }: EditorLayoutProps) {
         </div>
 
         {/* Editor content area */}
-        <div className="flex-1 overflow-y-auto p-8" data-theme={currentTheme} style={{ backgroundColor: 'var(--page-bg)' }}>
+        <div className="flex-1 overflow-y-auto p-8" data-theme={currentTheme}>
           <div className="max-w-3xl mx-auto prose prose-lg max-w-none editor-themed-content">
             {editor && <EditorContent editor={editor} />}
           </div>

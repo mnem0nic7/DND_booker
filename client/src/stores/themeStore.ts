@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 
 export type ThemeName =
   | 'classic-parchment'
@@ -12,7 +13,12 @@ interface ThemeState {
   setTheme: (theme: ThemeName) => void;
 }
 
-export const useThemeStore = create<ThemeState>((set) => ({
-  currentTheme: 'classic-parchment',
-  setTheme: (theme) => set({ currentTheme: theme }),
-}));
+export const useThemeStore = create<ThemeState>()(
+  persist(
+    (set) => ({
+      currentTheme: 'classic-parchment',
+      setTheme: (theme) => set({ currentTheme: theme }),
+    }),
+    { name: 'dnd-booker-theme' },
+  ),
+);
