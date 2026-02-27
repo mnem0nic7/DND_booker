@@ -274,12 +274,17 @@ aiChatRoutes.post('/ai/chat', validateUuid('projectId'), chatRateLimit, asyncHan
 
     const systemPrompt = aiContent.buildSystemPrompt(project.title);
 
+    // Abort the AI call if the client disconnects
+    const abortController = new AbortController();
+    req.on('close', () => abortController.abort());
+
     // Stream the response
     const result = streamText({
       model,
       system: systemPrompt,
       messages,
       maxOutputTokens: MAX_AI_RESPONSE_TOKENS,
+      abortSignal: abortController.signal,
     });
 
     // Collect the full response for persistence
@@ -291,6 +296,7 @@ aiChatRoutes.post('/ai/chat', validateUuid('projectId'), chatRateLimit, asyncHan
     res.setHeader('Transfer-Encoding', 'chunked');
 
     for await (const chunk of stream) {
+      if (abortController.signal.aborted) break;
       fullResponse += chunk;
       res.write(chunk);
     }

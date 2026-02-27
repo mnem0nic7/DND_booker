@@ -30,8 +30,12 @@ export function verifyAccessToken(token: string): { userId: string } {
   return jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] }) as { userId: string };
 }
 
-export function verifyRefreshToken(token: string): { userId: string; tokenVersion?: number } {
-  return jwt.verify(token, JWT_REFRESH_SECRET, { algorithms: ['HS256'] }) as { userId: string; tokenVersion?: number };
+export function verifyRefreshToken(token: string): { userId: string; tokenVersion: number } {
+  const payload = jwt.verify(token, JWT_REFRESH_SECRET, { algorithms: ['HS256'] }) as { userId: string; tokenVersion?: number };
+  if (typeof payload.tokenVersion !== 'number') {
+    throw new Error('Invalid token: missing tokenVersion');
+  }
+  return payload as { userId: string; tokenVersion: number };
 }
 
 export async function getUserById(userId: string) {

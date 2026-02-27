@@ -53,7 +53,7 @@ router.post('/register', authRateLimit, async (req: Request, res: Response) => {
     res.cookie('refreshToken', refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      sameSite: 'strict',
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
@@ -82,7 +82,7 @@ router.post('/login', authRateLimit, async (req: Request, res: Response) => {
     res.cookie('refreshToken', refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      sameSite: 'strict',
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
@@ -113,7 +113,7 @@ router.post('/refresh', async (req: Request, res: Response) => {
       return;
     }
     // Reject tokens issued before the last logout/invalidation
-    if (payload.tokenVersion !== undefined && payload.tokenVersion !== user.tokenVersion) {
+    if (payload.tokenVersion !== user.tokenVersion) {
       console.warn(`[SECURITY] Revoked token refresh attempt for user ${payload.userId}`);
       res.status(401).json({ error: 'Token revoked' });
       return;
@@ -140,7 +140,7 @@ router.post('/logout', async (req: Request, res: Response) => {
   res.clearCookie('refreshToken', {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
+    sameSite: 'strict',
   });
   res.json({ message: 'Logged out' });
 });
