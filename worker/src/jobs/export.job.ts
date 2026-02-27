@@ -105,16 +105,20 @@ export async function processExportJob(job: Job<ExportJobData>): Promise<void> {
 
     console.log(`[export.job] Export ${exportJobId} completed -> ${filepath}`);
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : String(error);
+    const message = (error instanceof Error ? error.message : String(error)).slice(0, 500);
 
     // Update export job with failure
-    await prisma.exportJob.update({
-      where: { id: exportJobId },
-      data: {
-        status: 'failed',
-        errorMessage: message,
-      },
-    });
+    try {
+      await prisma.exportJob.update({
+        where: { id: exportJobId },
+        data: {
+          status: 'failed',
+          errorMessage: message,
+        },
+      });
+    } catch (dbErr) {
+      console.error(`[export.job] Failed to update job status to failed:`, dbErr);
+    }
 
     console.error(`[export.job] Export ${exportJobId} failed:`, message);
     throw error;

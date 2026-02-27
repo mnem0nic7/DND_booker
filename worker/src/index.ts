@@ -18,8 +18,19 @@ worker.on('failed', (job, err) => console.error(`Job ${job?.id} failed:`, err.me
 
 async function shutdown() {
   console.log('Shutting down worker...');
-  await worker.close();
-  await connection.quit();
+  const SHUTDOWN_TIMEOUT_MS = 10_000;
+  const forceExit = setTimeout(() => {
+    console.error('Worker shutdown timed out, forcing exit.');
+    process.exit(1);
+  }, SHUTDOWN_TIMEOUT_MS);
+  forceExit.unref();
+
+  try {
+    await worker.close();
+    await connection.quit();
+  } catch (err) {
+    console.error('Error during worker shutdown:', err);
+  }
   process.exit(0);
 }
 

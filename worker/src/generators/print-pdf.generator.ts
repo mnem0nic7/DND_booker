@@ -86,6 +86,9 @@ const NO_SANDBOX_ARGS = process.env.PUPPETEER_SANDBOX === 'true'
   ? []
   : ['--no-sandbox', '--disable-setuid-sandbox'];
 
+/** Maximum time for page.setContent (loading HTML + resources). */
+const PAGE_TIMEOUT_MS = 60_000;
+
 export async function generatePrintPdf(html: string): Promise<Buffer> {
   const browser = await puppeteer.launch({
     headless: true,
@@ -94,7 +97,8 @@ export async function generatePrintPdf(html: string): Promise<Buffer> {
 
   try {
     const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: 'networkidle0' });
+    page.setDefaultTimeout(PAGE_TIMEOUT_MS);
+    await page.setContent(html, { waitUntil: 'networkidle0', timeout: PAGE_TIMEOUT_MS });
     await page.emulateMediaType('screen');
 
     // Inject crop marks into the rendered page
