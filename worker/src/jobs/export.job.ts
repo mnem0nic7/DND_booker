@@ -4,6 +4,7 @@ import { prisma } from '../config/database.js';
 import { assembleHtml } from '../renderers/html-assembler.js';
 import { generatePdf } from '../generators/pdf.generator.js';
 import { generatePrintPdf } from '../generators/print-pdf.generator.js';
+import { generateEpub } from '../generators/epub.generator.js';
 import fs from 'fs/promises';
 import path from 'path';
 
@@ -66,12 +67,14 @@ export async function processExportJob(job: Job<ExportJobData>): Promise<void> {
 
     await job.updateProgress(50);
 
-    // Generate PDF based on requested format
+    // Generate output based on requested format
     let buffer: Buffer;
     if (format === 'pdf') {
       buffer = await generatePdf(html);
     } else if (format === 'print_pdf') {
       buffer = await generatePrintPdf(html);
+    } else if (format === 'epub') {
+      buffer = await generateEpub(html, exportJob.project.title);
     } else {
       throw new Error(`Unsupported export format: ${format}`);
     }
@@ -82,7 +85,8 @@ export async function processExportJob(job: Job<ExportJobData>): Promise<void> {
     const outputDir = path.join(process.cwd(), 'output');
     await fs.mkdir(outputDir, { recursive: true });
 
-    const filename = `${exportJob.projectId}-${Date.now()}.pdf`;
+    const ext = format === 'epub' ? 'epub' : 'pdf';
+    const filename = `${exportJob.projectId}-${Date.now()}.${ext}`;
     const filepath = path.join(outputDir, filename);
     await fs.writeFile(filepath, buffer);
 
