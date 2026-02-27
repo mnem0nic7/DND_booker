@@ -25,17 +25,21 @@ import { BackCover } from '../blocks/BackCover/BackCoverExtension';
 import { Toolbar } from './Toolbar';
 import { BlockPalette } from '../sidebar/BlockPalette';
 import { ThemePicker } from './ThemePicker';
+import { ExportDialog } from './ExportDialog';
 import { useThemeStore } from '../../stores/themeStore';
+import { useExportStore } from '../../stores/exportStore';
 
 interface EditorLayoutProps {
+  projectId: string;
   content: any;
   onUpdate: (content: any) => void;
 }
 
-export function EditorLayout({ content, onUpdate }: EditorLayoutProps) {
+export function EditorLayout({ projectId, content, onUpdate }: EditorLayoutProps) {
   const [showBlockPalette, setShowBlockPalette] = useState(true);
   const [showProperties, setShowProperties] = useState(false);
   const currentTheme = useThemeStore((s) => s.currentTheme);
+  const openExportDialog = useExportStore((s) => s.openDialog);
 
   const editor = useEditor({
     extensions: [StarterKit, StatBlock, ReadAloudBox, SidebarCallout, ChapterHeader, SpellCard, MagicItem, RandomTable, NpcProfile, EncounterTable, ClassFeature, RaceBlock, FullBleedImage, MapBlock, Handout, PageBorder, PageBreak, ColumnBreak, TitlePage, TableOfContents, CreditsPage, BackCover],
@@ -68,6 +72,16 @@ export function EditorLayout({ content, onUpdate }: EditorLayoutProps) {
             <Toolbar editor={editor} />
           </div>
           <button
+            onClick={openExportDialog}
+            title="Export project"
+            className="px-3 py-1.5 text-sm text-gray-600 hover:text-indigo-700 hover:bg-indigo-50 transition-colors rounded mr-1 flex items-center gap-1"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+            </svg>
+            Export
+          </button>
+          <button
             onClick={() => setShowProperties((v) => !v)}
             title={showProperties ? 'Hide properties' : 'Show properties'}
             className="px-2 py-2 text-gray-400 hover:text-gray-600 transition-colors border-l"
@@ -99,6 +113,9 @@ export function EditorLayout({ content, onUpdate }: EditorLayoutProps) {
           </p>
         </div>
       )}
+
+      {/* Export Dialog */}
+      <ExportDialog projectId={projectId} />
     </div>
   );
 }

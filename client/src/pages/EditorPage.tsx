@@ -216,6 +216,7 @@ export default function EditorPage() {
           {activeDocument ? (
             <EditorLayout
               key={activeDocument.id}
+              projectId={projectId!}
               content={activeDocument.content}
               onUpdate={handleContentUpdate}
             />
