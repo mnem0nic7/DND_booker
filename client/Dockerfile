@@ -5,6 +5,7 @@ COPY package*.json ./
 COPY client/package.json client/
 COPY shared/package.json shared/
 RUN npm ci
+COPY tsconfig.json ./
 COPY shared/ shared/
 COPY client/ client/
 WORKDIR /app/client

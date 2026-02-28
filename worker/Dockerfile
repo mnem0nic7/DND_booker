@@ -10,6 +10,7 @@ COPY worker/package.json worker/
 COPY shared/package.json shared/
 COPY server/package.json server/
 RUN npm ci
+COPY tsconfig.json ./
 COPY shared/ shared/
 COPY worker/ worker/
 # Copy prisma schema from server (needed for prisma generate)

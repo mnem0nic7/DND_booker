@@ -2,11 +2,12 @@ import { createAnthropic } from '@ai-sdk/anthropic';
 import { createOpenAI } from '@ai-sdk/openai';
 import { generateText, type LanguageModel } from 'ai';
 
-export type AiProvider = 'anthropic' | 'openai';
+export type AiProvider = 'anthropic' | 'openai' | 'ollama';
 
 const DEFAULT_MODELS: Record<AiProvider, string> = {
   anthropic: 'claude-sonnet-4-20250514',
   openai: 'gpt-4o',
+  ollama: 'llama3.1:8b',
 };
 
 export const SUPPORTED_MODELS: Record<AiProvider, string[]> = {
@@ -20,9 +21,15 @@ export const SUPPORTED_MODELS: Record<AiProvider, string[]> = {
     'gpt-4.1',
     'gpt-4.1-mini',
   ],
+  ollama: [],
 };
 
-export function createModel(provider: AiProvider, apiKey: string, model?: string): LanguageModel {
+export function createModel(
+  provider: AiProvider,
+  apiKey: string,
+  model?: string,
+  baseUrl?: string,
+): LanguageModel {
   const modelId = model || DEFAULT_MODELS[provider];
 
   if (provider === 'anthropic') {
@@ -30,13 +37,33 @@ export function createModel(provider: AiProvider, apiKey: string, model?: string
     return anthropic(modelId);
   }
 
+  if (provider === 'ollama') {
+    const ollama = createOpenAI({
+      apiKey: 'ollama',
+      baseURL: `${baseUrl || 'http://localhost:11434'}/v1`,
+    });
+    return ollama(modelId);
+  }
+
   const openai = createOpenAI({ apiKey });
   return openai(modelId);
 }
 
-export async function validateApiKey(provider: AiProvider, apiKey: string): Promise<boolean> {
+export async function validateConnection(baseUrl: string): Promise<{ valid: boolean; models: string[] }> {
   try {
-    const model = createModel(provider, apiKey);
+    const res = await fetch(`${baseUrl}/api/tags`, { signal: AbortSignal.timeout(5000) });
+    if (!res.ok) return { valid: false, models: [] };
+    const data = await res.json() as { models?: { name: string }[] };
+    const models = (data.models ?? []).map((m: { name: string }) => m.name);
+    return { valid: true, models };
+  } catch {
+    return { valid: false, models: [] };
+  }
+}
+
+export async function validateApiKey(provider: AiProvider, apiKey: string, baseUrl?: string): Promise<boolean> {
+  try {
+    const model = createModel(provider, apiKey, undefined, baseUrl);
     await generateText({
       model,
       prompt: 'Say "ok".',

@@ -12,7 +12,8 @@ export function AiAutoFillButton({ blockType, currentAttrs, onApply }: AiAutoFil
   const [suggestions, setSuggestions] = useState<Record<string, unknown> | null>(null);
   const [error, setError] = useState('');
 
-  if (!settings?.hasApiKey) return null;
+  const isConfigured = settings?.provider === 'ollama' ? !!settings?.baseUrl : settings?.hasApiKey;
+  if (!isConfigured) return null;
 
   async function handleAutoFill() {
     setError('');

@@ -4,11 +4,12 @@ import type { AiProvider } from './ai-provider.service.js';
 
 export async function saveAiSettings(
   userId: string,
-  data: { provider: AiProvider; model: string; apiKey?: string },
+  data: { provider: AiProvider; model: string; apiKey?: string; baseUrl?: string },
 ) {
   const update: Record<string, string | null> = {
     aiProvider: data.provider,
     aiModel: data.model,
+    aiBaseUrl: data.baseUrl ?? null,
   };
 
   if (data.apiKey) {
@@ -16,6 +17,13 @@ export async function saveAiSettings(
     update.aiApiKeyEnc = encrypted;
     update.aiApiKeyIv = iv;
     update.aiApiKeyTag = tag;
+  }
+
+  // Ollama doesn't need an API key — clear any stale one when switching
+  if (data.provider === 'ollama' && !data.apiKey) {
+    update.aiApiKeyEnc = null;
+    update.aiApiKeyIv = null;
+    update.aiApiKeyTag = null;
   }
 
   await prisma.user.update({
@@ -31,6 +39,7 @@ export async function getAiSettings(userId: string) {
       aiProvider: true,
       aiModel: true,
       aiApiKeyEnc: true,
+      aiBaseUrl: true,
     },
   });
 
@@ -40,6 +49,7 @@ export async function getAiSettings(userId: string) {
     provider: user.aiProvider as AiProvider | null,
     model: user.aiModel,
     hasApiKey: !!user.aiApiKeyEnc,
+    baseUrl: user.aiBaseUrl,
   };
 }
 

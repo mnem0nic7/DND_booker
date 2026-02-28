@@ -19,6 +19,7 @@ model User {
   aiApiKeyEnc  String?     @map("ai_api_key_enc")
   aiApiKeyIv   String?     @map("ai_api_key_iv")
   aiApiKeyTag  String?     @map("ai_api_key_tag")
+  aiBaseUrl    String?     @map("ai_base_url")
   createdAt    DateTime    @default(now()) @map("created_at")
   updatedAt    DateTime    @updatedAt @map("updated_at")
 

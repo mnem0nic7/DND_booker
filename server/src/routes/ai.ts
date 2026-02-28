@@ -8,7 +8,7 @@ import { validateUuid } from '../middleware/validate-uuid.js';
 import * as aiSettings from '../services/ai-settings.service.js';
 import * as aiChat from '../services/ai-chat.service.js';
 import * as aiContent from '../services/ai-content.service.js';
-import { createModel, validateApiKey, SUPPORTED_MODELS, type AiProvider } from '../services/ai-provider.service.js';
+import { createModel, validateApiKey, validateConnection, SUPPORTED_MODELS, type AiProvider } from '../services/ai-provider.service.js';
 import { prisma } from '../config/database.js';
 
 const SUPPORTED_BLOCK_TYPES = aiContent.getSupportedBlockTypes();
@@ -36,11 +36,15 @@ aiSettingsRoutes.get('/settings', asyncHandler(async (req: AuthRequest, res: Res
 }));
 
 const saveSettingsSchema = z.object({
-  provider: z.enum(['anthropic', 'openai']),
+  provider: z.enum(['anthropic', 'openai', 'ollama']),
   model: z.string().min(1).max(100),
   apiKey: z.string().min(10).max(300).optional(),
+  baseUrl: z.string().url().max(500).optional(),
 }).refine(
-  (data) => SUPPORTED_MODELS[data.provider]?.includes(data.model),
+  (data) => {
+    if (data.provider === 'ollama') return true;
+    return SUPPORTED_MODELS[data.provider]?.includes(data.model);
+  },
   { message: 'Unsupported model for the selected provider', path: ['model'] }
 );
 
@@ -97,6 +101,25 @@ aiSettingsRoutes.post('/settings/validate', aiValidationRateLimit, asyncHandler(
     } else {
       res.status(500).json({ error: 'Could not validate key. Please try again.' });
     }
+  }
+}));
+
+const validateOllamaSchema = z.object({
+  baseUrl: z.string().url(),
+});
+
+aiSettingsRoutes.post('/settings/validate-ollama', aiValidationRateLimit, asyncHandler(async (req: AuthRequest, res: Response) => {
+  const parsed = validateOllamaSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'Validation failed' });
+    return;
+  }
+  try {
+    const result = await validateConnection(parsed.data.baseUrl);
+    res.json(result);
+  } catch (err) {
+    console.error('[AI] Ollama validation error:', err);
+    res.status(500).json({ error: 'Could not connect to Ollama.' });
   }
 }));
 
@@ -345,8 +368,14 @@ aiChatRoutes.delete('/ai/chat', validateUuid('projectId'), asyncHandler(async (r
 // --- Shared helper ---
 async function getModelForUser(userId: string) {
   const settings = await aiSettings.getAiSettings(userId);
-  if (!settings?.provider || !settings.hasApiKey) return null;
+  if (!settings?.provider) return null;
 
+  // Ollama doesn't require an API key
+  if (settings.provider === 'ollama') {
+    return createModel(settings.provider, 'ollama', settings.model ?? undefined, settings.baseUrl ?? undefined);
+  }
+
+  if (!settings.hasApiKey) return null;
   const apiKey = await aiSettings.getDecryptedApiKey(userId);
   if (!apiKey) return null;
 

@@ -64,7 +64,7 @@ export function AiChatPanel({ projectId, editor }: AiChatPanelProps) {
     }
   }
 
-  const isConfigured = settings?.hasApiKey;
+  const isConfigured = settings?.provider === 'ollama' ? !!settings?.baseUrl : settings?.hasApiKey;
 
   return (
     <div className="flex flex-col h-full bg-gray-50">

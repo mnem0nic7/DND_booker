@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import api, { setAccessToken, getAccessToken } from '../lib/api';
 import axios from 'axios';
 
-export type AiProvider = 'anthropic' | 'openai';
+export type AiProvider = 'anthropic' | 'openai' | 'ollama';
 
 interface ChatMessage {
   id: string;
@@ -16,6 +16,7 @@ interface AiSettings {
   provider: AiProvider | null;
   model: string | null;
   hasApiKey: boolean;
+  baseUrl: string | null;
   supportedModels: Record<AiProvider, string[]>;
 }
 
@@ -29,9 +30,10 @@ interface AiState {
   settings: AiSettings | null;
   isLoadingSettings: boolean;
   fetchSettings: () => Promise<void>;
-  saveSettings: (provider: AiProvider, model: string, apiKey?: string) => Promise<void>;
+  saveSettings: (provider: AiProvider, model: string, apiKey?: string, baseUrl?: string) => Promise<void>;
   removeApiKey: () => Promise<void>;
   validateKey: (provider: AiProvider, apiKey: string) => Promise<boolean>;
+  validateOllama: (baseUrl: string) => Promise<{ valid: boolean; models: string[] }>;
 
   // Chat
   messages: ChatMessage[];
@@ -75,9 +77,9 @@ export const useAiStore = create<AiState>((set, get) => ({
     }
   },
 
-  saveSettings: async (provider, model, apiKey?) => {
+  saveSettings: async (provider, model, apiKey?, baseUrl?) => {
     try {
-      await api.post('/ai/settings', { provider, model, apiKey });
+      await api.post('/ai/settings', { provider, model, apiKey, baseUrl });
       await get().fetchSettings();
     } catch (err) {
       console.error('[AI] Failed to save settings:', err);
@@ -98,6 +100,11 @@ export const useAiStore = create<AiState>((set, get) => ({
   validateKey: async (provider, apiKey) => {
     const { data } = await api.post('/ai/settings/validate', { provider, apiKey });
     return data.valid;
+  },
+
+  validateOllama: async (baseUrl) => {
+    const { data } = await api.post('/ai/settings/validate-ollama', { baseUrl });
+    return data;
   },
 
   // Chat

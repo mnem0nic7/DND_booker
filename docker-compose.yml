@@ -29,6 +29,8 @@ services:
     build:
       context: .
       dockerfile: server/Dockerfile
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - '4000:4000'
     environment:
@@ -37,8 +39,8 @@ services:
       - REDIS_PORT=6379
       - JWT_SECRET=dev-jwt-secret-change-in-production
       - JWT_REFRESH_SECRET=dev-refresh-secret-change-in-production
-      - CLIENT_URL=http://localhost:3000
-      - AI_KEY_ENCRYPTION_SECRET=change-me-to-64-char-hex-in-production-0000000000000000000000
+      - CLIENT_URL=http://localhost:3000,http://192.168.4.120:3000
+      - AI_KEY_ENCRYPTION_SECRET=027757e209befa1344e156fde96c92399438682589ccf96757fa0aa83f668fdd
       - NODE_ENV=production
       - PORT=4000
     healthcheck:

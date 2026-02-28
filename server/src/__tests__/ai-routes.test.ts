@@ -69,6 +69,7 @@ describe('AI Routes', () => {
       expect(res.body.supportedModels).toBeDefined();
       expect(res.body.supportedModels.anthropic).toBeDefined();
       expect(res.body.supportedModels.openai).toBeDefined();
+      expect(res.body.supportedModels.ollama).toBeDefined();
     });
 
     it('should return 401 without auth token', async () => {
@@ -205,6 +206,101 @@ describe('AI Routes', () => {
       const res = await request(app)
         .post('/api/ai/settings/validate')
         .send({ provider: 'openai', apiKey: 'sk-test-1234567890' });
+      expect(res.status).toBe(401);
+    });
+  });
+
+  describe('POST /api/ai/settings (Ollama)', () => {
+    it('should accept ollama provider with any model name', async () => {
+      const res = await request(app)
+        .post('/api/ai/settings')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({ provider: 'ollama', model: 'llama3.1:8b', baseUrl: 'http://localhost:11434' });
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+
+      const getRes = await request(app)
+        .get('/api/ai/settings')
+        .set('Authorization', `Bearer ${accessToken}`);
+      expect(getRes.body.provider).toBe('ollama');
+      expect(getRes.body.model).toBe('llama3.1:8b');
+      expect(getRes.body.baseUrl).toBe('http://localhost:11434');
+    });
+
+    it('should accept ollama without API key and clear stale key', async () => {
+      // First save with an API key on openai
+      await request(app)
+        .post('/api/ai/settings')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({ provider: 'openai', model: 'gpt-4o', apiKey: 'sk-test-fake-key-1234567890' });
+
+      // Verify key was saved
+      let getRes = await request(app)
+        .get('/api/ai/settings')
+        .set('Authorization', `Bearer ${accessToken}`);
+      expect(getRes.body.hasApiKey).toBe(true);
+
+      // Now switch to ollama — should clear the stale key
+      const res = await request(app)
+        .post('/api/ai/settings')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({ provider: 'ollama', model: 'mistral:7b' });
+
+      expect(res.status).toBe(200);
+
+      getRes = await request(app)
+        .get('/api/ai/settings')
+        .set('Authorization', `Bearer ${accessToken}`);
+      expect(getRes.body.provider).toBe('ollama');
+      expect(getRes.body.hasApiKey).toBe(false);
+    });
+
+    it('should skip model validation for ollama (any model name allowed)', async () => {
+      const res = await request(app)
+        .post('/api/ai/settings')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({ provider: 'ollama', model: 'custom-fine-tuned:latest' });
+
+      expect(res.status).toBe(200);
+    });
+  });
+
+  describe('POST /api/ai/settings/validate-ollama', () => {
+    it('should reject missing baseUrl', async () => {
+      const res = await request(app)
+        .post('/api/ai/settings/validate-ollama')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({});
+
+      expect(res.status).toBe(400);
+      expect(res.body.error).toBe('Validation failed');
+    });
+
+    it('should reject invalid URL format', async () => {
+      const res = await request(app)
+        .post('/api/ai/settings/validate-ollama')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({ baseUrl: 'not-a-url' });
+
+      expect(res.status).toBe(400);
+    });
+
+    it('should return invalid for unreachable Ollama server', async () => {
+      const res = await request(app)
+        .post('/api/ai/settings/validate-ollama')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({ baseUrl: 'http://localhost:1' });
+
+      expect(res.status).toBe(200);
+      expect(res.body.valid).toBe(false);
+      expect(res.body.models).toEqual([]);
+    });
+
+    it('should return 401 without auth token', async () => {
+      const res = await request(app)
+        .post('/api/ai/settings/validate-ollama')
+        .send({ baseUrl: 'http://localhost:11434' });
       expect(res.status).toBe(401);
     });
   });

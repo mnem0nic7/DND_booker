@@ -4,6 +4,7 @@ COPY package*.json ./
 COPY server/package.json server/
 COPY shared/package.json shared/
 RUN npm ci
+COPY tsconfig.json ./
 COPY shared/ shared/
 COPY server/ server/
 WORKDIR /app/server

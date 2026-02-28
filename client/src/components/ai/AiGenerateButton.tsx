@@ -12,7 +12,8 @@ export function AiGenerateButton({ blockType, onGenerated }: AiGenerateButtonPro
   const [prompt, setPrompt] = useState('');
   const [error, setError] = useState('');
 
-  if (!settings?.hasApiKey) return null;
+  const isConfigured = settings?.provider === 'ollama' ? !!settings?.baseUrl : settings?.hasApiKey;
+  if (!isConfigured) return null;
 
   async function handleGenerate() {
     if (!prompt.trim()) return;
