@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import api, { setAccessToken, getAccessToken } from '../lib/api';
 import axios from 'axios';
+import type { WizardEvent, WizardGeneratedSection, WizardOutline } from '@dnd-booker/shared';
 
 export type AiProvider = 'anthropic' | 'openai' | 'ollama';
 
@@ -10,6 +11,14 @@ interface ChatMessage {
   content: string;
   blocks?: unknown;
   createdAt: string;
+}
+
+export interface WizardProgress {
+  isGenerating: boolean;
+  outline: WizardOutline | null;
+  sections: WizardGeneratedSection[];
+  progress: number;
+  error: string | null;
 }
 
 interface AiSettings {
@@ -24,6 +33,7 @@ const STREAM_ERROR_SENTINEL = '\n\n[Response interrupted. Please try again.]';
 
 /** Active stream abort controller — allows cancelling in-flight SSE requests. */
 let _streamAbortController: AbortController | null = null;
+let _wizardAbortController: AbortController | null = null;
 
 interface AiState {
   // Settings
@@ -55,6 +65,13 @@ interface AiState {
   _autoFillCount: number;
   isAutoFilling: boolean;
   autoFillBlock: (blockType: string, currentAttrs: Record<string, unknown>) => Promise<Record<string, unknown> | null>;
+
+  // Wizard (autonomous creation)
+  wizardProgress: WizardProgress | null;
+  startWizardFromOutline: (projectId: string, outline: WizardOutline) => Promise<void>;
+  applyWizardSections: (projectId: string, sectionIds: string[]) => Promise<{ documents: unknown[] } | null>;
+  cancelWizardGeneration: () => void;
+  clearWizard: () => void;
 
   // Settings modal
   isSettingsModalOpen: boolean;
@@ -313,6 +330,210 @@ export const useAiStore = create<AiState>((set, get) => ({
         return { _autoFillCount: count, isAutoFilling: count > 0 };
       });
     }
+  },
+
+  // Wizard (autonomous creation)
+  wizardProgress: null,
+
+  startWizardFromOutline: async (projectId, outline) => {
+    _wizardAbortController?.abort();
+    const abortController = new AbortController();
+    _wizardAbortController = abortController;
+
+    set({
+      wizardProgress: {
+        isGenerating: true,
+        outline,
+        sections: [],
+        progress: 0,
+        error: null,
+      },
+    });
+
+    try {
+      const token = getAccessToken();
+      const response = await fetch(`/api/projects/${projectId}/ai/wizard/chat-generate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        credentials: 'include',
+        body: JSON.stringify(outline),
+        signal: abortController.signal,
+      });
+
+      if (!response.ok) {
+        let errorMsg = 'Generation failed';
+        try {
+          const err = await response.json();
+          errorMsg = err.error || errorMsg;
+        } catch { /* use default */ }
+        throw new Error(errorMsg);
+      }
+
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error('No response body');
+
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed) continue;
+            try {
+              const event = JSON.parse(trimmed) as WizardEvent;
+              switch (event.type) {
+                case 'outline':
+                  set((s) => ({
+                    wizardProgress: s.wizardProgress ? {
+                      ...s.wizardProgress,
+                      outline: event.outline,
+                    } : null,
+                  }));
+                  break;
+                case 'section_start':
+                  set((s) => ({
+                    wizardProgress: s.wizardProgress ? {
+                      ...s.wizardProgress,
+                      sections: [...s.wizardProgress.sections, {
+                        sectionId: event.sectionId,
+                        title: event.title,
+                        status: 'generating' as const,
+                        content: null,
+                      }],
+                    } : null,
+                  }));
+                  break;
+                case 'section_done':
+                  set((s) => ({
+                    wizardProgress: s.wizardProgress ? {
+                      ...s.wizardProgress,
+                      sections: s.wizardProgress.sections.map((sec) =>
+                        sec.sectionId === event.sectionId
+                          ? { ...sec, status: 'completed' as const }
+                          : sec,
+                      ),
+                    } : null,
+                  }));
+                  break;
+                case 'section_error':
+                  set((s) => ({
+                    wizardProgress: s.wizardProgress ? {
+                      ...s.wizardProgress,
+                      sections: s.wizardProgress.sections.map((sec) =>
+                        sec.sectionId === event.sectionId
+                          ? { ...sec, status: 'failed' as const, error: event.error }
+                          : sec,
+                      ),
+                    } : null,
+                  }));
+                  break;
+                case 'progress':
+                  set((s) => ({
+                    wizardProgress: s.wizardProgress ? {
+                      ...s.wizardProgress,
+                      progress: event.percent,
+                    } : null,
+                  }));
+                  break;
+                case 'error':
+                  set((s) => ({
+                    wizardProgress: s.wizardProgress ? {
+                      ...s.wizardProgress,
+                      error: event.error,
+                      isGenerating: false,
+                    } : null,
+                  }));
+                  break;
+                case 'done':
+                  set((s) => ({
+                    wizardProgress: s.wizardProgress ? {
+                      ...s.wizardProgress,
+                      isGenerating: false,
+                    } : null,
+                  }));
+                  break;
+              }
+            } catch { /* skip unparseable */ }
+          }
+        }
+
+        // Process remaining buffer
+        if (buffer.trim()) {
+          try {
+            const event = JSON.parse(buffer.trim()) as WizardEvent;
+            if (event.type === 'done') {
+              set((s) => ({
+                wizardProgress: s.wizardProgress ? {
+                  ...s.wizardProgress,
+                  isGenerating: false,
+                } : null,
+              }));
+            }
+          } catch { /* skip */ }
+        }
+      } finally {
+        reader.releaseLock();
+      }
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') return;
+      console.error('[AI Wizard] Generation failed:', err);
+      set((s) => ({
+        wizardProgress: s.wizardProgress ? {
+          ...s.wizardProgress,
+          error: err instanceof Error ? err.message : 'Generation failed',
+          isGenerating: false,
+        } : null,
+      }));
+    } finally {
+      if (_wizardAbortController === abortController) {
+        _wizardAbortController = null;
+      }
+    }
+  },
+
+  applyWizardSections: async (projectId, sectionIds) => {
+    try {
+      const { data } = await api.post(`/projects/${projectId}/ai/wizard/apply`, { sectionIds });
+      set({ wizardProgress: null });
+      return data;
+    } catch (err) {
+      console.error('[AI Wizard] Failed to apply:', err);
+      set((s) => ({
+        wizardProgress: s.wizardProgress ? {
+          ...s.wizardProgress,
+          error: 'Failed to create documents. Please try again.',
+        } : null,
+      }));
+      return null;
+    }
+  },
+
+  cancelWizardGeneration: () => {
+    _wizardAbortController?.abort();
+    _wizardAbortController = null;
+    set((s) => ({
+      wizardProgress: s.wizardProgress ? {
+        ...s.wizardProgress,
+        isGenerating: false,
+      } : null,
+    }));
+  },
+
+  clearWizard: () => {
+    _wizardAbortController?.abort();
+    _wizardAbortController = null;
+    set({ wizardProgress: null });
   },
 
   // Settings modal

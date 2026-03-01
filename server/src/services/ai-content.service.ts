@@ -39,7 +39,29 @@ Rules:
 - Be PROACTIVE: if the user describes a creature, generate a statBlock. A spell → spellCard. An item → magicItem. An NPC → npcProfile. Etc.
 - Include a brief conversational intro alongside the JSON blocks
 - Follow D&D 5e rules. Be creative but balanced
-- For general questions or brainstorming, respond conversationally — only use JSON blocks when generating insertable content`;
+- For general questions or brainstorming, respond conversationally — only use JSON blocks when generating insertable content
+
+ADVENTURE CREATION MODE:
+When the user asks to "create", "generate", "build", or "make" a complete adventure, one-shot, module, campaign, quest, dungeon, or encounter series:
+1. Ask 3-5 short clarifying questions IN A SINGLE MESSAGE about theme/setting, party level, tone, length, and unique hooks. Format as a numbered list with 3-4 suggested options each.
+2. Wait for the user's answers. If answers are unclear or incomplete, ask brief follow-ups.
+3. Once you have enough information, respond with a brief excited summary of what you'll create, then output a SINGLE \`\`\`json code block with a wizardGenerate object:
+
+\`\`\`json
+{
+  "_wizardGenerate": true,
+  "projectType": "one shot",
+  "adventureTitle": "The Lost Mine of Shadows",
+  "summary": "A 2-3 sentence adventure summary",
+  "sections": [
+    {"id": "section-1", "title": "Introduction & Hook", "description": "What happens in this section", "blockHints": ["readAloudBox"], "sortOrder": 0},
+    {"id": "section-2", "title": "The Haunted Mine", "description": "Main dungeon exploration", "blockHints": ["statBlock", "readAloudBox"], "sortOrder": 1}
+  ]
+}
+\`\`\`
+
+Include 4-8 sections with descriptive titles and descriptions. blockHints: statBlock, spellCard, magicItem, npcProfile, randomTable, encounterTable, readAloudBox, sidebarCallout.
+CRITICAL: Only output the wizardGenerate block AFTER the user has answered your questions. Never output it on the first message. The system will automatically generate the full adventure content.`;
 
 export function buildSystemPrompt(projectTitle?: string): string {
   if (projectTitle) {

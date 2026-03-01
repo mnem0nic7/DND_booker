@@ -1,11 +1,43 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import type { Editor } from '@tiptap/core';
 import { useAiStore } from '../../stores/aiStore';
-import { useWizardStore } from '../../stores/wizardStore';
 import { AiMessageBubble } from './AiMessageBubble';
-import { WizardPanel } from './WizardPanel';
+import { WizardChatProgress } from './WizardChatProgress';
+import type { WizardOutline } from '@dnd-booker/shared';
 
-const WIZARD_TRIGGER_REGEX = /\b(create|generate|build|make|write)\b.*\b(one[ -]?shot|adventure|module|campaign|quest|dungeon|encounter series)\b/i;
+/**
+ * Extract a wizardGenerate outline from an assistant message.
+ * The AI outputs it as a ```json block containing { "_wizardGenerate": true, ... }
+ */
+function extractWizardOutline(content: string): WizardOutline | null {
+  const fenceRegex = /```(?:json)?\s*([\s\S]*?)```/g;
+  let match: RegExpExecArray | null;
+
+  while ((match = fenceRegex.exec(content)) !== null) {
+    try {
+      const parsed = JSON.parse(match[1].trim());
+      if (parsed && parsed._wizardGenerate === true && parsed.adventureTitle && Array.isArray(parsed.sections)) {
+        return {
+          adventureTitle: parsed.adventureTitle,
+          summary: parsed.summary || '',
+          sections: parsed.sections.map((s: Record<string, unknown>, idx: number) => ({
+            id: String(s.id || `section-${idx + 1}`),
+            title: String(s.title || `Section ${idx + 1}`),
+            description: String(s.description || ''),
+            blockHints: Array.isArray(s.blockHints) ? s.blockHints.map(String) : [],
+            sortOrder: typeof s.sortOrder === 'number' ? s.sortOrder : idx,
+          })),
+        };
+      }
+    } catch { /* not valid JSON */ }
+  }
+  return null;
+}
+
+/** Strip the wizardGenerate JSON block from the visible message text */
+function stripWizardBlock(content: string): string {
+  return content.replace(/```(?:json)?\s*\{[\s\S]*?"_wizardGenerate"\s*:\s*true[\s\S]*?\}[\s\S]*?```/g, '').trim();
+}
 
 interface AiChatPanelProps {
   projectId: string;
@@ -26,14 +58,18 @@ export function AiChatPanel({ projectId, editor, onDocumentsCreated }: AiChatPan
     settings,
     fetchSettings,
     setSettingsModalOpen,
+    wizardProgress,
+    startWizardFromOutline,
+    applyWizardSections,
+    cancelWizardGeneration,
+    clearWizard,
   } = useAiStore();
-
-  const { isActive: isWizardActive } = useWizardStore();
 
   const [input, setInput] = useState('');
   const [insertError, setInsertError] = useState<string | null>(null);
-  const [showWizard, setShowWizard] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  // Track which wizard outlines we've already triggered generation for
+  const triggeredOutlinesRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     fetchSettings();
@@ -52,27 +88,36 @@ export function AiChatPanel({ projectId, editor, onDocumentsCreated }: AiChatPan
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, streamingContent]);
+  }, [messages, streamingContent, wizardProgress]);
 
-  // Sync wizard active state
+  // Detect wizardGenerate blocks in completed messages and auto-trigger generation
   useEffect(() => {
-    if (isWizardActive) {
-      setShowWizard(true);
-    }
-  }, [isWizardActive]);
+    if (isStreaming || wizardProgress?.isGenerating) return;
+
+    // Look at the last assistant message for a wizard outline
+    const lastMsg = messages[messages.length - 1];
+    if (!lastMsg || lastMsg.role !== 'assistant') return;
+
+    const outline = extractWizardOutline(lastMsg.content);
+    if (!outline) return;
+
+    // Don't re-trigger if we already started this one
+    const outlineKey = `${outline.adventureTitle}-${outline.sections.length}`;
+    if (triggeredOutlinesRef.current.has(outlineKey)) return;
+    triggeredOutlinesRef.current.add(outlineKey);
+
+    // Auto-trigger generation from the outline
+    startWizardFromOutline(projectId, outline);
+  }, [messages, isStreaming, wizardProgress, projectId, startWizardFromOutline]);
 
   async function handleSend() {
     const text = input.trim();
-    if (!text || isStreaming) return;
-
-    // Detect wizard-trigger phrases and launch automatically
-    if (WIZARD_TRIGGER_REGEX.test(text)) {
-      setInput('');
-      setShowWizard(true);
-      return;
-    }
+    if (!text || isStreaming || wizardProgress?.isGenerating) return;
 
     setInput('');
+    // All messages go through the normal chat — the AI's system prompt
+    // handles creation requests by asking questions first, then outputting
+    // a _wizardGenerate block when ready
     await sendMessage(projectId, text);
   }
 
@@ -87,27 +132,22 @@ export function AiChatPanel({ projectId, editor, onDocumentsCreated }: AiChatPan
     }
   }
 
-  function handleLaunchWizard() {
-    setShowWizard(true);
-  }
+  const handleApplyWizard = useCallback(async (sectionIds: string[]) => {
+    const result = await applyWizardSections(projectId, sectionIds);
+    if (result) {
+      onDocumentsCreated?.();
+    }
+  }, [projectId, applyWizardSections, onDocumentsCreated]);
 
-  function handleCloseWizard() {
-    setShowWizard(false);
-    useWizardStore.getState().reset();
-  }
+  const handleCancelWizard = useCallback(() => {
+    if (wizardProgress?.isGenerating) {
+      cancelWizardGeneration();
+    } else {
+      clearWizard();
+    }
+  }, [wizardProgress, cancelWizardGeneration, clearWizard]);
 
   const isConfigured = settings?.provider === 'ollama' ? !!settings?.baseUrl : settings?.hasApiKey;
-
-  // Show wizard panel when active
-  if (showWizard) {
-    return (
-      <WizardPanel
-        projectId={projectId}
-        onClose={handleCloseWizard}
-        onDocumentsCreated={onDocumentsCreated}
-      />
-    );
-  }
 
   return (
     <div className="flex flex-col h-full bg-gray-50">
@@ -124,6 +164,8 @@ export function AiChatPanel({ projectId, editor, onDocumentsCreated }: AiChatPan
             onClick={() => {
               if (window.confirm('Clear all chat history? This cannot be undone.')) {
                 clearChat(projectId);
+                clearWizard();
+                triggeredOutlinesRef.current.clear();
               }
             }}
             className="text-xs text-gray-400 hover:text-red-500 transition-colors"
@@ -154,24 +196,12 @@ export function AiChatPanel({ projectId, editor, onDocumentsCreated }: AiChatPan
               Configure AI
             </button>
           </div>
-        ) : messages.length === 0 && !isStreaming ? (
+        ) : messages.length === 0 && !isStreaming && !wizardProgress ? (
           <div className="flex flex-col items-center justify-center h-full text-center px-4">
             <p className="text-sm text-gray-500 mb-2">Ask me anything about your campaign!</p>
             <div className="space-y-1.5 w-full">
-              {/* Wizard entry point */}
-              <button
-                onClick={handleLaunchWizard}
-                className="block w-full text-left text-xs bg-purple-50 border border-purple-200 rounded-md px-3 py-2.5 hover:border-purple-400 hover:bg-purple-100 transition-colors group"
-              >
-                <span className="text-purple-700 font-medium group-hover:text-purple-800">
-                  Create with AI
-                </span>
-                <span className="text-purple-500 ml-1">
-                  — Generate a complete adventure with guided steps
-                </span>
-              </button>
-
               {[
+                'Create a one shot adventure for level 3 players',
                 'Create an orc war chief stat block',
                 'Design a fire spell for level 3',
                 'Generate an NPC tavern keeper',
@@ -188,20 +218,38 @@ export function AiChatPanel({ projectId, editor, onDocumentsCreated }: AiChatPan
           </div>
         ) : (
           <>
-            {messages.map((msg) => (
-              <AiMessageBubble
-                key={msg.id}
-                role={msg.role}
-                content={msg.content}
-                onInsertBlock={handleInsertBlock}
-              />
-            ))}
+            {messages.map((msg) => {
+              // Strip wizard JSON blocks from display but keep the surrounding text
+              const displayContent = msg.role === 'assistant'
+                ? stripWizardBlock(msg.content)
+                : msg.content;
+
+              // Skip rendering if the message was only a wizard block with no other text
+              if (msg.role === 'assistant' && !displayContent.trim()) return null;
+
+              return (
+                <AiMessageBubble
+                  key={msg.id}
+                  role={msg.role}
+                  content={displayContent}
+                  onInsertBlock={handleInsertBlock}
+                />
+              );
+            })}
             {isStreaming && streamingContent && (
               <AiMessageBubble
                 role="assistant"
                 content={streamingContent}
                 isStreaming
                 onInsertBlock={handleInsertBlock}
+              />
+            )}
+            {/* Wizard generation progress — shows inline in the chat */}
+            {wizardProgress && (
+              <WizardChatProgress
+                wizardProgress={wizardProgress}
+                onApply={handleApplyWizard}
+                onCancel={handleCancelWizard}
               />
             )}
           </>
@@ -244,7 +292,7 @@ export function AiChatPanel({ projectId, editor, onDocumentsCreated }: AiChatPan
             ) : (
               <button
                 onClick={handleSend}
-                disabled={!input.trim()}
+                disabled={!input.trim() || wizardProgress?.isGenerating}
                 className="self-end px-3 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

@@ -685,6 +685,272 @@ aiWizardRoutes.post('/ai/wizard/apply', validateUuid('projectId'), asyncHandler(
   }
 }));
 
+// POST /projects/:projectId/ai/wizard/auto-create — fully autonomous: prompt → outline → sections
+const wizardAutoCreateSchema = z.object({
+  prompt: z.string().min(1).max(5000),
+});
+
+aiWizardRoutes.post('/ai/wizard/auto-create', validateUuid('projectId'), wizardRateLimit, asyncHandler(async (req: AuthRequest, res: Response) => {
+  const projectId = req.params.projectId as string;
+  const parsed = wizardAutoCreateSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'Validation failed' });
+    return;
+  }
+
+  const project = await prisma.project.findFirst({
+    where: { id: projectId, userId: req.userId! },
+  });
+  if (!project) {
+    res.status(404).json({ error: 'Project not found' });
+    return;
+  }
+
+  const model = await getModelForUser(req.userId!);
+  if (!model) {
+    res.status(400).json({ error: 'AI not configured. Please set up your API key in AI settings.' });
+    return;
+  }
+
+  const abortController = new AbortController();
+  req.on('close', () => abortController.abort());
+
+  // Create wizard session
+  await aiWizard.deleteSession(projectId, req.userId!);
+  const session = await aiWizard.getOrCreateSession(projectId, req.userId!);
+
+  setupSSE(res);
+
+  // Phase 1: Generate outline from prompt
+  sendWizardEvent(res, { type: 'phase', phase: 'outline' });
+
+  let outline;
+  try {
+    outline = await aiWizard.generateOutlineFromPrompt(
+      parsed.data.prompt,
+      model,
+      abortController.signal,
+    );
+
+    await aiWizard.updateSession(session.id, {
+      outline,
+      phase: 'generating',
+      sections: [],
+      progress: 0,
+    });
+
+    sendWizardEvent(res, { type: 'outline', outline });
+  } catch (err: unknown) {
+    if (abortController.signal.aborted) { res.end(); return; }
+    console.error('[AI Wizard] Failed to generate outline:', err);
+    await aiWizard.updateSession(session.id, { errorMsg: 'Failed to generate outline' });
+    sendWizardEvent(res, { type: 'error', error: 'Failed to generate adventure outline. Please try again.' });
+    res.end();
+    return;
+  }
+
+  // Phase 2: Generate all sections
+  const generatedSections: WizardGeneratedSection[] = [];
+  const previousSummaries: string[] = [];
+  const totalSections = outline.sections.length;
+
+  for (let idx = 0; idx < totalSections; idx++) {
+    const section = outline.sections[idx];
+    if (abortController.signal.aborted) break;
+
+    sendWizardEvent(res, { type: 'section_start', sectionId: section.id, title: section.title });
+
+    try {
+      const result = await aiWizard.generateSection(
+        outline,
+        section,
+        previousSummaries,
+        model,
+        abortController.signal,
+      );
+
+      const genSection: WizardGeneratedSection = {
+        sectionId: section.id,
+        title: section.title,
+        status: 'completed',
+        content: result.content,
+        markdown: result.markdown,
+      };
+
+      generatedSections.push(genSection);
+      previousSummaries.push(aiWizard.summarizeSection(result.markdown));
+
+      const progress = Math.round(((idx + 1) / totalSections) * 100);
+
+      await aiWizard.updateSession(session.id, {
+        sections: generatedSections,
+        progress,
+      });
+
+      sendWizardEvent(res, { type: 'section_done', sectionId: section.id });
+      sendWizardEvent(res, { type: 'progress', percent: progress });
+    } catch (err: unknown) {
+      if (abortController.signal.aborted) break;
+      console.error(`[AI Wizard] Failed to generate section ${section.id}:`, err);
+
+      const genSection: WizardGeneratedSection = {
+        sectionId: section.id,
+        title: section.title,
+        status: 'failed',
+        content: null,
+        error: 'Generation failed',
+      };
+      generatedSections.push(genSection);
+      await aiWizard.updateSession(session.id, { sections: generatedSections });
+
+      sendWizardEvent(res, {
+        type: 'section_error',
+        sectionId: section.id,
+        error: 'Failed to generate this section.',
+      });
+    }
+  }
+
+  if (!abortController.signal.aborted) {
+    await aiWizard.updateSession(session.id, { phase: 'review', progress: 100 });
+    sendWizardEvent(res, { type: 'done' });
+  }
+
+  res.end();
+}));
+
+// POST /projects/:projectId/ai/wizard/chat-generate — generate adventure from chat outline
+const wizardChatGenerateSchema = z.object({
+  adventureTitle: z.string().min(1),
+  summary: z.string(),
+  sections: z.array(z.object({
+    id: z.string(),
+    title: z.string(),
+    description: z.string().optional().default(''),
+    blockHints: z.array(z.string()).optional().default([]),
+    sortOrder: z.number(),
+  })),
+});
+
+aiWizardRoutes.post('/ai/wizard/chat-generate', validateUuid('projectId'), wizardRateLimit, asyncHandler(async (req: AuthRequest, res: Response) => {
+  const projectId = req.params.projectId as string;
+  const parsed = wizardChatGenerateSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'Validation failed' });
+    return;
+  }
+
+  const project = await prisma.project.findFirst({
+    where: { id: projectId, userId: req.userId! },
+  });
+  if (!project) {
+    res.status(404).json({ error: 'Project not found' });
+    return;
+  }
+
+  const model = await getModelForUser(req.userId!);
+  if (!model) {
+    res.status(400).json({ error: 'AI not configured.' });
+    return;
+  }
+
+  const abortController = new AbortController();
+  req.on('close', () => abortController.abort());
+
+  const outline = parsed.data as {
+    adventureTitle: string;
+    summary: string;
+    sections: Array<{
+      id: string;
+      title: string;
+      description: string;
+      blockHints: string[];
+      sortOrder: number;
+    }>;
+  };
+
+  // Create/update wizard session for persistence
+  await aiWizard.deleteSession(projectId, req.userId!);
+  const session = await aiWizard.getOrCreateSession(projectId, req.userId!);
+  await aiWizard.updateSession(session.id, {
+    outline,
+    phase: 'generating',
+    sections: [],
+    progress: 0,
+  });
+
+  setupSSE(res);
+
+  const generatedSections: WizardGeneratedSection[] = [];
+  const previousSummaries: string[] = [];
+  const totalSections = outline.sections.length;
+
+  for (let idx = 0; idx < totalSections; idx++) {
+    const section = outline.sections[idx];
+    if (abortController.signal.aborted) break;
+
+    sendWizardEvent(res, { type: 'section_start', sectionId: section.id, title: section.title });
+
+    try {
+      const result = await aiWizard.generateSection(
+        outline,
+        section,
+        previousSummaries,
+        model,
+        abortController.signal,
+      );
+
+      const genSection: WizardGeneratedSection = {
+        sectionId: section.id,
+        title: section.title,
+        status: 'completed',
+        content: result.content,
+        markdown: result.markdown,
+      };
+
+      generatedSections.push(genSection);
+      previousSummaries.push(aiWizard.summarizeSection(result.markdown));
+
+      const progress = Math.round(((idx + 1) / totalSections) * 100);
+
+      await aiWizard.updateSession(session.id, {
+        sections: generatedSections,
+        progress,
+      });
+
+      sendWizardEvent(res, { type: 'section_done', sectionId: section.id });
+      sendWizardEvent(res, { type: 'progress', percent: progress });
+    } catch (err: unknown) {
+      if (abortController.signal.aborted) break;
+
+      console.error(`[AI Wizard Chat] Failed to generate section ${section.id}:`, err);
+
+      const genSection: WizardGeneratedSection = {
+        sectionId: section.id,
+        title: section.title,
+        status: 'failed',
+        content: null,
+        error: 'Generation failed',
+      };
+      generatedSections.push(genSection);
+      await aiWizard.updateSession(session.id, { sections: generatedSections });
+
+      sendWizardEvent(res, {
+        type: 'section_error',
+        sectionId: section.id,
+        error: 'Failed to generate this section.',
+      });
+    }
+  }
+
+  if (!abortController.signal.aborted) {
+    await aiWizard.updateSession(session.id, { phase: 'review', progress: 100 });
+    sendWizardEvent(res, { type: 'done' });
+  }
+
+  res.end();
+}));
+
 // DELETE /projects/:projectId/ai/wizard — cancel/delete wizard session
 aiWizardRoutes.delete('/ai/wizard', validateUuid('projectId'), asyncHandler(async (req: AuthRequest, res: Response) => {
   const projectId = req.params.projectId as string;

@@ -62,6 +62,34 @@ Return ONLY a JSON array of question objects. No explanation, no markdown fences
 Schema: [{"id": "q1", "question": "string", "options": ["opt1", "opt2", "opt3"]}]`;
 }
 
+export function buildAutoOutlinePrompt(userPrompt: string): string {
+  return `You are a creative D&D 5e adventure designer. A DM has asked you to create an adventure based on this request:
+
+"${userPrompt}"
+
+Create a detailed adventure outline with 4-8 sections. Each section should be a logical part of the adventure (e.g., "Introduction & Hook", "The Haunted Mine", "The Final Confrontation").
+
+If the request is vague, use your creativity to fill in details — pick an interesting theme, appropriate level range, and compelling story hooks. Make it exciting and playable.
+
+Available D&D block types you can suggest for each section: ${SUPPORTED_BLOCKS.join(', ')}, readAloudBox
+
+Return ONLY a JSON object. No explanation, no markdown fences.
+Schema:
+{
+  "adventureTitle": "string — evocative title for the adventure",
+  "summary": "string — 2-3 sentence adventure summary",
+  "sections": [
+    {
+      "id": "section-1",
+      "title": "string — section title",
+      "description": "string — 2-3 sentences describing what happens in this section",
+      "blockHints": ["statBlock", "readAloudBox"],
+      "sortOrder": 0
+    }
+  ]
+}`;
+}
+
 export function buildOutlinePrompt(params: WizardParameters): string {
   const answersText = Object.entries(params.answers)
     .map(([qId, answer]) => `${qId}: ${answer}`)
@@ -428,6 +456,30 @@ export async function generateQuestions(
   }
 
   return questions;
+}
+
+// ── Generate Outline from Prompt (autonomous) ───────────────────
+
+export async function generateOutlineFromPrompt(
+  userPrompt: string,
+  model: Parameters<typeof generateText>[0]['model'],
+  abortSignal?: AbortSignal,
+): Promise<WizardOutline> {
+  const prompt = buildAutoOutlinePrompt(userPrompt);
+
+  const { text } = await generateText({
+    model,
+    prompt,
+    maxOutputTokens: 4096,
+    abortSignal,
+  });
+
+  const outline = parseOutlineResponse(text);
+  if (!outline) {
+    throw new Error('Failed to parse AI-generated outline');
+  }
+
+  return outline;
 }
 
 // ── Generate Outline ────────────────────────────────────────────

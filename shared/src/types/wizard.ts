@@ -52,6 +52,7 @@ export interface WizardSession {
 
 /** SSE events sent during wizard streaming */
 export type WizardEvent =
+  | { type: 'phase'; phase: WizardPhase }
   | { type: 'questions'; questions: WizardQuestion[] }
   | { type: 'outline'; outline: WizardOutline }
   | { type: 'section_start'; sectionId: string; title: string }
