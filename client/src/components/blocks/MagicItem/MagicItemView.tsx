@@ -78,7 +78,7 @@ export function MagicItemView({
       >
         {/* Delete button */}
         <button
-          className="magic-item__delete-btn"
+          className="block-delete-btn"
           onClick={deleteNode}
           type="button"
           title="Delete magic item"

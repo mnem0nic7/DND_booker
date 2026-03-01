@@ -111,7 +111,7 @@ export function StatBlockView({
       >
         {/* Delete button */}
         <button
-          className="stat-block__delete-btn"
+          className="block-delete-btn"
           onClick={deleteNode}
           type="button"
           title="Delete stat block"

@@ -13,7 +13,7 @@ export function PageBreakView({
       >
         {/* Delete button */}
         <button
-          className="page-break__delete-btn"
+          className="block-delete-btn"
           onClick={deleteNode}
           type="button"
           title="Delete page break"

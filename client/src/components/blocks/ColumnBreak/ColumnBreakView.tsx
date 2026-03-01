@@ -13,7 +13,7 @@ export function ColumnBreakView({
       >
         {/* Delete button */}
         <button
-          className="column-break__delete-btn"
+          className="block-delete-btn"
           onClick={deleteNode}
           type="button"
           title="Delete column break"

@@ -28,7 +28,7 @@ export function SidebarCalloutView({
       >
         {/* Delete button */}
         <button
-          className="sidebar-callout__delete-btn"
+          className="block-delete-btn"
           onClick={deleteNode}
           type="button"
           title="Delete callout"

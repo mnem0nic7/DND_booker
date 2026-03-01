@@ -59,7 +59,7 @@ export function MapBlockView({
       >
         {/* Delete button */}
         <button
-          className="map-block__delete-btn"
+          className="block-delete-btn"
           onClick={deleteNode}
           type="button"
           title="Delete map block"

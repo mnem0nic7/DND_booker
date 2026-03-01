@@ -34,7 +34,7 @@ export function HandoutView({
       >
         {/* Delete button */}
         <button
-          className="handout__delete-btn"
+          className="block-delete-btn"
           onClick={deleteNode}
           type="button"
           title="Delete handout"

@@ -68,7 +68,7 @@ export function RaceBlockView({
       >
         {/* Delete button */}
         <button
-          className="race-block__delete-btn"
+          className="block-delete-btn"
           onClick={deleteNode}
           type="button"
           title="Delete race block"

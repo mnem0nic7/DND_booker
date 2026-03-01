@@ -29,7 +29,7 @@ export function ClassFeatureView({
       >
         {/* Delete button */}
         <button
-          className="class-feature__delete-btn"
+          className="block-delete-btn"
           onClick={deleteNode}
           type="button"
           title="Delete class feature"

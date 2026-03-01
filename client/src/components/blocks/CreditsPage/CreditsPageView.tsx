@@ -29,7 +29,7 @@ export function CreditsPageView({
       >
         {/* Delete button */}
         <button
-          className="credits-page__delete-btn"
+          className="block-delete-btn"
           onClick={deleteNode}
           type="button"
           title="Delete credits page"

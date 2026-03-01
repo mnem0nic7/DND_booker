@@ -47,7 +47,7 @@ export function SpellCardView({
       >
         {/* Delete button */}
         <button
-          className="spell-card__delete-btn"
+          className="block-delete-btn"
           onClick={deleteNode}
           type="button"
           title="Delete spell card"

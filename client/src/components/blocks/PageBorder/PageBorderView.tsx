@@ -33,7 +33,7 @@ export function PageBorderView({
       >
         {/* Delete button */}
         <button
-          className="page-border__delete-btn"
+          className="block-delete-btn"
           onClick={deleteNode}
           type="button"
           title="Delete page border"

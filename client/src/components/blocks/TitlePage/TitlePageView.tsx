@@ -32,7 +32,7 @@ export function TitlePageView({
       >
         {/* Delete button */}
         <button
-          className="title-page__delete-btn"
+          className="block-delete-btn"
           onClick={deleteNode}
           type="button"
           title="Delete title page"

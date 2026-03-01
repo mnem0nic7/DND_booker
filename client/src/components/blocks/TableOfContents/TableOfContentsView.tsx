@@ -66,7 +66,7 @@ export function TableOfContentsView({
       >
         {/* Delete button */}
         <button
-          className="table-of-contents__delete-btn"
+          className="block-delete-btn"
           onClick={deleteNode}
           type="button"
           title="Delete table of contents"

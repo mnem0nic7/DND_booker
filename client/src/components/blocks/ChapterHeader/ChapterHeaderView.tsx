@@ -40,7 +40,7 @@ export function ChapterHeaderView({
       >
         {/* Delete button */}
         <button
-          className="chapter-header__delete-btn"
+          className="block-delete-btn"
           onClick={deleteNode}
           type="button"
           title="Delete chapter header"

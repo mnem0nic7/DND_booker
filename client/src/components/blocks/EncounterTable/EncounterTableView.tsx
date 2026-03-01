@@ -71,7 +71,7 @@ export function EncounterTableView({
       >
         {/* Delete button */}
         <button
-          className="encounter-table__delete-btn"
+          className="block-delete-btn"
           onClick={deleteNode}
           type="button"
           title="Delete encounter table"

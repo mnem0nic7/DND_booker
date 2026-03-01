@@ -37,7 +37,7 @@ export function ReadAloudBoxView({
 
         {/* Delete button */}
         <button
-          className="read-aloud-box__delete-btn"
+          className="block-delete-btn"
           onClick={deleteNode}
           type="button"
           title="Delete read-aloud box"

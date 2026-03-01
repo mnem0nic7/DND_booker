@@ -35,7 +35,7 @@ export function FullBleedImageView({
       >
         {/* Delete button */}
         <button
-          className="full-bleed-image__delete-btn"
+          className="block-delete-btn"
           onClick={deleteNode}
           type="button"
           title="Delete image block"

@@ -46,3 +46,75 @@
   font-family: var(--heading-font);
   color: var(--accent-color);
 }
+
+/* ── Shared Block Controls ────────────────────────────────── */
+
+/* Unified delete button for all custom blocks */
+.block-delete-btn {
+  position: absolute;
+  top: 0.35rem;
+  right: 0.35rem;
+  background: #ef4444;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 0.2rem 0.5rem;
+  font-size: 0.65rem;
+  font-weight: 500;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  z-index: 5;
+}
+
+/* Show on block hover — each block CSS defines its own :hover rule;
+   this catch-all covers any wrapper with position:relative */
+.stat-block:hover .block-delete-btn,
+.spell-card:hover .block-delete-btn,
+.magic-item:hover .block-delete-btn,
+.npc-profile:hover .block-delete-btn,
+.random-table:hover .block-delete-btn,
+.encounter-table:hover .block-delete-btn,
+.class-feature:hover .block-delete-btn,
+.race-block:hover .block-delete-btn,
+.chapter-header:hover .block-delete-btn,
+.title-page:hover .block-delete-btn,
+.credits-page:hover .block-delete-btn,
+.back-cover:hover .block-delete-btn,
+.table-of-contents:hover .block-delete-btn,
+.handout:hover .block-delete-btn,
+.full-bleed-image:hover .block-delete-btn,
+.map-block:hover .block-delete-btn,
+.page-border:hover .block-delete-btn {
+  opacity: 1;
+}
+
+/* ── Global Focus Ring ─────────────────────────────────────── */
+
+/* Consistent purple focus ring on all block edit panel inputs */
+.stat-block__edit-panel input:focus,
+.stat-block__edit-panel select:focus,
+.stat-block__edit-panel textarea:focus,
+.spell-card__edit-panel input:focus,
+.spell-card__edit-panel select:focus,
+.spell-card__edit-panel textarea:focus,
+.magic-item__edit-panel input:focus,
+.magic-item__edit-panel select:focus,
+.magic-item__edit-panel textarea:focus,
+.npc-profile__edit-panel input:focus,
+.npc-profile__edit-panel select:focus,
+.npc-profile__edit-panel textarea:focus,
+.random-table__edit-panel input:focus,
+.random-table__edit-panel select:focus,
+.encounter-table__edit-panel input:focus,
+.encounter-table__edit-panel select:focus,
+.class-feature__edit-panel input:focus,
+.class-feature__edit-panel select:focus,
+.class-feature__edit-panel textarea:focus,
+.race-block__edit-panel input:focus,
+.race-block__edit-panel select:focus,
+.race-block__edit-panel textarea:focus {
+  outline: none;
+  border-color: #7c3aed;
+  box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.12);
+}

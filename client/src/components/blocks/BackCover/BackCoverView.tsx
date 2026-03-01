@@ -32,7 +32,7 @@ export function BackCoverView({
       >
         {/* Delete button */}
         <button
-          className="back-cover__delete-btn"
+          className="block-delete-btn"
           onClick={deleteNode}
           type="button"
           title="Delete back cover"

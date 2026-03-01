@@ -65,7 +65,7 @@ export function RandomTableView({
       >
         {/* Delete button */}
         <button
-          className="random-table__delete-btn"
+          className="block-delete-btn"
           onClick={deleteNode}
           type="button"
           title="Delete random table"

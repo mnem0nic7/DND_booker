@@ -32,7 +32,7 @@ export function NpcProfileView({
       >
         {/* Delete button */}
         <button
-          className="npc-profile__delete-btn"
+          className="block-delete-btn"
           onClick={deleteNode}
           type="button"
           title="Delete NPC profile"
