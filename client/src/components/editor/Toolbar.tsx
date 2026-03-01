@@ -9,6 +9,7 @@ interface ToolbarProps {
   setColumnCount: (n: 1 | 2) => void;
   showTexture: boolean;
   setShowTexture: (v: boolean) => void;
+  onOpenBlockPicker: () => void;
 }
 
 function Icon({ d }: { d: string }) {
@@ -56,7 +57,7 @@ const THEMES: { value: ThemeName; label: string; swatch: string }[] = [
   { value: 'infernal', label: 'Infernal', swatch: '#1a0a0a' },
 ];
 
-export function Toolbar({ editor, columnCount, setColumnCount, showTexture, setShowTexture }: ToolbarProps) {
+export function Toolbar({ editor, columnCount, setColumnCount, showTexture, setShowTexture, onOpenBlockPicker }: ToolbarProps) {
   const { currentTheme, setTheme } = useThemeStore();
   const [showThemeDropdown, setShowThemeDropdown] = useState(false);
   const [, setTick] = useState(0);
@@ -165,6 +166,9 @@ export function Toolbar({ editor, columnCount, setColumnCount, showTexture, setS
             </Btn>
             <Btn onClick={() => editor.chain().focus().toggleCodeBlock().run()} isActive={is('codeBlock')} title="Code block">
               <Icon d="M17.25 6.75L22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3l-4.5 16.5" />
+            </Btn>
+            <Btn onClick={() => onOpenBlockPicker()} title="Insert block">
+              <span className="text-[10px] font-bold">Block</span>
             </Btn>
           </div>
           <GroupLabel>Insert</GroupLabel>
