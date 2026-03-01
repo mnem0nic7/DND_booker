@@ -175,7 +175,7 @@ export default function CreateProjectModal({ open, onClose }: CreateProjectModal
                   placeholder="Enter project title..."
                   required
                   autoFocus
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none"
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-purple-500 focus:ring-1 focus:ring-purple-500 focus:outline-none"
                 />
               </div>
 
@@ -190,7 +190,7 @@ export default function CreateProjectModal({ open, onClose }: CreateProjectModal
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="Briefly describe your project..."
                   rows={3}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none resize-none"
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-purple-500 focus:ring-1 focus:ring-purple-500 focus:outline-none resize-none"
                 />
               </div>
 
@@ -226,7 +226,7 @@ export default function CreateProjectModal({ open, onClose }: CreateProjectModal
                 <button
                   type="submit"
                   disabled={!title.trim() || isCreating}
-                  className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isCreating ? 'Creating...' : 'Create Project'}
                 </button>

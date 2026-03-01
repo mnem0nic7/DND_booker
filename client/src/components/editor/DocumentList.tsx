@@ -137,7 +137,7 @@ export function DocumentList({
         <h2 className="text-sm font-semibold text-gray-700">Documents</h2>
         <button
           onClick={onAddDocument}
-          className="text-gray-400 hover:text-indigo-600 transition-colors"
+          className="text-gray-400 hover:text-purple-600 transition-colors"
           title="New document"
         >
           <svg
@@ -182,9 +182,9 @@ export function DocumentList({
               onDrop={(e) => handleDrop(e, doc.id)}
               className={`
                 group flex items-center justify-between px-3 py-2 cursor-pointer border-b border-gray-50 transition-all text-sm select-none
-                ${isActive ? 'bg-indigo-50 text-indigo-700 font-medium' : 'text-gray-700 hover:bg-gray-50'}
+                ${isActive ? 'bg-purple-50 text-purple-700 font-medium' : 'text-gray-700 hover:bg-gray-50'}
                 ${isDragged ? 'opacity-40' : 'opacity-100'}
-                ${isDropTarget ? 'border-t-2 border-t-indigo-400' : ''}
+                ${isDropTarget ? 'border-t-2 border-t-purple-400' : ''}
               `}
               onClick={() => {
                 if (!isRenaming) onSelectDocument(doc.id);

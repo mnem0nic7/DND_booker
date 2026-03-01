@@ -62,7 +62,7 @@ export function ThemePicker() {
               onClick={() => setTheme(theme.id)}
               className={`w-full text-left rounded-lg border-2 p-2 transition-all ${
                 isActive
-                  ? 'border-blue-500 ring-1 ring-blue-500'
+                  ? 'border-purple-500 ring-1 ring-purple-500'
                   : 'border-gray-200 hover:border-gray-300'
               }`}
             >
