@@ -94,7 +94,7 @@ export function ChapterHeaderView({
                 placeholder="Optional subtitle"
               />
             </div>
-            <div className="chapter-header__edit-row" style={{ display: 'flex', gap: '4px' }}>
+            <div className="chapter-header__edit-row block-button-group" style={{ justifyContent: 'flex-start' }}>
               <AiGenerateButton blockType="chapterHeader" onGenerated={updateAttributes} />
               <AiAutoFillButton blockType="chapterHeader" currentAttrs={{ ...attrs }} onApply={updateAttributes} />
             </div>

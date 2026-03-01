@@ -131,7 +131,7 @@ export function MapBlockView({
                 placeholder="e.g. 1 inch = 5 feet"
               />
             </div>
-            <h4 style={{ margin: '0.5rem 0 0.25rem', fontSize: '0.8rem' }}>Key Entries</h4>
+            <h4>Key Entries</h4>
             {keyEntries.map((entry, idx) => (
               <div key={idx} className="map-block__edit-entry">
                 <input
@@ -149,7 +149,7 @@ export function MapBlockView({
                 <button
                   type="button"
                   onClick={() => removeKeyEntry(idx)}
-                  style={{ color: '#dc2626', cursor: 'pointer', border: 'none', background: 'none', fontWeight: 'bold' }}
+                  className="text-red-600 font-bold bg-transparent border-none cursor-pointer hover:text-red-800 transition-colors"
                 >
                   X
                 </button>

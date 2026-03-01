@@ -53,7 +53,7 @@ export function ClassFeatureView({
 
         {/* Edit toggle + AI buttons */}
         {selected && (
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.35rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
+          <div className="block-button-group">
             <AiGenerateButton
               blockType="classFeature"
               onGenerated={(attrs) => updateAttributes(attrs)}
@@ -66,15 +66,7 @@ export function ClassFeatureView({
             <button
               onClick={() => setEditing((v) => !v)}
               type="button"
-              style={{
-                background: '#991b1b',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                padding: '0.25rem 0.6rem',
-                fontSize: '0.75rem',
-                cursor: 'pointer',
-              }}
+              className="block-edit-btn"
             >
               {editing ? 'Done Editing' : 'Edit Properties'}
             </button>

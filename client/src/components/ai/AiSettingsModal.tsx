@@ -137,6 +137,7 @@ export function AiSettingsModal() {
           <button
             onClick={() => setSettingsModalOpen(false)}
             className="text-gray-400 hover:text-gray-600"
+            aria-label="Close settings"
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -155,7 +156,7 @@ export function AiSettingsModal() {
                 value="anthropic"
                 checked={provider === 'anthropic'}
                 onChange={() => { setProvider('anthropic'); setValidationResult(null); setError(''); }}
-                className="text-indigo-600"
+                className="text-purple-600"
               />
               <span className="text-sm">Anthropic Claude</span>
             </label>
@@ -166,7 +167,7 @@ export function AiSettingsModal() {
                 value="openai"
                 checked={provider === 'openai'}
                 onChange={() => { setProvider('openai'); setValidationResult(null); setError(''); }}
-                className="text-indigo-600"
+                className="text-purple-600"
               />
               <span className="text-sm">OpenAI GPT</span>
             </label>
@@ -177,7 +178,7 @@ export function AiSettingsModal() {
                 value="ollama"
                 checked={provider === 'ollama'}
                 onChange={() => { setProvider('ollama'); setValidationResult(null); setError(''); }}
-                className="text-indigo-600"
+                className="text-purple-600"
               />
               <span className="text-sm">Local Ollama</span>
             </label>
@@ -193,7 +194,7 @@ export function AiSettingsModal() {
               value={baseUrl}
               onChange={(e) => { setBaseUrl(e.target.value); setValidationResult(null); setOllamaModels([]); }}
               placeholder="http://localhost:11434"
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-indigo-500 focus:border-indigo-500"
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-purple-500 focus:border-purple-500"
             />
             <button
               onClick={handleValidateOllama}
@@ -226,7 +227,7 @@ export function AiSettingsModal() {
             <select
               value={model}
               onChange={(e) => setModel(e.target.value)}
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-indigo-500 focus:border-indigo-500"
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-purple-500 focus:border-purple-500"
             >
               {models.map((m) => (
                 <option key={m} value={m}>{m}</option>
@@ -249,7 +250,7 @@ export function AiSettingsModal() {
               value={apiKey}
               onChange={(e) => { setApiKey(e.target.value); setValidationResult(null); }}
               placeholder={settings?.hasApiKey ? '••••••••••••••••' : 'Enter your API key'}
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-indigo-500 focus:border-indigo-500"
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-purple-500 focus:border-purple-500"
             />
             <div className="flex gap-2 mt-2">
               <button
@@ -296,7 +297,7 @@ export function AiSettingsModal() {
           <button
             onClick={handleSave}
             disabled={isSaving || !model}
-            className="px-4 py-2 text-sm bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50"
+            className="px-4 py-2 text-sm bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:opacity-50"
           >
             {isSaving ? 'Saving...' : 'Save'}
           </button>

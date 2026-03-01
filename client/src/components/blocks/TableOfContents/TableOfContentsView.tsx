@@ -106,19 +106,11 @@ export function TableOfContentsView({
 
         {/* Edit toggle */}
         {selected && (
-          <div style={{ textAlign: 'right', marginTop: '0.5rem' }}>
+          <div className="block-button-group">
             <button
               onClick={() => setEditing((v) => !v)}
               type="button"
-              style={{
-                background: '#58180d',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                padding: '0.25rem 0.6rem',
-                fontSize: '0.75rem',
-                cursor: 'pointer',
-              }}
+              className="block-edit-btn"
             >
               {editing ? 'Done Editing' : 'Edit Properties'}
             </button>

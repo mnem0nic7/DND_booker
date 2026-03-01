@@ -70,21 +70,15 @@ export function TitlePageView({
           )}
         </div>
 
-        {/* Edit toggle */}
+        {/* Edit toggle + AI buttons */}
         {selected && (
-          <div style={{ textAlign: 'right', marginTop: '0.5rem' }}>
+          <div className="block-button-group">
+            <AiGenerateButton blockType="titlePage" onGenerated={updateAttributes} />
+            <AiAutoFillButton blockType="titlePage" currentAttrs={{ ...attrs }} onApply={updateAttributes} />
             <button
               onClick={() => setEditing((v) => !v)}
               type="button"
-              style={{
-                background: '#58180d',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                padding: '0.25rem 0.6rem',
-                fontSize: '0.75rem',
-                cursor: 'pointer',
-              }}
+              className="block-edit-btn"
             >
               {editing ? 'Done Editing' : 'Edit Properties'}
             </button>
@@ -94,10 +88,6 @@ export function TitlePageView({
         {/* Edit panel */}
         {selected && editing && (
           <div className="title-page__edit-panel">
-            <div style={{ display: 'flex', gap: '4px', marginBottom: '0.5rem' }}>
-              <AiGenerateButton blockType="titlePage" onGenerated={updateAttributes} />
-              <AiAutoFillButton blockType="titlePage" currentAttrs={{ ...attrs }} onApply={updateAttributes} />
-            </div>
             <h4>Title Page Details</h4>
             <div className="title-page__edit-row">
               <label>Title</label>

@@ -76,6 +76,7 @@ export function ExportDialog({ projectId }: ExportDialogProps) {
               onClick={handleClose}
               className="text-gray-400 hover:text-gray-600 transition-colors"
               title="Close"
+              aria-label="Close export dialog"
             >
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -98,7 +99,7 @@ export function ExportDialog({ projectId }: ExportDialogProps) {
                     key={option.value}
                     className={`flex items-start gap-3 p-3 rounded-lg border-2 cursor-pointer transition-colors ${
                       selectedFormat === option.value
-                        ? 'border-indigo-500 bg-indigo-50'
+                        ? 'border-purple-500 bg-purple-50'
                         : 'border-gray-200 hover:border-gray-300'
                     }`}
                   >
@@ -108,7 +109,7 @@ export function ExportDialog({ projectId }: ExportDialogProps) {
                       value={option.value}
                       checked={selectedFormat === option.value}
                       onChange={(e) => setSelectedFormat(e.target.value)}
-                      className="mt-0.5 text-indigo-600 focus:ring-indigo-500"
+                      className="mt-0.5 text-purple-600 focus:ring-purple-500"
                     />
                     <div>
                       <div className="text-sm font-medium text-gray-900">{option.label}</div>
@@ -123,7 +124,7 @@ export function ExportDialog({ projectId }: ExportDialogProps) {
           {/* Exporting state (POST in progress) */}
           {isExporting && (
             <div className="text-center py-4">
-              <div className="inline-block w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mb-3" />
+              <div className="inline-block w-8 h-8 border-4 border-purple-200 border-t-purple-600 rounded-full animate-spin mb-3" />
               <p className="text-sm text-gray-600">Starting export...</p>
             </div>
           )}
@@ -139,7 +140,7 @@ export function ExportDialog({ projectId }: ExportDialogProps) {
               </div>
               <div className="w-full bg-gray-200 rounded-full h-2.5">
                 <div
-                  className="bg-indigo-600 h-2.5 rounded-full transition-all duration-500"
+                  className="bg-purple-600 h-2.5 rounded-full transition-all duration-500"
                   style={{ width: `${job.progress}%` }}
                 />
               </div>
@@ -165,7 +166,7 @@ export function ExportDialog({ projectId }: ExportDialogProps) {
                 <a
                   href={`/api/export-jobs/${job.id}/download`}
                   download
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors"
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 text-white text-sm font-medium rounded-lg hover:bg-purple-700 transition-colors"
                 >
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -215,7 +216,7 @@ export function ExportDialog({ projectId }: ExportDialogProps) {
                       <a
                         href={`/api/export-jobs/${historyJob.id}/download`}
                         download
-                        className="text-indigo-600 hover:text-indigo-800 font-medium"
+                        className="text-purple-600 hover:text-purple-800 font-medium"
                       >
                         Download
                       </a>
@@ -244,7 +245,7 @@ export function ExportDialog({ projectId }: ExportDialogProps) {
               </button>
               <button
                 onClick={handleExport}
-                className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors"
+                className="px-4 py-2 bg-purple-600 text-white text-sm font-medium rounded-lg hover:bg-purple-700 transition-colors"
               >
                 Export
               </button>
@@ -267,7 +268,7 @@ export function ExportDialog({ projectId }: ExportDialogProps) {
               </button>
               <button
                 onClick={handleClose}
-                className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors"
+                className="px-4 py-2 bg-purple-600 text-white text-sm font-medium rounded-lg hover:bg-purple-700 transition-colors"
               >
                 Close
               </button>

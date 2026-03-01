@@ -59,7 +59,7 @@ export function HandoutView({
 
         {/* Edit toggle + AI buttons */}
         {selected && (
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.25rem', marginTop: '0.5rem' }}>
+          <div className="block-button-group">
             <AiGenerateButton blockType="handout" onGenerated={updateAttributes} />
             <AiAutoFillButton blockType="handout" currentAttrs={{ ...attrs }} onApply={updateAttributes} />
           </div>
