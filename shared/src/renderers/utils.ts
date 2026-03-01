@@ -41,3 +41,11 @@ export function safeCssUrl(url: string): string | null {
 
   return escapeHtml(url);
 }
+
+/**
+ * Escape special Typst markup characters in plain text.
+ * Characters that have special meaning in Typst are prefixed with backslash.
+ */
+export function escapeTypst(text: string): string {
+  return text.replace(/[\\*_`#@$<>\[\]]/g, (ch) => `\\${ch}`);
+}

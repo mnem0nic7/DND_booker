@@ -1,2 +1,2 @@
 export { tiptapToHtml, renderNode } from './tiptap-to-html';
-export { escapeHtml, safeUrl, safeCssUrl } from './utils';
+export { escapeHtml, safeUrl, safeCssUrl, escapeTypst } from './utils';
