@@ -7,7 +7,8 @@ export type ThemeName =
   | 'dark-tome'
   | 'clean-modern'
   | 'fey-wild'
-  | 'infernal';
+  | 'infernal'
+  | 'dmguild';
 
 interface ThemeState {
   currentTheme: ThemeName;

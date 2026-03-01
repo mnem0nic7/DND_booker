@@ -34,7 +34,7 @@
 }
 
 .page-border__label {
-  font-family: 'Cinzel', 'Georgia', serif;
+  font-family: var(--heading-font);
   font-size: 0.85rem;
   color: #666;
   letter-spacing: 0.05em;
@@ -176,9 +176,9 @@
 }
 
 .page-border__style-btn--active {
-  background: #58180d;
+  background: var(--accent-color);
   color: white;
-  border-color: #58180d;
+  border-color: var(--accent-color);
 }
 
 @media print {

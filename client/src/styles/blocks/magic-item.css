@@ -1,18 +1,18 @@
 .magic-item {
-  font-family: 'Crimson Text', 'Libre Baskerville', serif;
-  background: #fafafa;
+  font-family: var(--body-font);
+  background: var(--stat-block-bg);
   padding: 1rem;
-  border: 1px solid #d1d5db;
-  border-top: 4px solid #6b7280;
+  border: 1px solid var(--magic-item-accent);
+  border-top: 4px solid var(--magic-item-accent);
   max-width: 420px;
   position: relative;
 }
 
 .magic-item__name {
-  font-family: 'Cinzel', 'Georgia', serif;
+  font-family: var(--heading-font);
   font-size: 1.5rem;
   font-weight: 700;
-  color: #6b7280;
+  color: var(--magic-item-accent);
   margin: 0;
   line-height: 1.2;
 }
@@ -20,13 +20,13 @@
 .magic-item__subtitle {
   font-size: 0.85rem;
   font-style: italic;
-  color: #4b5563;
+  color: var(--magic-item-accent);
   margin-bottom: 0.5rem;
 }
 
 .magic-item__divider {
   height: 2px;
-  background: linear-gradient(to right, #6b7280, transparent);
+  background: linear-gradient(to right, var(--magic-item-accent), transparent);
   margin: 0.5rem 0;
   border: none;
 }
@@ -34,17 +34,17 @@
 .magic-item__description {
   font-size: 0.875rem;
   line-height: 1.5;
-  color: #1a1a1a;
+  color: var(--text-color);
   margin: 0.5rem 0;
 }
 
 .magic-item__properties {
   font-size: 0.875rem;
   line-height: 1.5;
-  color: #1a1a1a;
+  color: var(--text-color);
   margin-top: 0.5rem;
   padding-top: 0.5rem;
-  border-top: 1px solid #e5e7eb;
+  border-top: 1px solid var(--magic-item-accent);
 }
 
 .magic-item__delete-btn {

@@ -16,7 +16,7 @@ export interface AssembleOptions {
 
 /** Map theme name to CSS custom property overrides.
  * Theme names must match client ThemeName type:
- * 'classic-parchment' | 'dark-tome' | 'clean-modern' | 'fey-wild' | 'infernal'
+ * 'classic-parchment' | 'dark-tome' | 'clean-modern' | 'fey-wild' | 'infernal' | 'dmguild'
  */
 /**
  * Returns CSS custom properties for the given theme.
@@ -52,6 +52,10 @@ function getThemeVariables(theme: string): string {
       --table-header-bg: #78350f;
       --table-stripe-bg: #fef3c7;
       --border-decoration: #8b1a1a;
+      --spell-card-accent: #7c3aed;
+      --magic-item-accent: #16a34a;
+      --class-feature-accent: #991b1b;
+      --encounter-accent: #2d6a3e;
       /* Worker aliases */
       --color-primary: #58180d;
       --color-secondary: #c9ad6a;
@@ -79,6 +83,10 @@ function getThemeVariables(theme: string): string {
       --table-header-bg: #3d2e6b;
       --table-stripe-bg: #22223a;
       --border-decoration: #7b68ae;
+      --spell-card-accent: #7b68ae;
+      --magic-item-accent: #c9a84c;
+      --class-feature-accent: #c9a84c;
+      --encounter-accent: #7b68ae;
       --color-primary: #c9a84c;
       --color-secondary: #7b68ae;
       --color-bg: #252545;
@@ -105,6 +113,10 @@ function getThemeVariables(theme: string): string {
       --table-header-bg: #1e40af;
       --table-stripe-bg: #f1f5f9;
       --border-decoration: #2563eb;
+      --spell-card-accent: #7c3aed;
+      --magic-item-accent: #16a34a;
+      --class-feature-accent: #dc2626;
+      --encounter-accent: #2563eb;
       --color-primary: #2563eb;
       --color-secondary: #64748b;
       --color-bg: #f1f5f9;
@@ -131,6 +143,10 @@ function getThemeVariables(theme: string): string {
       --table-header-bg: #166534;
       --table-stripe-bg: #f0fdf4;
       --border-decoration: #22c55e;
+      --spell-card-accent: #7c3aed;
+      --magic-item-accent: #22c55e;
+      --class-feature-accent: #ca8a04;
+      --encounter-accent: #166534;
       --color-primary: #166534;
       --color-secondary: #ca8a04;
       --color-bg: #e8f5e2;
@@ -157,6 +173,10 @@ function getThemeVariables(theme: string): string {
       --table-header-bg: #7f1d1d;
       --table-stripe-bg: #231515;
       --border-decoration: #ea580c;
+      --spell-card-accent: #ea580c;
+      --magic-item-accent: #ea580c;
+      --class-feature-accent: #dc2626;
+      --encounter-accent: #dc2626;
       --color-primary: #dc2626;
       --color-secondary: #ea580c;
       --color-bg: #2a1f1f;
@@ -166,6 +186,36 @@ function getThemeVariables(theme: string): string {
       --color-divider: #ea580c;
       --font-heading: 'Pirata One', cursive;
       --font-body: 'Bitter', serif;
+    `,
+    'dmguild': `
+      --page-bg: #EEE5CE;
+      --text-color: #1a1a1a;
+      --heading-font: 'Cinzel Decorative', 'Cinzel', serif;
+      --body-font: 'Libre Baskerville', serif;
+      --accent-color: #58180D;
+      --accent-secondary: #C9AD6A;
+      --stat-block-bg: #FDF1DC;
+      --stat-block-border: #E69A28;
+      --callout-bg: #E0E5C1;
+      --read-aloud-bg: #FAF7EA;
+      --read-aloud-border: #58180D;
+      --sidebar-bg: #E0E5C1;
+      --table-header-bg: #58180D;
+      --table-stripe-bg: #FDF1DC;
+      --border-decoration: #9C2B1B;
+      --spell-card-accent: #58180D;
+      --magic-item-accent: #58180D;
+      --class-feature-accent: #58180D;
+      --encounter-accent: #58180D;
+      --color-primary: #58180D;
+      --color-secondary: #C9AD6A;
+      --color-bg: #FDF1DC;
+      --color-text: #1a1a1a;
+      --color-accent: #E0E5C1;
+      --color-heading: #58180D;
+      --color-divider: #9C2B1B;
+      --font-heading: 'Cinzel Decorative', 'Cinzel', serif;
+      --font-body: 'Libre Baskerville', serif;
     `,
   };
 
@@ -288,7 +338,7 @@ export function assembleHtml(options: AssembleOptions): string {
   <title>${escapeHtml(projectTitle)}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Crimson+Text:ital,wght@0,400;0,700;1,400&family=Uncial+Antiqua&family=EB+Garamond:ital,wght@0,400;0,700;1,400&family=Inter:wght@400;600;700&family=Merriweather:ital,wght@0,400;0,700;1,400&family=Dancing+Script:wght@400;700&family=Lora:ital,wght@0,400;0,700;1,400&family=Pirata+One&family=Bitter:ital,wght@0,400;0,700;1,400&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Crimson+Text:ital,wght@0,400;0,700;1,400&family=Uncial+Antiqua&family=EB+Garamond:ital,wght@0,400;0,700;1,400&family=Inter:wght@400;600;700&family=Merriweather:ital,wght@0,400;0,700;1,400&family=Dancing+Script:wght@400;700&family=Lora:ital,wght@0,400;0,700;1,400&family=Pirata+One&family=Bitter:ital,wght@0,400;0,700;1,400&family=Cinzel+Decorative:wght@400;700&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet" />
   <style>
     /* Theme CSS variables */
     :root {
@@ -534,7 +584,7 @@ export function assembleHtml(options: AssembleOptions): string {
     /* Spell Card */
     .spell-card {
       background: var(--stat-block-bg);
-      border: 2px solid #4338ca;
+      border: 2px solid var(--spell-card-accent);
       padding: 1rem;
       margin: 1rem 0;
       page-break-inside: avoid;
@@ -542,7 +592,7 @@ export function assembleHtml(options: AssembleOptions): string {
 
     .spell-card__name {
       font-family: var(--font-heading);
-      color: #4338ca;
+      color: var(--spell-card-accent);
       margin: 0 0 0.1rem;
       font-size: 1.3rem;
     }
@@ -554,7 +604,7 @@ export function assembleHtml(options: AssembleOptions): string {
     }
 
     .spell-card__divider {
-      border-top-color: #4338ca;
+      border-top-color: var(--spell-card-accent);
     }
 
     .spell-card__property {
@@ -564,7 +614,7 @@ export function assembleHtml(options: AssembleOptions): string {
 
     .spell-card__property-name {
       font-weight: bold;
-      color: #4338ca;
+      color: var(--spell-card-accent);
     }
 
     .spell-card__description {
@@ -585,8 +635,8 @@ export function assembleHtml(options: AssembleOptions): string {
     /* Magic Item */
     .magic-item {
       background: var(--stat-block-bg);
-      border: 2px solid #16a34a;
-      border-top: 4px solid #16a34a;
+      border: 2px solid var(--magic-item-accent);
+      border-top: 4px solid var(--magic-item-accent);
       padding: 1rem;
       margin: 1rem 0;
       page-break-inside: avoid;
@@ -745,7 +795,7 @@ export function assembleHtml(options: AssembleOptions): string {
     /* Class Feature */
     .class-feature {
       background: var(--stat-block-bg);
-      border: 2px solid #991b1b;
+      border: 2px solid var(--class-feature-accent);
       padding: 1rem;
       margin: 1rem 0;
       page-break-inside: avoid;
@@ -753,7 +803,7 @@ export function assembleHtml(options: AssembleOptions): string {
 
     .class-feature__name {
       font-family: var(--font-heading);
-      color: #991b1b;
+      color: var(--class-feature-accent);
       margin: 0;
       font-size: 1.2rem;
     }
@@ -765,7 +815,7 @@ export function assembleHtml(options: AssembleOptions): string {
     }
 
     .class-feature__divider {
-      border-top-color: #991b1b;
+      border-top-color: var(--class-feature-accent);
     }
 
     .class-feature__description {

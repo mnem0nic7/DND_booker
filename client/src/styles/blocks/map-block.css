@@ -1,9 +1,9 @@
 .map-block {
   position: relative;
   margin: 1.5rem 0;
-  border: 2px solid #8b7355;
+  border: 2px solid var(--accent-secondary);
   border-radius: 4px;
-  background: #faf6f0;
+  background: var(--stat-block-bg);
   overflow: hidden;
 }
 
@@ -25,7 +25,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #ede5d8;
+  background: var(--callout-bg);
 }
 
 .map-block__img {
@@ -41,7 +41,7 @@
   align-items: center;
   justify-content: center;
   padding: 2rem;
-  color: #8b7355;
+  color: var(--accent-secondary);
 }
 
 .map-block__placeholder-icon {
@@ -58,9 +58,9 @@
 .map-block__scale {
   padding: 0.4rem 0.75rem;
   font-size: 0.8rem;
-  color: #5a4a3a;
-  border-top: 1px solid #d4c4a8;
-  background: #f5efe5;
+  color: var(--text-color);
+  border-top: 1px solid var(--accent-secondary);
+  background: var(--callout-bg);
 }
 
 .map-block__scale-label {
@@ -70,15 +70,15 @@
 /* Legend */
 .map-block__legend {
   padding: 0.75rem;
-  border-top: 2px solid #8b7355;
-  background: #faf6f0;
+  border-top: 2px solid var(--accent-secondary);
+  background: var(--stat-block-bg);
 }
 
 .map-block__legend-title {
-  font-family: 'Cinzel', 'Georgia', serif;
+  font-family: var(--heading-font);
   font-size: 0.9rem;
   font-weight: 700;
-  color: #58180d;
+  color: var(--accent-color);
   margin-bottom: 0.5rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -86,14 +86,14 @@
 
 .map-block__legend-entry {
   font-size: 0.8rem;
-  color: #333;
+  color: var(--text-color);
   margin-bottom: 0.25rem;
   line-height: 1.4;
 }
 
 .map-block__legend-label {
   font-weight: 700;
-  color: #58180d;
+  color: var(--accent-color);
 }
 
 /* Delete button */

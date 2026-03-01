@@ -10,9 +10,9 @@
 
 /* Info style */
 .sidebar-callout--info {
-  background: #e8edf3;
-  border-left: 4px solid #4a6fa5;
-  color: #1a2a3a;
+  background: var(--sidebar-bg);
+  border-left: 4px solid var(--accent-color);
+  color: var(--text-color);
 }
 
 /* Warning style */
@@ -24,9 +24,9 @@
 
 /* Lore style */
 .sidebar-callout--lore {
-  background: #e8f0e8;
-  border-left: 4px solid #2d5a2d;
-  color: #1a2a1a;
+  background: var(--callout-bg);
+  border-left: 4px solid var(--accent-color);
+  color: var(--text-color);
 }
 
 /* Selected ring */
@@ -58,7 +58,7 @@
 }
 
 .sidebar-callout--info .sidebar-callout__title {
-  color: #4a6fa5;
+  color: var(--accent-color);
 }
 
 .sidebar-callout--warning .sidebar-callout__title {
@@ -66,7 +66,7 @@
 }
 
 .sidebar-callout--lore .sidebar-callout__title {
-  color: #2d5a2d;
+  color: var(--accent-color);
 }
 
 .sidebar-callout__title-input {
@@ -105,9 +105,9 @@
 }
 
 .sidebar-callout__type-btn--active {
-  background: #4a6fa5;
+  background: var(--accent-color);
   color: white;
-  border-color: #4a6fa5;
+  border-color: var(--accent-color);
 }
 
 .sidebar-callout--warning .sidebar-callout__type-btn--active {
@@ -116,8 +116,8 @@
 }
 
 .sidebar-callout--lore .sidebar-callout__type-btn--active {
-  background: #2d5a2d;
-  border-color: #2d5a2d;
+  background: var(--accent-color);
+  border-color: var(--accent-color);
 }
 
 /* Delete button */

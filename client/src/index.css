@@ -6,6 +6,7 @@
 @import './styles/themes/clean-modern.css';
 @import './styles/themes/fey-wild.css';
 @import './styles/themes/infernal.css';
+@import './styles/themes/dmguild.css';
 
 /* Block CSS */
 @import './styles/blocks/stat-block.css';

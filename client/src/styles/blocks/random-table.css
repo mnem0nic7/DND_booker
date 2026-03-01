@@ -1,8 +1,8 @@
 .random-table {
-  font-family: 'Crimson Text', 'Libre Baskerville', serif;
-  background: #fffbf0;
+  font-family: var(--body-font);
+  background: var(--stat-block-bg);
   padding: 1rem;
-  border: 1px solid #92400e;
+  border: 1px solid var(--table-header-bg);
   max-width: 480px;
   position: relative;
 }
@@ -15,10 +15,10 @@
 }
 
 .random-table__title {
-  font-family: 'Cinzel', 'Georgia', serif;
+  font-family: var(--heading-font);
   font-size: 1.25rem;
   font-weight: 700;
-  color: #78350f;
+  color: var(--table-header-bg);
   margin: 0;
   line-height: 1.2;
 }
@@ -27,8 +27,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: #78350f;
-  color: #fef3c7;
+  background: var(--table-header-bg);
+  color: var(--table-stripe-bg);
   font-family: system-ui, sans-serif;
   font-size: 0.7rem;
   font-weight: 700;
@@ -44,8 +44,8 @@
 }
 
 .random-table__th {
-  background: #78350f;
-  color: #fef3c7;
+  background: var(--table-header-bg);
+  color: var(--table-stripe-bg);
   padding: 0.35rem 0.5rem;
   text-align: left;
   font-weight: 700;
@@ -58,23 +58,23 @@
 }
 
 .random-table__row:nth-child(even) {
-  background: #fef3c7;
+  background: var(--table-stripe-bg);
 }
 
 .random-table__row:nth-child(odd) {
-  background: #fffbeb;
+  background: var(--stat-block-bg);
 }
 
 .random-table__td {
   padding: 0.3rem 0.5rem;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--stat-block-border);
   line-height: 1.4;
 }
 
 .random-table__td--roll {
   text-align: center;
   font-weight: 700;
-  color: #78350f;
+  color: var(--table-header-bg);
 }
 
 .random-table__delete-btn {

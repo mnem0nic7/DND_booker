@@ -1,9 +1,9 @@
 .encounter-table {
-  font-family: 'Crimson Text', 'Libre Baskerville', serif;
-  background: #f5f9f5;
+  font-family: var(--body-font);
+  background: var(--stat-block-bg);
   padding: 1rem;
-  border: 1px solid #2d6a3e;
-  box-shadow: 0 0 0.25rem #2d6a3e;
+  border: 1px solid var(--encounter-accent);
+  box-shadow: 0 0 0.25rem var(--encounter-accent);
   max-width: 480px;
   position: relative;
 }
@@ -13,10 +13,10 @@
 }
 
 .encounter-table__title {
-  font-family: 'Cinzel', 'Georgia', serif;
+  font-family: var(--heading-font);
   font-size: 1.3rem;
   font-weight: 700;
-  color: #1a5c2e;
+  color: var(--encounter-accent);
   margin: 0;
   line-height: 1.2;
 }
@@ -24,7 +24,7 @@
 .encounter-table__cr-range {
   font-size: 0.8rem;
   font-style: italic;
-  color: #3a7a4e;
+  color: var(--encounter-accent);
   margin-top: 0.15rem;
 }
 
@@ -35,7 +35,7 @@
 }
 
 .encounter-table__th {
-  background: #1a5c2e;
+  background: var(--encounter-accent);
   color: #fff;
   font-weight: 700;
   font-size: 0.8rem;
@@ -46,23 +46,23 @@
 }
 
 .encounter-table__row:nth-child(even) {
-  background: #e8f0e8;
+  background: var(--table-stripe-bg);
 }
 
 .encounter-table__row:nth-child(odd) {
-  background: #f5f9f5;
+  background: var(--stat-block-bg);
 }
 
 .encounter-table__td {
   padding: 0.3rem 0.5rem;
-  border-bottom: 1px solid #c5dcc5;
-  color: #1a1a1a;
+  border-bottom: 1px solid var(--stat-block-border);
+  color: var(--text-color);
   line-height: 1.4;
 }
 
 .encounter-table__td--weight {
   font-weight: 700;
-  color: #1a5c2e;
+  color: var(--encounter-accent);
   width: 3rem;
   text-align: center;
 }
@@ -71,7 +71,7 @@
   width: 3rem;
   text-align: center;
   font-weight: 600;
-  color: #1a5c2e;
+  color: var(--encounter-accent);
 }
 
 .encounter-table__delete-btn {

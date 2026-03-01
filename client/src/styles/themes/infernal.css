@@ -14,4 +14,8 @@
   --table-header-bg: #7f1d1d;
   --table-stripe-bg: #231515;
   --border-decoration: #ea580c;
+  --spell-card-accent: #ea580c;
+  --magic-item-accent: #ea580c;
+  --class-feature-accent: #dc2626;
+  --encounter-accent: #dc2626;
 }

@@ -21,11 +21,11 @@
   background: #fffef8;
   border: 1px solid #d4c4a8;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
-  font-family: 'Crimson Text', 'Libre Baskerville', serif;
+  font-family: var(--body-font);
 }
 
 .handout--letter .handout__title {
-  font-family: 'Crimson Text', 'Libre Baskerville', serif;
+  font-family: var(--body-font);
   font-size: 1.1rem;
   font-weight: 600;
   color: #333;
@@ -47,15 +47,15 @@
   border: none;
   border-top: 6px solid #c4a462;
   border-bottom: 6px solid #c4a462;
-  font-family: 'Cinzel', 'Georgia', serif;
+  font-family: var(--heading-font);
   padding: 2rem 2.5rem;
 }
 
 .handout--scroll .handout__title {
-  font-family: 'Cinzel', 'Georgia', serif;
+  font-family: var(--heading-font);
   font-size: 1.2rem;
   font-weight: 700;
-  color: #58180d;
+  color: var(--accent-color);
   text-align: center;
   margin-bottom: 0.75rem;
   text-transform: uppercase;
@@ -63,7 +63,7 @@
 }
 
 .handout--scroll .handout__content {
-  font-family: 'Crimson Text', 'Libre Baskerville', serif;
+  font-family: var(--body-font);
   font-size: 0.95rem;
   line-height: 1.6;
   color: #3a2f1f;
@@ -82,7 +82,7 @@
 }
 
 .handout--poster .handout__title {
-  font-family: 'Cinzel', 'Georgia', serif;
+  font-family: var(--heading-font);
   font-size: 1.5rem;
   font-weight: 700;
   color: #1a1a1a;
@@ -175,7 +175,7 @@
   font-size: 0.75rem;
   background: white;
   resize: vertical;
-  font-family: 'Crimson Text', 'Libre Baskerville', serif;
+  font-family: var(--body-font);
 }
 
 /* Style selector */
@@ -199,9 +199,9 @@
 }
 
 .handout__style-btn--active {
-  background: #58180d;
+  background: var(--accent-color);
   color: white;
-  border-color: #58180d;
+  border-color: var(--accent-color);
 }
 
 @media print {

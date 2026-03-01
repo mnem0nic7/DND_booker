@@ -43,6 +43,12 @@ const themes: ThemeOption[] = [
     description: 'Demon & hellfire theme',
     colors: { bg: '#1c1517', text: '#e8d5c4', accent: '#dc2626', secondary: '#ea580c' },
   },
+  {
+    id: 'dmguild',
+    label: 'DMGuild',
+    description: "Player's Handbook style",
+    colors: { bg: '#EEE5CE', text: '#1a1a1a', accent: '#58180D', secondary: '#C9AD6A' },
+  },
 ];
 
 export function ThemePicker() {

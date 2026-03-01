@@ -1,17 +1,17 @@
 .table-of-contents {
-  font-family: 'Crimson Text', 'Libre Baskerville', serif;
-  background: #fdf1dc;
+  font-family: var(--body-font);
+  background: var(--stat-block-bg);
   padding: 2rem;
-  border: 1px solid #c9ad6a;
+  border: 1px solid var(--accent-secondary);
   position: relative;
   max-width: 500px;
 }
 
 .table-of-contents__heading {
-  font-family: 'Cinzel', 'Georgia', serif;
+  font-family: var(--heading-font);
   font-size: 1.75rem;
   font-weight: 700;
-  color: #58180d;
+  color: var(--accent-color);
   text-align: center;
   margin: 0 0 0.5rem;
   letter-spacing: 0.05em;
@@ -21,7 +21,7 @@
 .table-of-contents__note {
   font-size: 0.75rem;
   font-style: italic;
-  color: #a08050;
+  color: var(--accent-secondary);
   text-align: center;
   margin: 0 0 1.5rem;
 }
@@ -36,7 +36,7 @@
   display: flex;
   align-items: baseline;
   font-size: 0.95rem;
-  color: #1a1a1a;
+  color: var(--text-color);
   line-height: 1.5;
 }
 
@@ -47,7 +47,7 @@
 
 .table-of-contents__entry-leader {
   flex: 1;
-  border-bottom: 1px dotted #999;
+  border-bottom: 1px dotted var(--text-color);
   margin: 0 0.35rem;
   min-width: 1rem;
   position: relative;
@@ -58,7 +58,7 @@
   white-space: nowrap;
   flex-shrink: 0;
   font-weight: 600;
-  color: #58180d;
+  color: var(--accent-color);
 }
 
 .table-of-contents__delete-btn {

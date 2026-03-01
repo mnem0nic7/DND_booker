@@ -1,9 +1,9 @@
 .back-cover {
-  font-family: 'Crimson Text', 'Libre Baskerville', serif;
-  background: #1a1a2e;
+  font-family: var(--body-font);
+  background: var(--page-bg);
   border: 2px solid #333;
   position: relative;
-  color: #e0d8c8;
+  color: var(--text-color);
   min-height: 400px;
 }
 
@@ -25,12 +25,12 @@
   line-height: 1.6;
   font-style: italic;
   margin: 0;
-  color: #e0d8c8;
+  color: var(--text-color);
 }
 
 .back-cover__ornament {
   font-size: 1rem;
-  color: #c9ad6a;
+  color: var(--accent-secondary);
   margin: 0.5rem 0 1.5rem;
   letter-spacing: 0.75rem;
 }
@@ -48,7 +48,7 @@
   height: 64px;
   border-radius: 50%;
   object-fit: cover;
-  border: 2px solid #c9ad6a;
+  border: 2px solid var(--accent-secondary);
 }
 
 .back-cover__author-image-placeholder {
