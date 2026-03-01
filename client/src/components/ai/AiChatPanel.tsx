@@ -3,6 +3,7 @@ import type { Editor } from '@tiptap/core';
 import { useAiStore } from '../../stores/aiStore';
 import { useDocumentStore } from '../../stores/documentStore';
 import { AiMessageBubble } from './AiMessageBubble';
+import { AiPlanPanel } from './AiPlanPanel';
 import { WizardChatProgress } from './WizardChatProgress';
 import type { WizardOutline } from '@dnd-booker/shared';
 
@@ -48,6 +49,21 @@ function stripWizardBlock(content: string): string {
   }).trim();
 }
 
+/** Strip planning control blocks (_memoryUpdate, _planUpdate, _remember) from display */
+function stripPlanningBlocks(content: string): string {
+  return content.replace(/```(?:json)?\s*([\s\S]*?)```/g, (match, inner: string) => {
+    try {
+      const parsed = JSON.parse(inner.trim());
+      if (parsed && typeof parsed === 'object' && (
+        parsed._memoryUpdate || parsed._planUpdate || parsed._remember
+      )) {
+        return '';
+      }
+    } catch { /* not valid JSON, keep it */ }
+    return match;
+  }).trim();
+}
+
 interface AiChatPanelProps {
   projectId: string;
   editor: Editor | null;
@@ -71,10 +87,16 @@ export function AiChatPanel({ projectId, editor }: AiChatPanelProps) {
     applyWizardSections,
     cancelWizardGeneration,
     clearWizard,
+    planningState,
+    forgetFact,
+    resetPlan,
+    resetWorkingMemory,
+    rememberFact,
   } = useAiStore();
 
   const [input, setInput] = useState('');
   const [insertError, setInsertError] = useState<string | null>(null);
+  const [showPlanPanel, setShowPlanPanel] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   // Track which wizard outlines we've already triggered generation for
   const triggeredOutlinesRef = useRef<Set<string>>(new Set());
@@ -170,22 +192,45 @@ export function AiChatPanel({ projectId, editor }: AiChatPanelProps) {
           </svg>
           AI Assistant
         </h3>
-        {messages.length > 0 && (
-          <button
-            onClick={() => {
-              if (window.confirm('Clear all chat history? This cannot be undone.')) {
-                clearChat(projectId);
-                clearWizard();
-                triggeredOutlinesRef.current.clear();
-              }
-            }}
-            className="text-xs text-gray-400 hover:text-red-500 transition-colors"
-            title="Clear chat history"
-          >
-            Clear
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {planningState && (planningState.workingMemory.length > 0 || planningState.taskPlan.length > 0 || planningState.longTermMemory.length > 0) && (
+            <button
+              onClick={() => setShowPlanPanel(!showPlanPanel)}
+              className={`text-xs transition-colors ${showPlanPanel ? 'text-purple-600 font-medium' : 'text-gray-400 hover:text-purple-500'}`}
+              title="Toggle planning panel"
+            >
+              Plan
+            </button>
+          )}
+          {messages.length > 0 && (
+            <button
+              onClick={() => {
+                if (window.confirm('Clear all chat history? This cannot be undone.')) {
+                  clearChat(projectId);
+                  clearWizard();
+                  triggeredOutlinesRef.current.clear();
+                }
+              }}
+              className="text-xs text-gray-400 hover:text-red-500 transition-colors"
+              title="Clear chat history"
+            >
+              Clear
+            </button>
+          )}
+        </div>
       </div>
+
+      {/* Plan panel (collapsible) */}
+      {showPlanPanel && planningState && (
+        <AiPlanPanel
+          projectId={projectId}
+          planningState={planningState}
+          onForgetFact={(itemId) => forgetFact(projectId, itemId)}
+          onResetPlan={() => resetPlan(projectId)}
+          onResetWorkingMemory={() => resetWorkingMemory(projectId)}
+          onRememberFact={(type, content) => rememberFact(projectId, type, content)}
+        />
+      )}
 
       {/* Messages area */}
       <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
@@ -230,9 +275,9 @@ export function AiChatPanel({ projectId, editor }: AiChatPanelProps) {
         ) : (
           <>
             {messages.map((msg) => {
-              // Strip wizard JSON blocks from display but keep the surrounding text
+              // Strip wizard and planning JSON blocks from display
               const displayContent = msg.role === 'assistant'
-                ? stripWizardBlock(msg.content)
+                ? stripPlanningBlocks(stripWizardBlock(msg.content))
                 : msg.content;
 
               // Skip rendering if the message was only a wizard block with no other text
@@ -243,6 +288,7 @@ export function AiChatPanel({ projectId, editor }: AiChatPanelProps) {
                   key={msg.id}
                   role={msg.role}
                   content={displayContent}
+                  rawContent={msg.role === 'assistant' ? msg.content : undefined}
                   onInsertBlock={handleInsertBlock}
                 />
               );
@@ -250,7 +296,7 @@ export function AiChatPanel({ projectId, editor }: AiChatPanelProps) {
             {isStreaming && streamingContent && (
               <AiMessageBubble
                 role="assistant"
-                content={streamingContent}
+                content={stripPlanningBlocks(streamingContent)}
                 isStreaming
                 onInsertBlock={handleInsertBlock}
               />

@@ -4,6 +4,7 @@ import Markdown from 'react-markdown';
 interface AiMessageBubbleProps {
   role: 'user' | 'assistant';
   content: string;
+  rawContent?: string;
   isStreaming?: boolean;
   onInsertBlock: (blockType: string, attrs: Record<string, unknown>) => void;
 }
@@ -63,6 +64,44 @@ function tryParseBlock(jsonStr: string, blocks: DetectedBlock[]): string | null 
   return null;
 }
 
+interface StateChangeIndicator {
+  icon: string;
+  label: string;
+}
+
+function detectStateChanges(rawContent: string): StateChangeIndicator[] {
+  const indicators: StateChangeIndicator[] = [];
+  const fenceRegex = /```(?:json)?\s*([\s\S]*?)```/g;
+  let match: RegExpExecArray | null;
+
+  while ((match = fenceRegex.exec(rawContent)) !== null) {
+    try {
+      const parsed = JSON.parse(match[1].trim());
+      if (!parsed || typeof parsed !== 'object') continue;
+
+      if (parsed._memoryUpdate) {
+        const adds = parsed._memoryUpdate.add?.length || 0;
+        const drops = parsed._memoryUpdate.drop?.length || 0;
+        const parts: string[] = [];
+        if (adds) parts.push(`${adds} note${adds > 1 ? 's' : ''} added`);
+        if (drops) parts.push(`${drops} dropped`);
+        if (parts.length) indicators.push({ icon: '\u{1F4DD}', label: `Memory: ${parts.join(', ')}` });
+      } else if (parsed._planUpdate) {
+        const count = parsed._planUpdate.tasks?.length || 0;
+        if (count) indicators.push({ icon: '\u{1F4CB}', label: `Plan: ${count} task${count > 1 ? 's' : ''}` });
+      } else if (parsed._remember) {
+        const fact = parsed._remember.content;
+        const preview = typeof fact === 'string' && fact.length > 40
+          ? fact.slice(0, 40) + '...'
+          : fact;
+        indicators.push({ icon: '\u{1F4BE}', label: `Remembered: ${preview}` });
+      }
+    } catch { /* skip */ }
+  }
+
+  return indicators;
+}
+
 function extractBlocks(content: string): { text: string; blocks: DetectedBlock[] } {
   const blocks: DetectedBlock[] = [];
 
@@ -82,10 +121,15 @@ function extractBlocks(content: string): { text: string; blocks: DetectedBlock[]
   return { text, blocks };
 }
 
-export function AiMessageBubble({ role, content, isStreaming, onInsertBlock }: AiMessageBubbleProps) {
+export function AiMessageBubble({ role, content, isStreaming, onInsertBlock, rawContent }: AiMessageBubbleProps) {
   const { text, blocks } = useMemo(
     () => (role === 'assistant' ? extractBlocks(content) : { text: content, blocks: [] }),
     [content, role],
+  );
+
+  const stateChanges = useMemo(
+    () => (role === 'assistant' && rawContent ? detectStateChanges(rawContent) : []),
+    [role, rawContent],
   );
 
   const isUser = role === 'user';
@@ -131,6 +175,17 @@ export function AiMessageBubble({ role, content, isStreaming, onInsertBlock }: A
                   Insert
                 </button>
               </div>
+            ))}
+          </div>
+        )}
+
+        {/* State change indicators */}
+        {stateChanges.length > 0 && (
+          <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5">
+            {stateChanges.map((sc, i) => (
+              <span key={i} className="text-[10px] text-gray-400 italic">
+                {sc.icon} {sc.label}
+              </span>
             ))}
           </div>
         )}

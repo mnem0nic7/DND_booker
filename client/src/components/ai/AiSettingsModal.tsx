@@ -40,10 +40,13 @@ export function AiSettingsModal() {
   }, [settings]);
 
   useEffect(() => {
-    // When provider changes, set default model
+    // When provider changes, set appropriate default model
     if (provider === 'ollama') {
-      if (ollamaModels.length && !ollamaModels.includes(model)) {
-        setModel(ollamaModels[0]);
+      // Use first loaded Ollama model, or clear to prevent saving a non-Ollama model
+      if (ollamaModels.length) {
+        if (!ollamaModels.includes(model)) setModel(ollamaModels[0]);
+      } else {
+        setModel('');
       }
     } else if (settings?.supportedModels) {
       const models = settings.supportedModels[provider];

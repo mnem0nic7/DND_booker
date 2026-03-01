@@ -29,6 +29,9 @@ model User {
   templates      Template[]
   chatSessions   AiChatSession[]
   wizardSessions AiWizardSession[]
+  workingMemories AiWorkingMemory[]
+  memoryItems     AiMemoryItem[]
+  taskPlans       AiTaskPlan[]
 
   @@map("users")
 }
@@ -65,6 +68,9 @@ model Project {
   chatSessions   AiChatSession[]
   wizardSessions AiWizardSession[]
   assets         Asset[]
+  workingMemories AiWorkingMemory[]
+  memoryItems     AiMemoryItem[]
+  taskPlans       AiTaskPlan[]
 
   @@index([userId])
   @@map("projects")
@@ -201,4 +207,50 @@ model AiChatMessage {
 
   @@index([sessionId])
   @@map("ai_chat_messages")
+}
+
+model AiWorkingMemory {
+  id        String   @id @default(uuid())
+  projectId String   @map("project_id")
+  userId    String   @map("user_id")
+  bullets   Json     @default("[]")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, userId])
+  @@map("ai_working_memories")
+}
+
+model AiMemoryItem {
+  id         String   @id @default(uuid())
+  userId     String   @map("user_id")
+  projectId  String?  @map("project_id")
+  type       String
+  content    String
+  confidence Float    @default(1.0)
+  source     String?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project    Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([userId, projectId])
+  @@map("ai_memory_items")
+}
+
+model AiTaskPlan {
+  id        String   @id @default(uuid())
+  projectId String   @map("project_id")
+  userId    String   @map("user_id")
+  tasks     Json     @default("[]")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, userId])
+  @@map("ai_task_plans")
 }

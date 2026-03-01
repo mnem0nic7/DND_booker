@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import api, { setAccessToken, getAccessToken } from '../lib/api';
 import axios from 'axios';
-import type { WizardEvent, WizardGeneratedSection, WizardOutline } from '@dnd-booker/shared';
+import type { WizardEvent, WizardGeneratedSection, WizardOutline, PlanningState } from '@dnd-booker/shared';
 
 export type AiProvider = 'anthropic' | 'openai' | 'ollama';
 
@@ -73,6 +73,14 @@ interface AiState {
   cancelWizardGeneration: () => void;
   clearWizard: () => void;
 
+  // Planning state
+  planningState: PlanningState | null;
+  fetchPlanningState: (projectId: string) => Promise<void>;
+  rememberFact: (projectId: string, type: string, content: string) => Promise<void>;
+  forgetFact: (projectId: string, itemId: string) => Promise<void>;
+  resetPlan: (projectId: string) => Promise<void>;
+  resetWorkingMemory: (projectId: string) => Promise<void>;
+
   // Settings modal
   isSettingsModalOpen: boolean;
   setSettingsModalOpen: (open: boolean) => void;
@@ -139,10 +147,16 @@ export const useAiStore = create<AiState>((set, get) => ({
       return { _chatRequestId: requestId, messages: [], streamingContent: '', isStreaming: false, chatError: null };
     });
     try {
-      const { data } = await api.get(`/projects/${projectId}/ai/chat`);
+      const [chatRes, stateRes] = await Promise.all([
+        api.get(`/projects/${projectId}/ai/chat`),
+        api.get(`/projects/${projectId}/ai/state`).catch(() => null),
+      ]);
       // Ignore stale response if project changed while fetching
       if (get()._chatRequestId !== requestId) return;
-      set({ messages: data.messages });
+      set({
+        messages: chatRes.data.messages,
+        planningState: stateRes?.data ?? null,
+      });
     } catch (err) {
       console.error('[AI] Failed to fetch chat history:', err);
       if (get()._chatRequestId === requestId) {
@@ -257,6 +271,9 @@ export const useAiStore = create<AiState>((set, get) => ({
         isStreaming: false,
         streamingContent: '',
       }));
+
+      // Refresh planning state (control blocks may have updated it server-side)
+      get().fetchPlanningState(projectId);
     } catch (err) {
       // Don't show error for intentional aborts (user navigated away or sent new message)
       if (err instanceof DOMException && err.name === 'AbortError') {
@@ -284,8 +301,12 @@ export const useAiStore = create<AiState>((set, get) => ({
 
   clearChat: async (projectId) => {
     try {
-      await api.delete(`/projects/${projectId}/ai/chat`);
-      set({ messages: [], chatError: null });
+      await Promise.all([
+        api.delete(`/projects/${projectId}/ai/chat`),
+        api.post(`/projects/${projectId}/ai/memory/reset`).catch(() => {}),
+        api.post(`/projects/${projectId}/ai/plan/reset`).catch(() => {}),
+      ]);
+      set({ messages: [], chatError: null, planningState: null });
     } catch (err) {
       console.error('[AI] clearChat failed:', err);
       set({ chatError: 'Failed to clear chat history.' });
@@ -534,6 +555,54 @@ export const useAiStore = create<AiState>((set, get) => ({
     _wizardAbortController?.abort();
     _wizardAbortController = null;
     set({ wizardProgress: null });
+  },
+
+  // Planning state
+  planningState: null,
+
+  fetchPlanningState: async (projectId) => {
+    try {
+      const { data } = await api.get(`/projects/${projectId}/ai/state`);
+      set({ planningState: data });
+    } catch {
+      // Non-critical — silently fail
+    }
+  },
+
+  rememberFact: async (projectId, type, content) => {
+    try {
+      await api.post(`/projects/${projectId}/ai/memory/remember`, { type, content });
+      await get().fetchPlanningState(projectId);
+    } catch (err) {
+      console.error('[AI] rememberFact failed:', err);
+    }
+  },
+
+  forgetFact: async (projectId, itemId) => {
+    try {
+      await api.post(`/projects/${projectId}/ai/memory/forget`, { itemId });
+      await get().fetchPlanningState(projectId);
+    } catch (err) {
+      console.error('[AI] forgetFact failed:', err);
+    }
+  },
+
+  resetPlan: async (projectId) => {
+    try {
+      await api.post(`/projects/${projectId}/ai/plan/reset`);
+      await get().fetchPlanningState(projectId);
+    } catch (err) {
+      console.error('[AI] resetPlan failed:', err);
+    }
+  },
+
+  resetWorkingMemory: async (projectId) => {
+    try {
+      await api.post(`/projects/${projectId}/ai/memory/reset`);
+      await get().fetchPlanningState(projectId);
+    } catch (err) {
+      console.error('[AI] resetWorkingMemory failed:', err);
+    }
   },
 
   // Settings modal

@@ -2,16 +2,18 @@ import { Router, Response } from 'express';
 import { z } from 'zod';
 import { streamText, generateText } from 'ai';
 import { requireAuth, AuthRequest } from '../middleware/auth.js';
-import { chatRateLimit, blockGenRateLimit, autoFillRateLimit, aiValidationRateLimit, wizardRateLimit } from '../middleware/ai-rate-limit.js';
+import { chatRateLimit, blockGenRateLimit, autoFillRateLimit, aiValidationRateLimit, wizardRateLimit, memoryRateLimit } from '../middleware/ai-rate-limit.js';
 import { asyncHandler } from '../middleware/async-handler.js';
 import { validateUuid } from '../middleware/validate-uuid.js';
 import * as aiSettings from '../services/ai-settings.service.js';
 import * as aiChat from '../services/ai-chat.service.js';
 import * as aiContent from '../services/ai-content.service.js';
 import * as aiWizard from '../services/ai-wizard.service.js';
+import * as aiPlanner from '../services/ai-planner.service.js';
+import * as aiMemoryService from '../services/ai-memory.service.js';
 import { createModel, validateApiKey, validateConnection, SUPPORTED_MODELS, type AiProvider } from '../services/ai-provider.service.js';
 import { prisma } from '../config/database.js';
-import type { WizardEvent, WizardGeneratedSection } from '@dnd-booker/shared';
+import type { WizardEvent, WizardGeneratedSection, PlanningStateChanges } from '@dnd-booker/shared';
 
 const SUPPORTED_BLOCK_TYPES = aiContent.getSupportedBlockTypes();
 const MAX_CHAT_CONTEXT_MESSAGES = 30;
@@ -123,6 +125,56 @@ aiSettingsRoutes.post('/settings/validate-ollama', aiValidationRateLimit, asyncH
     console.error('[AI] Ollama validation error:', err);
     res.status(500).json({ error: 'Could not connect to Ollama.' });
   }
+}));
+
+// --- Global memory routes (user-scoped, no project) ---
+
+// GET /ai/memory — get global (non-project) memory items
+aiSettingsRoutes.get('/memory', asyncHandler(async (req: AuthRequest, res: Response) => {
+  const items = await aiMemoryService.getMemoryItems(req.userId!);
+  res.json({ items });
+}));
+
+const globalRememberSchema = z.object({
+  type: z.enum(['preference', 'project_fact', 'constraint', 'decision', 'glossary']),
+  content: z.string().min(1).max(2000),
+});
+
+// POST /ai/memory/remember — store a global preference
+aiSettingsRoutes.post('/memory/remember', memoryRateLimit, asyncHandler(async (req: AuthRequest, res: Response) => {
+  const parsed = globalRememberSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'Validation failed' });
+    return;
+  }
+
+  const item = await aiMemoryService.addMemoryItem(req.userId!, {
+    type: parsed.data.type,
+    content: parsed.data.content,
+    projectId: null,
+    source: 'explicit',
+  });
+  res.json({ item });
+}));
+
+const globalForgetSchema = z.object({
+  itemId: z.string().uuid(),
+});
+
+// POST /ai/memory/forget — remove a global memory item
+aiSettingsRoutes.post('/memory/forget', memoryRateLimit, asyncHandler(async (req: AuthRequest, res: Response) => {
+  const parsed = globalForgetSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'Validation failed' });
+    return;
+  }
+
+  const removed = await aiMemoryService.removeMemoryItem(req.userId!, parsed.data.itemId);
+  if (!removed) {
+    res.status(404).json({ error: 'Memory item not found' });
+    return;
+  }
+  res.json({ success: true });
 }));
 
 // --- Block generation routes (no project context) ---
@@ -297,7 +349,10 @@ aiChatRoutes.post('/ai/chat', validateUuid('projectId'), chatRateLimit, asyncHan
       content: m.content,
     }));
 
-    const systemPrompt = aiContent.buildSystemPrompt(project.title);
+    // Load planning context and append to system prompt
+    const planningCtx = await aiPlanner.buildPlanningContext(projectId, req.userId!);
+    const systemPrompt = aiContent.buildSystemPrompt(project.title)
+      + aiPlanner.buildPlanningPromptSection(planningCtx);
 
     // Abort the AI call if the client disconnects
     const abortController = new AbortController();
@@ -328,8 +383,11 @@ aiChatRoutes.post('/ai/chat', validateUuid('projectId'), chatRateLimit, asyncHan
 
     res.end();
 
-    // Persist the assistant message after streaming (truncate if absurdly long)
-    await aiChat.addMessage(session.id, 'assistant', fullResponse.slice(0, MAX_STORED_CONTENT));
+    // Process planning control blocks and persist cleaned response
+    const { visibleText } = await aiPlanner.processAssistantResponse(
+      fullResponse, projectId, req.userId!,
+    );
+    await aiChat.addMessage(session.id, 'assistant', visibleText.slice(0, MAX_STORED_CONTENT));
   } catch (err: unknown) {
     console.error('[AI] Chat stream error:', err);
     if (!res.headersSent) {
@@ -365,6 +423,107 @@ aiChatRoutes.delete('/ai/chat', validateUuid('projectId'), asyncHandler(async (r
     console.error('[AI] Failed to clear chat:', err);
     res.status(500).json({ error: 'Failed to clear chat history.' });
   }
+}));
+
+// --- Planning state routes (project-scoped) ---
+
+// GET /projects/:projectId/ai/state — return full planning state
+aiChatRoutes.get('/ai/state', validateUuid('projectId'), asyncHandler(async (req: AuthRequest, res: Response) => {
+  const projectId = req.params.projectId as string;
+
+  const project = await prisma.project.findFirst({
+    where: { id: projectId, userId: req.userId! },
+  });
+  if (!project) {
+    res.status(404).json({ error: 'Project not found' });
+    return;
+  }
+
+  const state = await aiPlanner.buildPlanningContext(projectId, req.userId!);
+  res.json(state);
+}));
+
+const rememberSchema = z.object({
+  type: z.enum(['preference', 'project_fact', 'constraint', 'decision', 'glossary']),
+  content: z.string().min(1).max(2000),
+});
+
+// POST /projects/:projectId/ai/memory/remember — explicitly store a memory item
+aiChatRoutes.post('/ai/memory/remember', validateUuid('projectId'), memoryRateLimit, asyncHandler(async (req: AuthRequest, res: Response) => {
+  const projectId = req.params.projectId as string;
+  const parsed = rememberSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'Validation failed' });
+    return;
+  }
+
+  const project = await prisma.project.findFirst({
+    where: { id: projectId, userId: req.userId! },
+  });
+  if (!project) {
+    res.status(404).json({ error: 'Project not found' });
+    return;
+  }
+
+  const item = await aiMemoryService.addMemoryItem(req.userId!, {
+    type: parsed.data.type,
+    content: parsed.data.content,
+    projectId,
+    source: 'explicit',
+  });
+  res.json({ item });
+}));
+
+const forgetSchema = z.object({
+  itemId: z.string().uuid(),
+});
+
+// POST /projects/:projectId/ai/memory/forget — remove a memory item by ID
+aiChatRoutes.post('/ai/memory/forget', validateUuid('projectId'), memoryRateLimit, asyncHandler(async (req: AuthRequest, res: Response) => {
+  const parsed = forgetSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'Validation failed' });
+    return;
+  }
+
+  const removed = await aiMemoryService.removeMemoryItem(req.userId!, parsed.data.itemId);
+  if (!removed) {
+    res.status(404).json({ error: 'Memory item not found' });
+    return;
+  }
+  res.json({ success: true });
+}));
+
+// POST /projects/:projectId/ai/plan/reset — clear the task plan
+aiChatRoutes.post('/ai/plan/reset', validateUuid('projectId'), memoryRateLimit, asyncHandler(async (req: AuthRequest, res: Response) => {
+  const projectId = req.params.projectId as string;
+
+  const project = await prisma.project.findFirst({
+    where: { id: projectId, userId: req.userId! },
+  });
+  if (!project) {
+    res.status(404).json({ error: 'Project not found' });
+    return;
+  }
+
+  await aiMemoryService.resetTaskPlan(projectId, req.userId!);
+  res.json({ success: true });
+}));
+
+// POST /projects/:projectId/ai/memory/reset — clear working memory
+aiChatRoutes.post('/ai/memory/reset', validateUuid('projectId'), memoryRateLimit, asyncHandler(async (req: AuthRequest, res: Response) => {
+  const projectId = req.params.projectId as string;
+
+  const project = await prisma.project.findFirst({
+    where: { id: projectId, userId: req.userId! },
+  });
+  if (!project) {
+    res.status(404).json({ error: 'Project not found' });
+    return;
+  }
+
+  await aiMemoryService.resetWorkingMemory(projectId, req.userId!);
+  res.json({ success: true });
 }));
 
 // --- Wizard routes (project-scoped) ---
@@ -974,7 +1133,11 @@ async function getModelForUser(userId: string) {
 
   // Ollama doesn't require an API key
   if (settings.provider === 'ollama') {
-    return createModel(settings.provider, 'ollama', settings.model ?? undefined, settings.baseUrl ?? undefined);
+    // Guard: if a non-Ollama model was saved (e.g. user switched from Anthropic), ignore it
+    const ollamaModel = settings.model && !settings.model.startsWith('claude-') && !settings.model.startsWith('gpt-')
+      ? settings.model
+      : undefined;
+    return createModel(settings.provider, 'ollama', ollamaModel, settings.baseUrl ?? undefined);
   }
 
   if (!settings.hasApiKey) return null;
