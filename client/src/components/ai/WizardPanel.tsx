@@ -1,10 +1,8 @@
 import { useEffect } from 'react';
 import { useWizardStore } from '../../stores/wizardStore';
 import { WizardQuestionnaire } from './WizardQuestionnaire';
-import { WizardOutlineReview } from './WizardOutlineReview';
 import { WizardGenerating } from './WizardGenerating';
 import { WizardReview } from './WizardReview';
-import type { WizardOutline } from '@dnd-booker/shared';
 
 interface Props {
   projectId: string;
@@ -23,8 +21,7 @@ export function WizardPanel({ projectId, onClose, onDocumentsCreated }: Props) {
     error,
     fetchSession,
     startWizard,
-    submitParameters,
-    generateSections,
+    submitAndGenerate,
     applyToProject,
     cancelWizard,
     stopStreaming,
@@ -53,15 +50,8 @@ export function WizardPanel({ projectId, onClose, onDocumentsCreated }: Props) {
   }, []);
 
   function handleSubmitParameters(projectType: string, answers: Record<string, string>) {
-    submitParameters(projectId, projectType, answers);
-  }
-
-  function handleApproveOutline(editedOutline: WizardOutline) {
-    generateSections(projectId, editedOutline);
-  }
-
-  function handleBackToQuestions() {
-    startWizard(projectId);
+    // Autonomous: submit answers → generate outline → generate all sections → review
+    submitAndGenerate(projectId, projectType, answers);
   }
 
   async function handleApply(sectionIds: string[]) {
@@ -76,6 +66,11 @@ export function WizardPanel({ projectId, onClose, onDocumentsCreated }: Props) {
     await cancelWizard(projectId);
     onClose();
   }
+
+  // Determine which step indicator is active
+  const phaseIndex = phase
+    ? ['questionnaire', 'outline', 'generating', 'review'].indexOf(phase)
+    : -1;
 
   return (
     <div className="flex flex-col h-full bg-gray-50">
@@ -98,31 +93,24 @@ export function WizardPanel({ projectId, onClose, onDocumentsCreated }: Props) {
 
       {/* Phase steps indicator */}
       <div className="flex items-center justify-center gap-1 px-4 py-2 bg-white border-b">
-        {(['questionnaire', 'outline', 'generating', 'review'] as const).map((step, idx) => {
-          const stepLabels = ['Questions', 'Outline', 'Generate', 'Review'];
-          const isCurrentOrPast = phase &&
-            ['questionnaire', 'outline', 'generating', 'review'].indexOf(phase) >= idx;
-          const isCurrent = phase === step;
-
-          return (
-            <div key={step} className="flex items-center gap-1">
-              {idx > 0 && (
-                <div className={`w-4 h-px ${isCurrentOrPast ? 'bg-purple-300' : 'bg-gray-200'}`} />
-              )}
-              <div
-                className={`text-[10px] px-1.5 py-0.5 rounded-full ${
-                  isCurrent
-                    ? 'bg-purple-600 text-white font-medium'
-                    : isCurrentOrPast
-                      ? 'bg-purple-100 text-purple-600'
-                      : 'bg-gray-100 text-gray-400'
-                }`}
-              >
-                {stepLabels[idx]}
-              </div>
+        {(['Questions', 'Outline', 'Generate', 'Review'] as const).map((label, idx) => (
+          <div key={label} className="flex items-center gap-1">
+            {idx > 0 && (
+              <div className={`w-4 h-px ${phaseIndex >= idx ? 'bg-purple-300' : 'bg-gray-200'}`} />
+            )}
+            <div
+              className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+                phaseIndex === idx
+                  ? 'bg-purple-600 text-white font-medium'
+                  : phaseIndex > idx
+                    ? 'bg-purple-100 text-purple-600'
+                    : 'bg-gray-100 text-gray-400'
+              }`}
+            >
+              {label}
             </div>
-          );
-        })}
+          </div>
+        ))}
       </div>
 
       {/* Content */}
@@ -133,6 +121,7 @@ export function WizardPanel({ projectId, onClose, onDocumentsCreated }: Props) {
           </div>
         )}
 
+        {/* Phase: Questionnaire — the only step requiring user input */}
         {phase === 'questionnaire' && (
           <WizardQuestionnaire
             questions={questions}
@@ -141,31 +130,45 @@ export function WizardPanel({ projectId, onClose, onDocumentsCreated }: Props) {
           />
         )}
 
-        {phase === 'outline' && outline && (
-          <WizardOutlineReview
-            outline={outline}
-            isStreaming={isStreaming}
-            onApprove={handleApproveOutline}
-            onBack={handleBackToQuestions}
-          />
-        )}
-
-        {phase === 'outline' && !outline && isStreaming && (
+        {/* Phase: Outline (auto-generated, shown briefly as progress) */}
+        {phase === 'outline' && (
           <div className="flex flex-col items-center justify-center py-12">
             <div className="w-8 h-8 border-2 border-purple-300 border-t-purple-600 rounded-full animate-spin mb-3" />
-            <p className="text-sm text-gray-500">Generating adventure outline...</p>
+            <p className="text-sm text-gray-500">Designing adventure outline...</p>
+            {outline && (
+              <div className="mt-4 w-full">
+                <p className="text-xs font-medium text-gray-700 text-center mb-1">
+                  {outline.adventureTitle}
+                </p>
+                <p className="text-xs text-gray-500 text-center">{outline.summary}</p>
+                <p className="text-[10px] text-gray-400 text-center mt-2">
+                  {outline.sections.length} sections planned — generating content...
+                </p>
+              </div>
+            )}
           </div>
         )}
 
+        {/* Phase: Generating — autonomous section generation with progress */}
         {phase === 'generating' && (
-          <WizardGenerating
-            sections={generatedSections}
-            progress={progress}
-            isStreaming={isStreaming}
-            onStop={stopStreaming}
-          />
+          <div className="space-y-4">
+            {/* Show outline context during generation */}
+            {outline && (
+              <div className="bg-white rounded-lg border border-gray-200 p-3 mb-2">
+                <p className="text-sm font-medium text-gray-700">{outline.adventureTitle}</p>
+                <p className="text-xs text-gray-500 mt-0.5">{outline.summary}</p>
+              </div>
+            )}
+            <WizardGenerating
+              sections={generatedSections}
+              progress={progress}
+              isStreaming={isStreaming}
+              onStop={stopStreaming}
+            />
+          </div>
         )}
 
+        {/* Phase: Review — user reviews and selects sections to insert */}
         {phase === 'review' && (
           <WizardReview
             sections={generatedSections}

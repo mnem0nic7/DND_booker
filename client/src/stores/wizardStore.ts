@@ -27,6 +27,8 @@ interface WizardState {
   fetchSession: (projectId: string) => Promise<void>;
   startWizard: (projectId: string, projectType?: string) => Promise<void>;
   submitParameters: (projectId: string, projectType: string, answers: Record<string, string>) => Promise<void>;
+  /** Autonomous flow: submit answers → generate outline → generate all sections → land on review */
+  submitAndGenerate: (projectId: string, projectType: string, answers: Record<string, string>) => Promise<void>;
   generateSections: (projectId: string, outline: WizardOutline) => Promise<void>;
   applyToProject: (projectId: string, sectionIds: string[]) => Promise<{ documents: unknown[] } | null>;
   cancelWizard: (projectId: string) => Promise<void>;
@@ -208,6 +210,112 @@ export const useWizardStore = create<WizardState>((set, get) => ({
       if (err instanceof DOMException && err.name === 'AbortError') return;
       set({
         error: err instanceof Error ? err.message : 'Failed to generate outline',
+        isStreaming: false,
+      });
+    } finally {
+      if (_wizardAbortController === abortController) {
+        _wizardAbortController = null;
+      }
+    }
+  },
+
+  submitAndGenerate: async (projectId, projectType, answers) => {
+    _wizardAbortController?.abort();
+    const abortController = new AbortController();
+    _wizardAbortController = abortController;
+
+    set({ isStreaming: true, error: null, phase: 'outline' });
+
+    let outline: WizardOutline | null = null;
+
+    try {
+      // Step 1: Submit parameters → get outline
+      await ssePost(
+        `/projects/${projectId}/ai/wizard/parameters`,
+        { projectType, answers },
+        (event) => {
+          switch (event.type) {
+            case 'outline':
+              outline = event.outline;
+              set({ outline: event.outline });
+              break;
+            case 'error':
+              set({ error: event.error, isStreaming: false });
+              break;
+          }
+        },
+        abortController.signal,
+      );
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') return;
+      set({
+        error: err instanceof Error ? err.message : 'Failed to generate outline',
+        isStreaming: false,
+      });
+      return;
+    }
+
+    if (!outline || abortController.signal.aborted) {
+      if (!abortController.signal.aborted) {
+        set({ error: 'Failed to generate outline', isStreaming: false });
+      }
+      return;
+    }
+
+    // Step 2: Immediately generate all sections
+    set({ phase: 'generating', generatedSections: [], progress: 0 });
+
+    try {
+      await ssePost(
+        `/projects/${projectId}/ai/wizard/generate`,
+        { outline },
+        (event) => {
+          switch (event.type) {
+            case 'section_start':
+              set((s) => ({
+                generatedSections: [...s.generatedSections, {
+                  sectionId: event.sectionId,
+                  title: event.title,
+                  status: 'generating' as const,
+                  content: null,
+                }],
+              }));
+              break;
+            case 'section_done':
+              set((s) => ({
+                generatedSections: s.generatedSections.map((sec) =>
+                  sec.sectionId === event.sectionId
+                    ? { ...sec, status: 'completed' as const }
+                    : sec,
+                ),
+              }));
+              break;
+            case 'section_error':
+              set((s) => ({
+                generatedSections: s.generatedSections.map((sec) =>
+                  sec.sectionId === event.sectionId
+                    ? { ...sec, status: 'failed' as const, error: event.error }
+                    : sec,
+                ),
+              }));
+              break;
+            case 'progress':
+              set({ progress: event.percent });
+              break;
+            case 'error':
+              set({ error: event.error, isStreaming: false });
+              break;
+            case 'done':
+              set({ isStreaming: false, phase: 'review' });
+              break;
+          }
+        },
+        abortController.signal,
+      );
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') return;
+      set({
+        error: err instanceof Error ? err.message : 'Generation failed',
         isStreaming: false,
       });
     } finally {

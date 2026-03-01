@@ -65,13 +65,11 @@ export function AiChatPanel({ projectId, editor, onDocumentsCreated }: AiChatPan
     const text = input.trim();
     if (!text || isStreaming) return;
 
-    // Check if the message triggers the wizard
+    // Detect wizard-trigger phrases and launch automatically
     if (WIZARD_TRIGGER_REGEX.test(text)) {
-      if (window.confirm('Would you like to use the AI Creation Wizard? It will guide you through creating a complete adventure with multiple sections, stat blocks, and more.')) {
-        setInput('');
-        setShowWizard(true);
-        return;
-      }
+      setInput('');
+      setShowWizard(true);
+      return;
     }
 
     setInput('');
