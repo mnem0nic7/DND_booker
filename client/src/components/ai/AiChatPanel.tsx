@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import type { Editor } from '@tiptap/core';
 import { useAiStore } from '../../stores/aiStore';
+import { useDocumentStore } from '../../stores/documentStore';
 import { AiMessageBubble } from './AiMessageBubble';
 import { WizardChatProgress } from './WizardChatProgress';
 import type { WizardOutline } from '@dnd-booker/shared';
@@ -36,16 +37,23 @@ function extractWizardOutline(content: string): WizardOutline | null {
 
 /** Strip the wizardGenerate JSON block from the visible message text */
 function stripWizardBlock(content: string): string {
-  return content.replace(/```(?:json)?\s*\{[\s\S]*?"_wizardGenerate"\s*:\s*true[\s\S]*?\}[\s\S]*?```/g, '').trim();
+  // Use the same fence regex as extractWizardOutline — match full ```json...``` blocks
+  // and remove any that parse as a _wizardGenerate object
+  return content.replace(/```(?:json)?\s*([\s\S]*?)```/g, (match, inner: string) => {
+    try {
+      const parsed = JSON.parse(inner.trim());
+      if (parsed && parsed._wizardGenerate === true) return '';
+    } catch { /* not valid JSON, keep it */ }
+    return match;
+  }).trim();
 }
 
 interface AiChatPanelProps {
   projectId: string;
   editor: Editor | null;
-  onDocumentsCreated?: () => void;
 }
 
-export function AiChatPanel({ projectId, editor, onDocumentsCreated }: AiChatPanelProps) {
+export function AiChatPanel({ projectId, editor }: AiChatPanelProps) {
   const {
     messages,
     isStreaming,
@@ -132,12 +140,15 @@ export function AiChatPanel({ projectId, editor, onDocumentsCreated }: AiChatPan
     }
   }
 
+  const fetchDocuments = useDocumentStore((s) => s.fetchDocuments);
+
   const handleApplyWizard = useCallback(async (sectionIds: string[]) => {
     const result = await applyWizardSections(projectId, sectionIds);
     if (result) {
-      onDocumentsCreated?.();
+      // Refresh document list so generated content appears in the sidebar/editor
+      await fetchDocuments(projectId);
     }
-  }, [projectId, applyWizardSections, onDocumentsCreated]);
+  }, [projectId, applyWizardSections, fetchDocuments]);
 
   const handleCancelWizard = useCallback(() => {
     if (wizardProgress?.isGenerating) {
@@ -208,7 +219,7 @@ export function AiChatPanel({ projectId, editor, onDocumentsCreated }: AiChatPan
               ].map((suggestion) => (
                 <button
                   key={suggestion}
-                  onClick={() => { setInput(suggestion); }}
+                  onClick={() => sendMessage(projectId, suggestion)}
                   className="block w-full text-left text-xs text-gray-500 bg-white border border-gray-200 rounded-md px-3 py-2 hover:border-purple-300 hover:text-purple-600 transition-colors"
                 >
                   {suggestion}
