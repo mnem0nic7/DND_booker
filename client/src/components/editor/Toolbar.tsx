@@ -50,7 +50,7 @@ export function Toolbar({ editor }: ToolbarProps) {
   if (!editor) return null;
 
   return (
-    <div className="flex items-center gap-0.5 flex-wrap px-3 py-1.5 sticky top-0 z-10">
+    <div className="flex items-center gap-0.5 flex-nowrap overflow-x-auto px-3 py-1.5 sticky top-0 z-10 scrollbar-none">
       {/* Text formatting */}
       <ToolbarButton
         onClick={() => editor.chain().focus().toggleBold().run()}

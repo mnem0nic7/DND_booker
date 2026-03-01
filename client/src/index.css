@@ -57,6 +57,15 @@
   scrollbar-color: #d4d4d8 transparent;
 }
 
+/* Hide scrollbar while keeping scrollable (e.g. toolbar) */
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
 /* Base theme-aware styles for the editor content area */
 [data-theme] {
   background-color: var(--page-bg);

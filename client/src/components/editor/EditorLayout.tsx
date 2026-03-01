@@ -69,7 +69,7 @@ export function EditorLayout({ projectId, content, onUpdate }: EditorLayoutProps
       {/* Center: Toolbar + Editor */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Toolbar */}
-        <div className="flex items-center border-b bg-white">
+        <div className="flex items-center border-b bg-white flex-nowrap">
           <button
             onClick={() => setShowBlockPalette((v) => !v)}
             title={showBlockPalette ? 'Hide block palette' : 'Show block palette'}
@@ -80,7 +80,7 @@ export function EditorLayout({ projectId, content, onUpdate }: EditorLayoutProps
               <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
             </svg>
           </button>
-          <div className="flex-1">
+          <div className="flex-1 min-w-0 overflow-hidden">
             <Toolbar editor={editor} />
           </div>
           <button
