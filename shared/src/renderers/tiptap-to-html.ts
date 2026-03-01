@@ -93,13 +93,18 @@ export function renderNode(node: TipTapNode): string {
       return renderMarks(node.text || '', node.marks);
 
     // ── Basic blocks ──
-    case 'paragraph':
-      return `<p>${renderChildren(node.content)}</p>`;
+    case 'paragraph': {
+      const align = attrs.textAlign;
+      const style = align && align !== 'left' ? ` style="text-align: ${escapeHtml(String(align))}"` : '';
+      return `<p${style}>${renderChildren(node.content)}</p>`;
+    }
 
     case 'heading': {
       const level = Number(attrs.level) || 1;
       const tag = `h${Math.min(Math.max(level, 1), 6)}`;
-      return `<${tag}>${renderChildren(node.content)}</${tag}>`;
+      const align = attrs.textAlign;
+      const style = align && align !== 'left' ? ` style="text-align: ${escapeHtml(String(align))}"` : '';
+      return `<${tag}${style}>${renderChildren(node.content)}</${tag}>`;
     }
 
     case 'bulletList':
@@ -122,7 +127,7 @@ export function renderNode(node: TipTapNode): string {
     }
 
     case 'horizontalRule':
-      return '<hr />';
+      return '<hr class="ornamental-divider" />';
 
     case 'hardBreak':
       return '<br />';
