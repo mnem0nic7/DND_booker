@@ -18,4 +18,20 @@
   --magic-item-accent: #22c55e;
   --class-feature-accent: #ca8a04;
   --encounter-accent: #166534;
+  /* Page simulation */
+  --page-texture: url('/textures/parchment-fey.jpg');
+  --column-rule-color: rgba(0, 0, 0, 0.05);
+  --footer-color: rgba(0, 0, 0, 0.35);
+  /* Typography */
+  --drop-cap-font: 'Dancing Script', cursive;
+  --paragraph-indent: 1em;
+  /* Decorative elements */
+  --divider-ornament: '\2766';
+  --divider-gradient: linear-gradient(to right, transparent, #16a34a 15%, #16a34a 85%, transparent);
+  --divider-height: 2px;
+  --blockquote-border: 3px solid #16a34a;
+  --blockquote-bg: rgba(22, 163, 74, 0.05);
+  /* Heading decoration */
+  --h1-border-bottom: 2px solid #16a34a;
+  --h1-padding-bottom: 0.25rem;
 }

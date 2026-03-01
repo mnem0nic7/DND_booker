@@ -18,4 +18,20 @@
   --magic-item-accent: #ea580c;
   --class-feature-accent: #dc2626;
   --encounter-accent: #dc2626;
+  /* Page simulation */
+  --page-texture: url('/textures/parchment-infernal.jpg');
+  --column-rule-color: rgba(255, 255, 255, 0.05);
+  --footer-color: rgba(255, 255, 255, 0.3);
+  /* Typography */
+  --drop-cap-font: 'Pirata One', serif;
+  --paragraph-indent: 1em;
+  /* Decorative elements */
+  --divider-ornament: '\2620';
+  --divider-gradient: linear-gradient(to right, transparent, #dc2626 15%, #dc2626 85%, transparent);
+  --divider-height: 3px;
+  --blockquote-border: 3px solid #dc2626;
+  --blockquote-bg: rgba(220, 38, 38, 0.06);
+  /* Heading decoration */
+  --h1-border-bottom: none;
+  --h1-padding-bottom: 0;
 }

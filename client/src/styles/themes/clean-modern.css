@@ -18,4 +18,20 @@
   --magic-item-accent: #16a34a;
   --class-feature-accent: #dc2626;
   --encounter-accent: #2563eb;
+  /* Page simulation */
+  --page-texture: none;
+  --column-rule-color: rgba(0, 0, 0, 0.08);
+  --footer-color: rgba(0, 0, 0, 0.35);
+  /* Typography */
+  --drop-cap-font: 'Inter', sans-serif;
+  --paragraph-indent: 0;
+  /* Decorative elements */
+  --divider-ornament: '';
+  --divider-gradient: linear-gradient(to right, transparent, #94a3b8 20%, #94a3b8 80%, transparent);
+  --divider-height: 1px;
+  --blockquote-border: 3px solid #6366f1;
+  --blockquote-bg: rgba(99, 102, 241, 0.04);
+  /* Heading decoration */
+  --h1-border-bottom: 2px solid #6366f1;
+  --h1-padding-bottom: 0.25rem;
 }

@@ -18,4 +18,20 @@
   --magic-item-accent: #c9a84c;
   --class-feature-accent: #c9a84c;
   --encounter-accent: #7b68ae;
+  /* Page simulation */
+  --page-texture: url('/textures/parchment-dark.jpg');
+  --column-rule-color: rgba(255, 255, 255, 0.06);
+  --footer-color: rgba(255, 255, 255, 0.3);
+  /* Typography */
+  --drop-cap-font: 'Cinzel', serif;
+  --paragraph-indent: 1em;
+  /* Decorative elements */
+  --divider-ornament: '\2666';
+  --divider-gradient: linear-gradient(to right, transparent, #9f7aea 15%, #9f7aea 85%, transparent);
+  --divider-height: 2px;
+  --blockquote-border: 3px solid #9f7aea;
+  --blockquote-bg: rgba(159, 122, 234, 0.08);
+  /* Heading decoration */
+  --h1-border-bottom: none;
+  --h1-padding-bottom: 0;
 }

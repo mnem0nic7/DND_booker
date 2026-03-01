@@ -18,6 +18,22 @@
   --magic-item-accent: #58180D;
   --class-feature-accent: #58180D;
   --encounter-accent: #58180D;
+  /* Page simulation */
+  --page-texture: url('/textures/parchment-dmguild.jpg');
+  --column-rule-color: rgba(0, 0, 0, 0.06);
+  --footer-color: rgba(0, 0, 0, 0.4);
+  /* Typography */
+  --drop-cap-font: 'Cinzel Decorative', 'Cinzel', serif;
+  --paragraph-indent: 1em;
+  /* Decorative elements */
+  --divider-ornament: '';
+  --divider-gradient: linear-gradient(to right, transparent, #9C2B1B 15%, #9C2B1B 85%, transparent);
+  --divider-height: 4px;
+  --blockquote-border: 3px solid #C9AD6A;
+  --blockquote-bg: rgba(201, 173, 106, 0.08);
+  /* Heading decoration */
+  --h1-border-bottom: 2px solid #C9AD6A;
+  --h1-padding-bottom: 0.25rem;
 }
 
 /* DMGuild decorative drop caps */
