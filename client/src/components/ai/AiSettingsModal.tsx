@@ -136,7 +136,7 @@ export function AiSettingsModal() {
           <h2 className="text-lg font-semibold text-gray-900">AI Assistant Settings</h2>
           <button
             onClick={() => setSettingsModalOpen(false)}
-            className="text-gray-400 hover:text-gray-600"
+            className="text-gray-400 hover:text-gray-600 transition-colors"
             aria-label="Close settings"
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -199,7 +199,7 @@ export function AiSettingsModal() {
             <button
               onClick={handleValidateOllama}
               disabled={!baseUrl || isValidating}
-              className="mt-2 px-3 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50"
+              className="mt-2 px-3 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 transition-colors"
             >
               {isValidating ? 'Connecting...' : 'Connect & Load Models'}
             </button>
@@ -256,14 +256,14 @@ export function AiSettingsModal() {
               <button
                 onClick={handleValidate}
                 disabled={!apiKey || isValidating}
-                className="px-3 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50"
+                className="px-3 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 transition-colors"
               >
                 {isValidating ? 'Testing...' : 'Validate'}
               </button>
               {settings?.hasApiKey && (
                 <button
                   onClick={handleRemoveKey}
-                  className="px-3 py-1 text-xs text-red-600 border border-red-200 rounded hover:bg-red-50"
+                  className="px-3 py-1 text-xs text-red-600 border border-red-200 rounded hover:bg-red-50 transition-colors"
                 >
                   Remove Key
                 </button>
@@ -290,14 +290,14 @@ export function AiSettingsModal() {
         <div className="flex justify-end gap-2">
           <button
             onClick={() => setSettingsModalOpen(false)}
-            className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-md"
+            className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-md transition-colors"
           >
             Cancel
           </button>
           <button
             onClick={handleSave}
             disabled={isSaving || !model}
-            className="px-4 py-2 text-sm bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:opacity-50"
+            className="px-4 py-2 text-sm bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:opacity-50 transition-colors"
           >
             {isSaving ? 'Saving...' : 'Save'}
           </button>

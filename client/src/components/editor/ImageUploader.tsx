@@ -99,7 +99,7 @@ export function ImageUploader({ projectId, onUpload, className }: ImageUploaderP
     <div
       className={`relative rounded-lg border-2 border-dashed p-6 text-center transition-colors cursor-pointer ${
         isDragging
-          ? 'border-blue-500 bg-blue-50'
+          ? 'border-purple-500 bg-purple-50'
           : 'border-gray-300 hover:border-gray-400'
       } ${className ?? ''}`}
       onDragOver={handleDragOver}
@@ -120,7 +120,7 @@ export function ImageUploader({ projectId, onUpload, className }: ImageUploaderP
           <p className="text-sm text-gray-600">Uploading...</p>
           <div className="mx-auto h-2 w-48 overflow-hidden rounded-full bg-gray-200">
             <div
-              className="h-full rounded-full bg-blue-600 transition-all"
+              className="h-full rounded-full bg-purple-600 transition-all duration-300"
               style={{ width: `${progress}%` }}
             />
           </div>

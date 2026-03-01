@@ -87,7 +87,7 @@ export function EditorLayout({ projectId, content, onUpdate }: EditorLayoutProps
             onClick={openExportDialog}
             title="Export project"
             aria-label="Export project"
-            className="px-3 py-1.5 text-sm text-gray-600 hover:text-indigo-700 hover:bg-indigo-50 transition-colors rounded mr-1 flex items-center gap-1"
+            className="px-3 py-1.5 text-sm text-gray-600 hover:text-purple-700 hover:bg-purple-50 transition-colors rounded mr-1 flex items-center gap-1"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
@@ -125,8 +125,8 @@ export function EditorLayout({ projectId, content, onUpdate }: EditorLayoutProps
             aria-label={showPreview ? 'Hide preview' : 'Show preview'}
             className={`px-3 py-1.5 text-sm transition-colors rounded mr-1 flex items-center gap-1 ${
               showPreview
-                ? 'text-indigo-700 bg-indigo-50'
-                : 'text-gray-600 hover:text-indigo-700 hover:bg-indigo-50'
+                ? 'text-purple-700 bg-purple-50'
+                : 'text-gray-600 hover:text-purple-700 hover:bg-purple-50'
             }`}
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

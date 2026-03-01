@@ -106,7 +106,7 @@ export default function ProjectCard({ project }: ProjectCardProps) {
           {confirmDelete && (
             <button
               onClick={handleCancelDelete}
-              className="rounded px-2 py-1 text-xs text-gray-500 hover:bg-gray-100"
+              className="rounded px-2 py-1 text-xs text-gray-500 hover:bg-gray-100 transition-colors"
             >
               Cancel
             </button>
