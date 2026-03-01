@@ -48,7 +48,7 @@ export function buildPlanningPromptSection(context: PlanningState): string {
   if (context.taskPlan.length > 0) {
     sections.push('\nTASK PLAN:');
     context.taskPlan.forEach((t) => {
-      const icon = t.status === 'done' ? '[x]' : t.status === 'blocked' ? '[!]' : '[ ]';
+      const icon = t.status === 'done' ? '[x]' : t.status === 'blocked' ? '[!]' : t.status === 'in_progress' ? '[~]' : '[ ]';
       const deps = t.dependsOn.length > 0 ? ` (blocked by: ${t.dependsOn.join(', ')})` : '';
       sections.push(`- ${icon} ${t.id}: ${t.title} (${t.status})${deps}`);
       if (t.notes) sections.push(`  Notes: ${t.notes}`);
