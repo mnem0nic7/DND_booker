@@ -58,6 +58,24 @@ export function ExportDialog({ projectId }: ExportDialogProps) {
     reset();
   };
 
+  const handleDownload = (e: React.MouseEvent, jobId: string, format: string) => {
+    e.preventDefault();
+    import('../../lib/api').then(({ default: apiClient }) => {
+      apiClient.get(`/export-jobs/${jobId}/download`, { responseType: 'blob' })
+        .then(({ data }) => {
+          const url = URL.createObjectURL(data);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `export.${format === 'epub' ? 'epub' : 'pdf'}`;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          URL.revokeObjectURL(url);
+        })
+        .catch((err) => console.error('[Export] Download failed:', err));
+    });
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       {/* Backdrop */}
@@ -165,7 +183,7 @@ export function ExportDialog({ projectId }: ExportDialogProps) {
               {job.outputUrl && (
                 <a
                   href={`/api/export-jobs/${job.id}/download`}
-                  download
+                  onClick={(e) => handleDownload(e, job.id, job.format)}
                   className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 text-white text-sm font-medium rounded-lg hover:bg-purple-700 transition-colors"
                 >
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -215,7 +233,7 @@ export function ExportDialog({ projectId }: ExportDialogProps) {
                     {historyJob.status === 'completed' ? (
                       <a
                         href={`/api/export-jobs/${historyJob.id}/download`}
-                        download
+                        onClick={(e) => handleDownload(e, historyJob.id, historyJob.format)}
                         className="text-purple-600 hover:text-purple-800 font-medium"
                       >
                         Download
