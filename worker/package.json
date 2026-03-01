@@ -13,8 +13,7 @@
     "@myriaddreamin/typst-ts-node-compiler": "^0.7.0-rc2",
     "@prisma/client": "^6.0.0",
     "bullmq": "^5.0.0",
-    "ioredis": "^5.4.0",
-    "puppeteer": "^24.0.0"
+    "ioredis": "^5.4.0"
   },
   "devDependencies": {
     "tsx": "^4.19.0",

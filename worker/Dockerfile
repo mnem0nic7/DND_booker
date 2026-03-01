@@ -1,8 +1,7 @@
 FROM node:20-alpine
 
-# Install Chromium for Puppeteer and Pandoc for ePub generation
-RUN apk add --no-cache chromium pandoc
-ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
+# Pandoc for ePub generation (Chromium no longer needed — PDF uses Typst NAPI)
+RUN apk add --no-cache pandoc
 
 WORKDIR /app
 COPY package*.json ./
@@ -17,6 +16,11 @@ COPY worker/ worker/
 COPY server/prisma/ server/prisma/
 WORKDIR /app/server
 RUN npx prisma generate
+# Build shared package to dist/ (plain node can't load raw .ts files)
+WORKDIR /app/shared
+RUN npm run build
+RUN sed -i 's|"main": "src/index.ts"|"main": "dist/index.js"|' package.json && \
+    sed -i 's|"types": "src/index.ts"|"types": "dist/index.d.ts"|' package.json
 WORKDIR /app/worker
 RUN npm run build
 CMD ["node", "dist/index.js"]
