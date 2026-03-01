@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import { ErrorBoundary } from '../ErrorBoundary';
 import type { DocumentContent } from '@dnd-booker/shared';
@@ -51,6 +51,9 @@ export function EditorLayout({ projectId, content, onUpdate }: EditorLayoutProps
   const currentTheme = useThemeStore((s) => s.currentTheme);
   const openExportDialog = useExportStore((s) => s.openDialog);
   const setSettingsModalOpen = useAiStore((s) => s.setSettingsModalOpen);
+  const [columnCount, setColumnCount] = useState<1 | 2>(2);
+  const [showTexture, setShowTexture] = useState(true);
+  const [sectionName, setSectionName] = useState('');
 
   const editor = useEditor({
     extensions: [StarterKit, Underline, Link.configure({ openOnClick: false, HTMLAttributes: { rel: 'noopener noreferrer nofollow' } }), StatBlock, ReadAloudBox, SidebarCallout, ChapterHeader, SpellCard, MagicItem, RandomTable, NpcProfile, EncounterTable, ClassFeature, RaceBlock, FullBleedImage, MapBlock, Handout, PageBorder, PageBreak, ColumnBreak, TitlePage, TableOfContents, CreditsPage, BackCover],
@@ -60,6 +63,26 @@ export function EditorLayout({ projectId, content, onUpdate }: EditorLayoutProps
       onUpdate(ed.getJSON());
     },
   });
+
+  useEffect(() => {
+    if (!editor) return;
+    const updateSection = () => {
+      let found = '';
+      const pos = editor.state.selection.$anchor.pos;
+      editor.state.doc.nodesBetween(0, pos, (node) => {
+        if (node.type.name === 'heading' && node.attrs.level === 1) {
+          found = node.textContent;
+        }
+      });
+      setSectionName(found);
+    };
+    editor.on('selectionUpdate', updateSection);
+    editor.on('update', updateSection);
+    return () => {
+      editor.off('selectionUpdate', updateSection);
+      editor.off('update', updateSection);
+    };
+  }, [editor]);
 
   return (
     <div className="flex h-full overflow-hidden">
@@ -148,13 +171,21 @@ export function EditorLayout({ projectId, content, onUpdate }: EditorLayoutProps
         </div>
 
         {/* Editor content area */}
-        <div className="flex-1 overflow-y-auto p-8" data-theme={currentTheme}>
-          <div className="max-w-3xl mx-auto prose prose-lg max-w-none editor-themed-content">
+        <div className="editor-outer" data-theme={currentTheme}>
+          <div
+            className="page-canvas editor-themed-content"
+            data-columns={columnCount}
+            {...(!showTexture ? { 'data-texture-off': '' } : {})}
+          >
             {editor && (
               <ErrorBoundary fallbackMessage="A block encountered an error. Try removing the last edited block.">
                 <EditorContent editor={editor} />
               </ErrorBoundary>
             )}
+            <div className="page-footer">
+              <span>{sectionName}</span>
+              <span>1</span>
+            </div>
           </div>
         </div>
       </div>

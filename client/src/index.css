@@ -92,6 +92,205 @@
   color: var(--accent-color);
 }
 
+/* ── Page Canvas Simulation ─────────────────────────────────── */
+
+.editor-outer {
+  background: #374151;
+  overflow-y: auto;
+  padding: 2rem 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  min-height: 0;
+}
+
+.page-canvas {
+  width: 816px;
+  min-height: 1056px;
+  margin-bottom: 2rem;
+  padding: 72px 60px 72px 72px;
+  background-color: var(--page-bg);
+  background-image: var(--page-texture);
+  background-size: cover;
+  background-position: center;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+  position: relative;
+  color: var(--text-color);
+  font-family: var(--body-font);
+}
+
+.page-canvas[data-texture-off] {
+  background-image: none;
+}
+
+.page-canvas .ProseMirror {
+  column-count: 2;
+  column-gap: 48px;
+  column-rule: 1px solid var(--column-rule-color, rgba(0,0,0,0.06));
+  outline: none;
+  min-height: 912px;
+}
+
+.page-canvas[data-columns="1"] .ProseMirror {
+  column-count: 1;
+}
+
+.page-canvas .ProseMirror > * {
+  break-inside: avoid;
+}
+
+.page-canvas .ProseMirror [data-column-break] {
+  break-after: column;
+}
+
+.page-canvas .ProseMirror [data-page-break] {
+  break-after: page;
+}
+
+.page-footer {
+  position: absolute;
+  bottom: 24px;
+  left: 72px;
+  right: 60px;
+  font-size: 0.65rem;
+  color: var(--footer-color, rgba(0,0,0,0.4));
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--body-font);
+  pointer-events: none;
+  user-select: none;
+}
+
+.page-canvas .title-page,
+.page-canvas .credits-page,
+.page-canvas .back-cover,
+.page-canvas .table-of-contents,
+.page-canvas .chapter-header,
+.page-canvas .full-bleed-image {
+  column-span: all;
+}
+
+/* ── Publication Typography ────────────────────────────────── */
+
+.page-canvas .ProseMirror p {
+  text-align: justify;
+  text-indent: var(--paragraph-indent, 1em);
+  line-height: 1.5;
+  margin-bottom: 0.5em;
+}
+
+.page-canvas .ProseMirror > p:first-child,
+.page-canvas .ProseMirror h1 + p,
+.page-canvas .ProseMirror h2 + p,
+.page-canvas .ProseMirror h3 + p {
+  text-indent: 0;
+}
+
+.page-canvas .ProseMirror h1,
+.page-canvas .ProseMirror h2,
+.page-canvas .ProseMirror h3 {
+  font-family: var(--heading-font);
+  color: var(--accent-color);
+}
+
+.page-canvas .ProseMirror h1 {
+  font-size: 1.75rem;
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+  border-bottom: var(--h1-border-bottom, none);
+  padding-bottom: var(--h1-padding-bottom, 0);
+}
+
+.page-canvas .ProseMirror h2 {
+  font-size: 1.35rem;
+  margin-top: 1.25rem;
+  margin-bottom: 0.4rem;
+}
+
+.page-canvas .ProseMirror h3 {
+  font-size: 1.1rem;
+  margin-top: 1rem;
+  margin-bottom: 0.3rem;
+}
+
+.page-canvas .ProseMirror .drop-cap::first-letter {
+  font-family: var(--drop-cap-font, var(--heading-font));
+  font-size: 3.5em;
+  float: left;
+  line-height: 0.8;
+  padding-right: 0.1em;
+  color: var(--accent-color);
+}
+
+.page-canvas .ProseMirror hr {
+  border: none;
+  height: var(--divider-height, 2px);
+  background: var(--divider-gradient);
+  margin: 1.5rem 0;
+  position: relative;
+  column-span: all;
+}
+
+.page-canvas .ProseMirror hr::before {
+  content: var(--divider-ornament, '');
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--page-bg);
+  padding: 0 0.5rem;
+  font-size: 0.9rem;
+  color: var(--accent-color);
+}
+
+.page-canvas .ProseMirror blockquote {
+  border-left: var(--blockquote-border, 3px solid #ccc);
+  background: var(--blockquote-bg, transparent);
+  padding: 0.75rem 1rem;
+  margin: 1rem 0;
+  border-radius: 0 4px 4px 0;
+}
+
+.page-canvas .ProseMirror table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.85rem;
+}
+
+.page-canvas .ProseMirror th {
+  background: var(--table-header-bg);
+  color: white;
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+  font-family: var(--heading-font);
+  font-size: 0.8rem;
+}
+
+.page-canvas .ProseMirror td {
+  padding: 0.4rem 0.75rem;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.page-canvas .ProseMirror tr:nth-child(even) td {
+  background: var(--table-stripe-bg);
+}
+
+.page-canvas .ProseMirror ul,
+.page-canvas .ProseMirror ol {
+  padding-left: 1.5em;
+  margin-bottom: 0.5em;
+}
+
+.page-canvas .ProseMirror li {
+  margin-bottom: 0.2em;
+}
+
+.page-canvas .ProseMirror li p {
+  text-indent: 0;
+  margin-bottom: 0.15em;
+}
+
 /* ── Shared Block Controls ────────────────────────────────── */
 
 /* Unified delete button for all custom blocks */
