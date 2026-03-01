@@ -193,6 +193,7 @@ export async function processAssistantResponse(
   for (const update of stateChanges.planUpdates) {
     if (Array.isArray(update.tasks)) {
       const validTasks: PlanTask[] = update.tasks
+        .slice(0, 50) // Cap at 50 tasks to prevent bloat
         .filter((t): t is PlanTask =>
           t && typeof t === 'object' &&
           typeof t.id === 'string' &&

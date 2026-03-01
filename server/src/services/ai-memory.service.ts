@@ -16,7 +16,9 @@ export async function getWorkingMemory(projectId: string, userId: string): Promi
 }
 
 export async function saveWorkingMemory(projectId: string, userId: string, bullets: string[]): Promise<void> {
-  const trimmed = bullets.slice(0, MAX_WORKING_MEMORY_BULLETS);
+  const trimmed = bullets
+    .slice(0, MAX_WORKING_MEMORY_BULLETS)
+    .map((b) => (typeof b === 'string' ? b.slice(0, 500) : ''));
   await prisma.aiWorkingMemory.upsert({
     where: { projectId_userId: { projectId, userId } },
     create: { projectId, userId, bullets: trimmed },
