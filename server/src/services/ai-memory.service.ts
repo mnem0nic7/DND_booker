@@ -2,6 +2,7 @@ import { prisma } from '../config/database.js';
 import type { PlanTask } from '@dnd-booker/shared';
 
 const MAX_WORKING_MEMORY_BULLETS = 20;
+const MAX_MEMORY_ITEMS_PER_USER = 500;
 
 // --- Working Memory ---
 
@@ -50,11 +51,24 @@ export async function addMemoryItem(userId: string, data: {
   confidence?: number;
   source?: string | null;
 }) {
+  // Guard against unbounded growth
+  const count = await prisma.aiMemoryItem.count({ where: { userId } });
+  if (count >= MAX_MEMORY_ITEMS_PER_USER) {
+    // Delete the oldest item to make room
+    const oldest = await prisma.aiMemoryItem.findFirst({
+      where: { userId },
+      orderBy: { createdAt: 'asc' },
+    });
+    if (oldest) {
+      await prisma.aiMemoryItem.delete({ where: { id: oldest.id } });
+    }
+  }
+
   return prisma.aiMemoryItem.create({
     data: {
       userId,
       type: data.type,
-      content: data.content,
+      content: data.content.slice(0, 2000),
       projectId: data.projectId ?? null,
       confidence: data.confidence ?? 1.0,
       source: data.source ?? null,
@@ -80,7 +94,13 @@ export async function getTaskPlan(projectId: string, userId: string): Promise<Pl
   });
   if (!record) return [];
   const tasks = record.tasks as unknown;
-  return Array.isArray(tasks) ? tasks as PlanTask[] : [];
+  if (!Array.isArray(tasks)) return [];
+  // Validate each task has the required shape
+  return tasks.filter((t): t is PlanTask =>
+    t && typeof t === 'object' &&
+    typeof t.id === 'string' &&
+    typeof t.title === 'string',
+  );
 }
 
 export async function saveTaskPlan(projectId: string, userId: string, tasks: PlanTask[]): Promise<void> {

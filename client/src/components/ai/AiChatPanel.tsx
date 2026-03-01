@@ -223,7 +223,6 @@ export function AiChatPanel({ projectId, editor }: AiChatPanelProps) {
       {/* Plan panel (collapsible) */}
       {showPlanPanel && planningState && (
         <AiPlanPanel
-          projectId={projectId}
           planningState={planningState}
           onForgetFact={(itemId) => forgetFact(projectId, itemId)}
           onResetPlan={() => resetPlan(projectId)}

@@ -2,7 +2,6 @@ import { useState } from 'react';
 import type { PlanningState, MemoryItem } from '@dnd-booker/shared';
 
 interface AiPlanPanelProps {
-  projectId: string;
   planningState: PlanningState;
   onForgetFact: (itemId: string) => void;
   onResetPlan: () => void;

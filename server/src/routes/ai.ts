@@ -13,7 +13,7 @@ import * as aiPlanner from '../services/ai-planner.service.js';
 import * as aiMemoryService from '../services/ai-memory.service.js';
 import { createModel, validateApiKey, validateConnection, SUPPORTED_MODELS, type AiProvider } from '../services/ai-provider.service.js';
 import { prisma } from '../config/database.js';
-import type { WizardEvent, WizardGeneratedSection, PlanningStateChanges } from '@dnd-booker/shared';
+import type { WizardEvent, WizardGeneratedSection } from '@dnd-booker/shared';
 
 const SUPPORTED_BLOCK_TYPES = aiContent.getSupportedBlockTypes();
 const MAX_CHAT_CONTEXT_MESSAGES = 30;
@@ -383,11 +383,19 @@ aiChatRoutes.post('/ai/chat', validateUuid('projectId'), chatRateLimit, asyncHan
 
     res.end();
 
-    // Process planning control blocks and persist cleaned response
-    const { visibleText } = await aiPlanner.processAssistantResponse(
-      fullResponse, projectId, req.userId!,
-    );
-    await aiChat.addMessage(session.id, 'assistant', visibleText.slice(0, MAX_STORED_CONTENT));
+    // Process planning control blocks and persist cleaned response (post-stream)
+    try {
+      const { visibleText } = await aiPlanner.processAssistantResponse(
+        fullResponse, projectId, req.userId!,
+      );
+      await aiChat.addMessage(session.id, 'assistant', visibleText.slice(0, MAX_STORED_CONTENT));
+    } catch (postErr) {
+      // Response already sent to client — log the error but save the raw response as fallback
+      console.error('[AI] Post-stream processing failed:', postErr);
+      await aiChat.addMessage(session.id, 'assistant', fullResponse.slice(0, MAX_STORED_CONTENT)).catch((saveErr) => {
+        console.error('[AI] Failed to save fallback message:', saveErr);
+      });
+    }
   } catch (err: unknown) {
     console.error('[AI] Chat stream error:', err);
     if (!res.headersSent) {
@@ -480,9 +488,18 @@ const forgetSchema = z.object({
 
 // POST /projects/:projectId/ai/memory/forget — remove a memory item by ID
 aiChatRoutes.post('/ai/memory/forget', validateUuid('projectId'), memoryRateLimit, asyncHandler(async (req: AuthRequest, res: Response) => {
+  const projectId = req.params.projectId as string;
   const parsed = forgetSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: 'Validation failed' });
+    return;
+  }
+
+  const project = await prisma.project.findFirst({
+    where: { id: projectId, userId: req.userId! },
+  });
+  if (!project) {
+    res.status(404).json({ error: 'Project not found' });
     return;
   }
 
