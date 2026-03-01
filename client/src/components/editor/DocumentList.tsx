@@ -215,7 +215,7 @@ export function DocumentList({
                       if (e.key === 'Escape') setRenamingId(null);
                     }}
                     onBlur={commitRename}
-                    className="w-full text-sm border rounded px-1 py-0 focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white"
+                    className="w-full text-sm border rounded px-1 py-0 focus:outline-none focus:ring-1 focus:ring-purple-500 bg-white"
                     onClick={(e) => e.stopPropagation()}
                   />
                 ) : (

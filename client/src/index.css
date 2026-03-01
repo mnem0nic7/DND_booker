@@ -33,6 +33,30 @@
 /* AI Assistant */
 @import './styles/ai-chat.css';
 
+/* ── Custom Scrollbars ────────────────────────────────────── */
+
+/* Thin, purple-tinted scrollbars for WebKit/Blink */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #d4d4d8;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #a1a1aa;
+}
+
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #d4d4d8 transparent;
+}
+
 /* Base theme-aware styles for the editor content area */
 [data-theme] {
   background-color: var(--page-bg);
@@ -113,6 +137,15 @@
   flex-wrap: wrap;
 }
 
+/* Smooth transitions for entry add/remove buttons in edit panels */
+[class$="__entry-add"],
+[class$="__entry-remove"] {
+  transition: background-color 0.15s ease, opacity 0.15s ease;
+}
+[class$="__entry-remove"]:hover {
+  background: #b91c1c;
+}
+
 /* ── Global Focus Ring ─────────────────────────────────────── */
 
 /* Consistent purple focus ring on all block edit panel inputs */
@@ -141,4 +174,16 @@
   outline: none;
   border-color: #7c3aed;
   box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.12);
+}
+
+/* Subtle hover feedback on edit panel inputs */
+[class$="__edit-panel"] input:hover,
+[class$="__edit-panel"] select:hover,
+[class$="__edit-panel"] textarea:hover {
+  border-color: #a3a3a3;
+}
+[class$="__edit-panel"] input,
+[class$="__edit-panel"] select,
+[class$="__edit-panel"] textarea {
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }

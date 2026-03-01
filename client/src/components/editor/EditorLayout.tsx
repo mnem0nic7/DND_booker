@@ -167,7 +167,7 @@ export function EditorLayout({ projectId, content, onUpdate }: EditorLayoutProps
         const isOpen = showingAi || showingPreview || showingProps;
         return (
           <div
-            className={`overflow-hidden transition-[width,min-width,opacity] duration-200 ease-in-out ${
+            className={`overflow-hidden transition-[width,min-width,opacity] duration-300 ease-in-out ${
               isOpen ? 'opacity-100 border-l' : 'w-0 min-w-0 opacity-0'
             } ${
               showingAi ? 'w-[380px] min-w-[300px]'

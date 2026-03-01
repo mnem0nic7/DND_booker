@@ -338,7 +338,7 @@ export function BlockPalette({ editor }: BlockPaletteProps) {
                       e.preventDefault();
                       block.insertContent(editor);
                     }}
-                    className="w-full flex items-center gap-2 px-2.5 py-1.5 text-sm text-gray-600 rounded-md hover:bg-white hover:text-gray-900 hover:shadow-sm transition-all group"
+                    className="w-full flex items-center gap-2 px-2.5 py-1.5 text-sm text-gray-600 rounded-md hover:bg-white hover:text-gray-900 hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-400 focus:ring-offset-1 transition-all group"
                   >
                     <span
                       className={`w-6 h-6 flex items-center justify-center rounded text-[10px] font-bold ${style.iconBg} ${style.iconText} group-hover:scale-110 transition-transform`}
