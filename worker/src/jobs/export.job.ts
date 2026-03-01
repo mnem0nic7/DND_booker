@@ -2,8 +2,8 @@ import type { Job } from 'bullmq';
 import type { DocumentContent } from '@dnd-booker/shared';
 import { prisma } from '../config/database.js';
 import { assembleHtml } from '../renderers/html-assembler.js';
-import { generatePdf } from '../generators/pdf.generator.js';
-import { generatePrintPdf } from '../generators/print-pdf.generator.js';
+import { assembleTypst } from '../renderers/typst-assembler.js';
+import { generateTypstPdf } from '../generators/typst.generator.js';
 import { generateEpub } from '../generators/epub.generator.js';
 import fs from 'fs/promises';
 import path from 'path';
@@ -19,8 +19,8 @@ interface ExportJobData {
  * Steps:
  *  1. Mark the export job as "processing" in the database
  *  2. Fetch the project and its documents
- *  3. Assemble full HTML from all documents using the project theme
- *  4. Generate a PDF (standard or print-ready) via Puppeteer
+ *  3. For PDF: assemble Typst source and compile via Typst NAPI compiler
+ *     For EPUB: assemble HTML and convert via Pandoc
  *  5. Write the output file to local storage
  *  6. Update the export job record with the output URL
  *
@@ -54,32 +54,40 @@ export async function processExportJob(job: Job<ExportJobData>): Promise<void> {
 
     await job.updateProgress(20);
 
-    // Assemble HTML from all documents
-    const html = assembleHtml({
-      documents: exportJob.project.documents.map((d) => ({
-        title: d.title,
-        content: d.content as DocumentContent | null,
-        sortOrder: d.sortOrder,
-      })),
-      theme: (exportJob.project.settings as Record<string, unknown>)?.theme as string || 'classic-parchment',
-      projectTitle: exportJob.project.title,
-    });
+    const theme = (exportJob.project.settings as Record<string, unknown>)?.theme as string || 'classic-parchment';
+    const docs = exportJob.project.documents.map((d) => ({
+      title: d.title,
+      content: d.content as DocumentContent | null,
+      sortOrder: d.sortOrder,
+    }));
 
     await job.updateProgress(50);
 
-    // Resolve relative /uploads/ URLs to absolute so Puppeteer can fetch them
-    const serverBaseUrl = process.env.SERVER_BASE_URL || 'http://localhost:4000';
-    const resolvedHtml = html.replace(/(?:src|href)="(\/uploads\/[^"]+)"/g, (_match, p1) => {
-      return `src="${serverBaseUrl}${p1}"`;
-    });
-
     // Generate output based on requested format
     let buffer: Buffer;
-    if (format === 'pdf') {
-      buffer = await generatePdf(resolvedHtml);
-    } else if (format === 'print_pdf') {
-      buffer = await generatePrintPdf(resolvedHtml);
+    if (format === 'pdf' || format === 'print_pdf') {
+      // Typst pipeline for PDF
+      const typstSource = assembleTypst({
+        documents: docs,
+        theme,
+        projectTitle: exportJob.project.title,
+        printReady: format === 'print_pdf',
+      });
+
+      const assetsDir = path.resolve(process.cwd(), 'assets');
+      const fontsDir = path.join(assetsDir, 'fonts');
+      buffer = await generateTypstPdf(typstSource, [fontsDir], assetsDir);
     } else if (format === 'epub') {
+      // HTML + Pandoc pipeline for EPUB
+      const html = assembleHtml({
+        documents: docs,
+        theme,
+        projectTitle: exportJob.project.title,
+      });
+      const serverBaseUrl = process.env.SERVER_BASE_URL || 'http://localhost:4000';
+      const resolvedHtml = html.replace(/(?:src|href)="(\/uploads\/[^"]+)"/g, (_match, p1) => {
+        return `src="${serverBaseUrl}${p1}"`;
+      });
       buffer = await generateEpub(resolvedHtml, exportJob.project.title);
     } else {
       throw new Error(`Unsupported export format: ${format}`);
