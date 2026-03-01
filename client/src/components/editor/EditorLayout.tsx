@@ -5,6 +5,7 @@ import type { DocumentContent } from '@dnd-booker/shared';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
 import Link from '@tiptap/extension-link';
+import TextAlign from '@tiptap/extension-text-align';
 import { StatBlock } from '../blocks/StatBlock/StatBlockExtension';
 import { ReadAloudBox } from '../blocks/ReadAloudBox/ReadAloudBoxExtension';
 import { SidebarCallout } from '../blocks/SidebarCallout/SidebarCalloutExtension';
@@ -56,7 +57,7 @@ export function EditorLayout({ projectId, content, onUpdate }: EditorLayoutProps
   const [sectionName, setSectionName] = useState('');
 
   const editor = useEditor({
-    extensions: [StarterKit, Underline, Link.configure({ openOnClick: false, HTMLAttributes: { rel: 'noopener noreferrer nofollow' } }), StatBlock, ReadAloudBox, SidebarCallout, ChapterHeader, SpellCard, MagicItem, RandomTable, NpcProfile, EncounterTable, ClassFeature, RaceBlock, FullBleedImage, MapBlock, Handout, PageBorder, PageBreak, ColumnBreak, TitlePage, TableOfContents, CreditsPage, BackCover],
+    extensions: [StarterKit, Underline, Link.configure({ openOnClick: false, HTMLAttributes: { rel: 'noopener noreferrer nofollow' } }), TextAlign.configure({ types: ['heading', 'paragraph'] }), StatBlock, ReadAloudBox, SidebarCallout, ChapterHeader, SpellCard, MagicItem, RandomTable, NpcProfile, EncounterTable, ClassFeature, RaceBlock, FullBleedImage, MapBlock, Handout, PageBorder, PageBreak, ColumnBreak, TitlePage, TableOfContents, CreditsPage, BackCover],
     content,
     immediatelyRender: false,
     onUpdate: ({ editor: ed }) => {
@@ -104,7 +105,13 @@ export function EditorLayout({ projectId, content, onUpdate }: EditorLayoutProps
             </svg>
           </button>
           <div className="flex-1 min-w-0 overflow-x-auto scrollbar-none">
-            <Toolbar editor={editor} />
+            <Toolbar
+              editor={editor}
+              columnCount={columnCount}
+              setColumnCount={setColumnCount}
+              showTexture={showTexture}
+              setShowTexture={setShowTexture}
+            />
           </div>
           <button
             onClick={openExportDialog}

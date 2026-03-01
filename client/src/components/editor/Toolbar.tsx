@@ -1,44 +1,16 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import type { Editor } from '@tiptap/react';
+import { useThemeStore } from '../../stores/themeStore';
+import type { ThemeName } from '../../stores/themeStore';
 
 interface ToolbarProps {
   editor: Editor | null;
+  columnCount: 1 | 2;
+  setColumnCount: (n: 1 | 2) => void;
+  showTexture: boolean;
+  setShowTexture: (v: boolean) => void;
 }
 
-interface ToolbarButtonProps {
-  onClick: () => void;
-  isActive?: boolean;
-  disabled?: boolean;
-  title: string;
-  children: React.ReactNode;
-}
-
-function ToolbarButton({ onClick, isActive, disabled, title, children }: ToolbarButtonProps) {
-  return (
-    <button
-      onMouseDown={(e) => {
-        e.preventDefault();
-        onClick();
-      }}
-      disabled={disabled}
-      title={title}
-      aria-label={title}
-      className={`px-2 py-1.5 rounded transition-colors flex-shrink-0 ${
-        isActive
-          ? 'bg-purple-100 text-purple-700'
-          : 'text-gray-500 hover:bg-gray-100 hover:text-gray-900'
-      } ${disabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`}
-    >
-      {children}
-    </button>
-  );
-}
-
-function ToolbarDivider() {
-  return <div className="w-px h-5 bg-gray-200 mx-0.5 flex-shrink-0" />;
-}
-
-/** 16x16 icon helper */
 function Icon({ d }: { d: string }) {
   return (
     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -47,9 +19,48 @@ function Icon({ d }: { d: string }) {
   );
 }
 
-export function Toolbar({ editor }: ToolbarProps) {
-  // Force re-render on every editor transaction so active states track cursor position
+function Btn({
+  onClick, isActive, disabled, title, children,
+}: {
+  onClick: () => void; isActive?: boolean; disabled?: boolean; title: string; children: React.ReactNode;
+}) {
+  return (
+    <button
+      onMouseDown={(e) => { e.preventDefault(); onClick(); }}
+      disabled={disabled}
+      title={title}
+      aria-label={title}
+      className={`px-1.5 py-1 rounded text-xs transition-colors flex-shrink-0 ${
+        isActive ? 'bg-purple-100 text-purple-700' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-900'
+      } ${disabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`}
+    >
+      {children}
+    </button>
+  );
+}
+
+function GroupLabel({ children }: { children: React.ReactNode }) {
+  return <div className="text-[9px] text-gray-400 uppercase tracking-wider text-center mt-0.5 select-none">{children}</div>;
+}
+
+function GroupDivider() {
+  return <div className="w-px self-stretch bg-gray-200 mx-1.5 flex-shrink-0" />;
+}
+
+const THEMES: { value: ThemeName; label: string; swatch: string }[] = [
+  { value: 'classic-parchment', label: 'Classic Parchment', swatch: '#f4e4c1' },
+  { value: 'dmguild', label: 'DMGuild', swatch: '#EEE5CE' },
+  { value: 'dark-tome', label: 'Dark Tome', swatch: '#1a1a2e' },
+  { value: 'clean-modern', label: 'Clean Modern', swatch: '#ffffff' },
+  { value: 'fey-wild', label: 'Fey Wild', swatch: '#e8f5e9' },
+  { value: 'infernal', label: 'Infernal', swatch: '#1a0a0a' },
+];
+
+export function Toolbar({ editor, columnCount, setColumnCount, showTexture, setShowTexture }: ToolbarProps) {
+  const { currentTheme, setTheme } = useThemeStore();
+  const [showThemeDropdown, setShowThemeDropdown] = useState(false);
   const [, setTick] = useState(0);
+
   useEffect(() => {
     if (!editor) return;
     const handler = () => setTick((t) => t + 1);
@@ -64,167 +75,167 @@ export function Toolbar({ editor }: ToolbarProps) {
   const canRedo = editor.can().redo();
 
   return (
-    <div className="flex items-center gap-0.5 flex-nowrap overflow-x-auto px-3 py-1.5 sticky top-0 z-10 scrollbar-none">
-      {/* Text formatting */}
-      <ToolbarButton
-        onClick={() => editor.chain().focus().toggleBold().run()}
-        isActive={is('bold')}
-        title="Bold"
-      >
-        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M6 4h7a4 4 0 0 1 0 8H6V4zm0 8h8a4 4 0 0 1 0 8H6v-8z" fillRule="evenodd" stroke="currentColor" strokeWidth={1} />
-        </svg>
-      </ToolbarButton>
-      <ToolbarButton
-        onClick={() => editor.chain().focus().toggleItalic().run()}
-        isActive={is('italic')}
-        title="Italic"
-      >
-        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-          <line x1="10" y1="4" x2="14" y2="4" />
-          <line x1="8" y1="20" x2="12" y2="20" />
-          <line x1="13" y1="4" x2="9" y2="20" />
-        </svg>
-      </ToolbarButton>
-      <ToolbarButton
-        onClick={() => editor.chain().focus().toggleUnderline().run()}
-        isActive={is('underline')}
-        title="Underline"
-      >
-        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-          <path d="M6 4v6a6 6 0 0 0 12 0V4" />
-          <line x1="4" y1="20" x2="20" y2="20" />
-        </svg>
-      </ToolbarButton>
-      <ToolbarButton
-        onClick={() => editor.chain().focus().toggleStrike().run()}
-        isActive={is('strike')}
-        title="Strikethrough"
-      >
-        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-          <line x1="4" y1="12" x2="20" y2="12" />
-          <path d="M17.5 7.5c0-2-1.5-3.5-5.5-3.5S6 6 6 7.5c0 4 12 2.5 12 7 0 2-2 3.5-6 3.5S6 16.5 6 15" />
-        </svg>
-      </ToolbarButton>
-      <ToolbarButton
-        onClick={() => {
-          if (editor.isActive('link')) {
-            editor.chain().focus().unsetLink().run();
-          } else {
-            const url = window.prompt('Enter URL:');
-            if (url) {
-              editor.chain().focus().setLink({ href: url }).run();
-            }
-          }
-        }}
-        isActive={is('link')}
-        title="Insert Link"
-      >
-        <Icon d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m9.86-2.802a4.5 4.5 0 00-1.242-7.244l-4.5-4.5a4.5 4.5 0 00-6.364 6.364L4.343 8.571" />
-      </ToolbarButton>
+    <div className="border-b bg-white">
+      <div className="flex items-start gap-0 px-2 py-1.5 overflow-x-auto scrollbar-none">
 
-      <ToolbarDivider />
+        {/* Text Group */}
+        <div className="flex flex-col items-center">
+          <div className="flex items-center gap-0.5">
+            <Btn onClick={() => editor.chain().focus().toggleBold().run()} isActive={is('bold')} title="Bold">
+              <span className="font-bold text-sm">B</span>
+            </Btn>
+            <Btn onClick={() => editor.chain().focus().toggleItalic().run()} isActive={is('italic')} title="Italic">
+              <span className="italic text-sm">I</span>
+            </Btn>
+            <Btn onClick={() => editor.chain().focus().toggleUnderline().run()} isActive={is('underline')} title="Underline">
+              <span className="underline text-sm">U</span>
+            </Btn>
+            <Btn onClick={() => editor.chain().focus().toggleStrike().run()} isActive={is('strike')} title="Strikethrough">
+              <span className="line-through text-sm">S</span>
+            </Btn>
+            <Btn
+              onClick={() => {
+                if (is('link')) { editor.chain().focus().unsetLink().run(); return; }
+                const url = window.prompt('URL:');
+                if (url) editor.chain().focus().setLink({ href: url }).run();
+              }}
+              isActive={is('link')}
+              title="Link"
+            >
+              <Icon d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m9.86-2.388a4.5 4.5 0 00-6.364-6.364L4.5 8.25" />
+            </Btn>
+          </div>
+          <GroupLabel>Text</GroupLabel>
+        </div>
 
-      {/* Headings — keep text labels since they're compact & recognizable */}
-      <ToolbarButton
-        onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
-        isActive={is('heading', { level: 1 })}
-        title="Heading 1"
-      >
-        <span className="text-xs font-bold tracking-tight">H1</span>
-      </ToolbarButton>
-      <ToolbarButton
-        onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
-        isActive={is('heading', { level: 2 })}
-        title="Heading 2"
-      >
-        <span className="text-xs font-bold tracking-tight">H2</span>
-      </ToolbarButton>
-      <ToolbarButton
-        onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
-        isActive={is('heading', { level: 3 })}
-        title="Heading 3"
-      >
-        <span className="text-xs font-bold tracking-tight">H3</span>
-      </ToolbarButton>
+        <GroupDivider />
 
-      <ToolbarDivider />
+        {/* Paragraph Group */}
+        <div className="flex flex-col items-center">
+          <div className="flex items-center gap-0.5">
+            <Btn onClick={() => editor.chain().focus().setTextAlign('left').run()} isActive={editor.isActive({ textAlign: 'left' })} title="Align left">
+              <Icon d="M3 6h18M3 12h12M3 18h18" />
+            </Btn>
+            <Btn onClick={() => editor.chain().focus().setTextAlign('center').run()} isActive={editor.isActive({ textAlign: 'center' })} title="Align center">
+              <Icon d="M3 6h18M6 12h12M3 18h18" />
+            </Btn>
+            <Btn onClick={() => editor.chain().focus().setTextAlign('right').run()} isActive={editor.isActive({ textAlign: 'right' })} title="Align right">
+              <Icon d="M3 6h18M9 12h12M3 18h18" />
+            </Btn>
+            <Btn onClick={() => editor.chain().focus().setTextAlign('justify').run()} isActive={editor.isActive({ textAlign: 'justify' })} title="Justify">
+              <Icon d="M3 6h18M3 12h18M3 18h18" />
+            </Btn>
+            <div className="w-px h-4 bg-gray-200 mx-0.5" />
+            <Btn onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} isActive={is('heading', { level: 1 })} title="Heading 1">
+              <span className="text-[11px] font-bold">H1</span>
+            </Btn>
+            <Btn onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} isActive={is('heading', { level: 2 })} title="Heading 2">
+              <span className="text-[11px] font-bold">H2</span>
+            </Btn>
+            <Btn onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()} isActive={is('heading', { level: 3 })} title="Heading 3">
+              <span className="text-[11px] font-bold">H3</span>
+            </Btn>
+            <div className="w-px h-4 bg-gray-200 mx-0.5" />
+            <Btn onClick={() => editor.chain().focus().toggleBulletList().run()} isActive={is('bulletList')} title="Bullet list">
+              <Icon d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />
+            </Btn>
+            <Btn onClick={() => editor.chain().focus().toggleOrderedList().run()} isActive={is('orderedList')} title="Ordered list">
+              <Icon d="M8 6h13M8 12h13M8 18h13M3.5 6V3l-1 .5M4 18.5H2.5l1.25-1.5c.5-.5.75-1 .25-1.5s-1.25 0-1.5.5" />
+            </Btn>
+            <Btn onClick={() => editor.chain().focus().toggleBlockquote().run()} isActive={is('blockquote')} title="Blockquote">
+              <Icon d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.087.16 2.185.283 3.293.369V21l4.076-4.076a1.526 1.526 0 011.037-.443 48.2 48.2 0 005.024-.516c1.577-.233 2.713-1.612 2.713-3.228V6.741c0-1.616-1.136-2.995-2.713-3.228A48.4 48.4 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z" />
+            </Btn>
+          </div>
+          <GroupLabel>Paragraph</GroupLabel>
+        </div>
 
-      {/* Lists */}
-      <ToolbarButton
-        onClick={() => editor.chain().focus().toggleBulletList().run()}
-        isActive={is('bulletList')}
-        title="Bullet List"
-      >
-        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-          <line x1="9" y1="6" x2="20" y2="6" />
-          <line x1="9" y1="12" x2="20" y2="12" />
-          <line x1="9" y1="18" x2="20" y2="18" />
-          <circle cx="5" cy="6" r="1.5" fill="currentColor" stroke="none" />
-          <circle cx="5" cy="12" r="1.5" fill="currentColor" stroke="none" />
-          <circle cx="5" cy="18" r="1.5" fill="currentColor" stroke="none" />
-        </svg>
-      </ToolbarButton>
-      <ToolbarButton
-        onClick={() => editor.chain().focus().toggleOrderedList().run()}
-        isActive={is('orderedList')}
-        title="Ordered List"
-      >
-        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-          <line x1="10" y1="6" x2="20" y2="6" />
-          <line x1="10" y1="12" x2="20" y2="12" />
-          <line x1="10" y1="18" x2="20" y2="18" />
-          <text x="3" y="8" fontSize="7" fontWeight="bold" fill="currentColor" stroke="none" fontFamily="system-ui">1</text>
-          <text x="3" y="14" fontSize="7" fontWeight="bold" fill="currentColor" stroke="none" fontFamily="system-ui">2</text>
-          <text x="3" y="20" fontSize="7" fontWeight="bold" fill="currentColor" stroke="none" fontFamily="system-ui">3</text>
-        </svg>
-      </ToolbarButton>
+        <GroupDivider />
 
-      <ToolbarDivider />
+        {/* Insert Group */}
+        <div className="flex flex-col items-center">
+          <div className="flex items-center gap-0.5">
+            <Btn onClick={() => editor.chain().focus().setHorizontalRule().run()} title="Ornamental divider">
+              <Icon d="M3 12h18" />
+            </Btn>
+            <Btn onClick={() => editor.chain().focus().insertContent({ type: 'columnBreak' }).run()} title="Column break">
+              <Icon d="M9 4v16M15 4v16" />
+            </Btn>
+            <Btn onClick={() => editor.chain().focus().insertContent({ type: 'pageBreak' }).run()} title="Page break">
+              <Icon d="M3 10h18M3 14h18" />
+            </Btn>
+            <Btn onClick={() => editor.chain().focus().toggleCodeBlock().run()} isActive={is('codeBlock')} title="Code block">
+              <Icon d="M17.25 6.75L22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3l-4.5 16.5" />
+            </Btn>
+          </div>
+          <GroupLabel>Insert</GroupLabel>
+        </div>
 
-      {/* Block elements */}
-      <ToolbarButton
-        onClick={() => editor.chain().focus().toggleBlockquote().run()}
-        isActive={is('blockquote')}
-        title="Blockquote"
-      >
-        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M4.583 17.321C3.553 16.227 3 15 3 13.011c0-3.5 2.457-6.637 6.03-8.188l.893 1.378c-3.335 1.804-3.987 4.145-4.247 5.621.537-.278 1.24-.375 1.929-.311 1.804.167 3.226 1.648 3.226 3.489a3.5 3.5 0 01-3.5 3.5c-1.073 0-2.099-.49-2.748-1.179zm10 0C13.553 16.227 13 15 13 13.011c0-3.5 2.457-6.637 6.03-8.188l.893 1.378c-3.335 1.804-3.987 4.145-4.247 5.621.537-.278 1.24-.375 1.929-.311 1.804.167 3.226 1.648 3.226 3.489a3.5 3.5 0 01-3.5 3.5c-1.073 0-2.099-.49-2.748-1.179z" />
-        </svg>
-      </ToolbarButton>
-      <ToolbarButton
-        onClick={() => editor.chain().focus().toggleCodeBlock().run()}
-        isActive={is('codeBlock')}
-        title="Code Block"
-      >
-        <Icon d="M17.25 6.75L22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3l-4.5 16.5" />
-      </ToolbarButton>
-      <ToolbarButton
-        onClick={() => editor.chain().focus().setHorizontalRule().run()}
-        title="Horizontal Rule"
-      >
-        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-          <line x1="3" y1="12" x2="21" y2="12" />
-        </svg>
-      </ToolbarButton>
+        <GroupDivider />
 
-      <ToolbarDivider />
+        {/* Layout Group */}
+        <div className="flex flex-col items-center">
+          <div className="flex items-center gap-0.5">
+            <Btn onClick={() => setColumnCount(1)} isActive={columnCount === 1} title="Single column">
+              <span className="text-[10px] font-bold">1-Col</span>
+            </Btn>
+            <Btn onClick={() => setColumnCount(2)} isActive={columnCount === 2} title="Two columns">
+              <span className="text-[10px] font-bold">2-Col</span>
+            </Btn>
+          </div>
+          <GroupLabel>Layout</GroupLabel>
+        </div>
 
-      {/* History */}
-      <ToolbarButton
-        onClick={() => editor.chain().focus().undo().run()}
-        disabled={!canUndo}
-        title="Undo"
-      >
-        <Icon d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3" />
-      </ToolbarButton>
-      <ToolbarButton
-        onClick={() => editor.chain().focus().redo().run()}
-        disabled={!canRedo}
-        title="Redo"
-      >
-        <Icon d="M15 15l6-6m0 0l-6-6m6 6H9a6 6 0 000 12h3" />
-      </ToolbarButton>
+        <GroupDivider />
+
+        {/* Theme Group */}
+        <div className="flex flex-col items-center">
+          <div className="flex items-center gap-0.5">
+            <div className="relative">
+              <Btn onClick={() => setShowThemeDropdown(!showThemeDropdown)} title="Theme">
+                <div className="flex items-center gap-1">
+                  <span className="w-3 h-3 rounded-full border border-gray-300" style={{ background: THEMES.find(t => t.value === currentTheme)?.swatch }} />
+                  <span className="text-[10px]">Theme</span>
+                  <Icon d="M19 9l-7 7-7-7" />
+                </div>
+              </Btn>
+              {showThemeDropdown && (
+                <div className="absolute top-full left-0 mt-1 bg-white rounded-lg shadow-lg border py-1 z-50 w-44">
+                  {THEMES.map((t) => (
+                    <button
+                      key={t.value}
+                      onMouseDown={(e) => { e.preventDefault(); setTheme(t.value); setShowThemeDropdown(false); }}
+                      className={`w-full flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-gray-50 ${currentTheme === t.value ? 'bg-purple-50 text-purple-700' : 'text-gray-700'}`}
+                    >
+                      <span className="w-4 h-4 rounded-full border" style={{ background: t.swatch }} />
+                      {t.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <Btn onClick={() => setShowTexture(!showTexture)} isActive={showTexture} title="Toggle page texture">
+              <Icon d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </Btn>
+          </div>
+          <GroupLabel>Theme</GroupLabel>
+        </div>
+
+        <GroupDivider />
+
+        {/* History */}
+        <div className="flex flex-col items-center">
+          <div className="flex items-center gap-0.5">
+            <Btn onClick={() => editor.chain().focus().undo().run()} disabled={!canUndo} title="Undo">
+              <Icon d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3" />
+            </Btn>
+            <Btn onClick={() => editor.chain().focus().redo().run()} disabled={!canRedo} title="Redo">
+              <Icon d="M15 15l6-6m0 0l-6-6m6 6H9a6 6 0 000 12h3" />
+            </Btn>
+          </div>
+          <GroupLabel>History</GroupLabel>
+        </div>
+
+      </div>
     </div>
   );
 }
