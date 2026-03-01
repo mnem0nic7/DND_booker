@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import axios from 'axios';
 import type { DocumentContent } from '@dnd-booker/shared';
 import api from '../lib/api';
 
@@ -12,13 +13,22 @@ interface Document {
   updatedAt: string;
 }
 
+export type SaveErrorCategory = 'network' | 'server';
+
+export interface SaveError {
+  message: string;
+  category: SaveErrorCategory;
+  /** HTTP status code, if available (server errors only). */
+  statusCode?: number;
+}
+
 interface DocumentState {
   documents: Document[];
   activeDocumentId: string | null;
   isLoading: boolean;
   isSaving: boolean;
   hasPendingChanges: boolean;
-  saveError: string | null;
+  saveError: SaveError | null;
   fetchError: string | null;
   fetchDocuments: (projectId: string) => Promise<void>;
   setActiveDocument: (id: string) => void;
@@ -31,11 +41,91 @@ interface DocumentState {
   flushPendingSave: () => Promise<void>;
   /** Cancel any pending save without flushing (call on project switch). */
   cancelPendingSave: () => void;
+  /** Manually retry the last failed save. */
+  retrySave: () => Promise<void>;
 }
+
+/* ─── localStorage backup helpers ─── */
+
+function backupKey(documentId: string): string {
+  return `dnd-booker-backup-${documentId}`;
+}
+
+function saveBackup(documentId: string, content: DocumentContent): void {
+  try {
+    localStorage.setItem(backupKey(documentId), JSON.stringify(content));
+  } catch {
+    // localStorage may be full or unavailable – silently ignore
+  }
+}
+
+function clearBackup(documentId: string): void {
+  try {
+    localStorage.removeItem(backupKey(documentId));
+  } catch {
+    // silently ignore
+  }
+}
+
+/* ─── error classification ─── */
+
+function classifySaveError(err: unknown): SaveError {
+  if (axios.isAxiosError(err)) {
+    if (err.response) {
+      // Server responded with an error status
+      const status = err.response.status;
+      return {
+        message: `Server error (${status}). Your changes have been backed up locally.`,
+        category: 'server',
+        statusCode: status,
+      };
+    }
+    // No response – network issue (timeout, DNS, offline, etc.)
+    return {
+      message: 'Network error – unable to reach the server. Your changes have been backed up locally.',
+      category: 'network',
+    };
+  }
+  // Unknown / non-Axios error
+  return {
+    message: 'An unexpected error occurred while saving. Your changes have been backed up locally.',
+    category: 'network',
+  };
+}
+
+/* ─── retry with exponential backoff ─── */
+
+async function saveWithRetry(
+  documentId: string,
+  content: DocumentContent,
+  maxAttempts = 3,
+): Promise<void> {
+  const backoffMs = [1000, 2000, 4000];
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    try {
+      await api.put(`/documents/${documentId}`, { content });
+      return; // success
+    } catch (err) {
+      lastError = err;
+      if (attempt < maxAttempts - 1) {
+        await new Promise((r) => setTimeout(r, backoffMs[attempt]));
+      }
+    }
+  }
+  throw lastError;
+}
+
+/* ─── module-level pending-save state ─── */
 
 let saveTimeout: ReturnType<typeof setTimeout> | null = null;
 let pendingSaveId: string | null = null;
 let pendingSaveContent: DocumentContent | null = null;
+
+/** Stores the last failed save so `retrySave` can replay it. */
+let failedSaveId: string | null = null;
+let failedSaveContent: DocumentContent | null = null;
 
 export const useDocumentStore = create<DocumentState>((set, get) => ({
   documents: [],
@@ -87,10 +177,16 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
       if (!saveId || !saveContent) return;
       set({ isSaving: true, saveError: null });
       try {
-        await api.put(`/documents/${saveId}`, { content: saveContent });
+        await saveWithRetry(saveId, saveContent);
+        clearBackup(saveId);
+        failedSaveId = null;
+        failedSaveContent = null;
         set({ isSaving: false, hasPendingChanges: false });
-      } catch {
-        set({ isSaving: false, saveError: 'Failed to save. Your changes may be lost.' });
+      } catch (err) {
+        saveBackup(saveId, saveContent);
+        failedSaveId = saveId;
+        failedSaveContent = saveContent;
+        set({ isSaving: false, saveError: classifySaveError(err) });
       }
     }, 1000);
   },
@@ -108,10 +204,16 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
     if (!saveId || !saveContent) return;
     set({ isSaving: true, saveError: null });
     try {
-      await api.put(`/documents/${saveId}`, { content: saveContent });
+      await saveWithRetry(saveId, saveContent);
+      clearBackup(saveId);
+      failedSaveId = null;
+      failedSaveContent = null;
       set({ isSaving: false, hasPendingChanges: false });
-    } catch {
-      set({ isSaving: false, saveError: 'Failed to save. Your changes may be lost.' });
+    } catch (err) {
+      saveBackup(saveId, saveContent);
+      failedSaveId = saveId;
+      failedSaveContent = saveContent;
+      set({ isSaving: false, saveError: classifySaveError(err) });
     }
   },
 
@@ -123,6 +225,24 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
     pendingSaveId = null;
     pendingSaveContent = null;
     set({ hasPendingChanges: false });
+  },
+
+  retrySave: async () => {
+    const saveId = failedSaveId;
+    const saveContent = failedSaveContent;
+    if (!saveId || !saveContent) return;
+
+    set({ isSaving: true, saveError: null });
+    try {
+      await saveWithRetry(saveId, saveContent);
+      clearBackup(saveId);
+      failedSaveId = null;
+      failedSaveContent = null;
+      set({ isSaving: false, hasPendingChanges: false });
+    } catch (err) {
+      saveBackup(saveId, saveContent);
+      set({ isSaving: false, saveError: classifySaveError(err) });
+    }
   },
 
   createDocument: async (projectId, title) => {

@@ -66,6 +66,17 @@
   display: none;
 }
 
+/* ── Editor Placeholder ──────────────────────────────────── */
+
+/* Show placeholder when editor is empty */
+.tiptap p.is-editor-empty:first-child::before {
+  content: 'Start writing or insert a block from the palette...';
+  color: #adb5bd;
+  pointer-events: none;
+  float: left;
+  height: 0;
+}
+
 /* Base theme-aware styles for the editor content area */
 [data-theme] {
   background-color: var(--page-bg);

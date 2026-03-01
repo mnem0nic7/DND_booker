@@ -29,6 +29,7 @@ export default function EditorPage() {
     reorderDocuments,
     flushPendingSave,
     cancelPendingSave,
+    retrySave,
   } = useDocumentStore();
 
   const { loadProjectTheme } = useThemeStore();
@@ -134,7 +135,15 @@ export default function EditorPage() {
           <div className="flex items-center gap-4">
             {/* Save indicator */}
             {saveError ? (
-              <span className="text-xs text-red-500 font-medium">{saveError}</span>
+              <span className="text-xs text-red-500 font-medium flex items-center gap-2">
+                {saveError.message}
+                <button
+                  onClick={retrySave}
+                  className="underline hover:text-red-400 transition-colors"
+                >
+                  Retry
+                </button>
+              </span>
             ) : (
               <span className="text-xs text-gray-400">
                 {isSaving ? 'Saving...' : hasPendingChanges ? 'Unsaved changes' : 'Saved'}

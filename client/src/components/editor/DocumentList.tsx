@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, type ReactNode } from 'react';
+import { useState, useRef, useCallback, useEffect, type ReactNode } from 'react';
 
 interface DocumentListProps {
   projectId: string;
@@ -26,8 +26,17 @@ export function DocumentList({
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameTitle, setRenameTitle] = useState('');
+  const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
+  const deleteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dragOverCounter = useRef<Map<string, number>>(new Map());
   const renameInputRef = useRef<HTMLInputElement>(null);
+
+  // Clear delete confirmation timer on unmount
+  useEffect(() => {
+    return () => {
+      if (deleteTimerRef.current) clearTimeout(deleteTimerRef.current);
+    };
+  }, []);
 
   const handleDragStart = useCallback(
     (e: React.DragEvent<HTMLDivElement>, docId: string) => {
@@ -221,6 +230,7 @@ export function DocumentList({
                 ) : (
                   <span
                     className="truncate"
+                    title={doc.title}
                     onDoubleClick={(e) => {
                       e.stopPropagation();
                       if (onRenameDocument) startRename(doc.id, doc.title);
@@ -231,28 +241,46 @@ export function DocumentList({
                 )}
               </div>
               {!isRenaming && onDeleteDocument && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onDeleteDocument(doc.id);
-                  }}
-                  className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 transition-all flex-shrink-0 ml-1"
-                  title="Delete document"
-                >
-                  <svg
-                    className="w-3.5 h-3.5"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={2}
+                confirmingDeleteId === doc.id ? (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (deleteTimerRef.current) clearTimeout(deleteTimerRef.current);
+                      setConfirmingDeleteId(null);
+                      onDeleteDocument(doc.id);
+                    }}
+                    className="text-red-600 hover:text-red-700 text-[10px] font-semibold transition-all flex-shrink-0 ml-1 px-1 py-0.5 rounded bg-red-50 hover:bg-red-100"
                   >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M6 18L18 6M6 6l12 12"
-                    />
-                  </svg>
-                </button>
+                    Delete?
+                  </button>
+                ) : (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setConfirmingDeleteId(doc.id);
+                      if (deleteTimerRef.current) clearTimeout(deleteTimerRef.current);
+                      deleteTimerRef.current = setTimeout(() => {
+                        setConfirmingDeleteId(null);
+                      }, 3000);
+                    }}
+                    className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 transition-all flex-shrink-0 ml-1"
+                    title="Delete document"
+                  >
+                    <svg
+                      className="w-3.5 h-3.5"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M6 18L18 6M6 6l12 12"
+                      />
+                    </svg>
+                  </button>
+                )
               )}
             </div>
           );

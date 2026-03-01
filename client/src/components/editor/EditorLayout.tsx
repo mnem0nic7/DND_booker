@@ -80,7 +80,7 @@ export function EditorLayout({ projectId, content, onUpdate }: EditorLayoutProps
               <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
             </svg>
           </button>
-          <div className="flex-1 min-w-0 overflow-hidden">
+          <div className="flex-1 min-w-0 overflow-x-auto scrollbar-none">
             <Toolbar editor={editor} />
           </div>
           <button

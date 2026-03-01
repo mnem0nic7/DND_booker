@@ -50,22 +50,33 @@ function getBlockDisplayName(node: { type: { name: string }; attrs?: Record<stri
 
 export function PropertiesPanel({ editor }: PropertiesPanelProps) {
   const stats = useMemo(() => {
-    if (!editor) return { words: 0, chars: 0, blocks: [] as BlockInfo[] };
+    if (!editor) return { words: 0, chars: 0, dndBlockCount: 0, blocks: [] as BlockInfo[] };
 
     const doc = editor.state.doc;
     const text = doc.textContent || '';
     const words = text.trim() ? text.trim().split(/\s+/).length : 0;
     const chars = text.length;
 
+    let dndBlockCount = 0;
     const blocks: BlockInfo[] = [];
     doc.descendants((node, pos) => {
+      // Include heading nodes (H1, H2, H3)
+      if (node.type.name === 'heading') {
+        const level = (node.attrs as { level?: number }).level || 1;
+        if (level >= 1 && level <= 3) {
+          const text = node.textContent || 'Untitled';
+          blocks.push({ type: 'heading', label: `H${level}: ${text}`, pos });
+        }
+        return;
+      }
       const label = getBlockDisplayName(node);
       if (label) {
+        dndBlockCount++;
         blocks.push({ type: node.type.name, label, pos });
       }
     });
 
-    return { words, chars, blocks };
+    return { words, chars, dndBlockCount, blocks };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editor, editor?.state.doc]);
 
@@ -90,7 +101,7 @@ export function PropertiesPanel({ editor }: PropertiesPanelProps) {
         </div>
         <div className="flex justify-between">
           <span>D&D Blocks</span>
-          <span className="font-medium">{stats.blocks.length}</span>
+          <span className="font-medium">{stats.dndBlockCount}</span>
         </div>
       </div>
 
@@ -98,7 +109,7 @@ export function PropertiesPanel({ editor }: PropertiesPanelProps) {
 
       {/* Block outline */}
       <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2">
-        Block Outline
+        Document Outline
       </h3>
       {stats.blocks.length > 0 ? (
         <ul className="text-xs space-y-1">
@@ -128,7 +139,7 @@ export function PropertiesPanel({ editor }: PropertiesPanelProps) {
         </ul>
       ) : (
         <p className="text-xs text-gray-400 italic">
-          No D&D blocks in this document yet.
+          No headings or blocks in this document yet.
         </p>
       )}
     </div>
