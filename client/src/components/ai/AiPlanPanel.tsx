@@ -67,6 +67,7 @@ export function AiPlanPanel({
                 onClick={onResetWorkingMemory}
                 className="text-gray-400 hover:text-red-500 transition-colors"
                 title="Reset working memory"
+                aria-label="Reset working memory"
               >
                 Reset
               </button>
@@ -90,6 +91,7 @@ export function AiPlanPanel({
                 onClick={onResetPlan}
                 className="text-gray-400 hover:text-red-500 transition-colors"
                 title="Reset task plan"
+                aria-label="Reset task plan"
               >
                 Reset
               </button>
@@ -126,6 +128,7 @@ export function AiPlanPanel({
                     onClick={() => onForgetFact(item.id)}
                     className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all flex-shrink-0"
                     title="Forget this fact"
+                    aria-label="Forget this fact"
                   >
                     ×
                   </button>
@@ -141,6 +144,7 @@ export function AiPlanPanel({
             value={rememberType}
             onChange={(e) => setRememberType(e.target.value as MemoryItem['type'])}
             className="border border-gray-200 rounded px-1.5 py-1 text-xs bg-white text-gray-600"
+            aria-label="Memory type"
           >
             <option value="project_fact">Fact</option>
             <option value="preference">Preference</option>
@@ -159,6 +163,7 @@ export function AiPlanPanel({
             onClick={handleRemember}
             disabled={!rememberInput.trim()}
             className="px-2 py-1 bg-purple-100 text-purple-700 rounded hover:bg-purple-200 disabled:opacity-50 transition-colors"
+            aria-label="Remember fact"
           >
             +
           </button>

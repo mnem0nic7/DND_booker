@@ -1,3 +1,4 @@
+import { useState, useMemo } from 'react';
 import { Editor } from '@tiptap/react';
 
 interface BlockType {
@@ -8,7 +9,21 @@ interface BlockType {
   insertContent: (editor: Editor) => void;
 }
 
+interface CategoryMeta {
+  accent: string;       // Tailwind border-l color
+  iconBg: string;       // Tailwind bg for icon
+  iconText: string;     // Tailwind text for icon
+}
+
+const CATEGORY_STYLES: Record<string, CategoryMeta> = {
+  Basic:     { accent: 'border-l-gray-300',    iconBg: 'bg-gray-100',    iconText: 'text-gray-600' },
+  'D&D':     { accent: 'border-l-amber-400',   iconBg: 'bg-amber-100',   iconText: 'text-amber-800' },
+  Layout:    { accent: 'border-l-blue-400',     iconBg: 'bg-blue-100',    iconText: 'text-blue-800' },
+  Structure: { accent: 'border-l-rose-400',     iconBg: 'bg-rose-100',    iconText: 'text-rose-800' },
+};
+
 const BLOCK_TYPES: BlockType[] = [
+  // Basic
   {
     name: 'paragraph',
     label: 'Paragraph',
@@ -69,7 +84,180 @@ const BLOCK_TYPES: BlockType[] = [
     insertContent: (editor) =>
       editor.chain().focus().setHorizontalRule().run(),
   },
+  // D&D
+  {
+    name: 'statBlock',
+    label: 'Stat Block',
+    icon: 'SB',
+    category: 'D&D',
+    insertContent: (editor) =>
+      editor.chain().focus().insertContent({ type: 'statBlock' }).run(),
+  },
+  {
+    name: 'readAloudBox',
+    label: 'Read Aloud',
+    icon: 'RA',
+    category: 'D&D',
+    insertContent: (editor) =>
+      editor.chain().focus().insertContent({ type: 'readAloudBox', content: [{ type: 'paragraph' }] }).run(),
+  },
+  {
+    name: 'sidebarCallout',
+    label: 'Sidebar Callout',
+    icon: 'SC',
+    category: 'D&D',
+    insertContent: (editor) =>
+      editor.chain().focus().insertContent({ type: 'sidebarCallout', content: [{ type: 'paragraph' }] }).run(),
+  },
+  {
+    name: 'chapterHeader',
+    label: 'Chapter Header',
+    icon: 'CH',
+    category: 'D&D',
+    insertContent: (editor) =>
+      editor.chain().focus().insertContent({ type: 'chapterHeader' }).run(),
+  },
+  {
+    name: 'spellCard',
+    label: 'Spell Card',
+    icon: 'SP',
+    category: 'D&D',
+    insertContent: (editor) =>
+      editor.chain().focus().insertContent({ type: 'spellCard' }).run(),
+  },
+  {
+    name: 'magicItem',
+    label: 'Magic Item',
+    icon: 'MI',
+    category: 'D&D',
+    insertContent: (editor) =>
+      editor.chain().focus().insertContent({ type: 'magicItem' }).run(),
+  },
+  {
+    name: 'randomTable',
+    label: 'Random Table',
+    icon: 'RT',
+    category: 'D&D',
+    insertContent: (editor) =>
+      editor.chain().focus().insertContent({ type: 'randomTable' }).run(),
+  },
+  {
+    name: 'npcProfile',
+    label: 'NPC Profile',
+    icon: 'NP',
+    category: 'D&D',
+    insertContent: (editor) =>
+      editor.chain().focus().insertContent({ type: 'npcProfile' }).run(),
+  },
+  {
+    name: 'encounterTable',
+    label: 'Encounter Table',
+    icon: 'ET',
+    category: 'D&D',
+    insertContent: (editor) =>
+      editor.chain().focus().insertContent({ type: 'encounterTable' }).run(),
+  },
+  {
+    name: 'classFeature',
+    label: 'Class Feature',
+    icon: 'CF',
+    category: 'D&D',
+    insertContent: (editor) =>
+      editor.chain().focus().insertContent({ type: 'classFeature' }).run(),
+  },
+  {
+    name: 'raceBlock',
+    label: 'Race Block',
+    icon: 'RB',
+    category: 'D&D',
+    insertContent: (editor) =>
+      editor.chain().focus().insertContent({ type: 'raceBlock' }).run(),
+  },
+  // Layout
+  {
+    name: 'fullBleedImage',
+    label: 'Full Bleed Image',
+    icon: 'FI',
+    category: 'Layout',
+    insertContent: (editor) =>
+      editor.chain().focus().insertContent({ type: 'fullBleedImage' }).run(),
+  },
+  {
+    name: 'mapBlock',
+    label: 'Map',
+    icon: 'MP',
+    category: 'Layout',
+    insertContent: (editor) =>
+      editor.chain().focus().insertContent({ type: 'mapBlock' }).run(),
+  },
+  {
+    name: 'handout',
+    label: 'Handout',
+    icon: 'HO',
+    category: 'Layout',
+    insertContent: (editor) =>
+      editor.chain().focus().insertContent({ type: 'handout' }).run(),
+  },
+  {
+    name: 'pageBorder',
+    label: 'Page Border',
+    icon: 'PB',
+    category: 'Layout',
+    insertContent: (editor) =>
+      editor.chain().focus().insertContent({ type: 'pageBorder' }).run(),
+  },
+  {
+    name: 'pageBreak',
+    label: 'Page Break',
+    icon: 'PG',
+    category: 'Layout',
+    insertContent: (editor) =>
+      editor.chain().focus().insertContent({ type: 'pageBreak' }).run(),
+  },
+  {
+    name: 'columnBreak',
+    label: 'Column Break',
+    icon: 'CB',
+    category: 'Layout',
+    insertContent: (editor) =>
+      editor.chain().focus().insertContent({ type: 'columnBreak' }).run(),
+  },
+  // Structure
+  {
+    name: 'titlePage',
+    label: 'Title Page',
+    icon: 'TP',
+    category: 'Structure',
+    insertContent: (editor) =>
+      editor.chain().focus().insertContent({ type: 'titlePage' }).run(),
+  },
+  {
+    name: 'tableOfContents',
+    label: 'Table of Contents',
+    icon: 'TC',
+    category: 'Structure',
+    insertContent: (editor) =>
+      editor.chain().focus().insertContent({ type: 'tableOfContents' }).run(),
+  },
+  {
+    name: 'creditsPage',
+    label: 'Credits Page',
+    icon: 'CR',
+    category: 'Structure',
+    insertContent: (editor) =>
+      editor.chain().focus().insertContent({ type: 'creditsPage' }).run(),
+  },
+  {
+    name: 'backCover',
+    label: 'Back Cover',
+    icon: 'BC',
+    category: 'Structure',
+    insertContent: (editor) =>
+      editor.chain().focus().insertContent({ type: 'backCover' }).run(),
+  },
 ];
+
+const CATEGORY_ORDER = ['Basic', 'D&D', 'Layout', 'Structure'];
 
 function groupByCategory(blocks: BlockType[]) {
   return blocks.reduce(
@@ -87,278 +275,89 @@ interface BlockPaletteProps {
 }
 
 export function BlockPalette({ editor }: BlockPaletteProps) {
+  const [filter, setFilter] = useState('');
+
+  const filtered = useMemo(() => {
+    if (!filter.trim()) return BLOCK_TYPES;
+    const q = filter.toLowerCase();
+    return BLOCK_TYPES.filter(
+      (b) => b.label.toLowerCase().includes(q) || b.category.toLowerCase().includes(q),
+    );
+  }, [filter]);
+
   if (!editor) return null;
 
-  const categories = groupByCategory(BLOCK_TYPES);
+  const categories = groupByCategory(filtered);
 
   return (
-    <div className="w-60 border-r bg-gray-50 p-4 overflow-y-auto">
-      <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">
-        Blocks
-      </h3>
-      {Object.entries(categories).map(([category, blocks]) => (
-        <div key={category} className="mb-4">
-          <h4 className="text-xs font-medium text-gray-400 uppercase mb-2">
-            {category}
-          </h4>
-          <div className="space-y-1">
-            {blocks.map((block) => (
-              <button
-                key={block.name}
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  block.insertContent(editor);
-                }}
-                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 rounded hover:bg-gray-200 transition-colors"
+    <div className="w-60 border-r bg-gray-50 flex flex-col h-full">
+      {/* Header + search */}
+      <div className="px-4 pt-4 pb-2">
+        <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2">
+          Blocks
+        </h3>
+        <div className="relative">
+          <svg
+            className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+          </svg>
+          <input
+            type="text"
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            placeholder="Filter blocks..."
+            aria-label="Filter blocks"
+            className="w-full pl-8 pr-3 py-1.5 text-xs border border-gray-200 rounded-md bg-white placeholder-gray-400 focus:outline-none focus:border-purple-400 focus:ring-1 focus:ring-purple-200 transition-colors"
+          />
+        </div>
+      </div>
+
+      {/* Scrollable block list */}
+      <div className="flex-1 overflow-y-auto px-4 pb-4">
+        {CATEGORY_ORDER.filter((cat) => categories[cat]?.length).map((category) => {
+          const blocks = categories[category];
+          const style = CATEGORY_STYLES[category] || CATEGORY_STYLES.Basic;
+
+          return (
+            <div key={category} className="mb-3">
+              <h4
+                className={`text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-1.5 pl-2 border-l-2 ${style.accent}`}
               >
-                <span className="w-6 h-6 flex items-center justify-center bg-gray-200 rounded text-xs font-mono">
-                  {block.icon}
-                </span>
-                {block.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      ))}
-      {/* D&D blocks */}
-      <div className="mt-6 pt-4 border-t">
-        <h4 className="text-xs font-medium text-gray-400 uppercase mb-2">
-          D&D
-        </h4>
-        <div className="space-y-1">
-          <button
-            onMouseDown={(e) => {
-              e.preventDefault();
-              editor
-                .chain()
-                .focus()
-                .insertContent({ type: 'statBlock' })
-                .run();
-            }}
-            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 rounded hover:bg-gray-200 transition-colors"
-          >
-            <span className="w-6 h-6 flex items-center justify-center bg-amber-100 text-amber-800 rounded text-xs font-mono">
-              SB
-            </span>
-            Stat Block
-          </button>
-          <button
-            onMouseDown={(e) => {
-              e.preventDefault();
-              editor.chain().focus().insertContent({ type: 'readAloudBox', content: [{ type: 'paragraph' }] }).run();
-            }}
-            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 rounded hover:bg-gray-200 transition-colors"
-          >
-            <span className="w-6 h-6 flex items-center justify-center bg-amber-100 text-amber-800 rounded text-xs font-mono">RA</span>
-            Read Aloud
-          </button>
-          <button
-            onMouseDown={(e) => {
-              e.preventDefault();
-              editor.chain().focus().insertContent({ type: 'sidebarCallout', content: [{ type: 'paragraph' }] }).run();
-            }}
-            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 rounded hover:bg-gray-200 transition-colors"
-          >
-            <span className="w-6 h-6 flex items-center justify-center bg-amber-100 text-amber-800 rounded text-xs font-mono">SC</span>
-            Sidebar Callout
-          </button>
-          <button
-            onMouseDown={(e) => {
-              e.preventDefault();
-              editor.chain().focus().insertContent({ type: 'chapterHeader' }).run();
-            }}
-            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 rounded hover:bg-gray-200 transition-colors"
-          >
-            <span className="w-6 h-6 flex items-center justify-center bg-amber-100 text-amber-800 rounded text-xs font-mono">CH</span>
-            Chapter Header
-          </button>
-          <button
-            onMouseDown={(e) => {
-              e.preventDefault();
-              editor.chain().focus().insertContent({ type: 'spellCard' }).run();
-            }}
-            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 rounded hover:bg-gray-200 transition-colors"
-          >
-            <span className="w-6 h-6 flex items-center justify-center bg-indigo-100 text-indigo-800 rounded text-xs font-mono">SP</span>
-            Spell Card
-          </button>
-          <button
-            onMouseDown={(e) => {
-              e.preventDefault();
-              editor.chain().focus().insertContent({ type: 'magicItem' }).run();
-            }}
-            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 rounded hover:bg-gray-200 transition-colors"
-          >
-            <span className="w-6 h-6 flex items-center justify-center bg-emerald-100 text-emerald-800 rounded text-xs font-mono">MI</span>
-            Magic Item
-          </button>
-          <button
-            onMouseDown={(e) => {
-              e.preventDefault();
-              editor.chain().focus().insertContent({ type: 'randomTable' }).run();
-            }}
-            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 rounded hover:bg-gray-200 transition-colors"
-          >
-            <span className="w-6 h-6 flex items-center justify-center bg-yellow-100 text-yellow-800 rounded text-xs font-mono">RT</span>
-            Random Table
-          </button>
-          <button
-            onMouseDown={(e) => {
-              e.preventDefault();
-              editor.chain().focus().insertContent({ type: 'npcProfile' }).run();
-            }}
-            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 rounded hover:bg-gray-200 transition-colors"
-          >
-            <span className="w-6 h-6 flex items-center justify-center bg-amber-100 text-amber-800 rounded text-xs font-mono">NP</span>
-            NPC Profile
-          </button>
-          <button
-            onMouseDown={(e) => {
-              e.preventDefault();
-              editor.chain().focus().insertContent({ type: 'encounterTable' }).run();
-            }}
-            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 rounded hover:bg-gray-200 transition-colors"
-          >
-            <span className="w-6 h-6 flex items-center justify-center bg-green-100 text-green-800 rounded text-xs font-mono">ET</span>
-            Encounter Table
-          </button>
-          <button
-            onMouseDown={(e) => {
-              e.preventDefault();
-              editor.chain().focus().insertContent({ type: 'classFeature' }).run();
-            }}
-            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 rounded hover:bg-gray-200 transition-colors"
-          >
-            <span className="w-6 h-6 flex items-center justify-center bg-red-100 text-red-800 rounded text-xs font-mono">CF</span>
-            Class Feature
-          </button>
-          <button
-            onMouseDown={(e) => {
-              e.preventDefault();
-              editor.chain().focus().insertContent({ type: 'raceBlock' }).run();
-            }}
-            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 rounded hover:bg-gray-200 transition-colors"
-          >
-            <span className="w-6 h-6 flex items-center justify-center bg-orange-100 text-orange-800 rounded text-xs font-mono">RB</span>
-            Race Block
-          </button>
-        </div>
-      </div>
-      {/* Layout blocks */}
-      <div className="mt-6 pt-4 border-t">
-        <h4 className="text-xs font-medium text-gray-400 uppercase mb-2">
-          Layout
-        </h4>
-        <div className="space-y-1">
-          <button
-            onMouseDown={(e) => {
-              e.preventDefault();
-              editor.chain().focus().insertContent({ type: 'fullBleedImage' }).run();
-            }}
-            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 rounded hover:bg-gray-200 transition-colors"
-          >
-            <span className="w-6 h-6 flex items-center justify-center bg-blue-100 text-blue-800 rounded text-xs font-mono">FI</span>
-            Full Bleed Image
-          </button>
-          <button
-            onMouseDown={(e) => {
-              e.preventDefault();
-              editor.chain().focus().insertContent({ type: 'mapBlock' }).run();
-            }}
-            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 rounded hover:bg-gray-200 transition-colors"
-          >
-            <span className="w-6 h-6 flex items-center justify-center bg-blue-100 text-blue-800 rounded text-xs font-mono">MP</span>
-            Map
-          </button>
-          <button
-            onMouseDown={(e) => {
-              e.preventDefault();
-              editor.chain().focus().insertContent({ type: 'handout' }).run();
-            }}
-            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 rounded hover:bg-gray-200 transition-colors"
-          >
-            <span className="w-6 h-6 flex items-center justify-center bg-blue-100 text-blue-800 rounded text-xs font-mono">HO</span>
-            Handout
-          </button>
-          <button
-            onMouseDown={(e) => {
-              e.preventDefault();
-              editor.chain().focus().insertContent({ type: 'pageBorder' }).run();
-            }}
-            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 rounded hover:bg-gray-200 transition-colors"
-          >
-            <span className="w-6 h-6 flex items-center justify-center bg-blue-100 text-blue-800 rounded text-xs font-mono">PB</span>
-            Page Border
-          </button>
-          <button
-            onMouseDown={(e) => {
-              e.preventDefault();
-              editor.chain().focus().insertContent({ type: 'pageBreak' }).run();
-            }}
-            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 rounded hover:bg-gray-200 transition-colors"
-          >
-            <span className="w-6 h-6 flex items-center justify-center bg-gray-100 text-gray-800 rounded text-xs font-mono">PG</span>
-            Page Break
-          </button>
-          <button
-            onMouseDown={(e) => {
-              e.preventDefault();
-              editor.chain().focus().insertContent({ type: 'columnBreak' }).run();
-            }}
-            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 rounded hover:bg-gray-200 transition-colors"
-          >
-            <span className="w-6 h-6 flex items-center justify-center bg-gray-100 text-gray-800 rounded text-xs font-mono">CB</span>
-            Column Break
-          </button>
-        </div>
-      </div>
-      {/* Structure blocks */}
-      <div className="mt-6 pt-4 border-t">
-        <h4 className="text-xs font-medium text-gray-400 uppercase mb-2">
-          Structure
-        </h4>
-        <div className="space-y-1">
-          <button
-            onMouseDown={(e) => {
-              e.preventDefault();
-              editor.chain().focus().insertContent({ type: 'titlePage' }).run();
-            }}
-            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 rounded hover:bg-gray-200 transition-colors"
-          >
-            <span className="w-6 h-6 flex items-center justify-center bg-rose-100 text-rose-800 rounded text-xs font-mono">TP</span>
-            Title Page
-          </button>
-          <button
-            onMouseDown={(e) => {
-              e.preventDefault();
-              editor.chain().focus().insertContent({ type: 'tableOfContents' }).run();
-            }}
-            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 rounded hover:bg-gray-200 transition-colors"
-          >
-            <span className="w-6 h-6 flex items-center justify-center bg-rose-100 text-rose-800 rounded text-xs font-mono">TC</span>
-            Table of Contents
-          </button>
-          <button
-            onMouseDown={(e) => {
-              e.preventDefault();
-              editor.chain().focus().insertContent({ type: 'creditsPage' }).run();
-            }}
-            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 rounded hover:bg-gray-200 transition-colors"
-          >
-            <span className="w-6 h-6 flex items-center justify-center bg-rose-100 text-rose-800 rounded text-xs font-mono">CR</span>
-            Credits Page
-          </button>
-          <button
-            onMouseDown={(e) => {
-              e.preventDefault();
-              editor.chain().focus().insertContent({ type: 'backCover' }).run();
-            }}
-            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 rounded hover:bg-gray-200 transition-colors"
-          >
-            <span className="w-6 h-6 flex items-center justify-center bg-rose-100 text-rose-800 rounded text-xs font-mono">BC</span>
-            Back Cover
-          </button>
-        </div>
+                {category}
+              </h4>
+              <div className="space-y-0.5">
+                {blocks.map((block) => (
+                  <button
+                    key={block.name}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      block.insertContent(editor);
+                    }}
+                    className="w-full flex items-center gap-2 px-2.5 py-1.5 text-sm text-gray-600 rounded-md hover:bg-white hover:text-gray-900 hover:shadow-sm transition-all group"
+                  >
+                    <span
+                      className={`w-6 h-6 flex items-center justify-center rounded text-[10px] font-bold ${style.iconBg} ${style.iconText} group-hover:scale-110 transition-transform`}
+                    >
+                      {block.icon}
+                    </span>
+                    <span className="truncate">{block.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+
+        {filtered.length === 0 && (
+          <p className="text-xs text-gray-400 text-center mt-4">
+            No blocks match "{filter}"
+          </p>
+        )}
       </div>
     </div>
   );

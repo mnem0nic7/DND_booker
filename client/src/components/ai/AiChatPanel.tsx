@@ -198,6 +198,7 @@ export function AiChatPanel({ projectId, editor }: AiChatPanelProps) {
               onClick={() => setShowPlanPanel(!showPlanPanel)}
               className={`text-xs transition-colors ${showPlanPanel ? 'text-purple-600 font-medium' : 'text-gray-400 hover:text-purple-500'}`}
               title="Toggle planning panel"
+              aria-label="Toggle planning panel"
             >
               Plan
             </button>
@@ -213,6 +214,7 @@ export function AiChatPanel({ projectId, editor }: AiChatPanelProps) {
               }}
               className="text-xs text-gray-400 hover:text-red-500 transition-colors"
               title="Clear chat history"
+              aria-label="Clear chat history"
             >
               Clear
             </button>
@@ -260,11 +262,12 @@ export function AiChatPanel({ projectId, editor }: AiChatPanelProps) {
                 'Create an orc war chief stat block',
                 'Design a fire spell for level 3',
                 'Generate an NPC tavern keeper',
-              ].map((suggestion) => (
+              ].map((suggestion, i) => (
                 <button
                   key={suggestion}
                   onClick={() => sendMessage(projectId, suggestion)}
-                  className="block w-full text-left text-xs text-gray-500 bg-white border border-gray-200 rounded-md px-3 py-2 hover:border-purple-300 hover:text-purple-600 transition-colors"
+                  className="block w-full text-left text-xs text-gray-500 bg-white border border-gray-200 rounded-md px-3 py-2 hover:border-purple-300 hover:text-purple-600 hover:shadow-sm transition-all animate-[fadeSlideIn_0.3s_ease-out_both]"
+                  style={{ animationDelay: `${i * 80}ms` }}
                 >
                   {suggestion}
                 </button>
@@ -340,6 +343,7 @@ export function AiChatPanel({ projectId, editor }: AiChatPanelProps) {
                 onClick={cancelStream}
                 className="self-end px-3 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors"
                 title="Stop generating"
+                aria-label="Stop generating"
               >
                 <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
                   <rect x="6" y="6" width="12" height="12" rx="2" />
@@ -350,6 +354,7 @@ export function AiChatPanel({ projectId, editor }: AiChatPanelProps) {
                 onClick={handleSend}
                 disabled={!input.trim() || wizardProgress?.isGenerating}
                 className="self-end px-3 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                aria-label="Send message"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />

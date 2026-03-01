@@ -58,15 +58,16 @@ export function PreviewPanel({ editor, theme }: PreviewPanelProps) {
         <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
           Preview
         </span>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center bg-gray-100 rounded-md p-0.5">
           {ZOOM_OPTIONS.map((level) => (
             <button
               key={level}
               onClick={() => setZoom(level)}
-              className={`px-2 py-0.5 text-xs rounded transition-colors ${
+              aria-label={`Zoom to ${level}%`}
+              className={`px-2.5 py-0.5 text-xs rounded transition-all ${
                 zoom === level
-                  ? 'bg-indigo-100 text-indigo-700 font-medium'
-                  : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
+                  ? 'bg-white text-purple-700 font-medium shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700'
               }`}
             >
               {level}%
@@ -78,7 +79,7 @@ export function PreviewPanel({ editor, theme }: PreviewPanelProps) {
       {/* Preview content area */}
       <div className="flex-1 overflow-auto p-4">
         <div
-          className="mx-auto bg-white shadow-lg rounded-sm origin-top"
+          className="mx-auto bg-white rounded-sm origin-top"
           style={{
             width: pageWidth,
             minHeight: pageWidth * (11 / 8.5), // Letter proportions
@@ -86,6 +87,9 @@ export function PreviewPanel({ editor, theme }: PreviewPanelProps) {
             transformOrigin: 'top center',
             // Adjust container to match the scaled visual size
             marginBottom: -(pageWidth * (11 / 8.5)) * (1 - scale),
+            // Layered shadow for realistic paper look
+            boxShadow:
+              '0 1px 3px rgba(0,0,0,0.08), 0 4px 12px rgba(0,0,0,0.06), 0 -1px 0 rgba(0,0,0,0.02)',
           }}
         >
           <PreviewRenderer html={html} theme={theme} />

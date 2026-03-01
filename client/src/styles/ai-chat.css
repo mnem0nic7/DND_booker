@@ -1,3 +1,15 @@
+/* Staggered fade-in animation for suggestion buttons */
+@keyframes fadeSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 /* AI Markdown in chat bubbles */
 .ai-markdown p { margin: 0.25em 0; }
 .ai-markdown p:first-child { margin-top: 0; }

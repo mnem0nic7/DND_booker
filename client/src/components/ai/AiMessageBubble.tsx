@@ -154,7 +154,11 @@ export function AiMessageBubble({ role, content, isStreaming, onInsertBlock, raw
 
         {/* Streaming cursor */}
         {isStreaming && (
-          <span className="inline-block w-2 h-4 bg-purple-400 animate-pulse ml-0.5" />
+          <span className="inline-flex items-center gap-0.5 ml-1 align-middle">
+            <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-bounce" style={{ animationDelay: '0ms', animationDuration: '0.8s' }} />
+            <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-bounce" style={{ animationDelay: '150ms', animationDuration: '0.8s' }} />
+            <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-bounce" style={{ animationDelay: '300ms', animationDuration: '0.8s' }} />
+          </span>
         )}
 
         {/* Detected block cards */}

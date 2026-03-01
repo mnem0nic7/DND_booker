@@ -73,6 +73,7 @@ export function EditorLayout({ projectId, content, onUpdate }: EditorLayoutProps
           <button
             onClick={() => setShowBlockPalette((v) => !v)}
             title={showBlockPalette ? 'Hide block palette' : 'Show block palette'}
+            aria-label={showBlockPalette ? 'Hide block palette' : 'Show block palette'}
             className="px-2 py-2 text-gray-400 hover:text-gray-600 transition-colors border-r"
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -85,6 +86,7 @@ export function EditorLayout({ projectId, content, onUpdate }: EditorLayoutProps
           <button
             onClick={openExportDialog}
             title="Export project"
+            aria-label="Export project"
             className="px-3 py-1.5 text-sm text-gray-600 hover:text-indigo-700 hover:bg-indigo-50 transition-colors rounded mr-1 flex items-center gap-1"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -95,6 +97,7 @@ export function EditorLayout({ projectId, content, onUpdate }: EditorLayoutProps
           <button
             onClick={() => setShowAiChat((v) => !v)}
             title={showAiChat ? 'Hide AI assistant' : 'Show AI assistant'}
+            aria-label={showAiChat ? 'Hide AI assistant' : 'Show AI assistant'}
             className={`px-3 py-1.5 text-sm transition-colors rounded mr-1 flex items-center gap-1 ${
               showAiChat
                 ? 'text-purple-700 bg-purple-50'
@@ -109,6 +112,7 @@ export function EditorLayout({ projectId, content, onUpdate }: EditorLayoutProps
           <button
             onClick={() => setSettingsModalOpen(true)}
             title="AI Settings"
+            aria-label="AI Settings"
             className="px-2 py-1.5 text-gray-400 hover:text-purple-600 transition-colors rounded mr-1"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -118,6 +122,7 @@ export function EditorLayout({ projectId, content, onUpdate }: EditorLayoutProps
           <button
             onClick={() => setShowPreview((v) => !v)}
             title={showPreview ? 'Hide preview' : 'Show preview'}
+            aria-label={showPreview ? 'Hide preview' : 'Show preview'}
             className={`px-3 py-1.5 text-sm transition-colors rounded mr-1 flex items-center gap-1 ${
               showPreview
                 ? 'text-indigo-700 bg-indigo-50'
@@ -133,6 +138,7 @@ export function EditorLayout({ projectId, content, onUpdate }: EditorLayoutProps
           <button
             onClick={() => setShowProperties((v) => !v)}
             title={showProperties ? 'Hide properties' : 'Show properties'}
+            aria-label={showProperties ? 'Hide properties' : 'Show properties'}
             className="px-2 py-2 text-gray-400 hover:text-gray-600 transition-colors border-l"
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
