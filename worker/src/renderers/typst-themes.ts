@@ -68,7 +68,7 @@ const themes: Record<string, ThemeDefinition> = {
     classFeatureAccent: '#c9a84c',
     headingFont: 'Uncial Antiqua',
     bodyFont: 'EB Garamond',
-    texture: 'dark-leather.jpg',
+    texture: 'parchment-dark.jpg',
   },
   'clean-modern': {
     primary: '#2563eb',
@@ -108,7 +108,7 @@ const themes: Record<string, ThemeDefinition> = {
     classFeatureAccent: '#ca8a04',
     headingFont: 'Dancing Script',
     bodyFont: 'Lora',
-    texture: 'fey-vines.jpg',
+    texture: 'parchment-fey.jpg',
   },
   'infernal': {
     primary: '#dc2626',
@@ -128,7 +128,7 @@ const themes: Record<string, ThemeDefinition> = {
     classFeatureAccent: '#dc2626',
     headingFont: 'Pirata One',
     bodyFont: 'Bitter',
-    texture: 'infernal-flame.jpg',
+    texture: 'parchment-infernal.jpg',
   },
   'dmguild': {
     primary: '#58180D',

@@ -34,7 +34,7 @@ describe('Typst Theme Variables', () => {
     expect(vars).toContain('#let theme-text = rgb("#e0d6c2")');
     expect(vars).toContain('#let heading-font = "Uncial Antiqua"');
     expect(vars).toContain('#let body-font = "EB Garamond"');
-    expect(vars).toContain('#let theme-texture = "dark-leather.jpg"');
+    expect(vars).toContain('#let theme-texture = "parchment-dark.jpg"');
   });
 
   it('should return clean-modern variables with no texture', () => {
@@ -57,7 +57,7 @@ describe('Typst Theme Variables', () => {
     expect(vars).toContain('#let theme-bg = rgb("#f0f7ee")');
     expect(vars).toContain('#let heading-font = "Dancing Script"');
     expect(vars).toContain('#let body-font = "Lora"');
-    expect(vars).toContain('#let theme-texture = "fey-vines.jpg"');
+    expect(vars).toContain('#let theme-texture = "parchment-fey.jpg"');
   });
 
   it('should return infernal variables', () => {
@@ -69,7 +69,7 @@ describe('Typst Theme Variables', () => {
     expect(vars).toContain('#let theme-text = rgb("#e8d5c4")');
     expect(vars).toContain('#let heading-font = "Pirata One"');
     expect(vars).toContain('#let body-font = "Bitter"');
-    expect(vars).toContain('#let theme-texture = "infernal-flame.jpg"');
+    expect(vars).toContain('#let theme-texture = "parchment-infernal.jpg"');
   });
 
   it('should return dmguild variables', () => {
