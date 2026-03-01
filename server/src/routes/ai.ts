@@ -2,14 +2,16 @@ import { Router, Response } from 'express';
 import { z } from 'zod';
 import { streamText, generateText } from 'ai';
 import { requireAuth, AuthRequest } from '../middleware/auth.js';
-import { chatRateLimit, blockGenRateLimit, autoFillRateLimit, aiValidationRateLimit } from '../middleware/ai-rate-limit.js';
+import { chatRateLimit, blockGenRateLimit, autoFillRateLimit, aiValidationRateLimit, wizardRateLimit } from '../middleware/ai-rate-limit.js';
 import { asyncHandler } from '../middleware/async-handler.js';
 import { validateUuid } from '../middleware/validate-uuid.js';
 import * as aiSettings from '../services/ai-settings.service.js';
 import * as aiChat from '../services/ai-chat.service.js';
 import * as aiContent from '../services/ai-content.service.js';
+import * as aiWizard from '../services/ai-wizard.service.js';
 import { createModel, validateApiKey, validateConnection, SUPPORTED_MODELS, type AiProvider } from '../services/ai-provider.service.js';
 import { prisma } from '../config/database.js';
+import type { WizardEvent, WizardGeneratedSection } from '@dnd-booker/shared';
 
 const SUPPORTED_BLOCK_TYPES = aiContent.getSupportedBlockTypes();
 const MAX_CHAT_CONTEXT_MESSAGES = 30;
@@ -363,6 +365,340 @@ aiChatRoutes.delete('/ai/chat', validateUuid('projectId'), asyncHandler(async (r
     console.error('[AI] Failed to clear chat:', err);
     res.status(500).json({ error: 'Failed to clear chat history.' });
   }
+}));
+
+// --- Wizard routes (project-scoped) ---
+export const aiWizardRoutes = Router({ mergeParams: true });
+aiWizardRoutes.use(requireAuth);
+
+/** Helper to send an SSE event (newline-delimited JSON) */
+function sendWizardEvent(res: Response, event: WizardEvent) {
+  res.write(JSON.stringify(event) + '\n');
+}
+
+/** Helper to set up SSE response headers */
+function setupSSE(res: Response) {
+  res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+  res.flushHeaders();
+}
+
+// GET /projects/:projectId/ai/wizard — get current wizard session
+aiWizardRoutes.get('/ai/wizard', validateUuid('projectId'), asyncHandler(async (req: AuthRequest, res: Response) => {
+  const projectId = req.params.projectId as string;
+
+  const project = await prisma.project.findFirst({
+    where: { id: projectId, userId: req.userId! },
+  });
+  if (!project) {
+    res.status(404).json({ error: 'Project not found' });
+    return;
+  }
+
+  const session = await aiWizard.getSession(projectId, req.userId!);
+  res.json({ session: session ?? null });
+}));
+
+// POST /projects/:projectId/ai/wizard/start — start wizard, generate questions
+const wizardStartSchema = z.object({
+  projectType: z.string().min(1).max(100).optional(),
+});
+
+aiWizardRoutes.post('/ai/wizard/start', validateUuid('projectId'), wizardRateLimit, asyncHandler(async (req: AuthRequest, res: Response) => {
+  const projectId = req.params.projectId as string;
+  const parsed = wizardStartSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'Validation failed' });
+    return;
+  }
+
+  const project = await prisma.project.findFirst({
+    where: { id: projectId, userId: req.userId! },
+  });
+  if (!project) {
+    res.status(404).json({ error: 'Project not found' });
+    return;
+  }
+
+  const model = await getModelForUser(req.userId!);
+  if (!model) {
+    res.status(400).json({ error: 'AI not configured. Please set up your API key in AI settings.' });
+    return;
+  }
+
+  // Delete any existing wizard session and create fresh
+  await aiWizard.deleteSession(projectId, req.userId!);
+  const session = await aiWizard.getOrCreateSession(projectId, req.userId!);
+
+  setupSSE(res);
+
+  try {
+    const projectType = parsed.data?.projectType || project.type.replace('_', ' ');
+    const questions = await aiWizard.generateQuestions(projectType, model);
+
+    await aiWizard.updateSession(session.id, { phase: 'questionnaire' });
+
+    sendWizardEvent(res, { type: 'questions', questions });
+    sendWizardEvent(res, { type: 'done' });
+  } catch (err: unknown) {
+    console.error('[AI Wizard] Failed to generate questions:', err);
+    await aiWizard.updateSession(session.id, { errorMsg: 'Failed to generate questions' });
+    sendWizardEvent(res, { type: 'error', error: 'Failed to generate questions. Please try again.' });
+  }
+
+  res.end();
+}));
+
+// POST /projects/:projectId/ai/wizard/parameters — submit answers, generate outline
+const wizardParametersSchema = z.object({
+  projectType: z.string().min(1).max(100),
+  answers: z.record(z.string().max(2000)),
+});
+
+aiWizardRoutes.post('/ai/wizard/parameters', validateUuid('projectId'), wizardRateLimit, asyncHandler(async (req: AuthRequest, res: Response) => {
+  const projectId = req.params.projectId as string;
+  const parsed = wizardParametersSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'Validation failed' });
+    return;
+  }
+
+  const project = await prisma.project.findFirst({
+    where: { id: projectId, userId: req.userId! },
+  });
+  if (!project) {
+    res.status(404).json({ error: 'Project not found' });
+    return;
+  }
+
+  const model = await getModelForUser(req.userId!);
+  if (!model) {
+    res.status(400).json({ error: 'AI not configured.' });
+    return;
+  }
+
+  const session = await aiWizard.getSession(projectId, req.userId!);
+  if (!session) {
+    res.status(404).json({ error: 'No wizard session found. Please start the wizard first.' });
+    return;
+  }
+
+  const params = parsed.data;
+
+  setupSSE(res);
+
+  try {
+    // Save parameters
+    await aiWizard.updateSession(session.id, {
+      parameters: params,
+      phase: 'outline',
+    });
+
+    // Generate outline
+    const outline = await aiWizard.generateOutline(params, model);
+
+    await aiWizard.updateSession(session.id, { outline });
+
+    sendWizardEvent(res, { type: 'outline', outline });
+    sendWizardEvent(res, { type: 'done' });
+  } catch (err: unknown) {
+    console.error('[AI Wizard] Failed to generate outline:', err);
+    await aiWizard.updateSession(session.id, { errorMsg: 'Failed to generate outline' });
+    sendWizardEvent(res, { type: 'error', error: 'Failed to generate outline. Please try again.' });
+  }
+
+  res.end();
+}));
+
+// POST /projects/:projectId/ai/wizard/generate — generate all sections
+const wizardGenerateSchema = z.object({
+  outline: z.object({
+    adventureTitle: z.string().min(1),
+    summary: z.string(),
+    sections: z.array(z.object({
+      id: z.string(),
+      title: z.string(),
+      description: z.string(),
+      blockHints: z.array(z.string()),
+      sortOrder: z.number(),
+    })),
+  }),
+});
+
+aiWizardRoutes.post('/ai/wizard/generate', validateUuid('projectId'), wizardRateLimit, asyncHandler(async (req: AuthRequest, res: Response) => {
+  const projectId = req.params.projectId as string;
+  const parsed = wizardGenerateSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'Validation failed' });
+    return;
+  }
+
+  const project = await prisma.project.findFirst({
+    where: { id: projectId, userId: req.userId! },
+  });
+  if (!project) {
+    res.status(404).json({ error: 'Project not found' });
+    return;
+  }
+
+  const model = await getModelForUser(req.userId!);
+  if (!model) {
+    res.status(400).json({ error: 'AI not configured.' });
+    return;
+  }
+
+  const session = await aiWizard.getSession(projectId, req.userId!);
+  if (!session) {
+    res.status(404).json({ error: 'No wizard session found.' });
+    return;
+  }
+
+  const abortController = new AbortController();
+  req.on('close', () => abortController.abort());
+
+  const outline = parsed.data.outline;
+
+  // Save the (potentially user-edited) outline
+  await aiWizard.updateSession(session.id, {
+    outline,
+    phase: 'generating',
+    sections: [],
+    progress: 0,
+  });
+
+  setupSSE(res);
+
+  const generatedSections: WizardGeneratedSection[] = [];
+  const previousSummaries: string[] = [];
+  const totalSections = outline.sections.length;
+
+  for (let idx = 0; idx < totalSections; idx++) {
+    const section = outline.sections[idx];
+
+    if (abortController.signal.aborted) break;
+
+    sendWizardEvent(res, { type: 'section_start', sectionId: section.id, title: section.title });
+
+    try {
+      const result = await aiWizard.generateSection(
+        outline,
+        section,
+        previousSummaries,
+        model,
+        abortController.signal,
+      );
+
+      const genSection: WizardGeneratedSection = {
+        sectionId: section.id,
+        title: section.title,
+        status: 'completed',
+        content: result.content,
+        markdown: result.markdown,
+      };
+
+      generatedSections.push(genSection);
+      previousSummaries.push(aiWizard.summarizeSection(result.markdown));
+
+      const progress = Math.round(((idx + 1) / totalSections) * 100);
+
+      // Persist after each section for resume support
+      await aiWizard.updateSession(session.id, {
+        sections: generatedSections,
+        progress,
+      });
+
+      sendWizardEvent(res, { type: 'section_done', sectionId: section.id });
+      sendWizardEvent(res, { type: 'progress', percent: progress });
+    } catch (err: unknown) {
+      if (abortController.signal.aborted) break;
+
+      console.error(`[AI Wizard] Failed to generate section ${section.id}:`, err);
+
+      const genSection: WizardGeneratedSection = {
+        sectionId: section.id,
+        title: section.title,
+        status: 'failed',
+        content: null,
+        error: 'Generation failed',
+      };
+      generatedSections.push(genSection);
+
+      await aiWizard.updateSession(session.id, { sections: generatedSections });
+
+      sendWizardEvent(res, {
+        type: 'section_error',
+        sectionId: section.id,
+        error: 'Failed to generate this section.',
+      });
+    }
+  }
+
+  if (!abortController.signal.aborted) {
+    await aiWizard.updateSession(session.id, { phase: 'review', progress: 100 });
+    sendWizardEvent(res, { type: 'done' });
+  }
+
+  res.end();
+}));
+
+// POST /projects/:projectId/ai/wizard/apply — create documents from selected sections
+const wizardApplySchema = z.object({
+  sectionIds: z.array(z.string()).min(1),
+});
+
+aiWizardRoutes.post('/ai/wizard/apply', validateUuid('projectId'), asyncHandler(async (req: AuthRequest, res: Response) => {
+  const projectId = req.params.projectId as string;
+  const parsed = wizardApplySchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'Validation failed' });
+    return;
+  }
+
+  const project = await prisma.project.findFirst({
+    where: { id: projectId, userId: req.userId! },
+  });
+  if (!project) {
+    res.status(404).json({ error: 'Project not found' });
+    return;
+  }
+
+  const session = await aiWizard.getSession(projectId, req.userId!);
+  if (!session) {
+    res.status(404).json({ error: 'No wizard session found.' });
+    return;
+  }
+
+  const sections = (session.sections ?? []) as unknown as WizardGeneratedSection[];
+
+  try {
+    const docs = await aiWizard.applyToProject(projectId, sections, parsed.data.sectionIds);
+
+    // Mark wizard as done
+    await aiWizard.updateSession(session.id, { phase: 'done' });
+
+    res.json({ documents: docs });
+  } catch (err: unknown) {
+    console.error('[AI Wizard] Failed to apply sections:', err);
+    res.status(500).json({ error: 'Failed to create documents.' });
+  }
+}));
+
+// DELETE /projects/:projectId/ai/wizard — cancel/delete wizard session
+aiWizardRoutes.delete('/ai/wizard', validateUuid('projectId'), asyncHandler(async (req: AuthRequest, res: Response) => {
+  const projectId = req.params.projectId as string;
+
+  const project = await prisma.project.findFirst({
+    where: { id: projectId, userId: req.userId! },
+  });
+  if (!project) {
+    res.status(404).json({ error: 'Project not found' });
+    return;
+  }
+
+  await aiWizard.deleteSession(projectId, req.userId!);
+  res.json({ success: true });
 }));
 
 // --- Shared helper ---

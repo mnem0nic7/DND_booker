@@ -23,11 +23,12 @@ model User {
   createdAt    DateTime    @default(now()) @map("created_at")
   updatedAt    DateTime    @updatedAt @map("updated_at")
 
-  projects     Project[]
-  exportJobs   ExportJob[]
-  assets       Asset[]
-  templates    Template[]
-  chatSessions AiChatSession[]
+  projects       Project[]
+  exportJobs     ExportJob[]
+  assets         Asset[]
+  templates      Template[]
+  chatSessions   AiChatSession[]
+  wizardSessions AiWizardSession[]
 
   @@map("users")
 }
@@ -62,6 +63,7 @@ model Project {
   documents      Document[]
   exportJobs     ExportJob[]
   chatSessions   AiChatSession[]
+  wizardSessions AiWizardSession[]
   assets         Asset[]
 
   @@index([userId])
@@ -163,6 +165,28 @@ model AiChatSession {
 
   @@unique([projectId, userId])
   @@map("ai_chat_sessions")
+}
+
+model AiWizardSession {
+  id         String   @id @default(uuid())
+  projectId  String   @map("project_id")
+  userId     String   @map("user_id")
+  phase      String   @default("questionnaire")
+  parameters Json?
+  outline    Json?
+  sections   Json     @default("[]")
+  progress   Int      @default(0)
+  errorMsg   String?  @map("error_msg")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, userId])
+  @@index([projectId])
+  @@index([userId])
+  @@map("ai_wizard_sessions")
 }
 
 model AiChatMessage {

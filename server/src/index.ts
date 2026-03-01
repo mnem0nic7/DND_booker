@@ -9,7 +9,7 @@ import { projectDocumentRoutes, documentRoutes } from './routes/documents.js';
 import { projectAssetRoutes, assetRoutes } from './routes/assets.js';
 import exportRoutes from './routes/exports.js';
 import templateRoutes from './routes/templates.js';
-import { aiSettingsRoutes, aiGenerateRoutes, aiChatRoutes } from './routes/ai.js';
+import { aiSettingsRoutes, aiGenerateRoutes, aiChatRoutes, aiWizardRoutes } from './routes/ai.js';
 import { publicRateLimit } from './middleware/ai-rate-limit.js';
 
 // Validate required env vars in production
@@ -84,6 +84,7 @@ app.use('/api/templates', templateRoutes);
 app.use('/api/ai', aiSettingsRoutes);
 app.use('/api/ai', aiGenerateRoutes);
 app.use('/api/projects/:projectId', aiChatRoutes);
+app.use('/api/projects/:projectId', aiWizardRoutes);
 
 // Serve uploaded files statically with security headers
 app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads'), {

@@ -1,14 +1,19 @@
 import { useState, useEffect, useRef } from 'react';
 import type { Editor } from '@tiptap/core';
 import { useAiStore } from '../../stores/aiStore';
+import { useWizardStore } from '../../stores/wizardStore';
 import { AiMessageBubble } from './AiMessageBubble';
+import { WizardPanel } from './WizardPanel';
+
+const WIZARD_TRIGGER_REGEX = /\b(create|generate|build|make|write)\b.*\b(one[ -]?shot|adventure|module|campaign|quest|dungeon|encounter series)\b/i;
 
 interface AiChatPanelProps {
   projectId: string;
   editor: Editor | null;
+  onDocumentsCreated?: () => void;
 }
 
-export function AiChatPanel({ projectId, editor }: AiChatPanelProps) {
+export function AiChatPanel({ projectId, editor, onDocumentsCreated }: AiChatPanelProps) {
   const {
     messages,
     isStreaming,
@@ -23,8 +28,11 @@ export function AiChatPanel({ projectId, editor }: AiChatPanelProps) {
     setSettingsModalOpen,
   } = useAiStore();
 
+  const { isActive: isWizardActive } = useWizardStore();
+
   const [input, setInput] = useState('');
   const [insertError, setInsertError] = useState<string | null>(null);
+  const [showWizard, setShowWizard] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -46,9 +54,26 @@ export function AiChatPanel({ projectId, editor }: AiChatPanelProps) {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, streamingContent]);
 
+  // Sync wizard active state
+  useEffect(() => {
+    if (isWizardActive) {
+      setShowWizard(true);
+    }
+  }, [isWizardActive]);
+
   async function handleSend() {
     const text = input.trim();
     if (!text || isStreaming) return;
+
+    // Check if the message triggers the wizard
+    if (WIZARD_TRIGGER_REGEX.test(text)) {
+      if (window.confirm('Would you like to use the AI Creation Wizard? It will guide you through creating a complete adventure with multiple sections, stat blocks, and more.')) {
+        setInput('');
+        setShowWizard(true);
+        return;
+      }
+    }
+
     setInput('');
     await sendMessage(projectId, text);
   }
@@ -64,7 +89,27 @@ export function AiChatPanel({ projectId, editor }: AiChatPanelProps) {
     }
   }
 
+  function handleLaunchWizard() {
+    setShowWizard(true);
+  }
+
+  function handleCloseWizard() {
+    setShowWizard(false);
+    useWizardStore.getState().reset();
+  }
+
   const isConfigured = settings?.provider === 'ollama' ? !!settings?.baseUrl : settings?.hasApiKey;
+
+  // Show wizard panel when active
+  if (showWizard) {
+    return (
+      <WizardPanel
+        projectId={projectId}
+        onClose={handleCloseWizard}
+        onDocumentsCreated={onDocumentsCreated}
+      />
+    );
+  }
 
   return (
     <div className="flex flex-col h-full bg-gray-50">
@@ -115,6 +160,19 @@ export function AiChatPanel({ projectId, editor }: AiChatPanelProps) {
           <div className="flex flex-col items-center justify-center h-full text-center px-4">
             <p className="text-sm text-gray-500 mb-2">Ask me anything about your campaign!</p>
             <div className="space-y-1.5 w-full">
+              {/* Wizard entry point */}
+              <button
+                onClick={handleLaunchWizard}
+                className="block w-full text-left text-xs bg-purple-50 border border-purple-200 rounded-md px-3 py-2.5 hover:border-purple-400 hover:bg-purple-100 transition-colors group"
+              >
+                <span className="text-purple-700 font-medium group-hover:text-purple-800">
+                  Create with AI
+                </span>
+                <span className="text-purple-500 ml-1">
+                  — Generate a complete adventure with guided steps
+                </span>
+              </button>
+
               {[
                 'Create an orc war chief stat block',
                 'Design a fire spell for level 3',

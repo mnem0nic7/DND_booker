@@ -45,6 +45,14 @@ export const crudRateLimit = rateLimit({
   message: { error: 'Too many requests. Please wait a moment.' },
 });
 
+/** Rate limit for AI wizard endpoints (expensive: multiple AI calls). */
+export const wizardRateLimit = rateLimit({
+  windowMs: 5 * 60 * 1000,
+  max: 5,
+  keyGenerator: (req) => (req as AuthRequest).userId || req.ip || 'unknown',
+  message: { error: 'Too many wizard requests. Please wait a few minutes.' },
+});
+
 /** Strict rate limit for AI key validation (prevents enumeration). */
 export const aiValidationRateLimit = rateLimit({
   windowMs: 60 * 1000,
