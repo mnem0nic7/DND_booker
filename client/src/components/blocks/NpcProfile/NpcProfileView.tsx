@@ -27,7 +27,7 @@ export function NpcProfileView({
   return (
     <NodeViewWrapper>
       <div
-        className={`npc-profile${selected ? ' ring-2 ring-amber-700 ring-offset-2' : ''}`}
+        className={`npc-profile transition-shadow${selected ? ' ring-2 ring-purple-500 ring-offset-2' : ''}`}
         contentEditable={false}
       >
         {/* Delete button */}

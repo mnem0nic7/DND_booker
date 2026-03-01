@@ -66,7 +66,7 @@ export function EncounterTableView({
   return (
     <NodeViewWrapper>
       <div
-        className={`encounter-table${selected ? ' ring-2 ring-green-700 ring-offset-2' : ''}`}
+        className={`encounter-table transition-shadow${selected ? ' ring-2 ring-purple-500 ring-offset-2' : ''}`}
         contentEditable={false}
       >
         {/* Delete button */}

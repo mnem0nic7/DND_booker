@@ -63,7 +63,7 @@ export function RaceBlockView({
   return (
     <NodeViewWrapper>
       <div
-        className={`race-block${selected ? ' ring-2 ring-amber-800 ring-offset-2' : ''}`}
+        className={`race-block transition-shadow${selected ? ' ring-2 ring-purple-500 ring-offset-2' : ''}`}
         contentEditable={false}
       >
         {/* Delete button */}

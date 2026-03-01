@@ -40,7 +40,7 @@ export function Toolbar({ editor }: ToolbarProps) {
   if (!editor) return null;
 
   return (
-    <div className="flex items-center gap-0.5 flex-wrap border-b bg-white px-3 py-2 sticky top-0 z-10">
+    <div className="flex items-center gap-1 flex-wrap px-3 py-2 sticky top-0 z-10">
       {/* Text formatting */}
       <ToolbarButton
         onClick={() => editor.chain().focus().toggleBold().run()}

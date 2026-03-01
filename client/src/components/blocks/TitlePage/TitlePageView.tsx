@@ -27,7 +27,7 @@ export function TitlePageView({
   return (
     <NodeViewWrapper>
       <div
-        className={`title-page${selected ? ' ring-2 ring-amber-500 ring-offset-2' : ''}`}
+        className={`title-page transition-shadow${selected ? ' ring-2 ring-purple-500 ring-offset-2' : ''}`}
         contentEditable={false}
       >
         {/* Delete button */}

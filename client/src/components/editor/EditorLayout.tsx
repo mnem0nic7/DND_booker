@@ -153,24 +153,29 @@ export function EditorLayout({ projectId, content, onUpdate }: EditorLayoutProps
         </div>
       </div>
 
-      {/* Right sidebar: AI Chat panel */}
-      {showAiChat && !showPreview && (
-        <div className="w-[380px] min-w-[300px] border-l">
-          <AiChatPanel projectId={projectId} editor={editor} />
-        </div>
-      )}
-
-      {/* Right sidebar: Preview panel */}
-      {showPreview && (
-        <div className="w-[480px] min-w-[320px]">
-          <PreviewPanel editor={editor} theme={currentTheme} />
-        </div>
-      )}
-
-      {/* Right sidebar: Properties panel */}
-      {showProperties && !showPreview && !showAiChat && (
-        <PropertiesPanel editor={editor} />
-      )}
+      {/* Right sidebar container — smooth width transitions */}
+      {(() => {
+        const showingAi = showAiChat && !showPreview;
+        const showingPreview = showPreview;
+        const showingProps = showProperties && !showPreview && !showAiChat;
+        const isOpen = showingAi || showingPreview || showingProps;
+        return (
+          <div
+            className={`overflow-hidden transition-[width,min-width,opacity] duration-200 ease-in-out ${
+              isOpen ? 'opacity-100 border-l' : 'w-0 min-w-0 opacity-0'
+            } ${
+              showingAi ? 'w-[380px] min-w-[300px]'
+              : showingPreview ? 'w-[480px] min-w-[320px]'
+              : showingProps ? 'w-64'
+              : ''
+            }`}
+          >
+            {showingAi && <AiChatPanel projectId={projectId} editor={editor} />}
+            {showingPreview && <PreviewPanel editor={editor} theme={currentTheme} />}
+            {showingProps && <PropertiesPanel editor={editor} />}
+          </div>
+        );
+      })()}
 
       {/* Export Dialog */}
       <ExportDialog projectId={projectId} />

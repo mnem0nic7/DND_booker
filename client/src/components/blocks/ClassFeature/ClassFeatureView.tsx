@@ -24,7 +24,7 @@ export function ClassFeatureView({
   return (
     <NodeViewWrapper>
       <div
-        className={`class-feature${selected ? ' ring-2 ring-red-700 ring-offset-2' : ''}`}
+        className={`class-feature transition-shadow${selected ? ' ring-2 ring-purple-500 ring-offset-2' : ''}`}
         contentEditable={false}
       >
         {/* Delete button */}

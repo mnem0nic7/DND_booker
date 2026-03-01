@@ -72,7 +72,7 @@ export function MagicItemView({
   return (
     <NodeViewWrapper>
       <div
-        className={`magic-item${selected ? ' ring-2 ring-emerald-500 ring-offset-2' : ''}`}
+        className={`magic-item transition-shadow${selected ? ' ring-2 ring-purple-500 ring-offset-2' : ''}`}
         contentEditable={false}
         style={{ borderTopColor: accentColor }}
       >

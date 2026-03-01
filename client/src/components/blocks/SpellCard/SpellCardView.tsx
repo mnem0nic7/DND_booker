@@ -42,7 +42,7 @@ export function SpellCardView({
   return (
     <NodeViewWrapper>
       <div
-        className={`spell-card${selected ? ' ring-2 ring-indigo-500 ring-offset-2' : ''}`}
+        className={`spell-card transition-shadow${selected ? ' ring-2 ring-purple-500 ring-offset-2' : ''}`}
         contentEditable={false}
       >
         {/* Delete button */}

@@ -106,7 +106,7 @@ export function StatBlockView({
   return (
     <NodeViewWrapper>
       <div
-        className={`stat-block${selected ? ' ring-2 ring-amber-500 ring-offset-2' : ''}`}
+        className={`stat-block transition-shadow${selected ? ' ring-2 ring-purple-500 ring-offset-2' : ''}`}
         contentEditable={false}
       >
         {/* Delete button */}
