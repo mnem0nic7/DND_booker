@@ -61,7 +61,7 @@ export function EditorLayout({ projectId, content, onUpdate }: EditorLayoutProps
   const [sectionName, setSectionName] = useState('');
 
   const editor = useEditor({
-    extensions: [StarterKit, Underline, Link.configure({ openOnClick: false, HTMLAttributes: { rel: 'noopener noreferrer nofollow' } }), TextAlign.configure({ types: ['heading', 'paragraph'] }), Table.configure({ resizable: false }), TableRow, TableHeader, TableCell, StatBlock, ReadAloudBox, SidebarCallout, ChapterHeader, SpellCard, MagicItem, RandomTable, NpcProfile, EncounterTable, ClassFeature, RaceBlock, FullBleedImage, MapBlock, Handout, PageBorder, PageBreak, ColumnBreak, TitlePage, TableOfContents, CreditsPage, BackCover],
+    extensions: [StarterKit.configure({ link: false, underline: false }), Underline, Link.configure({ openOnClick: false, HTMLAttributes: { rel: 'noopener noreferrer nofollow' } }), TextAlign.configure({ types: ['heading', 'paragraph'] }), Table.configure({ resizable: false }), TableRow, TableHeader, TableCell, StatBlock, ReadAloudBox, SidebarCallout, ChapterHeader, SpellCard, MagicItem, RandomTable, NpcProfile, EncounterTable, ClassFeature, RaceBlock, FullBleedImage, MapBlock, Handout, PageBorder, PageBreak, ColumnBreak, TitlePage, TableOfContents, CreditsPage, BackCover],
     content,
     immediatelyRender: false,
     onUpdate: ({ editor: ed }) => {
