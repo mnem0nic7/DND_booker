@@ -126,13 +126,23 @@ export function PropertiesPanel({ editor }: PropertiesPanelProps) {
                 onClick={() => {
                   if (!editor) return;
                   editor.commands.focus();
-                  editor.commands.setTextSelection(block.pos + 1);
+                  if (block.type === 'heading') {
+                    editor.commands.setTextSelection(block.pos + 1);
+                  } else {
+                    editor.commands.setNodeSelection(block.pos);
+                  }
                   // Scroll the node into view
-                  const dom = editor.view.domAtPos(block.pos + 1);
-                  if (dom.node instanceof HTMLElement) {
-                    dom.node.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                  } else if (dom.node.parentElement) {
-                    dom.node.parentElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  const domPos = block.type === 'heading' ? block.pos + 1 : block.pos;
+                  try {
+                    const dom = editor.view.domAtPos(domPos);
+                    const el = dom.node instanceof HTMLElement ? dom.node : dom.node.parentElement;
+                    el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  } catch {
+                    // fallback: scroll via resolved node
+                    const node = editor.view.nodeDOM(block.pos);
+                    if (node instanceof HTMLElement) {
+                      node.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
                   }
                 }}
                 className="w-full text-left px-2 py-1 rounded hover:bg-gray-200 transition-colors text-gray-700 truncate"
