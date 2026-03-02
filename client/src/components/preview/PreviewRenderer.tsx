@@ -47,6 +47,16 @@ export function PreviewRenderer({ html, theme }: PreviewRendererProps) {
       box-sizing: border-box;
     }
 
+    /* Override page-canvas sizing/layout — preview handles that externally */
+    .page-canvas {
+      width: auto;
+      min-height: auto;
+      margin-bottom: 0;
+      padding: 0;
+      box-shadow: none;
+      background-image: none;
+    }
+
     /* Page break indicators */
     .page-break {
       border-top: 2px dashed #94a3b8;
@@ -68,8 +78,10 @@ export function PreviewRenderer({ html, theme }: PreviewRendererProps) {
   </style>
 </head>
 <body>
-  <div data-theme="${theme}" class="editor-themed-content" style="min-height: 100%;">
-    ${html}
+  <div data-theme="${theme}" class="page-canvas editor-themed-content" style="min-height: 100%;">
+    <div class="ProseMirror">
+      ${html}
+    </div>
   </div>
 </body>
 </html>`;
