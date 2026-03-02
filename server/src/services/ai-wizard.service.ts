@@ -422,45 +422,52 @@ function parseInlineContent(text: string): TipTapNode[] {
   }));
 }
 
-/** Parse inline bold/italic/code marks in a line of text */
+/** Parse inline bold/italic/code/link marks in a line of text */
 export function parseInlineMarks(text: string): TipTapNode[] {
   const nodes: TipTapNode[] = [];
-  // Regex: `code`, ***bold+italic***, **bold**, *italic*, or plain text
-  const regex = /(`(.+?)`|\*\*\*(.+?)\*\*\*|\*\*(.+?)\*\*|\*(.+?)\*|([^`*]+))/g;
+  // Regex: [link](url), `code`, ***bold+italic***, **bold**, *italic*, or plain text
+  const regex = /(\[([^\]]+)\]\(([^)]+)\)|`(.+?)`|\*\*\*(.+?)\*\*\*|\*\*(.+?)\*\*|\*(.+?)\*|([^`*\[]+))/g;
   let match: RegExpExecArray | null;
 
   while ((match = regex.exec(text)) !== null) {
-    if (match[2]) {
-      // `inline code`
+    if (match[2] && match[3]) {
+      // [link text](url)
       nodes.push({
         type: 'text',
         text: match[2],
-        marks: [{ type: 'code' }],
-      });
-    } else if (match[3]) {
-      // ***bold+italic***
-      nodes.push({
-        type: 'text',
-        text: match[3],
-        marks: [{ type: 'bold' }, { type: 'italic' }],
+        marks: [{ type: 'link', attrs: { href: match[3], target: '_blank' } }],
       });
     } else if (match[4]) {
-      // **bold**
+      // `inline code`
       nodes.push({
         type: 'text',
         text: match[4],
-        marks: [{ type: 'bold' }],
+        marks: [{ type: 'code' }],
       });
     } else if (match[5]) {
-      // *italic*
+      // ***bold+italic***
       nodes.push({
         type: 'text',
         text: match[5],
-        marks: [{ type: 'italic' }],
+        marks: [{ type: 'bold' }, { type: 'italic' }],
       });
     } else if (match[6]) {
+      // **bold**
+      nodes.push({
+        type: 'text',
+        text: match[6],
+        marks: [{ type: 'bold' }],
+      });
+    } else if (match[7]) {
+      // *italic*
+      nodes.push({
+        type: 'text',
+        text: match[7],
+        marks: [{ type: 'italic' }],
+      });
+    } else if (match[8]) {
       // plain text
-      nodes.push({ type: 'text', text: match[6] });
+      nodes.push({ type: 'text', text: match[8] });
     }
   }
 
