@@ -244,6 +244,8 @@
   font-size: 1.1rem;
   margin-top: 1rem;
   margin-bottom: 0.3rem;
+  border-bottom: var(--h3-border-bottom, none);
+  padding-bottom: var(--h3-padding-bottom, 0);
 }
 
 .page-canvas .ProseMirror .drop-cap::first-letter {
