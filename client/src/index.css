@@ -171,12 +171,13 @@
   break-inside: avoid;
 }
 
-.page-canvas .ProseMirror [data-column-break] {
+.page-canvas .ProseMirror .node-columnBreak {
   break-after: column;
 }
 
-.page-canvas .ProseMirror [data-page-break] {
-  break-after: page;
+.page-canvas .ProseMirror .node-pageBreak {
+  column-span: all;
+  margin: 1rem 0;
 }
 
 .page-footer {
