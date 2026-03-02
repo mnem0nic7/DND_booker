@@ -42,7 +42,7 @@ export function createModel(
       apiKey: 'ollama',
       baseURL: `${baseUrl || 'http://localhost:11434'}/v1`,
     });
-    return ollama(modelId);
+    return ollama.chat(modelId);
   }
 
   const openai = createOpenAI({ apiKey });
@@ -75,8 +75,8 @@ export function assertSafeUrl(rawUrl: string): void {
       throw new Error('Private network addresses are not allowed');
     }
   }
-  // Block Docker internal hostnames
-  const blockedHosts = ['postgres', 'redis', 'server', 'worker', 'client', 'host.docker.internal'];
+  // Block Docker internal hostnames (host.docker.internal allowed for Ollama on host)
+  const blockedHosts = ['postgres', 'redis', 'server', 'worker', 'client'];
   if (blockedHosts.includes(hostname)) {
     throw new Error('Internal service hostnames are not allowed');
   }

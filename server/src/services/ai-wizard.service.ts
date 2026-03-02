@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { prisma } from '../config/database.js';
 import { generateText } from 'ai';
 import type { WizardPhase, WizardParameters, WizardOutline, WizardOutlineSection, WizardGeneratedSection, WizardQuestion } from '@dnd-booker/shared';
@@ -49,8 +50,8 @@ export async function resetAndCreateSession(projectId: string, userId: string) {
     create: { projectId, userId },
     update: {
       phase: 'questionnaire',
-      parameters: null,
-      outline: null,
+      parameters: Prisma.DbNull,
+      outline: Prisma.DbNull,
       sections: [],
       progress: 0,
       errorMsg: null,
@@ -656,13 +657,14 @@ export async function generateSection(
   previousSummaries: string[],
   model: Parameters<typeof generateText>[0]['model'],
   abortSignal?: AbortSignal,
+  maxOutputTokens = 8192,
 ): Promise<{ content: TipTapNode; markdown: string }> {
   const prompt = buildSectionPrompt(outline, section, previousSummaries);
 
   const { text } = await generateText({
     model,
     prompt,
-    maxOutputTokens: 8192,
+    maxOutputTokens,
     abortSignal,
   });
 

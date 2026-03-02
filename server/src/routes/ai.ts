@@ -19,6 +19,7 @@ const SUPPORTED_BLOCK_TYPES = aiContent.getSupportedBlockTypes();
 const MAX_CHAT_CONTEXT_MESSAGES = 30;
 const MAX_SESSION_MESSAGES = 200; // hard cap per session
 const MAX_AI_RESPONSE_TOKENS = 4096;
+const MAX_OLLAMA_RESPONSE_TOKENS = 1024;
 const MAX_STORED_CONTENT = 100_000;
 
 // --- Settings routes (no project context) ---
@@ -199,8 +200,8 @@ aiGenerateRoutes.post('/generate-block', blockGenRateLimit, asyncHandler(async (
   const { blockType, prompt } = parsed.data;
 
   try {
-    const model = await getModelForUser(req.userId!);
-    if (!model) {
+    const result = await getModelForUser(req.userId!);
+    if (!result) {
       res.status(400).json({ error: 'AI not configured. Please set up your API key in AI settings.' });
       return;
     }
@@ -209,10 +210,10 @@ aiGenerateRoutes.post('/generate-block', blockGenRateLimit, asyncHandler(async (
     const blockPrompt = aiContent.buildBlockPrompt(blockType, prompt);
 
     const { text } = await generateText({
-      model,
+      model: result.model,
       system: systemPrompt,
       prompt: blockPrompt,
-      maxOutputTokens: MAX_AI_RESPONSE_TOKENS,
+      maxOutputTokens: result.maxOutputTokens,
     });
 
     const attrs = aiContent.parseBlockResponse(text, blockType);
@@ -248,8 +249,8 @@ aiGenerateRoutes.post('/autofill', autoFillRateLimit, asyncHandler(async (req: A
   const { blockType, currentAttrs } = parsed.data;
 
   try {
-    const model = await getModelForUser(req.userId!);
-    if (!model) {
+    const result = await getModelForUser(req.userId!);
+    if (!result) {
       res.status(400).json({ error: 'AI not configured. Please set up your API key in AI settings.' });
       return;
     }
@@ -258,10 +259,10 @@ aiGenerateRoutes.post('/autofill', autoFillRateLimit, asyncHandler(async (req: A
     const autoFillPrompt = aiContent.buildAutoFillPrompt(blockType, currentAttrs);
 
     const { text } = await generateText({
-      model,
+      model: result.model,
       system: systemPrompt,
       prompt: autoFillPrompt,
-      maxOutputTokens: MAX_AI_RESPONSE_TOKENS,
+      maxOutputTokens: result.maxOutputTokens,
     });
 
     const suggestions = aiContent.parseBlockResponse(text, blockType);
@@ -326,8 +327,8 @@ aiChatRoutes.post('/ai/chat', validateUuid('projectId'), chatRateLimit, asyncHan
       return;
     }
 
-    const model = await getModelForUser(req.userId!);
-    if (!model) {
+    const userModel = await getModelForUser(req.userId!);
+    if (!userModel) {
       res.status(400).json({ error: 'AI not configured. Please set up your API key in AI settings.' });
       return;
     }
@@ -359,17 +360,17 @@ aiChatRoutes.post('/ai/chat', validateUuid('projectId'), chatRateLimit, asyncHan
     req.on('close', () => abortController.abort());
 
     // Stream the response
-    const result = streamText({
-      model,
+    const streamResult = streamText({
+      model: userModel.model,
       system: systemPrompt,
       messages,
-      maxOutputTokens: MAX_AI_RESPONSE_TOKENS,
+      maxOutputTokens: userModel.maxOutputTokens,
       abortSignal: abortController.signal,
     });
 
     // Collect the full response for persistence
     let fullResponse = '';
-    const stream = result.textStream;
+    const stream = streamResult.textStream;
 
     // Set up streaming headers
     res.setHeader('Content-Type', 'text/plain; charset=utf-8');
@@ -566,7 +567,7 @@ async function runSectionGeneration(
   res: Response,
   sessionId: string,
   outline: { adventureTitle: string; summary: string; sections: Array<{ id: string; title: string; description: string; blockHints: string[]; sortOrder: number }> },
-  model: Awaited<ReturnType<typeof getModelForUser>> & {},
+  userModel: Awaited<ReturnType<typeof getModelForUser>> & {},
   abortController: AbortController,
 ): Promise<void> {
   const generatedSections: WizardGeneratedSection[] = [];
@@ -585,8 +586,9 @@ async function runSectionGeneration(
           outline,
           section,
           previousSummaries,
-          model,
+          userModel.model,
           abortController.signal,
+          userModel.maxOutputTokens,
         );
 
         const genSection: WizardGeneratedSection = {
@@ -679,8 +681,8 @@ aiWizardRoutes.post('/ai/wizard/start', validateUuid('projectId'), wizardRateLim
     return;
   }
 
-  const model = await getModelForUser(req.userId!);
-  if (!model) {
+  const userModel = await getModelForUser(req.userId!);
+  if (!userModel) {
     res.status(400).json({ error: 'AI not configured. Please set up your API key in AI settings.' });
     return;
   }
@@ -692,7 +694,7 @@ aiWizardRoutes.post('/ai/wizard/start', validateUuid('projectId'), wizardRateLim
 
   try {
     const projectType = parsed.data?.projectType || project.type.replace('_', ' ');
-    const questions = await aiWizard.generateQuestions(projectType, model);
+    const questions = await aiWizard.generateQuestions(projectType, userModel.model);
 
     await aiWizard.updateSession(session.id, { phase: 'questionnaire' });
 
@@ -730,8 +732,8 @@ aiWizardRoutes.post('/ai/wizard/parameters', validateUuid('projectId'), wizardRa
     return;
   }
 
-  const model = await getModelForUser(req.userId!);
-  if (!model) {
+  const userModel = await getModelForUser(req.userId!);
+  if (!userModel) {
     res.status(400).json({ error: 'AI not configured.' });
     return;
   }
@@ -754,7 +756,7 @@ aiWizardRoutes.post('/ai/wizard/parameters', validateUuid('projectId'), wizardRa
     });
 
     // Generate outline
-    const outline = await aiWizard.generateOutline(params, model);
+    const outline = await aiWizard.generateOutline(params, userModel.model);
 
     await aiWizard.updateSession(session.id, { outline });
 
@@ -800,8 +802,8 @@ aiWizardRoutes.post('/ai/wizard/generate', validateUuid('projectId'), wizardRate
     return;
   }
 
-  const model = await getModelForUser(req.userId!);
-  if (!model) {
+  const userModel = await getModelForUser(req.userId!);
+  if (!userModel) {
     res.status(400).json({ error: 'AI not configured.' });
     return;
   }
@@ -826,7 +828,7 @@ aiWizardRoutes.post('/ai/wizard/generate', validateUuid('projectId'), wizardRate
   });
 
   setupSSE(res);
-  await runSectionGeneration(res, session.id, outline, model, abortController);
+  await runSectionGeneration(res, session.id, outline, userModel, abortController);
 }));
 
 // POST /projects/:projectId/ai/wizard/apply — create documents from selected sections
@@ -892,8 +894,8 @@ aiWizardRoutes.post('/ai/wizard/auto-create', validateUuid('projectId'), wizardR
     return;
   }
 
-  const model = await getModelForUser(req.userId!);
-  if (!model) {
+  const userModel = await getModelForUser(req.userId!);
+  if (!userModel) {
     res.status(400).json({ error: 'AI not configured. Please set up your API key in AI settings.' });
     return;
   }
@@ -913,7 +915,7 @@ aiWizardRoutes.post('/ai/wizard/auto-create', validateUuid('projectId'), wizardR
   try {
     outline = await aiWizard.generateOutlineFromPrompt(
       parsed.data.prompt,
-      model,
+      userModel.model,
       abortController.signal,
     );
 
@@ -935,7 +937,7 @@ aiWizardRoutes.post('/ai/wizard/auto-create', validateUuid('projectId'), wizardR
   }
 
   // Phase 2: Generate all sections
-  await runSectionGeneration(res, session.id, outline, model, abortController);
+  await runSectionGeneration(res, session.id, outline, userModel, abortController);
 }));
 
 // POST /projects/:projectId/ai/wizard/chat-generate — generate adventure from chat outline
@@ -967,8 +969,8 @@ aiWizardRoutes.post('/ai/wizard/chat-generate', validateUuid('projectId'), wizar
     return;
   }
 
-  const model = await getModelForUser(req.userId!);
-  if (!model) {
+  const userModel = await getModelForUser(req.userId!);
+  if (!userModel) {
     res.status(400).json({ error: 'AI not configured.' });
     return;
   }
@@ -998,7 +1000,7 @@ aiWizardRoutes.post('/ai/wizard/chat-generate', validateUuid('projectId'), wizar
   });
 
   setupSSE(res);
-  await runSectionGeneration(res, session.id, outline, model, abortController);
+  await runSectionGeneration(res, session.id, outline, userModel, abortController);
 }));
 
 // DELETE /projects/:projectId/ai/wizard — cancel/delete wizard session
@@ -1022,18 +1024,22 @@ async function getModelForUser(userId: string) {
   const settings = await aiSettings.getAiSettings(userId);
   if (!settings?.provider) return null;
 
+  const maxOutputTokens = settings.provider === 'ollama'
+    ? MAX_OLLAMA_RESPONSE_TOKENS
+    : MAX_AI_RESPONSE_TOKENS;
+
   // Ollama doesn't require an API key
   if (settings.provider === 'ollama') {
     // Guard: if a non-Ollama model was saved (e.g. user switched from Anthropic), ignore it
     const ollamaModel = settings.model && !settings.model.startsWith('claude-') && !settings.model.startsWith('gpt-')
       ? settings.model
       : undefined;
-    return createModel(settings.provider, 'ollama', ollamaModel, settings.baseUrl ?? undefined);
+    return { model: createModel(settings.provider, 'ollama', ollamaModel, settings.baseUrl ?? undefined), maxOutputTokens };
   }
 
   if (!settings.hasApiKey) return null;
   const apiKey = await aiSettings.getDecryptedApiKey(userId);
   if (!apiKey) return null;
 
-  return createModel(settings.provider, apiKey, settings.model ?? undefined);
+  return { model: createModel(settings.provider, apiKey, settings.model ?? undefined), maxOutputTokens };
 }
