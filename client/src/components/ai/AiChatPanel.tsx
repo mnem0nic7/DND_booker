@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import type { Editor } from '@tiptap/core';
 import { useAiStore } from '../../stores/aiStore';
-import { useDocumentStore } from '../../stores/documentStore';
+import { useProjectStore } from '../../stores/projectStore';
 import { AiMessageBubble } from './AiMessageBubble';
 import { AiPlanPanel } from './AiPlanPanel';
 import { WizardChatProgress } from './WizardChatProgress';
@@ -162,15 +162,15 @@ export function AiChatPanel({ projectId, editor }: AiChatPanelProps) {
     }
   }
 
-  const fetchDocuments = useDocumentStore((s) => s.fetchDocuments);
+  const fetchProject = useProjectStore((s) => s.fetchProject);
 
   const handleApplyWizard = useCallback(async (sectionIds: string[]) => {
     const result = await applyWizardSections(projectId, sectionIds);
     if (result) {
-      // Refresh document list so generated content appears in the sidebar/editor
-      await fetchDocuments(projectId);
+      // Refresh project so generated content appears in the editor
+      await fetchProject(projectId);
     }
-  }, [projectId, applyWizardSections, fetchDocuments]);
+  }, [projectId, applyWizardSections, fetchProject]);
 
   const handleCancelWizard = useCallback(() => {
     if (wizardProgress?.isGenerating) {

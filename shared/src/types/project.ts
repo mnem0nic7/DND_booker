@@ -1,3 +1,5 @@
+import type { DocumentContent } from './document';
+
 export type ProjectType = 'campaign' | 'one_shot' | 'supplement' | 'sourcebook';
 export type ProjectStatus = 'draft' | 'in_progress' | 'review' | 'published';
 
@@ -18,6 +20,7 @@ export interface Project {
   status: ProjectStatus;
   coverImageUrl: string | null;
   settings: ProjectSettings;
+  content?: DocumentContent;
   createdAt: string;
   updatedAt: string;
 }

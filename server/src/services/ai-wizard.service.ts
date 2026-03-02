@@ -691,14 +691,6 @@ export async function applyToProject(
   sections: WizardGeneratedSection[],
   selectedSectionIds: string[],
 ) {
-  // Get current max sortOrder
-  const maxDoc = await prisma.document.findFirst({
-    where: { projectId },
-    orderBy: { sortOrder: 'desc' },
-    select: { sortOrder: true },
-  });
-  let nextSort = (maxDoc?.sortOrder ?? -1) + 1;
-
   const selectedSections = sections
     .filter((s) => selectedSectionIds.includes(s.sectionId) && s.status === 'completed')
     .sort((a, b) => {
@@ -707,18 +699,38 @@ export async function applyToProject(
       return aIdx - bIdx;
     });
 
-  const createdDocs = await prisma.$transaction(
-    selectedSections.map((section, i) =>
-      prisma.document.create({
-        data: {
-          projectId,
-          title: section.title,
-          sortOrder: nextSort + i,
-          content: (section.content as object) ?? {},
-        },
-      })
-    )
-  );
+  // Build new content nodes from selected sections, with pageBreaks between them
+  const newNodes: object[] = [];
+  for (let i = 0; i < selectedSections.length; i++) {
+    if (i > 0) {
+      newNodes.push({ type: 'pageBreak' });
+    }
+    const sectionContent = selectedSections[i].content as { content?: object[] } | null;
+    if (sectionContent?.content) {
+      newNodes.push(...sectionContent.content);
+    }
+  }
 
-  return createdDocs;
+  if (newNodes.length === 0) return null;
+
+  // Append to existing project content
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+    select: { content: true },
+  });
+
+  const existing = project?.content as { type?: string; content?: object[] } | null;
+  const existingNodes = existing?.content ?? [];
+
+  // Add a pageBreak before the new content if there's existing content
+  const mergedNodes = existingNodes.length > 0
+    ? [...existingNodes, { type: 'pageBreak' }, ...newNodes]
+    : newNodes;
+
+  return prisma.project.update({
+    where: { id: projectId },
+    data: {
+      content: { type: 'doc', content: mergedNodes },
+    },
+  });
 }

@@ -97,7 +97,6 @@ export default function ProjectCard({ project }: ProjectCardProps) {
       {/* Footer */}
       <div className="flex items-center justify-between mt-4 pt-3 border-t border-gray-100">
         <div className="flex items-center gap-3 text-xs text-gray-400">
-          <span>{project._count?.documents ?? 0} docs</span>
           <span>Updated {formattedDate}</span>
         </div>
 

@@ -1,55 +1,44 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import type { DocumentContent } from '@dnd-booker/shared';
-import { useDocumentStore } from '../stores/documentStore';
+import { useProjectStore } from '../stores/projectStore';
 import { useAuthStore } from '../stores/authStore';
 import { useThemeStore } from '../stores/themeStore';
 import { EditorLayout } from '../components/editor/EditorLayout';
-import { DocumentList } from '../components/editor/DocumentList';
-import api from '../lib/api';
 
 export default function EditorPage() {
   const { id: projectId } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user, logout } = useAuthStore();
   const {
-    documents,
-    activeDocumentId,
-    isLoading,
+    currentProject,
+    isLoadingProject,
     isSaving,
     hasPendingChanges,
     saveError,
-    fetchError,
-    fetchDocuments,
-    setActiveDocument,
-    updateDocumentContent,
-    createDocument,
-    deleteDocument,
-    renameDocument,
-    reorderDocuments,
+    fetchProject,
+    updateContent,
     flushPendingSave,
     cancelPendingSave,
     retrySave,
-  } = useDocumentStore();
+  } = useProjectStore();
 
   const { loadProjectTheme } = useThemeStore();
-  const [showNewDocInput, setShowNewDocInput] = useState(false);
-  const [newDocTitle, setNewDocTitle] = useState('');
 
   useEffect(() => {
     if (projectId) {
       cancelPendingSave(); // Cancel saves for previous project
-      fetchDocuments(projectId);
-      // Load project settings (including theme) from server
-      api.get(`/projects/${projectId}`).then(({ data }) => {
-        loadProjectTheme(projectId, data.settings);
-      }).catch(() => {/* theme will use local fallback */});
+      fetchProject(projectId).then(() => {
+        const project = useProjectStore.getState().currentProject;
+        if (project) {
+          loadProjectTheme(projectId, project.settings);
+        }
+      });
     }
     return () => {
-      // Flush pending save on unmount (navigation away from editor)
       flushPendingSave();
     };
-  }, [projectId, fetchDocuments, loadProjectTheme, cancelPendingSave, flushPendingSave]);
+  }, [projectId, fetchProject, loadProjectTheme, cancelPendingSave, flushPendingSave]);
 
   // Warn user about unsaved changes when closing/navigating away
   useEffect(() => {
@@ -62,44 +51,11 @@ export default function EditorPage() {
     return () => window.removeEventListener('beforeunload', handler);
   }, [isSaving, hasPendingChanges]);
 
-  const activeDocument = documents.find((d) => d.id === activeDocumentId);
-
   const handleContentUpdate = useCallback(
     (content: DocumentContent) => {
-      if (activeDocumentId) {
-        updateDocumentContent(activeDocumentId, content);
-      }
+      updateContent(content);
     },
-    [activeDocumentId, updateDocumentContent],
-  );
-
-  const handleCreateDocument = async () => {
-    if (!projectId || !newDocTitle.trim()) return;
-    await createDocument(projectId, newDocTitle.trim());
-    setNewDocTitle('');
-    setShowNewDocInput(false);
-  };
-
-  const handleDeleteDocument = async (docId: string) => {
-    if (window.confirm('Delete this document? This cannot be undone.')) {
-      await deleteDocument(docId);
-    }
-  };
-
-  const handleRename = useCallback(
-    async (docId: string, title: string) => {
-      await renameDocument(docId, title);
-    },
-    [renameDocument],
-  );
-
-  const handleReorder = useCallback(
-    (documentIds: string[]) => {
-      if (projectId) {
-        reorderDocuments(projectId, documentIds);
-      }
-    },
-    [projectId, reorderDocuments],
+    [updateContent],
   );
 
   return (
@@ -160,86 +116,23 @@ export default function EditorPage() {
         </div>
       </header>
 
+      {/* Main editor area */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Document sidebar */}
-        {isLoading ? (
-          <div className="w-56 border-r bg-white flex items-center justify-center flex-shrink-0">
-            <span className="text-xs text-gray-400">Loading...</span>
-          </div>
-        ) : fetchError ? (
-          <div className="w-56 border-r bg-white flex flex-col items-center justify-center flex-shrink-0 p-4 text-center">
-            <p className="text-xs text-red-500 mb-2">{fetchError}</p>
-            <button
-              onClick={() => projectId && fetchDocuments(projectId)}
-              className="text-xs text-indigo-600 hover:text-indigo-800 font-medium"
-            >
-              Retry
-            </button>
-          </div>
-        ) : (
-          <DocumentList
-            projectId={projectId!}
-            documents={documents}
-            activeDocumentId={activeDocumentId}
-            onSelectDocument={setActiveDocument}
-            onAddDocument={() => setShowNewDocInput(true)}
-            onReorder={handleReorder}
-            onDeleteDocument={handleDeleteDocument}
-            onRenameDocument={handleRename}
-          >
-            {showNewDocInput && (
-              <div className="p-2 border-b">
-                <input
-                  type="text"
-                  value={newDocTitle}
-                  onChange={(e) => setNewDocTitle(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') handleCreateDocument();
-                    if (e.key === 'Escape') {
-                      setShowNewDocInput(false);
-                      setNewDocTitle('');
-                    }
-                  }}
-                  placeholder="Document title..."
-                  className="w-full text-sm border rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                  autoFocus
-                />
-                <div className="flex gap-1 mt-1">
-                  <button
-                    onClick={handleCreateDocument}
-                    className="text-xs bg-indigo-600 text-white rounded px-2 py-0.5 hover:bg-indigo-700"
-                  >
-                    Create
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowNewDocInput(false);
-                      setNewDocTitle('');
-                    }}
-                    className="text-xs text-gray-500 hover:text-gray-700 px-2 py-0.5"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            )}
-          </DocumentList>
-        )}
-
-        {/* Main editor area */}
         <div className="flex-1 overflow-hidden">
-          {activeDocument ? (
+          {isLoadingProject ? (
+            <div className="flex items-center justify-center h-full text-gray-400">
+              Loading...
+            </div>
+          ) : currentProject?.content ? (
             <EditorLayout
-              key={activeDocument.id}
+              key={currentProject.id}
               projectId={projectId!}
-              content={activeDocument.content}
+              content={currentProject.content}
               onUpdate={handleContentUpdate}
             />
           ) : (
             <div className="flex items-center justify-center h-full text-gray-400">
-              {isLoading
-                ? 'Loading documents...'
-                : 'Select or create a document to start editing.'}
+              Project not found.
             </div>
           )}
         </div>

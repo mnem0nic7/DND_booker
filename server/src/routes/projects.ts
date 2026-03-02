@@ -18,6 +18,16 @@ const createSchema = z.object({
   templateId: z.string().uuid().optional(),
 });
 
+// TipTap JSON content schema — validates structure without being overly strict
+const tiptapContentSchema = z.object({
+  type: z.string().max(50),
+  content: z.array(z.any()).optional(),
+  attrs: z.record(z.unknown()).optional(),
+}).refine(
+  (val) => JSON.stringify(val).length <= 5_000_000,
+  { message: 'Content exceeds 5 MB limit' }
+);
+
 const settingsSchema = z.object({
   theme: z.enum(['classic-parchment', 'dark-tome', 'clean-modern', 'fey-wild', 'infernal']).optional(),
   pageSize: z.enum(['letter', 'a4']).optional(),
@@ -69,6 +79,25 @@ router.put('/:id', validateUuid('id'), asyncHandler(async (req: AuthRequest, res
     ...rest,
     ...(settings !== undefined && { settings: settings as Prisma.InputJsonValue }),
   });
+  if (!project) {
+    res.status(404).json({ error: 'Project not found' });
+    return;
+  }
+  res.json(project);
+}));
+
+router.put('/:id/content', validateUuid('id'), asyncHandler(async (req: AuthRequest, res: Response) => {
+  const parsed = tiptapContentSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'Validation failed' });
+    return;
+  }
+
+  const project = await projectService.updateProjectContent(
+    req.params.id as string,
+    req.userId!,
+    parsed.data as Prisma.InputJsonValue
+  );
   if (!project) {
     res.status(404).json({ error: 'Project not found' });
     return;

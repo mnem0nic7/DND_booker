@@ -69,7 +69,7 @@ interface AiState {
   // Wizard (autonomous creation)
   wizardProgress: WizardProgress | null;
   startWizardFromOutline: (projectId: string, outline: WizardOutline) => Promise<void>;
-  applyWizardSections: (projectId: string, sectionIds: string[]) => Promise<{ documents: unknown[] } | null>;
+  applyWizardSections: (projectId: string, sectionIds: string[]) => Promise<{ project: unknown } | null>;
   cancelWizardGeneration: () => void;
   clearWizard: () => void;
 
@@ -539,7 +539,7 @@ export const useAiStore = create<AiState>((set, get) => ({
       set((s) => ({
         wizardProgress: s.wizardProgress ? {
           ...s.wizardProgress,
-          error: 'Failed to create documents. Please try again.',
+          error: 'Failed to apply sections. Please try again.',
         } : null,
       }));
       return null;

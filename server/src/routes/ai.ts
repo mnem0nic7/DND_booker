@@ -846,7 +846,7 @@ aiWizardRoutes.post('/ai/wizard/generate', validateUuid('projectId'), wizardRate
   await runSectionGeneration(res, session.id, outline, userModel, abortController);
 }));
 
-// POST /projects/:projectId/ai/wizard/apply — create documents from selected sections
+// POST /projects/:projectId/ai/wizard/apply — append generated sections to project content
 const wizardApplySchema = z.object({
   sectionIds: z.array(z.string()).min(1),
 });
@@ -876,15 +876,15 @@ aiWizardRoutes.post('/ai/wizard/apply', validateUuid('projectId'), asyncHandler(
   const sections = (session.sections ?? []) as unknown as WizardGeneratedSection[];
 
   try {
-    const docs = await aiWizard.applyToProject(projectId, sections, parsed.data.sectionIds);
+    const updatedProject = await aiWizard.applyToProject(projectId, sections, parsed.data.sectionIds);
 
     // Mark wizard as done
     await aiWizard.updateSession(session.id, { phase: 'done' });
 
-    res.json({ documents: docs });
+    res.json({ project: updatedProject });
   } catch (err: unknown) {
     console.error('[AI Wizard] Failed to apply sections:', err);
-    res.status(500).json({ error: 'Failed to create documents.' });
+    res.status(500).json({ error: 'Failed to apply sections.' });
   }
 }));
 

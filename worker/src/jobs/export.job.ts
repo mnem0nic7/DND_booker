@@ -36,16 +36,10 @@ export async function processExportJob(job: Job<ExportJobData>): Promise<void> {
   });
 
   try {
-    // Fetch export job with full project and documents
+    // Fetch export job with project
     const exportJob = await prisma.exportJob.findUnique({
       where: { id: exportJobId },
-      include: {
-        project: {
-          include: {
-            documents: { orderBy: { sortOrder: 'asc' } },
-          },
-        },
-      },
+      include: { project: true },
     });
 
     if (!exportJob) {
@@ -55,11 +49,12 @@ export async function processExportJob(job: Job<ExportJobData>): Promise<void> {
     await job.updateProgress(20);
 
     const theme = (exportJob.project.settings as Record<string, unknown>)?.theme as string || 'classic-parchment';
-    const docs = exportJob.project.documents.map((d) => ({
-      title: d.title,
-      content: d.content as DocumentContent | null,
-      sortOrder: d.sortOrder,
-    }));
+    // Single-element docs array for backward compatibility with assemblers
+    const docs = [{
+      title: exportJob.project.title,
+      content: exportJob.project.content as DocumentContent | null,
+      sortOrder: 0,
+    }];
 
     await job.updateProgress(50);
 

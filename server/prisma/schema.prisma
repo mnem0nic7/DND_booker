@@ -59,11 +59,11 @@ model Project {
   status         ProjectStatus @default(draft)
   coverImageUrl  String?       @map("cover_image_url")
   settings       Json          @default("{}")
+  content        Json          @default("{}")
   createdAt      DateTime      @default(now()) @map("created_at")
   updatedAt      DateTime      @updatedAt @map("updated_at")
 
   user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  documents      Document[]
   exportJobs     ExportJob[]
   chatSessions   AiChatSession[]
   wizardSessions AiWizardSession[]
@@ -76,20 +76,6 @@ model Project {
   @@map("projects")
 }
 
-model Document {
-  id          String   @id @default(uuid())
-  projectId   String   @map("project_id")
-  title       String
-  sortOrder   Int      @default(0) @map("sort_order")
-  content     Json     @default("{}")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
-
-  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-
-  @@index([projectId])
-  @@map("documents")
-}
 
 model Template {
   id            String      @id @default(uuid())

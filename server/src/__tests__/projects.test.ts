@@ -99,9 +99,8 @@ describe('Projects API', () => {
       expect(res.status).toBe(200);
       expect(Array.isArray(res.body)).toBe(true);
       expect(res.body.length).toBeGreaterThanOrEqual(1);
-      // Should include document count
-      expect(res.body[0]._count).toBeDefined();
-      expect(res.body[0]._count.documents).toBeDefined();
+      // List should not include content (too large for listing)
+      expect(res.body[0].content).toBeUndefined();
     });
 
     it('should return 401 without auth token', async () => {
@@ -112,7 +111,7 @@ describe('Projects API', () => {
   });
 
   describe('GET /api/projects/:id', () => {
-    it('should get a single project with documents', async () => {
+    it('should get a single project with content', async () => {
       const res = await request(app)
         .get(`/api/projects/${createdProjectId}`)
         .set('Authorization', `Bearer ${accessToken}`);
@@ -120,8 +119,8 @@ describe('Projects API', () => {
       expect(res.status).toBe(200);
       expect(res.body.id).toBe(createdProjectId);
       expect(res.body.title).toBe('My Campaign');
-      expect(res.body.documents).toBeDefined();
-      expect(Array.isArray(res.body.documents)).toBe(true);
+      expect(res.body.content).toBeDefined();
+      expect(res.body.content.type).toBe('doc');
     });
 
     it('should return 404 for non-existent project', async () => {
@@ -234,6 +233,45 @@ describe('Projects API', () => {
       const res = await request(app)
         .put(`/api/projects/${createdProjectId}`)
         .send({ title: 'Unauthorized Update' });
+
+      expect(res.status).toBe(401);
+    });
+  });
+
+  describe('PUT /api/projects/:id/content', () => {
+    it('should update project content', async () => {
+      const content = { type: 'doc', content: [{ type: 'paragraph' }] };
+      const res = await request(app)
+        .put(`/api/projects/${createdProjectId}/content`)
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send(content);
+
+      expect(res.status).toBe(200);
+      expect(res.body.content.type).toBe('doc');
+    });
+
+    it('should return 404 for non-existent project', async () => {
+      const res = await request(app)
+        .put('/api/projects/00000000-0000-0000-0000-000000000000/content')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({ type: 'doc', content: [] });
+
+      expect(res.status).toBe(404);
+    });
+
+    it('should return 400 for invalid content', async () => {
+      const res = await request(app)
+        .put(`/api/projects/${createdProjectId}/content`)
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({ invalid: true });
+
+      expect(res.status).toBe(400);
+    });
+
+    it('should return 401 without auth token', async () => {
+      const res = await request(app)
+        .put(`/api/projects/${createdProjectId}/content`)
+        .send({ type: 'doc', content: [] });
 
       expect(res.status).toBe(401);
     });
