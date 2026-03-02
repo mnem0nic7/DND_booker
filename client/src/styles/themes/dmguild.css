@@ -39,7 +39,10 @@
 /* DMGuild decorative drop caps */
 [data-theme="dmguild"] .editor-themed-content h1 + p::first-letter,
 [data-theme="dmguild"] .editor-themed-content h2 + p::first-letter,
-[data-theme="dmguild"] .editor-themed-content h3 + p::first-letter {
+[data-theme="dmguild"] .editor-themed-content h3 + p::first-letter,
+[data-theme="dmguild"] .page-canvas .ProseMirror h1 + p::first-letter,
+[data-theme="dmguild"] .page-canvas .ProseMirror h2 + p::first-letter,
+[data-theme="dmguild"] .page-canvas .ProseMirror h3 + p::first-letter {
   font-family: 'Cinzel Decorative', 'Cinzel', serif;
   font-size: 3.5em;
   float: left;
@@ -75,6 +78,22 @@
   opacity: 0.5;
 }
 
+[data-theme="dmguild"] .page-canvas .ProseMirror hr {
+  height: 4px;
+  background: linear-gradient(to right, transparent, #9C2B1B 15%, #9C2B1B 85%, transparent);
+}
+
+[data-theme="dmguild"] .page-canvas .ProseMirror hr::after {
+  content: '';
+  position: absolute;
+  top: 6px;
+  left: 15%;
+  right: 15%;
+  height: 1px;
+  background: #9C2B1B;
+  opacity: 0.5;
+}
+
 /* DMGuild heading spacing — printed book feel */
 [data-theme="dmguild"] .editor-themed-content h1 {
   margin-top: 2rem;
@@ -89,6 +108,23 @@
 }
 
 [data-theme="dmguild"] .editor-themed-content h3 {
+  margin-top: 1.25rem;
+  margin-bottom: 0.4rem;
+}
+
+[data-theme="dmguild"] .page-canvas .ProseMirror h1 {
+  margin-top: 2rem;
+  margin-bottom: 0.75rem;
+  border-bottom: 2px solid #C9AD6A;
+  padding-bottom: 0.25rem;
+}
+
+[data-theme="dmguild"] .page-canvas .ProseMirror h2 {
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+}
+
+[data-theme="dmguild"] .page-canvas .ProseMirror h3 {
   margin-top: 1.25rem;
   margin-bottom: 0.4rem;
 }
