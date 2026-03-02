@@ -148,7 +148,7 @@ describe('Typst Assembler', () => {
         projectTitle: 'Test',
       });
 
-      expect(source).toContain('margin: (top: 0.75in, bottom: 0.75in, inside: 0.75in, outside: 0.625in)');
+      expect(source).toContain('margin: (top: 0.75in, bottom: 0.75in, inside: 0.75in, outside: 0.75in)');
     });
 
     it('should include DMGuild theme variables', () => {
@@ -197,6 +197,42 @@ describe('Typst Assembler', () => {
 
       // Falls back to classic-parchment
       expect(source).toContain('#let theme-primary = rgb("#58180d")');
+    });
+
+    it('should include column-gutter in page setup', () => {
+      const source = assembleTypst({
+        documents: [],
+        theme: 'dmguild',
+        projectTitle: 'Test',
+      });
+      expect(source).toContain('column-gutter: 0.9cm');
+    });
+
+    it('should include H4 heading show rule', () => {
+      const source = assembleTypst({
+        documents: [],
+        theme: 'dmguild',
+        projectTitle: 'Test',
+      });
+      expect(source).toContain('#show heading.where(level: 4)');
+    });
+
+    it('should include gold underline for H3', () => {
+      const source = assembleTypst({
+        documents: [],
+        theme: 'dmguild',
+        projectTitle: 'Test',
+      });
+      expect(source).toContain('theme-header-underline');
+    });
+
+    it('should use gold footer text color', () => {
+      const source = assembleTypst({
+        documents: [],
+        theme: 'dmguild',
+        projectTitle: 'Test',
+      });
+      expect(source).toContain('fill: theme-secondary');
     });
   });
 });

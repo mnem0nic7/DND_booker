@@ -41,11 +41,12 @@ export function assembleTypst(options: AssembleTypstOptions): string {
   t += `#set page(\n`;
   t += `  paper: "us-letter",\n`;
   t += `  columns: 2,\n`;
+  t += `  column-gutter: 0.9cm,\n`;
 
   if (printReady) {
     t += `  margin: (top: 0.875in, bottom: 0.875in, inside: 0.875in, outside: 0.75in),\n`;
   } else {
-    t += `  margin: (top: 0.75in, bottom: 0.75in, inside: 0.75in, outside: 0.625in),\n`;
+    t += `  margin: (top: 0.75in, bottom: 0.75in, inside: 0.75in, outside: 0.75in),\n`;
   }
 
   if (texture) {
@@ -56,7 +57,7 @@ export function assembleTypst(options: AssembleTypstOptions): string {
     t += `  footer: context {\n`;
     t += `    let headings = query(selector(heading.where(level: 1)).before(here()))\n`;
     t += `    let section-name = if headings.len() > 0 { headings.last().body } else { "${escapeTypstString(projectTitle)}" }\n`;
-    t += `    set text(size: 8pt)\n`;
+    t += `    set text(size: 8pt, fill: theme-secondary)\n`;
     t += `    grid(columns: (1fr, auto, 1fr),\n`;
     t += `      align(left, text(font: heading-font, upper(section-name))),\n`;
     t += `      none,\n`;
@@ -70,30 +71,42 @@ export function assembleTypst(options: AssembleTypstOptions): string {
 
   // 3. Typography
   t += `#set text(font: body-font, size: 9.5pt, fill: theme-text)\n`;
-  t += `#set par(justify: true, first-line-indent: 1em, leading: 0.65em)\n\n`;
+  t += `#set par(justify: true, leading: 0.55em, spacing: 0.325cm)\n\n`;
 
-  // 4. Heading show rules
+  // 4. Heading show rules — PHB style
+
+  // H1: Large, no divider line
   t += `#show heading.where(level: 1): it => {\n`;
-  t += `  set text(font: heading-font, size: 18pt, fill: theme-primary, weight: "bold")\n`;
+  t += `  set text(font: heading-font, size: 23pt, fill: theme-primary, weight: "bold")\n`;
   t += `  v(12pt)\n`;
   t += `  it.body\n`;
-  t += `  v(2pt)\n`;
-  t += `  line(length: 100%, stroke: 1pt + theme-divider)\n`;
-  t += `  v(6pt)\n`;
+  t += `  v(4pt)\n`;
   t += `}\n\n`;
 
+  // H2: Medium
   t += `#show heading.where(level: 2): it => {\n`;
-  t += `  set text(font: heading-font, size: 14pt, fill: theme-primary, weight: "bold")\n`;
+  t += `  set text(font: heading-font, size: 17pt, fill: theme-primary, weight: "bold")\n`;
   t += `  v(8pt)\n`;
   t += `  it.body\n`;
   t += `  v(4pt)\n`;
   t += `}\n\n`;
 
+  // H3: Gold underline — key PHB signature
   t += `#show heading.where(level: 3): it => {\n`;
-  t += `  set text(font: heading-font, size: 12pt, fill: theme-primary, weight: "bold")\n`;
+  t += `  set text(font: heading-font, size: 14pt, fill: theme-primary, weight: "bold")\n`;
   t += `  v(6pt)\n`;
   t += `  it.body\n`;
+  t += `  v(1pt)\n`;
+  t += `  line(length: 100%, stroke: 2pt + theme-header-underline)\n`;
   t += `  v(3pt)\n`;
+  t += `}\n\n`;
+
+  // H4: Small heading
+  t += `#show heading.where(level: 4): it => {\n`;
+  t += `  set text(font: heading-font, size: 12pt, fill: theme-primary, weight: "bold")\n`;
+  t += `  v(4pt)\n`;
+  t += `  it.body\n`;
+  t += `  v(2pt)\n`;
   t += `}\n\n`;
 
   // 5. Render each document
