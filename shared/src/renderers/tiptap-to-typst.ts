@@ -72,6 +72,24 @@ function renderMarks(text: string, marks?: TipTapNode['marks']): string {
       case 'underline':
         result = `#underline[${result}]`;
         break;
+      case 'superscript':
+        result = `#super[${result}]`;
+        break;
+      case 'subscript':
+        result = `#sub[${result}]`;
+        break;
+      case 'highlight': {
+        const color = String(mark.attrs?.color || 'yellow');
+        result = `#highlight(fill: rgb("${escapeTypst(color)}"))[${result}]`;
+        break;
+      }
+      case 'textStyle': {
+        const fontSize = mark.attrs?.fontSize ? String(mark.attrs.fontSize) : null;
+        if (fontSize) {
+          result = `#text(size: ${escapeTypst(fontSize)})[${result}]`;
+        }
+        break;
+      }
       case 'link': {
         const href = String(mark.attrs?.href || '');
         result = `#link("${escapeTypstUrl(href)}")[${result}]`;
@@ -137,6 +155,12 @@ function renderTypstNodeImpl(node: TipTapNode): string {
     case 'paragraph': {
       const content = renderChildren(node.content);
       if (!content) return '\n';
+      if (attrs.dropCap && content.length > 0) {
+        // Extract first visible character for drop cap styling
+        const first = content.charAt(0);
+        const rest = content.slice(1);
+        return `#text(size: 36pt, font: title-font, fill: theme-primary)[${first}]${rest}\n\n`;
+      }
       return `${content}\n\n`;
     }
 

@@ -58,10 +58,28 @@ const THEMES: { value: ThemeName; label: string; swatch: string }[] = [
   { value: 'infernal', label: 'Infernal', swatch: '#1a0a0a' },
 ];
 
+const FONT_SIZES = [
+  { label: 'Small', value: '8pt' },
+  { label: 'Normal', value: null },
+  { label: 'Large', value: '12pt' },
+  { label: 'Extra Large', value: '16pt' },
+];
+
+const HIGHLIGHT_COLORS = [
+  { color: '#fef08a', label: 'Yellow' },
+  { color: '#bbf7d0', label: 'Green' },
+  { color: '#bfdbfe', label: 'Blue' },
+  { color: '#fecdd3', label: 'Pink' },
+];
+
 export function Toolbar({ editor, columnCount, setColumnCount, showTexture, setShowTexture, onOpenBlockPicker }: ToolbarProps) {
   const { currentTheme, setTheme } = useThemeStore();
   const [showThemeDropdown, setShowThemeDropdown] = useState(false);
+  const [showHighlightDropdown, setShowHighlightDropdown] = useState(false);
+  const [showFontSizeDropdown, setShowFontSizeDropdown] = useState(false);
   const themeBtnRef = useRef<HTMLDivElement>(null);
+  const highlightBtnRef = useRef<HTMLDivElement>(null);
+  const fontSizeBtnRef = useRef<HTMLDivElement>(null);
   const [, setTick] = useState(0);
 
   useEffect(() => {
@@ -81,6 +99,28 @@ export function Toolbar({ editor, columnCount, setColumnCount, showTexture, setS
     document.addEventListener('mousedown', close);
     return () => document.removeEventListener('mousedown', close);
   }, [showThemeDropdown]);
+
+  useEffect(() => {
+    if (!showHighlightDropdown) return;
+    const close = (e: MouseEvent) => {
+      if (highlightBtnRef.current && !highlightBtnRef.current.contains(e.target as Node)) {
+        setShowHighlightDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, [showHighlightDropdown]);
+
+  useEffect(() => {
+    if (!showFontSizeDropdown) return;
+    const close = (e: MouseEvent) => {
+      if (fontSizeBtnRef.current && !fontSizeBtnRef.current.contains(e.target as Node)) {
+        setShowFontSizeDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, [showFontSizeDropdown]);
 
   if (!editor) return null;
 
@@ -107,6 +147,12 @@ export function Toolbar({ editor, columnCount, setColumnCount, showTexture, setS
             <Btn onClick={() => editor.chain().focus().toggleStrike().run()} isActive={is('strike')} title="Strikethrough (Ctrl+Shift+S)">
               <span className="line-through text-sm">S</span>
             </Btn>
+            <Btn onClick={() => editor.chain().focus().toggleSuperscript().run()} isActive={is('superscript')} title="Superscript">
+              <span className="text-sm">X<sup className="text-[8px]">2</sup></span>
+            </Btn>
+            <Btn onClick={() => editor.chain().focus().toggleSubscript().run()} isActive={is('subscript')} title="Subscript">
+              <span className="text-sm">X<sub className="text-[8px]">2</sub></span>
+            </Btn>
             <Btn
               onClick={() => {
                 if (is('link')) { editor.chain().focus().unsetLink().run(); return; }
@@ -123,6 +169,93 @@ export function Toolbar({ editor, columnCount, setColumnCount, showTexture, setS
             >
               <Icon d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m9.86-2.388a4.5 4.5 0 00-6.364-6.364L4.5 8.25" />
             </Btn>
+            <Btn onClick={() => editor.chain().focus().unsetAllMarks().clearNodes().run()} title="Clear formatting">
+              <Icon d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+            </Btn>
+            <div className="relative" ref={highlightBtnRef}>
+              <Btn onClick={() => setShowHighlightDropdown(!showHighlightDropdown)} isActive={is('highlight')} title="Highlight">
+                <div className="flex items-center gap-0.5">
+                  <span className="text-[10px] font-bold px-0.5 rounded" style={{ background: '#fef08a' }}>A</span>
+                  <Icon d="M19 9l-7 7-7-7" />
+                </div>
+              </Btn>
+              {showHighlightDropdown && createPortal(
+                <div
+                  className="fixed bg-white rounded-lg shadow-lg border py-1 w-32"
+                  style={{
+                    zIndex: 9999,
+                    top: (highlightBtnRef.current?.getBoundingClientRect().bottom ?? 0) + 4,
+                    left: highlightBtnRef.current?.getBoundingClientRect().left ?? 0,
+                  }}
+                >
+                  {HIGHLIGHT_COLORS.map((h) => (
+                    <button
+                      key={h.color}
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        editor.chain().focus().toggleHighlight({ color: h.color }).run();
+                        setShowHighlightDropdown(false);
+                      }}
+                      className="w-full flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-gray-50 text-gray-700"
+                    >
+                      <span className="w-4 h-4 rounded border" style={{ background: h.color }} />
+                      {h.label}
+                    </button>
+                  ))}
+                  <button
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      editor.chain().focus().unsetHighlight().run();
+                      setShowHighlightDropdown(false);
+                    }}
+                    className="w-full flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-gray-50 text-gray-700"
+                  >
+                    <span className="w-4 h-4 rounded border bg-white relative">
+                      <span className="absolute inset-0 flex items-center justify-center text-red-400 text-[10px]">✕</span>
+                    </span>
+                    None
+                  </button>
+                </div>,
+                document.body
+              )}
+            </div>
+            <div className="relative" ref={fontSizeBtnRef}>
+              <Btn onClick={() => setShowFontSizeDropdown(!showFontSizeDropdown)} title="Font size">
+                <div className="flex items-center gap-0.5">
+                  <span className="text-[10px]">Size</span>
+                  <Icon d="M19 9l-7 7-7-7" />
+                </div>
+              </Btn>
+              {showFontSizeDropdown && createPortal(
+                <div
+                  className="fixed bg-white rounded-lg shadow-lg border py-1 w-32"
+                  style={{
+                    zIndex: 9999,
+                    top: (fontSizeBtnRef.current?.getBoundingClientRect().bottom ?? 0) + 4,
+                    left: fontSizeBtnRef.current?.getBoundingClientRect().left ?? 0,
+                  }}
+                >
+                  {FONT_SIZES.map((fs) => (
+                    <button
+                      key={fs.label}
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        if (fs.value) {
+                          editor.chain().focus().setFontSize(fs.value).run();
+                        } else {
+                          editor.chain().focus().unsetFontSize().run();
+                        }
+                        setShowFontSizeDropdown(false);
+                      }}
+                      className="w-full flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-gray-50 text-gray-700"
+                    >
+                      {fs.label}{fs.value ? ` (${fs.value})` : ''}
+                    </button>
+                  ))}
+                </div>,
+                document.body
+              )}
+            </div>
           </div>
           <GroupLabel>Text</GroupLabel>
         </div>
@@ -154,6 +287,9 @@ export function Toolbar({ editor, columnCount, setColumnCount, showTexture, setS
             <Btn onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()} isActive={is('heading', { level: 3 })} title="Heading 3">
               <span className="text-[11px] font-bold">H3</span>
             </Btn>
+            <Btn onClick={() => editor.chain().focus().toggleHeading({ level: 4 }).run()} isActive={is('heading', { level: 4 })} title="Heading 4">
+              <span className="text-[11px] font-bold">H4</span>
+            </Btn>
             <div className="w-px h-4 bg-gray-200 mx-0.5" />
             <Btn onClick={() => editor.chain().focus().toggleBulletList().run()} isActive={is('bulletList')} title="Bullet list">
               <Icon d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />
@@ -163,6 +299,13 @@ export function Toolbar({ editor, columnCount, setColumnCount, showTexture, setS
             </Btn>
             <Btn onClick={() => editor.chain().focus().toggleBlockquote().run()} isActive={is('blockquote')} title="Blockquote">
               <Icon d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.087.16 2.185.283 3.293.369V21l4.076-4.076a1.526 1.526 0 011.037-.443 48.2 48.2 0 005.024-.516c1.577-.233 2.713-1.612 2.713-3.228V6.741c0-1.616-1.136-2.995-2.713-3.228A48.4 48.4 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z" />
+            </Btn>
+            <Btn
+              onClick={() => editor.chain().focus().toggleDropCap().run()}
+              isActive={editor.isActive('paragraph', { dropCap: true })}
+              title="Drop cap"
+            >
+              <span className="text-[13px] font-serif font-bold leading-none">D</span>
             </Btn>
           </div>
           <GroupLabel>Paragraph</GroupLabel>

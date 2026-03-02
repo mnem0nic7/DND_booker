@@ -87,7 +87,8 @@
 
 [data-theme] .editor-themed-content h1,
 [data-theme] .editor-themed-content h2,
-[data-theme] .editor-themed-content h3 {
+[data-theme] .editor-themed-content h3,
+[data-theme] .editor-themed-content h4 {
   font-family: var(--heading-font);
   color: var(--accent-color);
 }
@@ -215,7 +216,8 @@
 .page-canvas .ProseMirror > p:first-child,
 .page-canvas .ProseMirror h1 + p,
 .page-canvas .ProseMirror h2 + p,
-.page-canvas .ProseMirror h3 + p {
+.page-canvas .ProseMirror h3 + p,
+.page-canvas .ProseMirror h4 + p {
   text-indent: 0;
 }
 
@@ -246,6 +248,15 @@
   margin-bottom: 0.3rem;
   border-bottom: var(--h3-border-bottom, none);
   padding-bottom: var(--h3-padding-bottom, 0);
+}
+
+.page-canvas .ProseMirror h4 {
+  font-family: var(--heading-font);
+  color: var(--accent-color);
+  font-size: 0.95rem;
+  margin-top: 0.75rem;
+  margin-bottom: 0.2rem;
+  font-weight: bold;
 }
 
 .page-canvas .ProseMirror .drop-cap::first-letter {

@@ -6,6 +6,12 @@ import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
 import Link from '@tiptap/extension-link';
 import TextAlign from '@tiptap/extension-text-align';
+import Superscript from '@tiptap/extension-superscript';
+import Subscript from '@tiptap/extension-subscript';
+import Highlight from '@tiptap/extension-highlight';
+import { TextStyle } from '@tiptap/extension-text-style';
+import { FontSize } from '../../extensions/FontSize';
+import { DropCap } from '../../extensions/DropCap';
 import { Table } from '@tiptap/extension-table';
 import { TableRow } from '@tiptap/extension-table-row';
 import { TableHeader } from '@tiptap/extension-table-header';
@@ -61,7 +67,7 @@ export function EditorLayout({ projectId, content, onUpdate }: EditorLayoutProps
   const [sectionName, setSectionName] = useState('');
 
   const editor = useEditor({
-    extensions: [StarterKit.configure({ link: false, underline: false }), Underline, Link.configure({ openOnClick: false, HTMLAttributes: { rel: 'noopener noreferrer nofollow' } }), TextAlign.configure({ types: ['heading', 'paragraph'] }), Table.configure({ resizable: false }), TableRow, TableHeader, TableCell, StatBlock, ReadAloudBox, SidebarCallout, ChapterHeader, SpellCard, MagicItem, RandomTable, NpcProfile, EncounterTable, ClassFeature, RaceBlock, FullBleedImage, MapBlock, Handout, PageBorder, PageBreak, ColumnBreak, TitlePage, TableOfContents, CreditsPage, BackCover],
+    extensions: [StarterKit.configure({ link: false, underline: false }), Underline, Link.configure({ openOnClick: false, HTMLAttributes: { rel: 'noopener noreferrer nofollow' } }), TextAlign.configure({ types: ['heading', 'paragraph'] }), Superscript, Subscript, Highlight.configure({ multicolor: true }), TextStyle, FontSize, DropCap, Table.configure({ resizable: false }), TableRow, TableHeader, TableCell, StatBlock, ReadAloudBox, SidebarCallout, ChapterHeader, SpellCard, MagicItem, RandomTable, NpcProfile, EncounterTable, ClassFeature, RaceBlock, FullBleedImage, MapBlock, Handout, PageBorder, PageBreak, ColumnBreak, TitlePage, TableOfContents, CreditsPage, BackCover],
     content,
     immediatelyRender: false,
     onUpdate: ({ editor: ed }) => {

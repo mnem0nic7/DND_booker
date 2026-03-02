@@ -62,6 +62,24 @@ function renderMarks(text: string, marks?: TipTapNode['marks']): string {
       case 'underline':
         html = `<u>${html}</u>`;
         break;
+      case 'superscript':
+        html = `<sup>${html}</sup>`;
+        break;
+      case 'subscript':
+        html = `<sub>${html}</sub>`;
+        break;
+      case 'highlight': {
+        const color = escapeHtml(String(mark.attrs?.color || 'yellow'));
+        html = `<mark style="background-color: ${color}">${html}</mark>`;
+        break;
+      }
+      case 'textStyle': {
+        const fontSize = mark.attrs?.fontSize ? escapeHtml(String(mark.attrs.fontSize)) : null;
+        if (fontSize) {
+          html = `<span style="font-size: ${fontSize}">${html}</span>`;
+        }
+        break;
+      }
       case 'link': {
         const href = safeUrl(String(mark.attrs?.href || ''));
         const target = mark.attrs?.target ? ` target="${escapeHtml(String(mark.attrs.target))}"` : '';
@@ -96,7 +114,8 @@ export function renderNode(node: TipTapNode): string {
     case 'paragraph': {
       const align = attrs.textAlign;
       const style = align && align !== 'left' ? ` style="text-align: ${escapeHtml(String(align))}"` : '';
-      return `<p${style}>${renderChildren(node.content)}</p>`;
+      const dropCapClass = attrs.dropCap ? ' class="drop-cap"' : '';
+      return `<p${dropCapClass}${style}>${renderChildren(node.content)}</p>`;
     }
 
     case 'heading': {

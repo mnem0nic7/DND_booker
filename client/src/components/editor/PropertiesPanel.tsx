@@ -65,7 +65,7 @@ export function PropertiesPanel({ editor }: PropertiesPanelProps) {
       // Include heading nodes (H1, H2, H3)
       if (node.type.name === 'heading') {
         const level = (node.attrs as { level?: number }).level || 1;
-        if (level >= 1 && level <= 3) {
+        if (level >= 1 && level <= 4) {
           const text = node.textContent || 'Untitled';
           blocks.push({ type: 'heading', label: `H${level}: ${text}`, pos });
         }
