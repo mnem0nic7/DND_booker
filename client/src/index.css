@@ -107,7 +107,7 @@
   width: 816px;
   min-height: 1056px;
   margin: 0 auto 2rem auto;
-  padding: 72px 60px 72px 72px;
+  padding: 72px;
   background-color: var(--page-bg);
   background-image: var(--page-texture);
   background-size: 816px 1056px;
@@ -168,9 +168,10 @@
 .page-canvas .ProseMirror .node-pageBreak {
   column-span: all;
   /* Extend to page-canvas edges by cancelling parent padding */
-  margin: 0 -60px 0 -72px;
-  /* paddingTop is set dynamically by usePageAlignment to fill the page */
-  padding: 0;
+  margin: 0 -72px;
+  /* paddingTop is set dynamically by usePageAlignment to fill the remaining page.
+     paddingBottom creates a "top margin" on the next page (parchment shows through). */
+  padding: 0 0 48px 0;
   /* Transparent so the parchment from .page-canvas shows through the fill area */
   background: transparent;
 }
@@ -179,7 +180,7 @@
   position: absolute;
   bottom: 24px;
   left: 72px;
-  right: 60px;
+  right: 72px;
   font-size: 0.65rem;
   color: var(--footer-color, rgba(0,0,0,0.4));
   display: flex;

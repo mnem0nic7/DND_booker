@@ -1,8 +1,13 @@
 import { useEffect, useRef } from 'react';
 import type { Editor } from '@tiptap/core';
 
-// 11in page at 96dpi = 1056px, minus 72px top + 72px bottom padding = 912px content area
-const PAGE_CONTENT_HEIGHT = 912;
+// 11in page at 96dpi = 1056px, minus 72px top + 72px bottom padding = 912px total.
+// Reserve 48px bottom margin so content never touches the break bar directly.
+const PAGE_CONTENT_HEIGHT = 864;
+
+// Pages with less than this much content collapse to a compact separator
+// instead of filling a near-blank page. ~80px ≈ one heading line.
+const MIN_CONTENT_FOR_FULL_PAGE = 80;
 
 /**
  * Aligns page break nodes to 8.5x11 page boundaries by adding fill
@@ -42,8 +47,11 @@ export function usePageAlignment(editor: Editor | null) {
           nextPageEnd += PAGE_CONTENT_HEIGHT;
         }
 
-        // Fill from current position to the page boundary
-        const fill = Math.max(0, nextPageEnd - pbTop);
+        // Fill from current position to the page boundary.
+        // If the page would be nearly blank, collapse to a compact separator
+        // to avoid wasting a full page of blank space in the editor.
+        const rawFill = Math.max(0, nextPageEnd - pbTop);
+        const fill = rawFill > PAGE_CONTENT_HEIGHT - MIN_CONTENT_FOR_FULL_PAGE ? 48 : rawFill;
         pb.style.paddingTop = `${fill}px`;
 
         // Force reflow so subsequent measurements are accurate
