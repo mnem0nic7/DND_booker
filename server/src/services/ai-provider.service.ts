@@ -101,7 +101,7 @@ export async function validateApiKey(provider: AiProvider, apiKey: string, baseU
     await generateText({
       model,
       prompt: 'Say "ok".',
-      maxOutputTokens: 5,
+      maxOutputTokens: 16,
     });
     return true;
   } catch (err: unknown) {
