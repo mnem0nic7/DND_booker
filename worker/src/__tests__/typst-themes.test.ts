@@ -7,21 +7,24 @@ describe('Typst Theme Variables', () => {
 
     expect(vars).toContain('#let theme-primary = rgb("#58180d")');
     expect(vars).toContain('#let theme-secondary = rgb("#c9ad6a")');
-    expect(vars).toContain('#let theme-bg = rgb("#f4e4c1")');
+    expect(vars).toContain('#let theme-bg = rgb("#EEE5CE")');
     expect(vars).toContain('#let theme-text = rgb("#1a1a1a")');
-    expect(vars).toContain('#let theme-stat-block-bg = rgb("#fdf1dc")');
-    expect(vars).toContain('#let theme-stat-block-border = rgb("#e69a28")');
-    expect(vars).toContain('#let theme-read-aloud-bg = rgb("#e8dcc8")');
-    expect(vars).toContain('#let theme-read-aloud-border = rgb("#5c3a1e")');
-    expect(vars).toContain('#let theme-sidebar-bg = rgb("#e8edf3")');
-    expect(vars).toContain('#let theme-table-header-bg = rgb("#78350f")');
-    expect(vars).toContain('#let theme-table-stripe-bg = rgb("#fef3c7")');
-    expect(vars).toContain('#let theme-divider = rgb("#8b1a1a")');
-    expect(vars).toContain('#let theme-spell-card-accent = rgb("#7c3aed")');
-    expect(vars).toContain('#let theme-magic-item-accent = rgb("#16a34a")');
-    expect(vars).toContain('#let theme-class-feature-accent = rgb("#991b1b")');
-    expect(vars).toContain('#let heading-font = "Cinzel"');
-    expect(vars).toContain('#let body-font = "Crimson Text"');
+    expect(vars).toContain('#let theme-stat-block-bg = rgb("#F2E5B5")');
+    expect(vars).toContain('#let theme-stat-block-border = rgb("#E69A28")');
+    expect(vars).toContain('#let theme-read-aloud-bg = rgb("#FAF7EA")');
+    expect(vars).toContain('#let theme-read-aloud-border = rgb("#58180D")');
+    expect(vars).toContain('#let theme-sidebar-bg = rgb("#E0E5C1")');
+    expect(vars).toContain('#let theme-table-header-bg = rgb("#58180D")');
+    expect(vars).toContain('#let theme-table-stripe-bg = rgb("#E0E5C1")');
+    expect(vars).toContain('#let theme-divider = rgb("#9C2B1B")');
+    expect(vars).toContain('#let theme-spell-card-accent = rgb("#58180D")');
+    expect(vars).toContain('#let theme-magic-item-accent = rgb("#58180D")');
+    expect(vars).toContain('#let theme-class-feature-accent = rgb("#58180D")');
+    expect(vars).toContain('#let heading-font = "Mr Eaves Small Caps"');
+    expect(vars).toContain('#let body-font = "Bookinsanity"');
+    expect(vars).toContain('#let title-font = "Nodesto Caps Condensed"');
+    expect(vars).toContain('#let stat-font = "Scaly Sans"');
+    expect(vars).toContain('#let theme-header-underline = rgb("#C0AD6A")');
     expect(vars).toContain('#let theme-texture = "parchment-classic.jpg"');
   });
 
@@ -79,19 +82,22 @@ describe('Typst Theme Variables', () => {
     expect(vars).toContain('#let theme-secondary = rgb("#C9AD6A")');
     expect(vars).toContain('#let theme-bg = rgb("#EEE5CE")');
     expect(vars).toContain('#let theme-text = rgb("#1a1a1a")');
-    expect(vars).toContain('#let theme-stat-block-bg = rgb("#FDF1DC")');
+    expect(vars).toContain('#let theme-stat-block-bg = rgb("#F2E5B5")');
     expect(vars).toContain('#let theme-stat-block-border = rgb("#E69A28")');
     expect(vars).toContain('#let theme-read-aloud-bg = rgb("#FAF7EA")');
     expect(vars).toContain('#let theme-read-aloud-border = rgb("#58180D")');
     expect(vars).toContain('#let theme-sidebar-bg = rgb("#E0E5C1")');
     expect(vars).toContain('#let theme-table-header-bg = rgb("#58180D")');
-    expect(vars).toContain('#let theme-table-stripe-bg = rgb("#FDF1DC")');
+    expect(vars).toContain('#let theme-table-stripe-bg = rgb("#E0E5C1")');
     expect(vars).toContain('#let theme-divider = rgb("#9C2B1B")');
     expect(vars).toContain('#let theme-spell-card-accent = rgb("#58180D")');
     expect(vars).toContain('#let theme-magic-item-accent = rgb("#58180D")');
     expect(vars).toContain('#let theme-class-feature-accent = rgb("#58180D")');
-    expect(vars).toContain('#let heading-font = "Cinzel Decorative"');
-    expect(vars).toContain('#let body-font = "Libre Baskerville"');
+    expect(vars).toContain('#let heading-font = "Mr Eaves Small Caps"');
+    expect(vars).toContain('#let body-font = "Bookinsanity"');
+    expect(vars).toContain('#let title-font = "Nodesto Caps Condensed"');
+    expect(vars).toContain('#let stat-font = "Scaly Sans"');
+    expect(vars).toContain('#let theme-header-underline = rgb("#C0AD6A")');
     expect(vars).toContain('#let theme-texture = "parchment-dmguild.jpg"');
   });
 
@@ -99,8 +105,8 @@ describe('Typst Theme Variables', () => {
     const vars = getTypstThemeVariables('nonexistent');
 
     expect(vars).toContain('#let theme-primary = rgb("#58180d")');
-    expect(vars).toContain('#let heading-font = "Cinzel"');
-    expect(vars).toContain('#let body-font = "Crimson Text"');
+    expect(vars).toContain('#let heading-font = "Mr Eaves Small Caps"');
+    expect(vars).toContain('#let body-font = "Bookinsanity"');
   });
 
   it('should output valid Typst #let declarations', () => {
@@ -112,15 +118,15 @@ describe('Typst Theme Variables', () => {
     }
   });
 
-  it('should include only the first font name without fallback', () => {
-    // classic-parchment CSS: 'Cinzel', serif → Typst: "Cinzel"
+  it('should include only the font name without fallback', () => {
+    // classic-parchment uses Solbera fonts directly (no CSS fallbacks in Typst)
     const vars = getTypstThemeVariables('classic-parchment');
-    expect(vars).toContain('#let heading-font = "Cinzel"');
+    expect(vars).toContain('#let heading-font = "Mr Eaves Small Caps"');
     expect(vars).not.toContain('serif');
 
-    // dmguild CSS: 'Cinzel Decorative', 'Cinzel', serif → Typst: "Cinzel Decorative"
+    // dmguild uses same Solbera fonts
     const dmVars = getTypstThemeVariables('dmguild');
-    expect(dmVars).toContain('#let heading-font = "Cinzel Decorative"');
+    expect(dmVars).toContain('#let heading-font = "Mr Eaves Small Caps"');
     expect(dmVars).not.toContain('serif');
   });
 });
