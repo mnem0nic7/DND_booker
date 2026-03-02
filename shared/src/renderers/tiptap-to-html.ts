@@ -132,6 +132,16 @@ export function renderNode(node: TipTapNode): string {
     case 'hardBreak':
       return '<br />';
 
+    // ── Standard Tables ──
+    case 'table':
+      return `<table>${renderChildren(node.content)}</table>`;
+    case 'tableRow':
+      return `<tr>${renderChildren(node.content)}</tr>`;
+    case 'tableHeader':
+      return `<th>${renderChildren(node.content)}</th>`;
+    case 'tableCell':
+      return `<td>${renderChildren(node.content)}</td>`;
+
     // ── D&D Blocks ──
     case 'statBlock':
       return renderStatBlock(attrs);
