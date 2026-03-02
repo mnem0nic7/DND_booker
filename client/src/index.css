@@ -99,9 +99,6 @@
   background: #374151;
   overflow-y: auto;
   padding: 2rem 1rem;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
   flex: 1;
   min-height: 0;
 }
@@ -109,12 +106,13 @@
 .page-canvas {
   width: 816px;
   min-height: 1056px;
-  margin-bottom: 2rem;
+  margin: 0 auto 2rem auto;
   padding: 72px 60px 72px 72px;
   background-color: var(--page-bg);
   background-image: var(--page-texture);
-  background-size: cover;
-  background-position: center;
+  background-size: 816px 1056px;
+  background-repeat: repeat-y;
+  background-position: top center;
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
   position: relative;
   color: var(--text-color);
