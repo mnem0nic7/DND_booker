@@ -412,6 +412,33 @@ export function assembleHtml(options: AssembleOptions): string {
       color: var(--color-primary);
     }
 
+    a {
+      color: var(--color-primary);
+      text-decoration: underline;
+      text-decoration-thickness: 1px;
+      text-underline-offset: 2px;
+    }
+
+    ul, ol {
+      padding-left: 1.5em;
+      margin: 0.5em 0;
+      line-height: 1.5;
+    }
+
+    ul { list-style-type: disc; }
+    ol { list-style-type: decimal; }
+    ul ul { list-style-type: circle; }
+    ul ul ul { list-style-type: square; }
+
+    li {
+      margin-bottom: 0.2em;
+    }
+
+    li p {
+      text-indent: 0;
+      margin: 0 0 0.15em;
+    }
+
     blockquote {
       border-left: 4px solid var(--color-primary);
       padding-left: 1rem;
