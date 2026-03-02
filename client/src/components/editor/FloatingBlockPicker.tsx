@@ -20,6 +20,7 @@ export function FloatingBlockPicker({ editor, isOpen, onClose }: FloatingBlockPi
   const [search, setSearch] = useState('');
   const panelRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const cleanupRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -30,13 +31,22 @@ export function FloatingBlockPicker({ editor, isOpen, onClose }: FloatingBlockPi
 
   useEffect(() => {
     if (!isOpen) return;
-    const handleClick = (e: MouseEvent) => {
-      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
-        onClose();
-      }
+    // Delay attaching to avoid closing on the same click that opened it
+    const timer = setTimeout(() => {
+      const handleClick = (e: MouseEvent) => {
+        if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
+          onClose();
+        }
+      };
+      document.addEventListener('mousedown', handleClick);
+      // Store cleanup ref
+      cleanupRef.current = () => document.removeEventListener('mousedown', handleClick);
+    }, 0);
+    return () => {
+      clearTimeout(timer);
+      cleanupRef.current?.();
+      cleanupRef.current = null;
     };
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
   }, [isOpen, onClose]);
 
   useEffect(() => {

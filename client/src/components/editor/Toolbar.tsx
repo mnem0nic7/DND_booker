@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import type { Editor } from '@tiptap/react';
 import { useThemeStore } from '../../stores/themeStore';
 import type { ThemeName } from '../../stores/themeStore';
@@ -60,6 +61,7 @@ const THEMES: { value: ThemeName; label: string; swatch: string }[] = [
 export function Toolbar({ editor, columnCount, setColumnCount, showTexture, setShowTexture, onOpenBlockPicker }: ToolbarProps) {
   const { currentTheme, setTheme } = useThemeStore();
   const [showThemeDropdown, setShowThemeDropdown] = useState(false);
+  const themeBtnRef = useRef<HTMLDivElement>(null);
   const [, setTick] = useState(0);
 
   useEffect(() => {
@@ -69,6 +71,17 @@ export function Toolbar({ editor, columnCount, setColumnCount, showTexture, setS
     return () => { editor.off('transaction', handler); };
   }, [editor]);
 
+  useEffect(() => {
+    if (!showThemeDropdown) return;
+    const close = (e: MouseEvent) => {
+      if (themeBtnRef.current && !themeBtnRef.current.contains(e.target as Node)) {
+        setShowThemeDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, [showThemeDropdown]);
+
   if (!editor) return null;
 
   const is = (name: string, attrs?: Record<string, unknown>) => editor.isActive(name, attrs);
@@ -77,7 +90,7 @@ export function Toolbar({ editor, columnCount, setColumnCount, showTexture, setS
 
   return (
     <div className="border-b bg-white">
-      <div className="flex items-start gap-0 px-2 py-1.5 overflow-x-auto scrollbar-none">
+      <div className="flex items-start gap-0 px-2 py-1.5 flex-wrap">
 
         {/* Text Group */}
         <div className="flex flex-col items-center">
@@ -194,7 +207,7 @@ export function Toolbar({ editor, columnCount, setColumnCount, showTexture, setS
         {/* Theme Group */}
         <div className="flex flex-col items-center">
           <div className="flex items-center gap-0.5">
-            <div className="relative">
+            <div className="relative" ref={themeBtnRef}>
               <Btn onClick={() => setShowThemeDropdown(!showThemeDropdown)} title="Theme">
                 <div className="flex items-center gap-1">
                   <span className="w-3 h-3 rounded-full border border-gray-300" style={{ background: THEMES.find(t => t.value === currentTheme)?.swatch }} />
@@ -202,8 +215,15 @@ export function Toolbar({ editor, columnCount, setColumnCount, showTexture, setS
                   <Icon d="M19 9l-7 7-7-7" />
                 </div>
               </Btn>
-              {showThemeDropdown && (
-                <div className="absolute top-full left-0 mt-1 bg-white rounded-lg shadow-lg border py-1 z-50 w-44">
+              {showThemeDropdown && createPortal(
+                <div
+                  className="fixed bg-white rounded-lg shadow-lg border py-1 w-44"
+                  style={{
+                    zIndex: 9999,
+                    top: (themeBtnRef.current?.getBoundingClientRect().bottom ?? 0) + 4,
+                    left: themeBtnRef.current?.getBoundingClientRect().left ?? 0,
+                  }}
+                >
                   {THEMES.map((t) => (
                     <button
                       key={t.value}
@@ -214,7 +234,8 @@ export function Toolbar({ editor, columnCount, setColumnCount, showTexture, setS
                       {t.label}
                     </button>
                   ))}
-                </div>
+                </div>,
+                document.body
               )}
             </div>
             <Btn onClick={() => setShowTexture(!showTexture)} isActive={showTexture} title="Toggle page texture">
