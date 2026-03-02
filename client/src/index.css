@@ -118,6 +118,9 @@
   position: relative;
   color: var(--text-color);
   font-family: var(--body-font);
+  font-feature-settings: 'kern' 1, 'liga' 1;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 .page-canvas[data-texture-off] {

@@ -56,6 +56,8 @@ export function PropertiesPanel({ editor }: PropertiesPanelProps) {
     const text = doc.textContent || '';
     const words = text.trim() ? text.trim().split(/\s+/).length : 0;
     const chars = text.length;
+    // Rough page estimate: ~500 words per two-column page
+    const estPages = Math.max(1, Math.ceil(words / 500));
 
     let dndBlockCount = 0;
     const blocks: BlockInfo[] = [];
@@ -76,7 +78,7 @@ export function PropertiesPanel({ editor }: PropertiesPanelProps) {
       }
     });
 
-    return { words, chars, dndBlockCount, blocks };
+    return { words, chars, estPages, dndBlockCount, blocks };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editor, editor?.state.doc]);
 
@@ -98,6 +100,10 @@ export function PropertiesPanel({ editor }: PropertiesPanelProps) {
         <div className="flex justify-between">
           <span>Characters</span>
           <span className="font-medium">{stats.chars.toLocaleString()}</span>
+        </div>
+        <div className="flex justify-between">
+          <span>Est. Pages</span>
+          <span className="font-medium">~{stats.estPages}</span>
         </div>
         <div className="flex justify-between">
           <span>D&D Blocks</span>
