@@ -5,7 +5,7 @@ import { useProjectStore } from '../../stores/projectStore';
 import { AiMessageBubble } from './AiMessageBubble';
 import { AiPlanPanel } from './AiPlanPanel';
 import { WizardChatProgress } from './WizardChatProgress';
-import type { WizardOutline } from '@dnd-booker/shared';
+import type { WizardOutline, DocumentEditOperation } from '@dnd-booker/shared';
 
 /**
  * Extract a wizardGenerate outline from an assistant message.
@@ -49,19 +49,94 @@ function stripWizardBlock(content: string): string {
   }).trim();
 }
 
-/** Strip planning control blocks (_memoryUpdate, _planUpdate, _remember) from display */
+/** Strip planning control blocks (_memoryUpdate, _planUpdate, _remember, _documentEdit) from display */
 function stripPlanningBlocks(content: string): string {
   return content.replace(/```(?:json)?\s*([\s\S]*?)```/g, (match, inner: string) => {
     try {
       const parsed = JSON.parse(inner.trim());
       if (parsed && typeof parsed === 'object' && (
-        parsed._memoryUpdate || parsed._planUpdate || parsed._remember
+        parsed._memoryUpdate || parsed._planUpdate || parsed._remember || parsed._documentEdit
       )) {
         return '';
       }
     } catch { /* not valid JSON, keep it */ }
     return match;
   }).trim();
+}
+
+/** Extract a _documentEdit control block from an assistant message. */
+function extractDocumentEdit(content: string): { description: string; operations: DocumentEditOperation[] } | null {
+  const fenceRegex = /```(?:json)?\s*([\s\S]*?)```/g;
+  let match: RegExpExecArray | null;
+
+  while ((match = fenceRegex.exec(content)) !== null) {
+    try {
+      const parsed = JSON.parse(match[1].trim());
+      if (parsed && parsed._documentEdit && Array.isArray(parsed.operations)) {
+        return {
+          description: String(parsed.description || 'Document edited'),
+          operations: parsed.operations.filter(
+            (op: Record<string, unknown>) =>
+              typeof op.op === 'string' && typeof op.nodeIndex === 'number'
+          ),
+        };
+      }
+    } catch { /* not valid JSON */ }
+  }
+  return null;
+}
+
+/**
+ * Execute document edit operations against the TipTap editor.
+ * Processes in descending nodeIndex order so earlier indices remain valid.
+ * Runs as a single ProseMirror transaction (one undo step).
+ */
+function executeDocumentEdits(editor: Editor, operations: DocumentEditOperation[]): number {
+  if (operations.length === 0) return 0;
+
+  const { state } = editor.view;
+  const { doc, schema, tr } = state;
+  let applied = 0;
+
+  // Sort by nodeIndex descending so later ops don't shift earlier positions
+  const sorted = [...operations].sort((a, b) => b.nodeIndex - a.nodeIndex);
+
+  for (const op of sorted) {
+    // Bounds check
+    if (op.nodeIndex < 0 || op.nodeIndex >= doc.childCount) continue;
+
+    // Calculate the position of the node at this index.
+    // Start at 1 to account for the doc node's opening token (position 0 = before doc).
+    let pos = 1;
+    for (let i = 0; i < op.nodeIndex; i++) {
+      pos += doc.child(i).nodeSize;
+    }
+
+    const targetNode = doc.child(op.nodeIndex);
+
+    try {
+      if (op.op === 'remove') {
+        tr.delete(pos, pos + targetNode.nodeSize);
+        applied++;
+      } else if (op.op === 'insertBefore' && op.node) {
+        const newNode = schema.nodeFromJSON(op.node);
+        tr.insert(pos, newNode);
+        applied++;
+      } else if (op.op === 'insertAfter' && op.node) {
+        const newNode = schema.nodeFromJSON(op.node);
+        tr.insert(pos + targetNode.nodeSize, newNode);
+        applied++;
+      }
+    } catch (err) {
+      console.warn('[AI] Skipping invalid document edit operation:', op, err);
+    }
+  }
+
+  if (applied > 0) {
+    editor.view.dispatch(tr);
+  }
+
+  return applied;
 }
 
 interface AiChatPanelProps {
@@ -97,9 +172,12 @@ export function AiChatPanel({ projectId, editor }: AiChatPanelProps) {
   const [input, setInput] = useState('');
   const [insertError, setInsertError] = useState<string | null>(null);
   const [showPlanPanel, setShowPlanPanel] = useState(false);
+  const [editBanner, setEditBanner] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   // Track which wizard outlines we've already triggered generation for
   const triggeredOutlinesRef = useRef<Set<string>>(new Set());
+  // Track which document edits we've already applied (by message index)
+  const appliedEditsRef = useRef<Set<number>>(new Set());
 
   useEffect(() => {
     fetchSettings();
@@ -139,6 +217,32 @@ export function AiChatPanel({ projectId, editor }: AiChatPanelProps) {
     // Auto-trigger generation from the outline
     startWizardFromOutline(projectId, outline);
   }, [messages, isStreaming, wizardProgress, projectId, startWizardFromOutline]);
+
+  // Auto-execute _documentEdit blocks when streaming completes
+  useEffect(() => {
+    if (isStreaming || !editor) return;
+
+    const lastIdx = messages.length - 1;
+    if (lastIdx < 0) return;
+    const lastMsg = messages[lastIdx];
+    if (!lastMsg || lastMsg.role !== 'assistant') return;
+    if (appliedEditsRef.current.has(lastIdx)) return;
+
+    const edit = extractDocumentEdit(lastMsg.content);
+    if (!edit || edit.operations.length === 0) {
+      console.debug('[AI DocumentEdit] No _documentEdit block found in last assistant message');
+      return;
+    }
+
+    console.log('[AI DocumentEdit] Applying', edit.operations.length, 'operations:', edit.description);
+    appliedEditsRef.current.add(lastIdx);
+    const count = executeDocumentEdits(editor, edit.operations);
+    console.log('[AI DocumentEdit] Applied', count, 'of', edit.operations.length, 'operations');
+    if (count > 0) {
+      setEditBanner(`${edit.description} (${count} operation${count > 1 ? 's' : ''} applied)`);
+      setTimeout(() => setEditBanner(null), 5000);
+    }
+  }, [messages, isStreaming, editor]);
 
   async function handleSend() {
     const text = input.trim();
@@ -312,6 +416,14 @@ export function AiChatPanel({ projectId, editor }: AiChatPanelProps) {
               />
             )}
           </>
+        )}
+        {editBanner && (
+          <div className="mx-1 px-3 py-2 text-xs text-green-700 bg-green-50 border border-green-200 rounded-md flex items-center gap-1.5">
+            <svg className="w-3.5 h-3.5 text-green-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+            {editBanner}
+          </div>
         )}
         {(chatError || insertError) && (
           <div className="mx-1 px-3 py-2 text-xs text-red-700 bg-red-50 border border-red-200 rounded-md">

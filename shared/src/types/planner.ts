@@ -46,6 +46,20 @@ export interface RememberBlock {
   };
 }
 
+/** A single document editing operation the AI can emit */
+export interface DocumentEditOperation {
+  op: 'insertBefore' | 'insertAfter' | 'remove';
+  nodeIndex: number;
+  node?: { type: string; attrs?: Record<string, unknown> };
+}
+
+/** Control block for AI-driven document structure edits */
+export interface DocumentEditBlock {
+  _documentEdit: true;
+  description: string;
+  operations: DocumentEditOperation[];
+}
+
 /** Result of parsing control blocks from an AI response */
 export interface PlanningStateChanges {
   memoryUpdates: MemoryUpdateBlock['_memoryUpdate'][];

@@ -95,6 +95,10 @@ function detectStateChanges(rawContent: string): StateChangeIndicator[] {
           ? fact.slice(0, 40) + '...'
           : fact;
         indicators.push({ icon: '\u{1F4BE}', label: `Remembered: ${preview}` });
+      } else if (parsed._documentEdit) {
+        const count = parsed.operations?.length || 0;
+        const desc = parsed.description || 'Document edited';
+        indicators.push({ icon: '\u{1F4C4}', label: `Edit: ${desc} (${count} op${count !== 1 ? 's' : ''})` });
       }
     } catch { /* skip */ }
   }
