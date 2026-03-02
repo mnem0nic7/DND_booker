@@ -140,12 +140,17 @@ Use the :::blockType syntax to mark blocks:
 Descriptive read-aloud text the DM reads to players.
 :::
 
-:::statBlock
-{"name":"Creature Name","size":"Medium","type":"humanoid",...}
+:::sidebarCallout title="DM Tips" calloutType="info"
+Tips or notes for the DM. Can use title and calloutType attributes.
 :::
 
-For statBlock, spellCard, magicItem, npcProfile, randomTable, encounterTable, and other structured blocks, put the complete JSON attrs object inside the fenced block.
-For readAloudBox and sidebarCallout, put the prose content directly.`
+:::statBlock
+{"name":"Goblin Shaman","size":"Small","type":"humanoid","alignment":"neutral evil","ac":13,"acType":"natural armor","hp":21,"hitDice":"6d6","speed":"30 ft.","str":8,"dex":14,"con":10,"int":12,"wis":15,"cha":11,"skills":"Arcana +3, Stealth +4","senses":"darkvision 60 ft., passive Perception 12","languages":"Common, Goblin","cr":"1","xp":"200","traits":"[{\\"name\\":\\"Spellcasting\\",\\"description\\":\\"The shaman casts spells using Wisdom (DC 12, +4 to hit).\\"}]","actions":"[{\\"name\\":\\"Staff\\",\\"description\\":\\"Melee Weapon Attack: +1 to hit, 5 ft., 1d6-1 bludgeoning.\\"}]","reactions":"[]","legendaryActions":"[]"}
+:::
+
+IMPORTANT: For statBlock, spellCard, magicItem, npcProfile, randomTable, encounterTable, and other structured blocks, put a SINGLE LINE of valid JSON inside the fenced block.
+Array fields (traits, actions, reactions, legendaryActions, features, entries) MUST be JSON-encoded STRINGS, not raw arrays. Use escaped quotes: "[{\\"name\\":\\"Bite\\",\\"description\\":\\"Attack...\\"}]"
+For readAloudBox and sidebarCallout, put prose content directly (not JSON).`
     : '';
 
   return `You are a creative D&D 5e adventure writer. Write the content for one section of an adventure.
@@ -227,6 +232,15 @@ export function markdownToTipTap(markdown: string): TipTapNode {
         // Structured blocks — try to parse JSON attrs
         try {
           const attrs = JSON.parse(blockContent);
+          // Normalize array fields that TipTap expects as JSON-encoded strings
+          // (AI sometimes outputs real arrays instead of stringified JSON arrays)
+          const arrayFields = ['traits', 'actions', 'reactions', 'legendaryActions',
+            'features', 'entries', 'keyEntries'];
+          for (const field of arrayFields) {
+            if (Array.isArray(attrs[field])) {
+              attrs[field] = JSON.stringify(attrs[field]);
+            }
+          }
           content.push({ type: blockType, attrs });
         } catch {
           // If JSON parse fails, treat as a paragraph
@@ -317,6 +331,46 @@ export function markdownToTipTap(markdown: string): TipTapNode {
       continue;
     }
 
+    // ── Markdown table (lines starting with |)
+    if (line.match(/^\|.+\|/)) {
+      const tableLines: string[] = [];
+      while (i < lines.length && lines[i].match(/^\|.+\|/)) {
+        tableLines.push(lines[i]);
+        i++;
+      }
+      // Parse table: first line = header, second line = separator (skip), rest = data rows
+      if (tableLines.length >= 2) {
+        const parseRow = (row: string): string[] =>
+          row.split('|').slice(1, -1).map((cell) => cell.trim());
+
+        const headerCells = parseRow(tableLines[0]);
+        // Skip separator row (index 1)
+        const dataRows = tableLines.slice(2).map(parseRow);
+
+        const headerRow: TipTapNode = {
+          type: 'tableRow',
+          content: headerCells.map((cell) => ({
+            type: 'tableHeader',
+            content: [{ type: 'paragraph', content: parseInlineMarks(cell) }],
+          })),
+        };
+
+        const bodyRows: TipTapNode[] = dataRows.map((cells) => ({
+          type: 'tableRow',
+          content: cells.map((cell) => ({
+            type: 'tableCell',
+            content: [{ type: 'paragraph', content: parseInlineMarks(cell) }],
+          })),
+        }));
+
+        content.push({
+          type: 'table',
+          content: [headerRow, ...bodyRows],
+        });
+      }
+      continue;
+    }
+
     // ── Horizontal rule
     if (line.match(/^---+\s*$/) || line.match(/^\*\*\*+\s*$/)) {
       content.push({ type: 'horizontalRule' });
@@ -342,7 +396,8 @@ export function markdownToTipTap(markdown: string): TipTapNode {
       !lines[i].match(/^---+\s*$/) &&
       !lines[i].match(/^\*\*\*+\s*$/) &&
       !lines[i].match(/^```/) &&
-      !lines[i].match(/^>\s?/)
+      !lines[i].match(/^>\s?/) &&
+      !lines[i].match(/^\|.+\|/)
     ) {
       paraLines.push(lines[i]);
       i++;
