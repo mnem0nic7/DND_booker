@@ -407,3 +407,26 @@
 [class$="__edit-panel"] textarea {
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
+
+/* ── Responsive Page Canvas ─────────────────────────────────── */
+
+@media (max-width: 900px) {
+  .page-canvas {
+    transform: scale(0.85);
+    transform-origin: top center;
+    margin-bottom: -6rem;
+  }
+}
+
+@media (max-width: 700px) {
+  .page-canvas {
+    transform: scale(0.65);
+    transform-origin: top center;
+    margin-bottom: -16rem;
+  }
+}
+
+/* Smooth theme transitions */
+.page-canvas {
+  transition: background-color 0.3s ease;
+}
