@@ -144,7 +144,7 @@ export function stripControlBlocks(responseText: string): string {
       try {
         const parsed = JSON.parse(inner.trim());
         if (parsed && typeof parsed === 'object' && (
-          parsed._memoryUpdate || parsed._planUpdate || parsed._remember
+          parsed._memoryUpdate || parsed._planUpdate || parsed._remember || parsed._wizardGenerate
         )) {
           return '';
         }
@@ -192,6 +192,9 @@ export async function processAssistantResponse(
   // Apply task plan updates (last one wins if multiple)
   for (const update of stateChanges.planUpdates) {
     if (Array.isArray(update.tasks)) {
+      if (update.tasks.length > 50) {
+        console.warn(`[AI Planner] Task plan for project ${projectId} truncated from ${update.tasks.length} to 50 tasks`);
+      }
       const validTasks: PlanTask[] = update.tasks
         .slice(0, 50) // Cap at 50 tasks to prevent bloat
         .filter((t): t is PlanTask =>

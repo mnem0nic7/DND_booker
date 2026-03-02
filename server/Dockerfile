@@ -16,5 +16,10 @@ RUN sed -i 's|"main": "src/index.ts"|"main": "dist/index.js"|' package.json && \
     sed -i 's|"types": "src/index.ts"|"types": "dist/index.d.ts"|' package.json
 WORKDIR /app/server
 RUN npm run build
+
+# Run as non-root user for security
+RUN addgroup -g 1001 -S nodejs && adduser -S nodeapp -u 1001 -G nodejs
+USER nodeapp
+
 EXPOSE 4000
 CMD ["sh", "-c", "npx prisma migrate deploy && node dist/index.js"]

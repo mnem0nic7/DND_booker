@@ -1,11 +1,16 @@
 import { prisma } from '../config/database.js';
 import { encryptApiKey, decryptApiKey } from '../utils/encryption.js';
-import type { AiProvider } from './ai-provider.service.js';
+import { assertSafeUrl, type AiProvider } from './ai-provider.service.js';
 
 export async function saveAiSettings(
   userId: string,
   data: { provider: AiProvider; model: string; apiKey?: string; baseUrl?: string },
 ) {
+  // Validate baseUrl to prevent SSRF before persisting
+  if (data.baseUrl) {
+    assertSafeUrl(data.baseUrl);
+  }
+
   const update: Record<string, string | null> = {
     aiProvider: data.provider,
     aiModel: data.model,

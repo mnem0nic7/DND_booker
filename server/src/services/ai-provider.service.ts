@@ -49,8 +49,42 @@ export function createModel(
   return openai(modelId);
 }
 
+/**
+ * Validate that a URL is safe for server-side requests (blocks private/internal IPs).
+ * Prevents SSRF attacks via user-controlled Ollama base URLs.
+ */
+export function assertSafeUrl(rawUrl: string): void {
+  const parsed = new URL(rawUrl);
+  if (!['http:', 'https:'].includes(parsed.protocol)) {
+    throw new Error('Only http/https protocols are allowed');
+  }
+  const hostname = parsed.hostname.toLowerCase();
+  // Block loopback
+  if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1' || hostname === '[::1]') {
+    throw new Error('Loopback addresses are not allowed');
+  }
+  // Block common metadata endpoints
+  if (hostname === '169.254.169.254' || hostname === 'metadata.google.internal') {
+    throw new Error('Cloud metadata endpoints are not allowed');
+  }
+  // Block private IP ranges (RFC 1918 + link-local)
+  const ipMatch = hostname.match(/^(\d+)\.(\d+)\.\d+\.\d+$/);
+  if (ipMatch) {
+    const [, first, second] = ipMatch.map(Number);
+    if (first === 10 || (first === 172 && second >= 16 && second <= 31) || (first === 192 && second === 168) || first === 169) {
+      throw new Error('Private network addresses are not allowed');
+    }
+  }
+  // Block Docker internal hostnames
+  const blockedHosts = ['postgres', 'redis', 'server', 'worker', 'client', 'host.docker.internal'];
+  if (blockedHosts.includes(hostname)) {
+    throw new Error('Internal service hostnames are not allowed');
+  }
+}
+
 export async function validateConnection(baseUrl: string): Promise<{ valid: boolean; models: string[] }> {
   try {
+    assertSafeUrl(baseUrl);
     const res = await fetch(`${baseUrl}/api/tags`, { signal: AbortSignal.timeout(5000) });
     if (!res.ok) return { valid: false, models: [] };
     const data = await res.json() as { models?: { name: string }[] };

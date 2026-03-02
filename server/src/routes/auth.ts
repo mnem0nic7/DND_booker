@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import rateLimit from 'express-rate-limit';
+import { asyncHandler } from '../middleware/async-handler.js';
 import {
   registerUser,
   loginUser,
@@ -16,11 +17,40 @@ const router = Router();
 // Rate limiting for auth endpoints — prevent brute-force
 const authRateLimit = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 20, // 20 attempts per window
+  max: 10, // 10 attempts per window (reduced from 20)
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many attempts. Please try again later.' },
 });
+
+// Per-account lockout tracking (in-memory, resets on server restart)
+const failedLoginAttempts = new Map<string, { count: number; lastAttempt: number }>();
+const ACCOUNT_LOCKOUT_THRESHOLD = 10;
+const ACCOUNT_LOCKOUT_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
+
+function checkAccountLockout(email: string): boolean {
+  const record = failedLoginAttempts.get(email);
+  if (!record) return false;
+  if (Date.now() - record.lastAttempt > ACCOUNT_LOCKOUT_WINDOW_MS) {
+    failedLoginAttempts.delete(email);
+    return false;
+  }
+  return record.count >= ACCOUNT_LOCKOUT_THRESHOLD;
+}
+
+function recordFailedLogin(email: string): void {
+  const record = failedLoginAttempts.get(email);
+  if (record && Date.now() - record.lastAttempt < ACCOUNT_LOCKOUT_WINDOW_MS) {
+    record.count++;
+    record.lastAttempt = Date.now();
+  } else {
+    failedLoginAttempts.set(email, { count: 1, lastAttempt: Date.now() });
+  }
+}
+
+function clearFailedLogins(email: string): void {
+  failedLoginAttempts.delete(email);
+}
 
 const registerSchema = z.object({
   email: z.string().email(),
@@ -38,7 +68,7 @@ const loginSchema = z.object({
   password: z.string().min(1),
 });
 
-router.post('/register', authRateLimit, async (req: Request, res: Response) => {
+router.post('/register', authRateLimit, asyncHandler(async (req: Request, res: Response) => {
   const parsed = registerSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: 'Validation failed' });
@@ -65,17 +95,24 @@ router.post('/register', authRateLimit, async (req: Request, res: Response) => {
     }
     res.status(500).json({ error: 'Registration failed' });
   }
-});
+}));
 
-router.post('/login', authRateLimit, async (req: Request, res: Response) => {
+router.post('/login', authRateLimit, asyncHandler(async (req: Request, res: Response) => {
   const parsed = loginSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: 'Validation failed' });
     return;
   }
 
+  // Per-account lockout check
+  if (checkAccountLockout(parsed.data.email)) {
+    res.status(429).json({ error: 'Account temporarily locked due to too many failed attempts. Please try again later.' });
+    return;
+  }
+
   try {
     const user = await loginUser(parsed.data.email, parsed.data.password);
+    clearFailedLogins(parsed.data.email);
     const accessToken = generateAccessToken(user.id);
     const refreshToken = generateRefreshToken(user.id, user.tokenVersion);
 
@@ -90,15 +127,16 @@ router.post('/login', authRateLimit, async (req: Request, res: Response) => {
     res.json({ user: userResponse, accessToken });
   } catch (err: unknown) {
     if (err instanceof Error && err.message === 'INVALID_CREDENTIALS') {
+      recordFailedLogin(parsed.data.email);
       console.warn(`[SECURITY] Failed login attempt for ${parsed.data.email} from ${req.ip}`);
       res.status(401).json({ error: 'Invalid email or password' });
       return;
     }
     res.status(500).json({ error: 'Login failed' });
   }
-});
+}));
 
-router.post('/refresh', async (req: Request, res: Response) => {
+router.post('/refresh', asyncHandler(async (req: Request, res: Response) => {
   const token = req.cookies?.refreshToken;
   if (!token) {
     res.status(401).json({ error: 'No refresh token' });
@@ -124,9 +162,9 @@ router.post('/refresh', async (req: Request, res: Response) => {
   } catch {
     res.status(401).json({ error: 'Invalid refresh token' });
   }
-});
+}));
 
-router.post('/logout', async (req: Request, res: Response) => {
+router.post('/logout', asyncHandler(async (req: Request, res: Response) => {
   // Best-effort: invalidate refresh tokens if we can identify the user
   const refreshTokenCookie = req.cookies?.refreshToken;
   if (refreshTokenCookie) {
@@ -143,6 +181,6 @@ router.post('/logout', async (req: Request, res: Response) => {
     sameSite: 'strict',
   });
   res.json({ message: 'Logged out' });
-});
+}));
 
 export default router;

@@ -10,7 +10,7 @@
  */
 
 import type { DocumentContent } from '../types/document';
-import { escapeTypst } from './utils';
+import { escapeTypst, escapeTypstUrl } from './utils';
 
 type TipTapNode = DocumentContent;
 
@@ -74,7 +74,7 @@ function renderMarks(text: string, marks?: TipTapNode['marks']): string {
         break;
       case 'link': {
         const href = String(mark.attrs?.href || '');
-        result = `#link("${href}")[${result}]`;
+        result = `#link("${escapeTypstUrl(href)}")[${result}]`;
         break;
       }
       default:
@@ -500,7 +500,7 @@ function renderNpcProfile(attrs: Record<string, unknown>): string {
   // Header with optional portrait
   if (portraitUrl) {
     t += `  #grid(columns: (60pt, 1fr), gutter: 12pt,\n`;
-    t += `    image("${portraitUrl}", width: 60pt),\n`;
+    t += `    image("${escapeTypstUrl(portraitUrl)}", width: 60pt),\n`;
     t += `    [\n`;
     t += `      #text(font: heading-font, size: 16pt, weight: "bold")[${name}]\n`;
     t += `      #text(style: "italic")[${race} ${npcClass}]\n`;
@@ -619,7 +619,7 @@ function renderFullBleedImage(attrs: Record<string, unknown>): string {
   let t = '';
   if (src) {
     t += `#figure(\n`;
-    t += `  image("${src}", width: 100%),\n`;
+    t += `  image("${escapeTypstUrl(src)}", width: 100%),\n`;
     if (caption) {
       t += `  caption: [${escapeTypst(caption)}],\n`;
     }
@@ -636,7 +636,7 @@ function renderMapBlock(attrs: Record<string, unknown>): string {
   let t = '';
   t += `#block(width: 100%, inset: 8pt)[\n`;
   if (src) {
-    t += `  #image("${src}", width: 100%)\n`;
+    t += `  #image("${escapeTypstUrl(src)}", width: 100%)\n`;
   }
   if (scale) {
     t += `  #text(size: 9pt, style: "italic")[Scale: ${escapeTypst(scale)}]\n`;
@@ -682,7 +682,7 @@ function renderTitlePage(attrs: Record<string, unknown>): string {
   t += `#align(center)[\n`;
 
   if (coverImageUrl) {
-    t += `  #image("${coverImageUrl}", width: 80%)\n`;
+    t += `  #image("${escapeTypstUrl(coverImageUrl)}", width: 80%)\n`;
     t += `  #v(1fr)\n`;
   } else {
     t += `  #v(1fr)\n`;
@@ -757,7 +757,7 @@ function renderBackCover(attrs: Record<string, unknown>): string {
   t += `  \\u{2726} \\u{2726} \\u{2726}\n\n`; // ornaments
   t += `  #v(12pt)\n`;
   if (authorImageUrl) {
-    t += `  #image("${authorImageUrl}", width: 60pt)\n`;
+    t += `  #image("${escapeTypstUrl(authorImageUrl)}", width: 60pt)\n`;
     t += `  #v(8pt)\n`;
   }
   t += `  #text(size: 10pt)[${authorBio}]\n`;

@@ -42,6 +42,22 @@ export async function deleteSession(projectId: string, userId: string) {
   }
 }
 
+/** Atomic delete+create — avoids race conditions with concurrent requests */
+export async function resetAndCreateSession(projectId: string, userId: string) {
+  return prisma.aiWizardSession.upsert({
+    where: { projectId_userId: { projectId, userId } },
+    create: { projectId, userId },
+    update: {
+      phase: 'questionnaire',
+      parameters: null,
+      outline: null,
+      sections: [],
+      progress: 0,
+      errorMsg: null,
+    },
+  });
+}
+
 // ── Prompt Builders ─────────────────────────────────────────────
 
 const SUPPORTED_BLOCKS = getSupportedBlockTypes();
@@ -689,19 +705,18 @@ export async function applyToProject(
       return aIdx - bIdx;
     });
 
-  const createdDocs = [];
-
-  for (const section of selectedSections) {
-    const doc = await prisma.document.create({
-      data: {
-        projectId,
-        title: section.title,
-        sortOrder: nextSort++,
-        content: section.content as object ?? {},
-      },
-    });
-    createdDocs.push(doc);
-  }
+  const createdDocs = await prisma.$transaction(
+    selectedSections.map((section, i) =>
+      prisma.document.create({
+        data: {
+          projectId,
+          title: section.title,
+          sortOrder: nextSort + i,
+          content: (section.content as object) ?? {},
+        },
+      })
+    )
+  );
 
   return createdDocs;
 }

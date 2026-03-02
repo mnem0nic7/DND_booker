@@ -111,7 +111,12 @@ export function Toolbar({ editor, columnCount, setColumnCount, showTexture, setS
               onClick={() => {
                 if (is('link')) { editor.chain().focus().unsetLink().run(); return; }
                 const url = window.prompt('URL:');
-                if (url) editor.chain().focus().setLink({ href: url }).run();
+                if (url) {
+                  const trimmed = url.trim().toLowerCase();
+                  if (trimmed.startsWith('javascript:') || trimmed.startsWith('data:')) return;
+                  const safe = /^https?:\/\//i.test(url.trim()) ? url.trim() : `https://${url.trim()}`;
+                  editor.chain().focus().setLink({ href: safe }).run();
+                }
               }}
               isActive={is('link')}
               title="Link"

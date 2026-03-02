@@ -236,6 +236,7 @@ export const useAiStore = create<AiState>((set, get) => ({
 
       const decoder = new TextDecoder();
       let fullContent = '';
+      const MAX_STREAM_SIZE = 2 * 1024 * 1024; // 2MB safety limit
 
       try {
         while (true) {
@@ -243,6 +244,10 @@ export const useAiStore = create<AiState>((set, get) => ({
           if (done) break;
           const chunk = decoder.decode(value, { stream: true });
           fullContent += chunk;
+          if (fullContent.length > MAX_STREAM_SIZE) {
+            console.warn('[AI] Stream exceeded max size, truncating');
+            break;
+          }
           set({ streamingContent: fullContent });
         }
       } finally {
@@ -273,7 +278,7 @@ export const useAiStore = create<AiState>((set, get) => ({
       }));
 
       // Refresh planning state (control blocks may have updated it server-side)
-      get().fetchPlanningState(projectId);
+      void get().fetchPlanningState(projectId);
     } catch (err) {
       // Don't show error for intentional aborts (user navigated away or sent new message)
       if (err instanceof DOMException && err.name === 'AbortError') {
@@ -412,8 +417,9 @@ export const useAiStore = create<AiState>((set, get) => ({
             const trimmed = line.trim();
             if (!trimmed) continue;
             try {
-              const event = JSON.parse(trimmed) as WizardEvent;
-              switch (event.type) {
+              const event = JSON.parse(trimmed);
+              if (!event || typeof event !== 'object' || typeof event.type !== 'string') continue;
+              switch ((event as WizardEvent).type) {
                 case 'outline':
                   set((s) => ({
                     wizardProgress: s.wizardProgress ? {

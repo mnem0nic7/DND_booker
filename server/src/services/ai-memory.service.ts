@@ -53,28 +53,30 @@ export async function addMemoryItem(userId: string, data: {
   confidence?: number;
   source?: string | null;
 }) {
-  // Guard against unbounded growth
-  const count = await prisma.aiMemoryItem.count({ where: { userId } });
-  if (count >= MAX_MEMORY_ITEMS_PER_USER) {
-    // Delete the oldest item to make room
-    const oldest = await prisma.aiMemoryItem.findFirst({
-      where: { userId },
-      orderBy: { createdAt: 'asc' },
-    });
-    if (oldest) {
-      await prisma.aiMemoryItem.delete({ where: { id: oldest.id } });
+  // Atomic count+evict+create to prevent race conditions under concurrency
+  return prisma.$transaction(async (tx) => {
+    const count = await tx.aiMemoryItem.count({ where: { userId } });
+    if (count >= MAX_MEMORY_ITEMS_PER_USER) {
+      const oldest = await tx.aiMemoryItem.findFirst({
+        where: { userId },
+        orderBy: { createdAt: 'asc' },
+      });
+      if (oldest) {
+        console.warn(`[AI Memory] User ${userId} hit memory cap (${MAX_MEMORY_ITEMS_PER_USER}), evicting oldest item`);
+        await tx.aiMemoryItem.delete({ where: { id: oldest.id } });
+      }
     }
-  }
 
-  return prisma.aiMemoryItem.create({
-    data: {
-      userId,
-      type: data.type,
-      content: data.content.slice(0, 2000),
-      projectId: data.projectId ?? null,
-      confidence: data.confidence ?? 1.0,
-      source: data.source ?? null,
-    },
+    return tx.aiMemoryItem.create({
+      data: {
+        userId,
+        type: data.type,
+        content: data.content.slice(0, 2000),
+        projectId: data.projectId ?? null,
+        confidence: data.confidence ?? 1.0,
+        source: data.source ?? null,
+      },
+    });
   });
 }
 

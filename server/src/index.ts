@@ -11,6 +11,7 @@ import exportRoutes from './routes/exports.js';
 import templateRoutes from './routes/templates.js';
 import { aiSettingsRoutes, aiGenerateRoutes, aiChatRoutes, aiWizardRoutes } from './routes/ai.js';
 import { publicRateLimit } from './middleware/ai-rate-limit.js';
+import { requireAuth, type AuthRequest } from './middleware/auth.js';
 
 // Validate required env vars in production
 if (process.env.NODE_ENV === 'production') {
@@ -29,7 +30,7 @@ const PORT = process.env.PORT || 4000;
 app.set('trust proxy', 1);
 
 app.use(helmet({
-  crossOriginResourcePolicy: { policy: 'cross-origin' },
+  crossOriginResourcePolicy: { policy: 'same-site' },
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
@@ -66,7 +67,7 @@ app.use(cors({
   },
   credentials: true,
 }));
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({ limit: '5mb' }));
 app.use(cookieParser());
 
 app.get('/api/health', publicRateLimit, (_req, res) => {
@@ -86,13 +87,30 @@ app.use('/api/ai', aiGenerateRoutes);
 app.use('/api/projects/:projectId', aiChatRoutes);
 app.use('/api/projects/:projectId', aiWizardRoutes);
 
-// Serve uploaded files statically with security headers
-app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads'), {
-  setHeaders: (res) => {
-    res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.setHeader('Content-Security-Policy', "default-src 'none'; img-src 'self'; style-src 'none'; script-src 'none'");
-  },
-}));
+// Serve uploaded files with auth — verify the requesting user owns the project
+app.use('/uploads/:projectId/:filename', requireAuth, async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  const authReq = req as AuthRequest;
+  const projectId = String(req.params.projectId);
+  const filename = String(req.params.filename);
+
+  // Verify the user owns this project
+  const { prisma: db } = await import('./config/database.js');
+  const project = await db.project.findFirst({
+    where: { id: projectId, userId: authReq.userId! },
+  });
+  if (!project) {
+    res.status(404).json({ error: 'Not found' });
+    return;
+  }
+
+  // Serve the file with security headers
+  const filePath = path.resolve(process.cwd(), 'uploads', projectId, filename);
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Content-Security-Policy', "default-src 'none'; img-src 'self'; style-src 'none'; script-src 'none'");
+  res.sendFile(filePath, (err) => {
+    if (err) next();
+  });
+});
 
 // Global error handler — catches unhandled errors from async route handlers
 app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {

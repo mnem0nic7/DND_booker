@@ -49,3 +49,11 @@ export function safeCssUrl(url: string): string | null {
 export function escapeTypst(text: string): string {
   return text.replace(/[\\*_`#@$<>\[\]]/g, (ch) => `\\${ch}`);
 }
+
+/**
+ * Escape a URL for safe interpolation inside Typst string literals (double-quoted).
+ * Prevents injection via `"` or `\` characters in user-controlled URLs.
+ */
+export function escapeTypstUrl(url: string): string {
+  return url.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+}
