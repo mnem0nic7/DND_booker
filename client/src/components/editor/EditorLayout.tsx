@@ -37,6 +37,7 @@ import { TitlePage } from '../blocks/TitlePage/TitlePageExtension';
 import { TableOfContents } from '../blocks/TableOfContents/TableOfContentsExtension';
 import { CreditsPage } from '../blocks/CreditsPage/CreditsPageExtension';
 import { BackCover } from '../blocks/BackCover/BackCoverExtension';
+import { usePageAlignment } from '../../hooks/usePageAlignment';
 import { Toolbar } from './Toolbar';
 import { FloatingBlockPicker } from './FloatingBlockPicker';
 import { ExportDialog } from './ExportDialog';
@@ -74,6 +75,9 @@ export function EditorLayout({ projectId, content, onUpdate }: EditorLayoutProps
       onUpdate(ed.getJSON());
     },
   });
+
+  // Align page breaks to 8.5x11 page boundaries
+  usePageAlignment(editor);
 
   useEffect(() => {
     if (!editor) return;

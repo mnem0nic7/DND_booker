@@ -1,0 +1,77 @@
+import { useEffect, useRef } from 'react';
+import type { Editor } from '@tiptap/core';
+
+// 11in page at 96dpi = 1056px, minus 72px top + 72px bottom padding = 912px content area
+const PAGE_CONTENT_HEIGHT = 912;
+
+/**
+ * Aligns page break nodes to 8.5x11 page boundaries by adding fill
+ * padding so each page break sits at the bottom of its page.
+ *
+ * The wrapper (.node-pageBreak) is transparent — the fill area shows
+ * the parchment background from .page-canvas. The inner .page-break
+ * element renders the dark gap between pages.
+ */
+export function usePageAlignment(editor: Editor | null) {
+  const rafRef = useRef(0);
+
+  useEffect(() => {
+    if (!editor) return;
+
+    const align = () => {
+      const pmEl = editor.view.dom as HTMLElement;
+      const pageBreaks = pmEl.querySelectorAll<HTMLElement>('.node-pageBreak');
+      if (!pageBreaks.length) return;
+
+      // Reset all fills to 0 so we measure natural positions
+      pageBreaks.forEach((pb) => {
+        pb.style.paddingTop = '0';
+      });
+
+      // Force synchronous reflow
+      void pmEl.offsetHeight;
+
+      const pmTop = pmEl.getBoundingClientRect().top;
+      let nextPageEnd = PAGE_CONTENT_HEIGHT;
+
+      pageBreaks.forEach((pb) => {
+        const pbTop = pb.getBoundingClientRect().top - pmTop;
+
+        // Advance to the page boundary at or after this break
+        while (nextPageEnd < pbTop) {
+          nextPageEnd += PAGE_CONTENT_HEIGHT;
+        }
+
+        // Fill from current position to the page boundary
+        const fill = Math.max(0, nextPageEnd - pbTop);
+        pb.style.paddingTop = `${fill}px`;
+
+        // Force reflow so subsequent measurements are accurate
+        void pb.offsetHeight;
+
+        // Next page ends one page-height after this break's bottom edge
+        const pbBottom = pb.getBoundingClientRect().bottom - pmTop;
+        nextPageEnd = pbBottom + PAGE_CONTENT_HEIGHT;
+      });
+    };
+
+    const scheduleAlign = () => {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = requestAnimationFrame(align);
+    };
+
+    // Align on content changes and initial render
+    scheduleAlign();
+    editor.on('update', scheduleAlign);
+
+    // Re-align when editor resizes (e.g. column toggle, panel open/close)
+    const observer = new ResizeObserver(scheduleAlign);
+    observer.observe(editor.view.dom);
+
+    return () => {
+      cancelAnimationFrame(rafRef.current);
+      editor.off('update', scheduleAlign);
+      observer.disconnect();
+    };
+  }, [editor]);
+}
