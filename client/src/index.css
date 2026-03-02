@@ -119,6 +119,7 @@
   position: relative;
   color: var(--text-color);
   font-family: var(--body-font);
+  font-size: 9.5pt;
   font-feature-settings: 'kern' 1, 'liga' 1;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -130,7 +131,7 @@
 
 .page-canvas .ProseMirror {
   column-count: 2;
-  column-gap: 48px;
+  column-gap: 32px;
   column-rule: 1px solid var(--column-rule-color, rgba(0,0,0,0.06));
   outline: none;
   min-height: 912px;
@@ -208,8 +209,8 @@
 .page-canvas .ProseMirror p {
   text-align: justify;
   text-indent: var(--paragraph-indent, 1em);
-  line-height: 1.5;
-  margin-bottom: 0.5em;
+  line-height: 1.35;
+  margin-bottom: 0.35em;
   widows: 2;
   orphans: 2;
 }
@@ -230,23 +231,23 @@
 }
 
 .page-canvas .ProseMirror h1 {
-  font-size: 1.75rem;
-  margin-top: 1.5rem;
-  margin-bottom: 0.5rem;
+  font-size: 16pt;
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
   border-bottom: var(--h1-border-bottom, none);
   padding-bottom: var(--h1-padding-bottom, 0);
 }
 
 .page-canvas .ProseMirror h2 {
-  font-size: 1.35rem;
-  margin-top: 1.25rem;
-  margin-bottom: 0.4rem;
+  font-size: 13pt;
+  margin-top: 1.25em;
+  margin-bottom: 0.4em;
 }
 
 .page-canvas .ProseMirror h3 {
-  font-size: 1.1rem;
-  margin-top: 1rem;
-  margin-bottom: 0.3rem;
+  font-size: 11pt;
+  margin-top: 1em;
+  margin-bottom: 0.3em;
   border-bottom: var(--h3-border-bottom, none);
   padding-bottom: var(--h3-padding-bottom, 0);
 }
@@ -254,9 +255,9 @@
 .page-canvas .ProseMirror h4 {
   font-family: var(--heading-font);
   color: var(--accent-color);
-  font-size: 0.95rem;
-  margin-top: 0.75rem;
-  margin-bottom: 0.2rem;
+  font-size: 10pt;
+  margin-top: 0.75em;
+  margin-bottom: 0.2em;
   font-weight: bold;
 }
 
