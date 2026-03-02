@@ -425,8 +425,9 @@ function parseInlineContent(text: string): TipTapNode[] {
 /** Parse inline bold/italic/code/link marks in a line of text */
 export function parseInlineMarks(text: string): TipTapNode[] {
   const nodes: TipTapNode[] = [];
-  // Regex: [link](url), `code`, ***bold+italic***, **bold**, *italic*, or plain text
-  const regex = /(\[([^\]]+)\]\(([^)]+)\)|`(.+?)`|\*\*\*(.+?)\*\*\*|\*\*(.+?)\*\*|\*(.+?)\*|([^`*\[]+))/g;
+  // Regex: [link](url), `code`, ***bold+italic***, **bold**, *italic*, plain text, or single special char
+  // The final (.) catches unmatched *, [, ` as literal text to prevent text loss
+  const regex = /(\[([^\]]+)\]\(([^)]+)\)|`(.+?)`|\*\*\*(.+?)\*\*\*|\*\*(.+?)\*\*|\*(.+?)\*|([^`*\[]+)|(.))/g;
   let match: RegExpExecArray | null;
 
   while ((match = regex.exec(text)) !== null) {
@@ -468,6 +469,14 @@ export function parseInlineMarks(text: string): TipTapNode[] {
     } else if (match[8]) {
       // plain text
       nodes.push({ type: 'text', text: match[8] });
+    } else if (match[9]) {
+      // single unmatched special character (*, [, `) — treat as literal
+      const prev = nodes[nodes.length - 1];
+      if (prev && !prev.marks) {
+        prev.text += match[9]; // merge with previous plain text node
+      } else {
+        nodes.push({ type: 'text', text: match[9] });
+      }
     }
   }
 

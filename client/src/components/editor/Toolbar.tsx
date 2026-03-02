@@ -95,16 +95,16 @@ export function Toolbar({ editor, columnCount, setColumnCount, showTexture, setS
         {/* Text Group */}
         <div className="flex flex-col items-center">
           <div className="flex items-center gap-0.5">
-            <Btn onClick={() => editor.chain().focus().toggleBold().run()} isActive={is('bold')} title="Bold">
+            <Btn onClick={() => editor.chain().focus().toggleBold().run()} isActive={is('bold')} title="Bold (Ctrl+B)">
               <span className="font-bold text-sm">B</span>
             </Btn>
-            <Btn onClick={() => editor.chain().focus().toggleItalic().run()} isActive={is('italic')} title="Italic">
+            <Btn onClick={() => editor.chain().focus().toggleItalic().run()} isActive={is('italic')} title="Italic (Ctrl+I)">
               <span className="italic text-sm">I</span>
             </Btn>
-            <Btn onClick={() => editor.chain().focus().toggleUnderline().run()} isActive={is('underline')} title="Underline">
+            <Btn onClick={() => editor.chain().focus().toggleUnderline().run()} isActive={is('underline')} title="Underline (Ctrl+U)">
               <span className="underline text-sm">U</span>
             </Btn>
-            <Btn onClick={() => editor.chain().focus().toggleStrike().run()} isActive={is('strike')} title="Strikethrough">
+            <Btn onClick={() => editor.chain().focus().toggleStrike().run()} isActive={is('strike')} title="Strikethrough (Ctrl+Shift+S)">
               <span className="line-through text-sm">S</span>
             </Btn>
             <Btn
