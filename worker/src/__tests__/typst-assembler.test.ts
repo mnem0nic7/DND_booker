@@ -12,8 +12,8 @@ describe('Typst Assembler', () => {
 
       expect(source).toContain('#let theme-primary = rgb("#58180d")');
       expect(source).toContain('#let theme-secondary = rgb("#c9ad6a")');
-      expect(source).toContain('#let heading-font = "Cinzel"');
-      expect(source).toContain('#let body-font = "Crimson Text"');
+      expect(source).toContain('#let heading-font = "Mr Eaves Small Caps"');
+      expect(source).toContain('#let body-font = "Bookinsanity"');
     });
 
     it('should set up us-letter page with 2 columns', () => {
@@ -159,8 +159,8 @@ describe('Typst Assembler', () => {
       });
 
       expect(source).toContain('#let theme-primary = rgb("#58180D")');
-      expect(source).toContain('#let heading-font = "Cinzel Decorative"');
-      expect(source).toContain('#let body-font = "Libre Baskerville"');
+      expect(source).toContain('#let heading-font = "Mr Eaves Small Caps"');
+      expect(source).toContain('#let body-font = "Bookinsanity"');
       expect(source).toContain('#let theme-divider = rgb("#9C2B1B")');
       expect(source).toContain('background: image("textures/parchment-dmguild.jpg"');
     });

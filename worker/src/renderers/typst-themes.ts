@@ -27,28 +27,34 @@ interface ThemeDefinition {
   headingFont: string;
   bodyFont: string;
   texture: string;
+  titleFont: string;
+  statFont: string;
+  headerUnderline: string;
 }
 
 const themes: Record<string, ThemeDefinition> = {
   'classic-parchment': {
     primary: '#58180d',
     secondary: '#c9ad6a',
-    bg: '#f4e4c1',
+    bg: '#EEE5CE',
     text: '#1a1a1a',
-    statBlockBg: '#fdf1dc',
-    statBlockBorder: '#e69a28',
-    readAloudBg: '#e8dcc8',
-    readAloudBorder: '#5c3a1e',
-    sidebarBg: '#e8edf3',
-    tableHeaderBg: '#78350f',
-    tableStripeBg: '#fef3c7',
-    divider: '#8b1a1a',
-    spellCardAccent: '#7c3aed',
-    magicItemAccent: '#16a34a',
-    classFeatureAccent: '#991b1b',
-    headingFont: 'Cinzel',
-    bodyFont: 'Crimson Text',
+    statBlockBg: '#F2E5B5',
+    statBlockBorder: '#E69A28',
+    readAloudBg: '#FAF7EA',
+    readAloudBorder: '#58180D',
+    sidebarBg: '#E0E5C1',
+    tableHeaderBg: '#58180D',
+    tableStripeBg: '#E0E5C1',
+    divider: '#9C2B1B',
+    spellCardAccent: '#58180D',
+    magicItemAccent: '#58180D',
+    classFeatureAccent: '#58180D',
+    headingFont: 'Mr Eaves Small Caps',
+    bodyFont: 'Bookinsanity',
     texture: 'parchment-classic.jpg',
+    titleFont: 'Nodesto Caps Condensed',
+    statFont: 'Scaly Sans',
+    headerUnderline: '#C0AD6A',
   },
   'dark-tome': {
     primary: '#c9a84c',
@@ -69,6 +75,9 @@ const themes: Record<string, ThemeDefinition> = {
     headingFont: 'Uncial Antiqua',
     bodyFont: 'EB Garamond',
     texture: 'parchment-dark.jpg',
+    titleFont: 'Uncial Antiqua',
+    statFont: 'EB Garamond',
+    headerUnderline: '#7b68ae',
   },
   'clean-modern': {
     primary: '#2563eb',
@@ -89,6 +98,9 @@ const themes: Record<string, ThemeDefinition> = {
     headingFont: 'Inter',
     bodyFont: 'Merriweather',
     texture: '',
+    titleFont: 'Inter',
+    statFont: 'Merriweather',
+    headerUnderline: '#64748b',
   },
   'fey-wild': {
     primary: '#166534',
@@ -109,6 +121,9 @@ const themes: Record<string, ThemeDefinition> = {
     headingFont: 'Dancing Script',
     bodyFont: 'Lora',
     texture: 'parchment-fey.jpg',
+    titleFont: 'Dancing Script',
+    statFont: 'Lora',
+    headerUnderline: '#ca8a04',
   },
   'infernal': {
     primary: '#dc2626',
@@ -129,26 +144,32 @@ const themes: Record<string, ThemeDefinition> = {
     headingFont: 'Pirata One',
     bodyFont: 'Bitter',
     texture: 'parchment-infernal.jpg',
+    titleFont: 'Pirata One',
+    statFont: 'Bitter',
+    headerUnderline: '#ea580c',
   },
   'dmguild': {
     primary: '#58180D',
     secondary: '#C9AD6A',
     bg: '#EEE5CE',
     text: '#1a1a1a',
-    statBlockBg: '#FDF1DC',
+    statBlockBg: '#F2E5B5',
     statBlockBorder: '#E69A28',
     readAloudBg: '#FAF7EA',
     readAloudBorder: '#58180D',
     sidebarBg: '#E0E5C1',
     tableHeaderBg: '#58180D',
-    tableStripeBg: '#FDF1DC',
+    tableStripeBg: '#E0E5C1',
     divider: '#9C2B1B',
     spellCardAccent: '#58180D',
     magicItemAccent: '#58180D',
     classFeatureAccent: '#58180D',
-    headingFont: 'Cinzel Decorative',
-    bodyFont: 'Libre Baskerville',
+    headingFont: 'Mr Eaves Small Caps',
+    bodyFont: 'Bookinsanity',
     texture: 'parchment-dmguild.jpg',
+    titleFont: 'Nodesto Caps Condensed',
+    statFont: 'Scaly Sans',
+    headerUnderline: '#C0AD6A',
   },
 };
 
@@ -176,5 +197,8 @@ export function getTypstThemeVariables(theme: string): string {
 #let theme-class-feature-accent = rgb("${t.classFeatureAccent}")
 #let heading-font = "${t.headingFont}"
 #let body-font = "${t.bodyFont}"
+#let title-font = "${t.titleFont}"
+#let stat-font = "${t.statFont}"
+#let theme-header-underline = rgb("${t.headerUnderline}")
 #let theme-texture = "${t.texture}"`;
 }
