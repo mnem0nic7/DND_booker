@@ -32,19 +32,17 @@ export function ReadAloudBoxView({
             >
               {style === 'parchment' ? 'Dark' : 'Parchment'}
             </button>
+            <button
+              className="read-aloud-box__delete-btn-inline"
+              onClick={deleteNode}
+              type="button"
+              title="Delete read-aloud box"
+              contentEditable={false}
+            >
+              Delete
+            </button>
           </div>
         </div>
-
-        {/* Delete button */}
-        <button
-          className="block-delete-btn"
-          onClick={deleteNode}
-          type="button"
-          title="Delete read-aloud box"
-          contentEditable={false}
-        >
-          Delete
-        </button>
 
         {/* Editable content area */}
         <NodeViewContent className="read-aloud-box__content" />

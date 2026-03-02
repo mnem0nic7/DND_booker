@@ -430,7 +430,6 @@
 .full-bleed-image:hover .block-delete-btn,
 .map-block:hover .block-delete-btn,
 .page-border:hover .block-delete-btn,
-.read-aloud-box:hover .block-delete-btn,
 .sidebar-callout:hover .block-delete-btn {
   opacity: 1;
 }

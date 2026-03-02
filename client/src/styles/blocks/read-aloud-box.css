@@ -87,24 +87,22 @@
   opacity: 1;
 }
 
-/* Delete button */
-.read-aloud-box__delete-btn {
-  position: absolute;
-  top: 0.25rem;
-  right: 0.25rem;
-  background: #dc2626;
+/* Inline delete button (inside header controls, no overlap) */
+.read-aloud-box__delete-btn-inline {
+  background: #ef4444;
   color: white;
   border: none;
-  border-radius: 4px;
-  padding: 0.15rem 0.4rem;
-  font-size: 0.7rem;
+  border-radius: 3px;
+  padding: 0.1rem 0.4rem;
+  font-size: 0.65rem;
   font-style: normal;
+  font-weight: 500;
   cursor: pointer;
   opacity: 0;
   transition: opacity 0.2s;
 }
 
-.read-aloud-box:hover .read-aloud-box__delete-btn {
+.read-aloud-box:hover .read-aloud-box__delete-btn-inline {
   opacity: 1;
 }
 
