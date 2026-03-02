@@ -317,6 +317,18 @@
   background: var(--table-stripe-bg);
 }
 
+/* TipTap table cell selection */
+.page-canvas .ProseMirror .selectedCell {
+  background: rgba(124, 58, 237, 0.1);
+}
+
+.page-canvas .ProseMirror th,
+.page-canvas .ProseMirror td {
+  position: relative;
+  min-width: 80px;
+  vertical-align: top;
+}
+
 /* Inline code */
 .page-canvas .ProseMirror code {
   background: rgba(0, 0, 0, 0.06);

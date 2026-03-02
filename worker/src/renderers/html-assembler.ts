@@ -378,6 +378,7 @@ export function assembleHtml(options: AssembleOptions): string {
     table {
       border-collapse: collapse;
       width: 100%;
+      font-size: 0.85rem;
     }
 
     th, td {
@@ -388,8 +389,13 @@ export function assembleHtml(options: AssembleOptions): string {
 
     th {
       font-family: var(--font-heading);
+      font-size: 0.8rem;
       color: white;
       background: var(--table-header-bg);
+    }
+
+    tr:nth-child(even) td {
+      background: var(--table-stripe-bg, rgba(0, 0, 0, 0.04));
     }
 
     hr {
