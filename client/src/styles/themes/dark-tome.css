@@ -18,6 +18,9 @@
   --magic-item-accent: #c9a84c;
   --class-feature-accent: #c9a84c;
   --encounter-accent: #7b68ae;
+  --code-bg: rgba(255, 255, 255, 0.08);
+  --table-border-color: rgba(255, 255, 255, 0.1);
+  --placeholder-color: rgba(255, 255, 255, 0.35);
   /* Page simulation */
   --page-texture: url('/textures/parchment-dark.jpg');
   --column-rule-color: rgba(255, 255, 255, 0.06);

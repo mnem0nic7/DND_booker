@@ -18,12 +18,15 @@
   --magic-item-accent: #ea580c;
   --class-feature-accent: #dc2626;
   --encounter-accent: #dc2626;
+  --code-bg: rgba(255, 255, 255, 0.08);
+  --table-border-color: rgba(255, 255, 255, 0.1);
+  --placeholder-color: rgba(255, 255, 255, 0.35);
   /* Page simulation */
   --page-texture: url('/textures/parchment-infernal.jpg');
   --column-rule-color: rgba(255, 255, 255, 0.05);
   --footer-color: rgba(255, 255, 255, 0.3);
   /* Typography */
-  --drop-cap-font: 'Pirata One', serif;
+  --drop-cap-font: 'Pirata One', cursive;
   --paragraph-indent: 1em;
   /* Decorative elements */
   --divider-ornament: '\2620';

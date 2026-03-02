@@ -72,7 +72,7 @@
 /* Show placeholder when editor is empty */
 .tiptap p.is-editor-empty:first-child::before {
   content: 'Start writing or insert a block from the palette...';
-  color: #adb5bd;
+  color: var(--placeholder-color, #adb5bd);
   pointer-events: none;
   float: left;
   height: 0;
@@ -313,7 +313,7 @@
 
 .page-canvas .ProseMirror td {
   padding: 0.4rem 0.75rem;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  border-bottom: 1px solid var(--table-border-color, rgba(0, 0, 0, 0.08));
 }
 
 .page-canvas .ProseMirror tr:nth-child(even) td {
@@ -334,7 +334,7 @@
 
 /* Inline code */
 .page-canvas .ProseMirror code {
-  background: rgba(0, 0, 0, 0.06);
+  background: var(--code-bg, rgba(0, 0, 0, 0.06));
   padding: 0.15em 0.35em;
   border-radius: 3px;
   font-size: 0.85em;
@@ -343,7 +343,7 @@
 
 /* Code blocks */
 .page-canvas .ProseMirror pre {
-  background: rgba(0, 0, 0, 0.06);
+  background: var(--code-bg, rgba(0, 0, 0, 0.06));
   padding: 1rem;
   border-radius: 4px;
   overflow-x: auto;
