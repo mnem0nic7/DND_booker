@@ -188,7 +188,7 @@ export function EditorLayout({ projectId, content, onUpdate }: EditorLayoutProps
             )}
             <div className="page-footer">
               <span>{sectionName}</span>
-              <span>1</span>
+              <span></span>
             </div>
           </div>
         </div>

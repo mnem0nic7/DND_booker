@@ -394,8 +394,22 @@ export function assembleHtml(options: AssembleOptions): string {
 
     hr {
       border: none;
-      border-top: 2px solid var(--color-divider);
+      height: 2px;
+      background: var(--divider-gradient, linear-gradient(to right, transparent, var(--color-divider) 15%, var(--color-divider) 85%, transparent));
       margin: 0.75rem 0;
+      position: relative;
+    }
+
+    hr.ornamental-divider::before {
+      content: var(--divider-ornament, '');
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: var(--page-bg, white);
+      padding: 0 0.5rem;
+      font-size: 0.9rem;
+      color: var(--color-primary);
     }
 
     blockquote {

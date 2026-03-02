@@ -189,10 +189,11 @@ export function markdownToTipTap(markdown: string): TipTapNode {
   while (i < lines.length) {
     const line = lines[i];
 
-    // ── Fenced D&D block: :::blockType ... :::
-    const blockMatch = line.match(/^:::(\w+)\s*$/);
+    // ── Fenced D&D block: :::blockType ... ::: (with optional attrs like title="...")
+    const blockMatch = line.match(/^:::(\w+)(.*)$/);
     if (blockMatch) {
       const blockType = blockMatch[1];
+      const inlineAttrs = blockMatch[2]?.trim() || '';
       const blockLines: string[] = [];
       i++;
       while (i < lines.length && lines[i].trim() !== ':::') {
@@ -205,12 +206,21 @@ export function markdownToTipTap(markdown: string): TipTapNode {
 
       // For structured blocks (statBlock, spellCard, etc.), parse JSON attrs
       if (['readAloudBox', 'sidebarCallout'].includes(blockType)) {
-        // Prose blocks — wrap content in a paragraph inside the block
+        // Parse inline attributes (e.g., title="Custom Title" calloutType="warning")
+        const parsedAttrs: Record<string, string> = {};
+        const attrRegex = /(\w+)="([^"]*)"/g;
+        let attrMatch: RegExpExecArray | null;
+        while ((attrMatch = attrRegex.exec(inlineAttrs)) !== null) {
+          parsedAttrs[attrMatch[1]] = attrMatch[2];
+        }
+
+        const attrs = blockType === 'sidebarCallout'
+          ? { title: parsedAttrs.title || 'Note', calloutType: parsedAttrs.calloutType || 'info' }
+          : undefined;
+
         content.push({
           type: blockType,
-          attrs: blockType === 'sidebarCallout'
-            ? { title: 'Note', calloutType: 'info' }
-            : undefined,
+          attrs,
           content: parseInlineContent(blockContent),
         });
       } else {
@@ -269,6 +279,44 @@ export function markdownToTipTap(markdown: string): TipTapNode {
       continue;
     }
 
+    // ── Code fence (triple backtick)
+    if (line.match(/^```/)) {
+      const langMatch = line.match(/^```(\w+)?/);
+      const language = langMatch?.[1] || null;
+      const codeLines: string[] = [];
+      i++;
+      while (i < lines.length && !lines[i].match(/^```\s*$/)) {
+        codeLines.push(lines[i]);
+        i++;
+      }
+      i++; // skip closing ```
+      content.push({
+        type: 'codeBlock',
+        attrs: language ? { language } : {},
+        content: codeLines.length > 0
+          ? [{ type: 'text', text: codeLines.join('\n') }]
+          : undefined,
+      });
+      continue;
+    }
+
+    // ── Blockquote
+    if (line.match(/^>\s?/)) {
+      const quoteLines: string[] = [];
+      while (i < lines.length && lines[i].match(/^>\s?/)) {
+        quoteLines.push(lines[i].replace(/^>\s?/, ''));
+        i++;
+      }
+      content.push({
+        type: 'blockquote',
+        content: [{
+          type: 'paragraph',
+          content: parseInlineMarks(quoteLines.join(' ')),
+        }],
+      });
+      continue;
+    }
+
     // ── Horizontal rule
     if (line.match(/^---+\s*$/) || line.match(/^\*\*\*+\s*$/)) {
       content.push({ type: 'horizontalRule' });
@@ -292,7 +340,9 @@ export function markdownToTipTap(markdown: string): TipTapNode {
       !lines[i].match(/^[-*]\s+/) &&
       !lines[i].match(/^\d+\.\s+/) &&
       !lines[i].match(/^---+\s*$/) &&
-      !lines[i].match(/^\*\*\*+\s*$/)
+      !lines[i].match(/^\*\*\*+\s*$/) &&
+      !lines[i].match(/^```/) &&
+      !lines[i].match(/^>\s?/)
     ) {
       paraLines.push(lines[i]);
       i++;
@@ -317,38 +367,45 @@ function parseInlineContent(text: string): TipTapNode[] {
   }));
 }
 
-/** Parse inline bold/italic marks in a line of text */
+/** Parse inline bold/italic/code marks in a line of text */
 export function parseInlineMarks(text: string): TipTapNode[] {
   const nodes: TipTapNode[] = [];
-  // Regex matches: **bold**, *italic*, ***bold+italic***, or plain text
-  const regex = /(\*\*\*(.+?)\*\*\*|\*\*(.+?)\*\*|\*(.+?)\*|([^*]+))/g;
+  // Regex: `code`, ***bold+italic***, **bold**, *italic*, or plain text
+  const regex = /(`(.+?)`|\*\*\*(.+?)\*\*\*|\*\*(.+?)\*\*|\*(.+?)\*|([^`*]+))/g;
   let match: RegExpExecArray | null;
 
   while ((match = regex.exec(text)) !== null) {
     if (match[2]) {
-      // ***bold+italic***
+      // `inline code`
       nodes.push({
         type: 'text',
         text: match[2],
-        marks: [{ type: 'bold' }, { type: 'italic' }],
+        marks: [{ type: 'code' }],
       });
     } else if (match[3]) {
-      // **bold**
+      // ***bold+italic***
       nodes.push({
         type: 'text',
         text: match[3],
-        marks: [{ type: 'bold' }],
+        marks: [{ type: 'bold' }, { type: 'italic' }],
       });
     } else if (match[4]) {
-      // *italic*
+      // **bold**
       nodes.push({
         type: 'text',
         text: match[4],
-        marks: [{ type: 'italic' }],
+        marks: [{ type: 'bold' }],
       });
     } else if (match[5]) {
+      // *italic*
+      nodes.push({
+        type: 'text',
+        text: match[5],
+        marks: [{ type: 'italic' }],
+      });
+    } else if (match[6]) {
       // plain text
-      nodes.push({ type: 'text', text: match[5] });
+      nodes.push({ type: 'text', text: match[6] });
     }
   }
 

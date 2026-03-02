@@ -136,7 +136,25 @@
   column-count: 1;
 }
 
-.page-canvas .ProseMirror > * {
+/* Only prevent column breaks inside D&D blocks and complex elements,
+   NOT plain paragraphs (which must flow naturally across columns) */
+.page-canvas .ProseMirror > .stat-block,
+.page-canvas .ProseMirror > .spell-card,
+.page-canvas .ProseMirror > .magic-item,
+.page-canvas .ProseMirror > .read-aloud-box,
+.page-canvas .ProseMirror > .sidebar-callout,
+.page-canvas .ProseMirror > .npc-profile,
+.page-canvas .ProseMirror > .random-table,
+.page-canvas .ProseMirror > .encounter-table,
+.page-canvas .ProseMirror > .class-feature,
+.page-canvas .ProseMirror > .race-block,
+.page-canvas .ProseMirror > .handout,
+.page-canvas .ProseMirror > .map-block,
+.page-canvas .ProseMirror > .page-border,
+.page-canvas .ProseMirror > .full-bleed-image,
+.page-canvas .ProseMirror > blockquote,
+.page-canvas .ProseMirror > pre,
+.page-canvas .ProseMirror > table {
   break-inside: avoid;
 }
 
@@ -229,7 +247,6 @@
   background: var(--divider-gradient);
   margin: 1.5rem 0;
   position: relative;
-  column-span: all;
 }
 
 .page-canvas .ProseMirror hr::before {
@@ -274,6 +291,33 @@
 
 .page-canvas .ProseMirror tr:nth-child(even) td {
   background: var(--table-stripe-bg);
+}
+
+/* Inline code */
+.page-canvas .ProseMirror code {
+  background: rgba(0, 0, 0, 0.06);
+  padding: 0.15em 0.35em;
+  border-radius: 3px;
+  font-size: 0.85em;
+  font-family: 'Courier New', Courier, monospace;
+}
+
+/* Code blocks */
+.page-canvas .ProseMirror pre {
+  background: rgba(0, 0, 0, 0.06);
+  padding: 1rem;
+  border-radius: 4px;
+  overflow-x: auto;
+  margin: 1rem 0;
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.page-canvas .ProseMirror pre code {
+  background: none;
+  padding: 0;
+  border-radius: 0;
+  font-size: inherit;
 }
 
 .page-canvas .ProseMirror ul,
@@ -329,7 +373,9 @@
 .handout:hover .block-delete-btn,
 .full-bleed-image:hover .block-delete-btn,
 .map-block:hover .block-delete-btn,
-.page-border:hover .block-delete-btn {
+.page-border:hover .block-delete-btn,
+.read-aloud-box:hover .block-delete-btn,
+.sidebar-callout:hover .block-delete-btn {
   opacity: 1;
 }
 
@@ -411,18 +457,24 @@
 /* ── Responsive Page Canvas ─────────────────────────────────── */
 
 @media (max-width: 900px) {
+  .editor-outer {
+    padding: 1rem 0.5rem;
+  }
   .page-canvas {
-    transform: scale(0.85);
-    transform-origin: top center;
-    margin-bottom: -6rem;
+    width: 100%;
+    max-width: 816px;
+    min-height: auto;
+    padding: 48px 36px 48px 42px;
+  }
+  .page-canvas .ProseMirror {
+    column-count: 1;
+    min-height: auto;
   }
 }
 
 @media (max-width: 700px) {
   .page-canvas {
-    transform: scale(0.65);
-    transform-origin: top center;
-    margin-bottom: -16rem;
+    padding: 32px 20px 32px 24px;
   }
 }
 
