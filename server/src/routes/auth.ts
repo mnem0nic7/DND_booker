@@ -11,6 +11,7 @@ import {
   verifyRefreshToken,
   incrementTokenVersion,
 } from '../services/auth.service.js';
+import { redis } from '../config/redis.js';
 
 const router = Router();
 
@@ -23,33 +24,42 @@ const authRateLimit = rateLimit({
   message: { error: 'Too many attempts. Please try again later.' },
 });
 
-// Per-account lockout tracking (in-memory, resets on server restart)
-const failedLoginAttempts = new Map<string, { count: number; lastAttempt: number }>();
+// Per-account lockout tracking via Redis (persists across restarts)
 const ACCOUNT_LOCKOUT_THRESHOLD = 10;
-const ACCOUNT_LOCKOUT_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
+const ACCOUNT_LOCKOUT_TTL = 900; // 15 minutes in seconds
 
-function checkAccountLockout(email: string): boolean {
-  const record = failedLoginAttempts.get(email);
-  if (!record) return false;
-  if (Date.now() - record.lastAttempt > ACCOUNT_LOCKOUT_WINDOW_MS) {
-    failedLoginAttempts.delete(email);
+function lockoutKey(email: string): string {
+  return `lockout:${email}`;
+}
+
+async function checkAccountLockout(email: string): Promise<boolean> {
+  const raw = await redis.get(lockoutKey(email));
+  if (!raw) return false;
+  try {
+    const record = JSON.parse(raw) as { count: number };
+    return record.count >= ACCOUNT_LOCKOUT_THRESHOLD;
+  } catch {
     return false;
   }
-  return record.count >= ACCOUNT_LOCKOUT_THRESHOLD;
 }
 
-function recordFailedLogin(email: string): void {
-  const record = failedLoginAttempts.get(email);
-  if (record && Date.now() - record.lastAttempt < ACCOUNT_LOCKOUT_WINDOW_MS) {
-    record.count++;
-    record.lastAttempt = Date.now();
-  } else {
-    failedLoginAttempts.set(email, { count: 1, lastAttempt: Date.now() });
+async function recordFailedLogin(email: string): Promise<void> {
+  const key = lockoutKey(email);
+  const raw = await redis.get(key);
+  let count = 1;
+  if (raw) {
+    try {
+      const record = JSON.parse(raw) as { count: number };
+      count = record.count + 1;
+    } catch {
+      // corrupted data, reset
+    }
   }
+  await redis.set(key, JSON.stringify({ count }), 'EX', ACCOUNT_LOCKOUT_TTL);
 }
 
-function clearFailedLogins(email: string): void {
-  failedLoginAttempts.delete(email);
+async function clearFailedLogins(email: string): Promise<void> {
+  await redis.del(lockoutKey(email));
 }
 
 const registerSchema = z.object({
@@ -104,15 +114,15 @@ router.post('/login', authRateLimit, asyncHandler(async (req: Request, res: Resp
     return;
   }
 
-  // Per-account lockout check
-  if (checkAccountLockout(parsed.data.email)) {
+  // Per-account lockout check (Redis-backed)
+  if (await checkAccountLockout(parsed.data.email)) {
     res.status(429).json({ error: 'Account temporarily locked due to too many failed attempts. Please try again later.' });
     return;
   }
 
   try {
     const user = await loginUser(parsed.data.email, parsed.data.password);
-    clearFailedLogins(parsed.data.email);
+    await clearFailedLogins(parsed.data.email);
     const accessToken = generateAccessToken(user.id);
     const refreshToken = generateRefreshToken(user.id, user.tokenVersion);
 
@@ -127,7 +137,7 @@ router.post('/login', authRateLimit, asyncHandler(async (req: Request, res: Resp
     res.json({ user: userResponse, accessToken });
   } catch (err: unknown) {
     if (err instanceof Error && err.message === 'INVALID_CREDENTIALS') {
-      recordFailedLogin(parsed.data.email);
+      await recordFailedLogin(parsed.data.email);
       console.warn(`[SECURITY] Failed login attempt for ${parsed.data.email} from ${req.ip}`);
       res.status(401).json({ error: 'Invalid email or password' });
       return;

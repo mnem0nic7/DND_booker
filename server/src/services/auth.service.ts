@@ -70,9 +70,14 @@ export async function registerUser(email: string, password: string, displayName:
   return user;
 }
 
+// Pre-hashed dummy for timing-safe user-not-found path
+const DUMMY_HASH = '$2b$12$LJ3m4yPmLsgJJl8t2nOmqOQYCmn3qGZ7.QfGv0u9y7PdVLKXFKWeS';
+
 export async function loginUser(email: string, password: string) {
   const user = await prisma.user.findUnique({ where: { email } });
   if (!user) {
+    // Perform a dummy compare to normalize response timing
+    await bcrypt.compare(password, DUMMY_HASH);
     throw new Error('INVALID_CREDENTIALS');
   }
 

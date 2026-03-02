@@ -5,6 +5,7 @@ import path from 'path';
 import os from 'os';
 
 const execFileAsync = promisify(execFile);
+const PANDOC_TIMEOUT_MS = 30_000; // 30 seconds
 
 /**
  * Generate an ePub file from an HTML string using the Pandoc CLI.
@@ -37,7 +38,7 @@ export async function generateEpub(html: string, title: string): Promise<Buffer>
       '--standalone',
       '--metadata', `title:${safeTitle}`,
       '--embed-resources',
-    ]);
+    ], { timeout: PANDOC_TIMEOUT_MS });
 
     return await fs.readFile(outputPath);
   } catch (error: unknown) {

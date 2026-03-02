@@ -19,8 +19,10 @@ const SUPPORTED_BLOCK_TYPES = aiContent.getSupportedBlockTypes();
 const MAX_CHAT_CONTEXT_MESSAGES = 30;
 const MAX_SESSION_MESSAGES = 200; // hard cap per session
 const MAX_AI_RESPONSE_TOKENS = 4096;
-const MAX_OLLAMA_RESPONSE_TOKENS = 1024;
+const MAX_OLLAMA_RESPONSE_TOKENS = 2048;
+const MIN_OUTPUT_TOKENS = 64; // floor to prevent Ollama "below minimum" errors
 const MAX_STORED_CONTENT = 100_000;
+const MAX_SSE_BYTES = 512_000; // 500KB cap on SSE stream output
 
 // --- Settings routes (no project context) ---
 export const aiSettingsRoutes = Router();
@@ -370,6 +372,7 @@ aiChatRoutes.post('/ai/chat', validateUuid('projectId'), chatRateLimit, asyncHan
 
     // Collect the full response for persistence
     let fullResponse = '';
+    let totalBytes = 0;
     const stream = streamResult.textStream;
 
     // Set up streaming headers
@@ -378,6 +381,11 @@ aiChatRoutes.post('/ai/chat', validateUuid('projectId'), chatRateLimit, asyncHan
 
     for await (const chunk of stream) {
       if (abortController.signal.aborted) break;
+      totalBytes += Buffer.byteLength(chunk, 'utf8');
+      if (totalBytes > MAX_SSE_BYTES) {
+        res.write('\n\n[Stream limit reached]');
+        break;
+      }
       fullResponse += chunk;
       res.write(chunk);
     }
@@ -548,9 +556,11 @@ aiChatRoutes.post('/ai/memory/reset', validateUuid('projectId'), memoryRateLimit
 export const aiWizardRoutes = Router({ mergeParams: true });
 aiWizardRoutes.use(requireAuth);
 
-/** Helper to send an SSE event (newline-delimited JSON) */
-function sendWizardEvent(res: Response, event: WizardEvent) {
-  res.write(JSON.stringify(event) + '\n');
+/** Helper to send an SSE event (newline-delimited JSON). Returns bytes written. */
+function sendWizardEvent(res: Response, event: WizardEvent): number {
+  const data = JSON.stringify(event) + '\n';
+  res.write(data);
+  return Buffer.byteLength(data, 'utf8');
 }
 
 /** Helper to set up SSE response headers */
@@ -573,13 +583,18 @@ async function runSectionGeneration(
   const generatedSections: WizardGeneratedSection[] = [];
   const previousSummaries: string[] = [];
   const totalSections = outline.sections.length;
+  let wizardBytes = 0;
 
   try {
     for (let idx = 0; idx < totalSections; idx++) {
       const section = outline.sections[idx];
       if (abortController.signal.aborted) break;
+      if (wizardBytes > MAX_SSE_BYTES) {
+        sendWizardEvent(res, { type: 'error', error: 'Stream size limit reached.' });
+        break;
+      }
 
-      sendWizardEvent(res, { type: 'section_start', sectionId: section.id, title: section.title });
+      wizardBytes += sendWizardEvent(res, { type: 'section_start', sectionId: section.id, title: section.title });
 
       try {
         const result = await aiWizard.generateSection(
@@ -609,8 +624,8 @@ async function runSectionGeneration(
           progress,
         });
 
-        sendWizardEvent(res, { type: 'section_done', sectionId: section.id });
-        sendWizardEvent(res, { type: 'progress', percent: progress });
+        wizardBytes += sendWizardEvent(res, { type: 'section_done', sectionId: section.id });
+        wizardBytes += sendWizardEvent(res, { type: 'progress', percent: progress });
       } catch (err: unknown) {
         if (abortController.signal.aborted) break;
 
@@ -627,7 +642,7 @@ async function runSectionGeneration(
 
         await aiWizard.updateSession(sessionId, { sections: generatedSections });
 
-        sendWizardEvent(res, {
+        wizardBytes += sendWizardEvent(res, {
           type: 'section_error',
           sectionId: section.id,
           error: 'Failed to generate this section.',
@@ -1024,9 +1039,10 @@ async function getModelForUser(userId: string) {
   const settings = await aiSettings.getAiSettings(userId);
   if (!settings?.provider) return null;
 
-  const maxOutputTokens = settings.provider === 'ollama'
-    ? MAX_OLLAMA_RESPONSE_TOKENS
-    : MAX_AI_RESPONSE_TOKENS;
+  const maxOutputTokens = Math.max(
+    MIN_OUTPUT_TOKENS,
+    settings.provider === 'ollama' ? MAX_OLLAMA_RESPONSE_TOKENS : MAX_AI_RESPONSE_TOKENS,
+  );
 
   // Ollama doesn't require an API key
   if (settings.provider === 'ollama') {
