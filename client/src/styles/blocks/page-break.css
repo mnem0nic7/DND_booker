@@ -1,6 +1,6 @@
 .page-break {
   position: relative;
-  margin: 1.5rem 0;
+  margin: 0;
   padding: 0.5rem 0;
 }
 
@@ -18,19 +18,19 @@
   gap: 0.75rem;
 }
 
-/* Dashed lines */
+/* Dashed lines — lighter for dark gap background */
 .page-break__line {
   flex: 1;
   height: 0;
-  border-top: 2px dashed #9ca3af;
+  border-top: 2px dashed #6b7280;
 }
 
-/* Label */
+/* Label — lighter for dark gap background */
 .page-break__label {
   font-family: system-ui, sans-serif;
   font-size: 0.75rem;
   font-weight: 600;
-  color: #9ca3af;
+  color: #d1d5db;
   text-transform: uppercase;
   letter-spacing: 0.1em;
   white-space: nowrap;
