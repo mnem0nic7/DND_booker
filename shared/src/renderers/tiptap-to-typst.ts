@@ -267,18 +267,19 @@ function renderStatBlock(attrs: Record<string, unknown>): string {
   const abilityLabels = ['STR', 'DEX', 'CON', 'INT', 'WIS', 'CHA'];
 
   let t = '';
-  t += `#block(width: 100%, fill: theme-stat-block-bg, stroke: (left: 3pt + theme-stat-block-border), inset: 12pt, radius: 2pt)[\n`;
+  t += `#block(width: 100%, fill: theme-stat-block-bg, stroke: (top: 4pt + theme-stat-block-border, bottom: 4pt + theme-stat-block-border), inset: 12pt)[\n`;
+  t += `  #set text(font: stat-font)\n`;
 
   // Header
   t += `  #text(font: heading-font, size: 16pt, weight: "bold")[${name}]\n`;
-  t += `  #text(style: "italic")[${size} ${type}, ${alignment}]\n`;
-  t += `  #line(length: 100%, stroke: theme-divider)\n`;
+  t += `  #text(size: 9pt, style: "italic")[${size} ${type}, ${alignment}]\n`;
+  t += `  #line(length: 100%, stroke: 1.5pt + theme-primary)\n`;
 
   // Core stats
   t += `  *Armor Class* ${ac}${acType ? ` (${escapeTypst(acType)})` : ''}\n`;
   t += `  *Hit Points* ${hp}${hitDice ? ` (${escapeTypst(hitDice)})` : ''}\n`;
   t += `  *Speed* ${speed}\n`;
-  t += `  #line(length: 100%, stroke: theme-divider)\n`;
+  t += `  #line(length: 100%, stroke: 1.5pt + theme-primary)\n`;
 
   // Ability scores table
   t += `  #table(\n`;
@@ -295,7 +296,7 @@ function renderStatBlock(attrs: Record<string, unknown>): string {
   t += `    ${headerCells.join(', ')},\n`;
   t += `    ${scoreCells.join(', ')},\n`;
   t += `  )\n`;
-  t += `  #line(length: 100%, stroke: theme-divider)\n`;
+  t += `  #line(length: 100%, stroke: 1.5pt + theme-primary)\n`;
 
   // Optional properties
   const optionalProps: Array<[string, string]> = [
@@ -325,40 +326,43 @@ function renderStatBlock(attrs: Record<string, unknown>): string {
   // Traits
   const traits = parseJsonArray<NameDesc>(String(attrs.traits || '[]'));
   if (traits.length > 0) {
-    t += `  #line(length: 100%, stroke: theme-divider)\n`;
+    t += `  #line(length: 100%, stroke: 1.5pt + theme-primary)\n`;
     for (const trait of traits) {
-      t += `  *${escapeTypst(trait.name)}.* ${escapeTypst(trait.description)}\n\n`;
+      t += `  _*${escapeTypst(trait.name)}.*_ ${escapeTypst(trait.description)}\n\n`;
     }
   }
 
   // Actions
   const actions = parseJsonArray<NameDesc>(String(attrs.actions || '[]'));
   if (actions.length > 0) {
-    t += `  #text(size: 14pt, weight: "bold")[Actions]\n`;
+    t += `  #text(size: 14pt, weight: "bold", fill: theme-primary)[Actions]\n`;
+    t += `  #line(length: 100%, stroke: 0.5pt + theme-primary)\n`;
     for (const action of actions) {
-      t += `  *${escapeTypst(action.name)}.* ${escapeTypst(action.description)}\n\n`;
+      t += `  _*${escapeTypst(action.name)}.*_ ${escapeTypst(action.description)}\n\n`;
     }
   }
 
   // Reactions
   const reactions = parseJsonArray<NameDesc>(String(attrs.reactions || '[]'));
   if (reactions.length > 0) {
-    t += `  #text(size: 14pt, weight: "bold")[Reactions]\n`;
+    t += `  #text(size: 14pt, weight: "bold", fill: theme-primary)[Reactions]\n`;
+    t += `  #line(length: 100%, stroke: 0.5pt + theme-primary)\n`;
     for (const reaction of reactions) {
-      t += `  *${escapeTypst(reaction.name)}.* ${escapeTypst(reaction.description)}\n\n`;
+      t += `  _*${escapeTypst(reaction.name)}.*_ ${escapeTypst(reaction.description)}\n\n`;
     }
   }
 
   // Legendary Actions
   const legendaryActions = parseJsonArray<NameDesc>(String(attrs.legendaryActions || '[]'));
   if (legendaryActions.length > 0) {
-    t += `  #text(size: 14pt, weight: "bold")[Legendary Actions]\n`;
+    t += `  #text(size: 14pt, weight: "bold", fill: theme-primary)[Legendary Actions]\n`;
+    t += `  #line(length: 100%, stroke: 0.5pt + theme-primary)\n`;
     const legendaryDescription = String(attrs.legendaryDescription || '');
     if (legendaryDescription) {
       t += `  ${escapeTypst(legendaryDescription)}\n\n`;
     }
     for (const la of legendaryActions) {
-      t += `  *${escapeTypst(la.name)}.* ${escapeTypst(la.description)}\n\n`;
+      t += `  _*${escapeTypst(la.name)}.*_ ${escapeTypst(la.description)}\n\n`;
     }
   }
 
@@ -368,8 +372,8 @@ function renderStatBlock(attrs: Record<string, unknown>): string {
 
 function renderReadAloudBox(attrs: Record<string, unknown>, content?: TipTapNode[]): string {
   let t = '';
-  t += `#block(width: 100%, fill: theme-read-aloud-bg, stroke: (left: 4pt + theme-read-aloud-border), inset: 12pt, radius: 2pt)[\n`;
-  t += `  #text(weight: "bold", size: 10pt)[Read Aloud]\n`;
+  t += `#block(width: 100%, fill: theme-read-aloud-bg, stroke: 1pt + theme-read-aloud-border, inset: 12pt)[\n`;
+  t += `  #set text(font: stat-font)\n`;
   t += `  ${renderInlineChildren(content)}\n`;
   t += `]\n\n`;
   return t;
@@ -379,7 +383,8 @@ function renderSidebarCallout(attrs: Record<string, unknown>, content?: TipTapNo
   const title = escapeTypst(String(attrs.title || 'Note'));
 
   let t = '';
-  t += `#block(width: 100%, fill: theme-sidebar-bg, inset: 12pt, radius: 2pt)[\n`;
+  t += `#block(width: 100%, fill: theme-sidebar-bg, stroke: 1pt + theme-primary, inset: 12pt)[\n`;
+  t += `  #set text(font: stat-font)\n`;
   t += `  #text(font: heading-font, weight: "bold", size: 12pt)[${title}]\n`;
   t += `  ${renderInlineChildren(content)}\n`;
   t += `]\n\n`;
@@ -393,7 +398,7 @@ function renderChapterHeader(attrs: Record<string, unknown>): string {
 
   let t = '';
   if (chapterNumber) {
-    t += `#text(font: heading-font, size: 14pt, fill: theme-secondary)[${escapeTypst(chapterNumber)}]\n\n`;
+    t += `#text(font: title-font, size: 14pt, fill: theme-secondary)[${escapeTypst(chapterNumber)}]\n\n`;
   }
   t += `= ${title}\n\n`;
   t += `#line(length: 100%, stroke: theme-divider)\n\n`;
@@ -470,6 +475,7 @@ function renderRandomTable(attrs: Record<string, unknown>): string {
 
   let t = '';
   t += `#block(width: 100%, inset: 0pt)[\n`;
+  t += `  #set text(font: stat-font)\n`;
   t += `  #text(font: heading-font, size: 14pt, weight: "bold")[${title}] #h(1fr) #text(size: 10pt)[${dieType}]\n\n`;
   t += `  #table(\n`;
   t += `    columns: (auto, 1fr),\n`;
@@ -544,6 +550,7 @@ function renderEncounterTable(attrs: Record<string, unknown>): string {
 
   let t = '';
   t += `#block(width: 100%, inset: 0pt)[\n`;
+  t += `  #set text(font: stat-font)\n`;
   t += `  #text(font: heading-font, size: 14pt, weight: "bold")[${environment} Encounters]\n`;
   t += `  #text(size: 10pt)[CR Range: ${crRange}]\n\n`;
   t += `  #table(\n`;
@@ -688,7 +695,7 @@ function renderTitlePage(attrs: Record<string, unknown>): string {
     t += `  #v(1fr)\n`;
   }
 
-  t += `  #text(font: heading-font, size: 28pt, weight: "bold")[${title}]\n`;
+  t += `  #text(font: title-font, size: 28pt, weight: "bold")[${title}]\n`;
   if (subtitle) {
     t += `  #v(8pt)\n`;
     t += `  #text(size: 16pt, style: "italic")[${escapeTypst(subtitle)}]\n`;
@@ -711,7 +718,7 @@ function renderTableOfContents(attrs: Record<string, unknown>): string {
 
   let t = '';
   t += `#set page(columns: 1)\n`;
-  t += `#text(font: heading-font, size: 20pt, weight: "bold")[${title}]\n\n`;
+  t += `#text(font: title-font, size: 20pt, weight: "bold")[${title}]\n\n`;
   t += `#outline(title: none, depth: 3)\n\n`;
   t += `#pagebreak()\n`;
   t += `#set page(columns: 2)\n\n`;
@@ -726,7 +733,7 @@ function renderCreditsPage(attrs: Record<string, unknown>): string {
   let t = '';
   t += `#set page(columns: 1)\n`;
   t += `#align(center)[\n`;
-  t += `  #text(font: heading-font, size: 20pt, weight: "bold")[Credits]\n\n`;
+  t += `  #text(font: title-font, size: 20pt, weight: "bold")[Credits]\n\n`;
 
   const lines = credits.split('\n');
   for (const line of lines) {

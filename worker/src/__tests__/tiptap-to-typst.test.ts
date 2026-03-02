@@ -304,7 +304,6 @@ describe('TipTap-to-Typst Renderer', () => {
       }));
       expect(result).toContain('theme-read-aloud-bg');
       expect(result).toContain('theme-read-aloud-border');
-      expect(result).toContain('Read Aloud');
       expect(result).toContain('You enter a dark room.');
     });
   });
