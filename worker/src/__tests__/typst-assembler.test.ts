@@ -199,13 +199,13 @@ describe('Typst Assembler', () => {
       expect(source).toContain('#let theme-primary = rgb("#58180d")');
     });
 
-    it('should include column-gutter in page setup', () => {
+    it('should include column gutter setting', () => {
       const source = assembleTypst({
         documents: [],
         theme: 'dmguild',
         projectTitle: 'Test',
       });
-      expect(source).toContain('column-gutter: 0.9cm');
+      expect(source).toContain('#set columns(gutter: 0.9cm)');
     });
 
     it('should include H4 heading show rule', () => {

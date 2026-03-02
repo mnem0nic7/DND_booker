@@ -38,10 +38,10 @@ export function assembleTypst(options: AssembleTypstOptions): string {
   t += themeVars + '\n\n';
 
   // 2. Page setup
+  t += `#set columns(gutter: 0.9cm)\n`;
   t += `#set page(\n`;
   t += `  paper: "us-letter",\n`;
   t += `  columns: 2,\n`;
-  t += `  column-gutter: 0.9cm,\n`;
 
   if (printReady) {
     t += `  margin: (top: 0.875in, bottom: 0.875in, inside: 0.875in, outside: 0.75in),\n`;
