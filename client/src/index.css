@@ -30,6 +30,7 @@
 @import './styles/blocks/table-of-contents.css';
 @import './styles/blocks/credits-page.css';
 @import './styles/blocks/back-cover.css';
+@import './styles/blocks/auto-page-gap.css';
 
 /* AI Assistant */
 @import './styles/ai-chat.css';

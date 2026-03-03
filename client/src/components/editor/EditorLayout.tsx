@@ -37,6 +37,7 @@ import { TitlePage } from '../blocks/TitlePage/TitlePageExtension';
 import { TableOfContents } from '../blocks/TableOfContents/TableOfContentsExtension';
 import { CreditsPage } from '../blocks/CreditsPage/CreditsPageExtension';
 import { BackCover } from '../blocks/BackCover/BackCoverExtension';
+import { AutoPagination } from '../../extensions/AutoPagination';
 import { usePageAlignment } from '../../hooks/usePageAlignment';
 import { Toolbar } from './Toolbar';
 import { FloatingBlockPicker } from './FloatingBlockPicker';
@@ -68,7 +69,7 @@ export function EditorLayout({ projectId, content, onUpdate }: EditorLayoutProps
   const [sectionName, setSectionName] = useState('');
 
   const editor = useEditor({
-    extensions: [StarterKit.configure({ link: false, underline: false }), Underline, Link.configure({ openOnClick: false, HTMLAttributes: { rel: 'noopener noreferrer nofollow' } }), TextAlign.configure({ types: ['heading', 'paragraph'] }), Superscript, Subscript, Highlight.configure({ multicolor: true }), TextStyle, FontSize, DropCap, Table.configure({ resizable: false }), TableRow, TableHeader, TableCell, StatBlock, ReadAloudBox, SidebarCallout, ChapterHeader, SpellCard, MagicItem, RandomTable, NpcProfile, EncounterTable, ClassFeature, RaceBlock, FullBleedImage, MapBlock, Handout, PageBorder, PageBreak, ColumnBreak, TitlePage, TableOfContents, CreditsPage, BackCover],
+    extensions: [StarterKit.configure({ link: false, underline: false }), Underline, Link.configure({ openOnClick: false, HTMLAttributes: { rel: 'noopener noreferrer nofollow' } }), TextAlign.configure({ types: ['heading', 'paragraph'] }), Superscript, Subscript, Highlight.configure({ multicolor: true }), TextStyle, FontSize, DropCap, Table.configure({ resizable: false }), TableRow, TableHeader, TableCell, StatBlock, ReadAloudBox, SidebarCallout, ChapterHeader, SpellCard, MagicItem, RandomTable, NpcProfile, EncounterTable, ClassFeature, RaceBlock, FullBleedImage, MapBlock, Handout, PageBorder, PageBreak, ColumnBreak, TitlePage, TableOfContents, CreditsPage, BackCover, AutoPagination],
     content,
     immediatelyRender: false,
     onUpdate: ({ editor: ed }) => {

@@ -1,0 +1,40 @@
+/* Auto-pagination gap — inserted as ProseMirror widget decorations.
+   Height is set dynamically via inline style.
+   Top portion is transparent (parchment shows through),
+   bottom 56px is the dark gap between pages (::after). */
+
+.auto-page-gap {
+  column-span: all;
+  /* Extend to page-canvas edges, cancelling the 72px parent padding */
+  margin: 0 -72px;
+  /* Top margin for the next page (parchment shows through).
+     Use content-box so padding-bottom adds to the inline height
+     instead of eating into it (Tailwind 4 sets border-box globally). */
+  box-sizing: content-box;
+  padding-bottom: 48px;
+  background: transparent;
+  pointer-events: none;
+  user-select: none;
+  position: relative;
+}
+
+.auto-page-gap::after {
+  content: '';
+  display: block;
+  position: absolute;
+  /* Sit above the padding-bottom area */
+  bottom: 48px;
+  left: 0;
+  right: 0;
+  height: 56px;
+  background: #374151;
+  box-shadow:
+    inset 0 6px 10px -4px rgba(0, 0, 0, 0.35),
+    inset 0 -6px 10px -4px rgba(0, 0, 0, 0.35);
+}
+
+@media print {
+  .auto-page-gap {
+    display: none;
+  }
+}

@@ -99,17 +99,78 @@ function truncate(str: string, maxLen: number): string {
   return clean.slice(0, maxLen - 1) + '\u2026';
 }
 
+// --- Height estimation for pagination awareness ---
+
+// Page layout constants (must match client usePageAlignment + CSS)
+const PAGE_HEIGHT = 864; // 1056px page - 72px top - 72px bottom - 48px margin reserve
+const LINE_HEIGHT = 17;  // 9.5pt * 1.35 line-height ≈ 17px
+const CHARS_PER_COL_LINE = 40; // ~320px column width at 9.5pt
+
+// Node types that span both columns (column-span: all in CSS)
+const COLUMN_SPANNING_TYPES = new Set([
+  'titlePage', 'creditsPage', 'backCover', 'tableOfContents',
+  'chapterHeader', 'fullBleedImage', 'pageBreak', 'columnBreak',
+]);
+
+/** Count entries in a JSON-encoded array string or actual array. */
+function countEntries(entries: unknown): number {
+  if (typeof entries === 'string') {
+    try { return JSON.parse(entries).length; } catch { return 4; }
+  }
+  if (Array.isArray(entries)) return entries.length;
+  return 4;
+}
+
+/** Estimate the rendered height of a node in pixels (single-column basis). */
+function estimateNodeHeight(node: TipTapNode): number {
+  const textLen = extractTextContent(node).length;
+  const textLines = Math.max(1, Math.ceil(textLen / CHARS_PER_COL_LINE));
+
+  switch (node.type) {
+    case 'paragraph':
+      if (!textLen) return 20;
+      return textLines * LINE_HEIGHT + 6; // +6 for margin-bottom
+    case 'heading': {
+      const sizes: Record<number, number> = { 1: 50, 2: 40, 3: 32, 4: 28 };
+      return sizes[(node.attrs?.level as number) || 1] || 28;
+    }
+    case 'pageBreak': return 56;
+    case 'horizontalRule': return 40;
+    case 'columnBreak': return 0;
+    case 'statBlock': return 300 + Math.min(textLines * 8, 300);
+    case 'spellCard': return 180 + Math.min(textLines * 8, 200);
+    case 'magicItem': return 160 + Math.min(textLines * 8, 200);
+    case 'npcProfile': return 250;
+    case 'randomTable': return 80 + countEntries(node.attrs?.entries) * 24;
+    case 'encounterTable': return 80 + countEntries(node.attrs?.entries) * 24;
+    case 'sidebarCallout': return 100 + textLines * LINE_HEIGHT;
+    case 'readAloudBox': return 60 + textLines * LINE_HEIGHT;
+    case 'chapterHeader': return 200;
+    case 'titlePage': return PAGE_HEIGHT;
+    case 'creditsPage': return 400;
+    case 'backCover': return 400;
+    case 'classFeature': return 80 + textLines * LINE_HEIGHT;
+    case 'raceBlock': return 200;
+    case 'handout': return 250;
+    case 'fullBleedImage': return PAGE_HEIGHT;
+    case 'tableOfContents': return 300;
+    default: return 30;
+  }
+}
+
 const MAX_OUTLINE_NODES = 200;
 
 /**
- * Build a compact indexed outline from TipTap JSON content.
- * Returns null if content is empty or invalid.
+ * Build a compact indexed outline from TipTap JSON content with page
+ * position annotations. Estimates node heights and tracks which page
+ * each node falls on, so the AI can reason about pagination.
  *
  * Example output:
- * [0] heading(1): "Title Page"
- * [1] paragraph: "Your Campaign Title"
- * [2] pageBreak
- * [3] statBlock: "Goblin"
+ * [0] titlePage: "The Lost Mine" (~864px) [P1 100%]
+ * [1] pageBreak [P1→2]
+ * [2] heading(1): "Chapter 1" (~50px) [P2 6%]
+ * [3] paragraph: "The adventurers arrive..." (~40px) [P2 11%]
+ * [4] statBlock: "Goblin" (~400px) [P2 57%]
  */
 export function buildDocumentOutline(content: unknown): string | null {
   if (!content || typeof content !== 'object') return null;
@@ -119,43 +180,90 @@ export function buildDocumentOutline(content: unknown): string | null {
   const nodes = doc.content.slice(0, MAX_OUTLINE_NODES);
   const lines: string[] = [];
 
+  let currentPage = 1;
+  let pageFill = 0;       // px used on current page
+  let columnBuffer = 0;   // accumulated column-flowing content height
+  let overflowCount = 0;
+  let pageBreakCount = 0;
+
   for (let i = 0; i < nodes.length; i++) {
     const node = nodes[i];
     const type = node.type;
+    const height = estimateNodeHeight(node);
+    const isSpanning = COLUMN_SPANNING_TYPES.has(type);
 
-    // Structural nodes with no meaningful text preview
-    if (type === 'pageBreak' || type === 'columnBreak' || type === 'horizontalRule') {
-      lines.push(`[${i}] ${type}`);
+    // --- Page position tracking ---
+    if (type === 'pageBreak') {
+      // Flush column buffer before break
+      if (columnBuffer > 0) {
+        pageFill += Math.ceil(columnBuffer * 0.55);
+        columnBuffer = 0;
+      }
+      const pct = Math.min(100, Math.round((pageFill / PAGE_HEIGHT) * 100));
+      lines.push(`[${i}] pageBreak [P${currentPage} ${pct}%→P${currentPage + 1}]`);
+      currentPage++;
+      pageFill = 0;
+      pageBreakCount++;
       continue;
     }
 
-    // Heading: show level + text
-    if (type === 'heading') {
+    if (isSpanning) {
+      // Flush column buffer for spanning element
+      if (columnBuffer > 0) {
+        pageFill += Math.ceil(columnBuffer * 0.55);
+        columnBuffer = 0;
+      }
+      // Check overflow
+      if (pageFill + height > PAGE_HEIGHT && pageFill > 0) {
+        currentPage++;
+        pageFill = 0;
+        overflowCount++;
+      }
+      pageFill += height;
+    } else {
+      // Column-flowing content
+      columnBuffer += height;
+      const effectiveFill = pageFill + Math.ceil(columnBuffer * 0.55);
+      if (effectiveFill > PAGE_HEIGHT && pageFill > 0) {
+        currentPage++;
+        pageFill = 0;
+        columnBuffer = height; // only this node on new page
+        overflowCount++;
+      }
+    }
+
+    // --- Build label ---
+    const totalFill = pageFill + Math.ceil(columnBuffer * 0.55);
+    const pct = Math.min(100, Math.round((totalFill / PAGE_HEIGHT) * 100));
+    let label: string;
+
+    if (type === 'columnBreak' || type === 'horizontalRule') {
+      label = `[${i}] ${type}`;
+    } else if (type === 'heading') {
       const level = node.attrs?.level ?? '';
       const text = truncate(extractTextContent(node), 60);
-      lines.push(`[${i}] heading(${level}): "${text}"`);
-      continue;
-    }
-
-    // Paragraph: short preview
-    if (type === 'paragraph') {
+      label = `[${i}] heading(${level}): "${text}" (~${height}px)`;
+    } else if (type === 'paragraph') {
       const text = extractTextContent(node);
       if (!text.trim()) {
-        lines.push(`[${i}] paragraph: (empty)`);
+        label = `[${i}] paragraph: (empty)`;
       } else {
-        lines.push(`[${i}] paragraph: "${truncate(text, 40)}"`);
+        label = `[${i}] paragraph: "${truncate(text, 40)}" (~${height}px)`;
       }
-      continue;
+    } else {
+      const name = node.attrs?.name || node.attrs?.title || node.attrs?.adventureTitle || '';
+      if (name) {
+        label = `[${i}] ${type}: "${truncate(String(name), 40)}" (~${height}px)`;
+      } else {
+        label = `[${i}] ${type} (~${height}px)`;
+      }
     }
 
-    // D&D blocks: show name/title from attrs
-    const name = node.attrs?.name || node.attrs?.title || node.attrs?.adventureTitle || '';
-    if (name) {
-      lines.push(`[${i}] ${type}: "${truncate(String(name), 40)}"`);
-    } else {
-      lines.push(`[${i}] ${type}`);
-    }
+    lines.push(`${label} [P${currentPage} ${pct}%]`);
   }
+
+  // Summary line
+  lines.push(`--- ${nodes.length} nodes, ~${currentPage} pages, ${pageBreakCount} page breaks, ${overflowCount} auto-paginated boundaries ---`);
 
   if (nodes.length < (doc.content?.length ?? 0)) {
     lines.push(`... (${doc.content!.length - MAX_OUTLINE_NODES} more nodes truncated)`);
@@ -176,21 +284,42 @@ export function buildSystemPrompt(projectTitle?: string, documentOutline?: strin
     prompt += `
 
 === DOCUMENT STRUCTURE ===
-The user's document currently has this structure (node index in brackets):
+The user's document currently has this structure. Each line shows:
+  [nodeIndex] type: "preview" (~estimatedHeight) [Page# fill%]
+
 ${documentOutline}
 === END DOCUMENT STRUCTURE ===
 
-=== DOCUMENT EDITING MODE ===
-When the user asks to "fix pagination", "add page breaks", "fix formatting", "clean up layout", "remove duplicate breaks", or similar document-level requests, you can modify the document structure by emitting a \`_documentEdit\` control block.
+=== PAGE LAYOUT MODEL ===
+- Each page is 8.5×11 inches (816×1056px). Usable content area: ~864px height.
+- Content renders in a TWO-COLUMN layout (each column ~320px wide).
+- Column-flowing nodes (paragraphs, headings, stat blocks, etc.) fill left column then right column, effectively halving their height contribution to the page.
+- Column-spanning nodes (titlePage, chapterHeader, creditsPage, backCover, fullBleedImage) span both columns and use their full height.
+- The editor automatically inserts visual page boundaries (auto-page-gaps) at ~864px intervals. These are ProseMirror decorations — NOT document nodes — so they are invisible to undo/redo and the document structure above.
+- Auto-page-gaps appear as dark gaps with parchment margins, providing visual page separation without any manual intervention.
+- Manual pageBreak nodes serve as INTENTIONAL SECTION STARTERS (e.g., new chapters, fresh pages for important content). They force content to the next page.
+- Do NOT add pageBreak nodes just to prevent content overflow — auto-pagination already handles visual page separation gracefully.
+- Height estimates (~Npx) and fill percentages (N%) are approximate. "Auto-paginated boundaries" in the summary indicate where auto-page-gaps will appear — these are NOT problems to fix.
+=== END PAGE LAYOUT MODEL ===
 
-Output a \`\`\`json code block like this:
+=== DOCUMENT EDITING MODE ===
+When the user asks to "fix pagination", "add page breaks", "fix formatting", "clean up layout", "remove duplicate breaks", or similar document-level requests, you MUST modify the document structure by emitting a \`_documentEdit\` control block in a \`\`\`json code fence.
+
+CRITICAL: You MUST always output the \`\`\`json block below. Do NOT just describe what you would do — the JSON block is what actually applies the changes. Without it, nothing happens. Even if you determine no changes are needed, output the block with an empty operations array.
+
+Example — your response should look like this:
+
+I analyzed the document and found several pagination issues. Here's what I'm fixing:
+- Adding a page break before Chapter 3 (node 45) since it starts at 85% of page 5
+- Removing the duplicate page break at node 22
+
 \`\`\`json
 {
   "_documentEdit": true,
-  "description": "Added page breaks before each chapter heading",
+  "description": "Fixed pagination: added break before Chapter 3, removed duplicate at node 22",
   "operations": [
-    {"op": "insertBefore", "nodeIndex": 5, "node": {"type": "pageBreak"}},
-    {"op": "remove", "nodeIndex": 12}
+    {"op": "insertBefore", "nodeIndex": 45, "node": {"type": "pageBreak"}},
+    {"op": "remove", "nodeIndex": 22}
   ]
 }
 \`\`\`
@@ -202,15 +331,21 @@ Supported operations:
 
 Insertable node types: pageBreak, columnBreak, horizontalRule
 
-RULES:
+PAGINATION RULES:
+- Auto-pagination handles all visual page separation. Use pageBreak ONLY for intentional section boundaries.
+- Don't treat overflow points or auto-paginated boundaries in the outline as problems — auto-gaps handle them.
 - Reference nodes by their [index] from the document structure above
-- Insert pageBreak before major H1 headings (chapters) for proper pagination
+- WHEN TO INSERT pageBreak:
+  - Before a chapter heading (H1) that isn't already at the start of a page (fill% > ~10%) — chapters deserve fresh pages
+  - Only when the user specifically asks to start a block or section on a fresh page
+- WHEN TO REMOVE pageBreak:
+  - Remove pageBreak nodes that create nearly-empty pages (less than ~15% content before the next break)
+  - Remove consecutive/duplicate pageBreak nodes
 - NEVER insert a break before the very first node (index 0)
-- NEVER insert duplicate breaks (check if a pageBreak already exists adjacent)
+- NEVER insert a break right after an existing pageBreak
 - Prefer minimal changes — only add/remove what's needed
 - The "description" field should briefly explain what you did
-- Include the _documentEdit block AFTER your conversational response
-- Always explain what changes you're making in your visible response text
+- ALWAYS output the \`\`\`json block with _documentEdit — this is NOT optional
 === END DOCUMENT EDITING MODE ===`;
   }
 
