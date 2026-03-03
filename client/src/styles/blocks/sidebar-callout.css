@@ -4,7 +4,7 @@
   margin: 1rem 0;
   border-radius: 4px;
   font-family: system-ui, -apple-system, sans-serif;
-  font-size: 0.9rem;
+  font-size: 0.9em;
   line-height: 1.5;
 }
 
@@ -53,7 +53,7 @@
 
 .sidebar-callout__title {
   font-weight: 700;
-  font-size: 1rem;
+  font-size: 1em;
   cursor: text;
 }
 
@@ -71,7 +71,7 @@
 
 .sidebar-callout__title-input {
   font-weight: 700;
-  font-size: 1rem;
+  font-size: 1em;
   border: 1px solid #ccc;
   border-radius: 3px;
   padding: 0.1rem 0.3rem;
@@ -151,4 +151,24 @@
 
 .sidebar-callout__content p:last-child {
   margin-bottom: 0;
+}
+
+/* List styles inside callout content */
+.sidebar-callout__content ul,
+.sidebar-callout__content ol {
+  margin: 0 0 0.5rem;
+  padding-left: 1.25em;
+}
+
+.sidebar-callout__content ul:last-child,
+.sidebar-callout__content ol:last-child {
+  margin-bottom: 0;
+}
+
+.sidebar-callout__content li {
+  margin-bottom: 0.2rem;
+}
+
+.sidebar-callout__content li p {
+  margin: 0;
 }

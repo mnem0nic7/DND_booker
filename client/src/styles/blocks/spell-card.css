@@ -10,7 +10,7 @@
 
 .spell-card__name {
   font-family: var(--heading-font);
-  font-size: 1.5rem;
+  font-size: 1.5em;
   font-weight: 700;
   color: var(--spell-card-accent);
   margin: 0;
@@ -18,7 +18,7 @@
 }
 
 .spell-card__subtitle {
-  font-size: 0.85rem;
+  font-size: 0.85em;
   font-style: italic;
   color: var(--spell-card-accent);
   margin-bottom: 0.5rem;
@@ -32,7 +32,7 @@
 }
 
 .spell-card__property {
-  font-size: 0.875rem;
+  font-size: 0.875em;
   line-height: 1.4;
   color: var(--text-color);
 }
@@ -43,14 +43,14 @@
 }
 
 .spell-card__description {
-  font-size: 0.875rem;
+  font-size: 0.875em;
   line-height: 1.5;
   color: var(--text-color);
   margin: 0.5rem 0;
 }
 
 .spell-card__higher-levels {
-  font-size: 0.875rem;
+  font-size: 0.875em;
   line-height: 1.5;
   color: var(--text-color);
   margin-top: 0.5rem;

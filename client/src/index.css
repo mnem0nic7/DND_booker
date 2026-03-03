@@ -170,22 +170,24 @@
   column-count: 1;
 }
 
-/* Only prevent column breaks inside D&D blocks and complex elements,
-   NOT plain paragraphs (which must flow naturally across columns) */
-.page-canvas .ProseMirror > .stat-block,
-.page-canvas .ProseMirror > .spell-card,
-.page-canvas .ProseMirror > .magic-item,
-.page-canvas .ProseMirror > .read-aloud-box,
-.page-canvas .ProseMirror > .sidebar-callout,
-.page-canvas .ProseMirror > .npc-profile,
-.page-canvas .ProseMirror > .random-table,
-.page-canvas .ProseMirror > .encounter-table,
-.page-canvas .ProseMirror > .class-feature,
-.page-canvas .ProseMirror > .race-block,
-.page-canvas .ProseMirror > .handout,
-.page-canvas .ProseMirror > .map-block,
-.page-canvas .ProseMirror > .page-border,
-.page-canvas .ProseMirror > .full-bleed-image,
+/* Prevent column/page breaks inside D&D blocks and complex elements.
+   TipTap wraps custom blocks in .node-<name> divs via ReactNodeViewRenderer,
+   so we target those wrapper classes (not the inner .stat-block etc.) */
+.page-canvas .ProseMirror > .node-statBlock,
+.page-canvas .ProseMirror > .node-spellCard,
+.page-canvas .ProseMirror > .node-magicItem,
+.page-canvas .ProseMirror > .node-readAloudBox,
+.page-canvas .ProseMirror > .node-sidebarCallout,
+.page-canvas .ProseMirror > .node-npcProfile,
+.page-canvas .ProseMirror > .node-randomTable,
+.page-canvas .ProseMirror > .node-encounterTable,
+.page-canvas .ProseMirror > .node-classFeature,
+.page-canvas .ProseMirror > .node-raceBlock,
+.page-canvas .ProseMirror > .node-handout,
+.page-canvas .ProseMirror > .node-mapBlock,
+.page-canvas .ProseMirror > .node-pageBorder,
+.page-canvas .ProseMirror > .node-fullBleedImage,
+.page-canvas .ProseMirror > .node-chapterHeader,
 .page-canvas .ProseMirror > blockquote,
 .page-canvas .ProseMirror > pre,
 .page-canvas .ProseMirror > table {
@@ -302,6 +304,16 @@
   background: var(--divider-gradient);
   margin: 1.5rem 0;
   position: relative;
+}
+
+/* Block-internal dividers: tighter spacing than standalone hr */
+.page-canvas .ProseMirror .stat-block__divider,
+.page-canvas .ProseMirror .spell-card__divider,
+.page-canvas .ProseMirror .magic-item__divider,
+.page-canvas .ProseMirror .npc-profile__divider,
+.page-canvas .ProseMirror .race-block__divider,
+.page-canvas .ProseMirror .class-feature__divider {
+  margin: 0.35rem 0;
 }
 
 .page-canvas .ProseMirror hr::before {

@@ -4,7 +4,7 @@
   margin: 1rem 0;
   border-radius: 4px;
   font-family: var(--body-font);
-  font-size: 0.95rem;
+  font-size: 0.95em;
   font-style: italic;
   line-height: 1.6;
 }
@@ -41,7 +41,7 @@
 
 .read-aloud-box__label {
   font-family: var(--heading-font);
-  font-size: 0.7rem;
+  font-size: 0.7em;
   font-style: normal;
   font-weight: 700;
   text-transform: uppercase;

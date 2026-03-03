@@ -10,7 +10,7 @@
 
 .stat-block__name {
   font-family: var(--heading-font);
-  font-size: 1.5rem;
+  font-size: 1.5em;
   font-weight: 700;
   color: var(--accent-color);
   margin: 0;
@@ -18,7 +18,7 @@
 }
 
 .stat-block__subtitle {
-  font-size: 0.85rem;
+  font-size: 0.85em;
   font-style: italic;
   color: var(--accent-color);
   margin-bottom: 0.5rem;
@@ -27,12 +27,12 @@
 .stat-block__divider {
   height: 2px;
   background: linear-gradient(to right, var(--stat-block-border), transparent);
-  margin: 0.5rem 0;
+  margin: 0.35rem 0;
   border: none;
 }
 
 .stat-block__property {
-  font-size: 0.875rem;
+  font-size: 0.875em;
   line-height: 1.4;
   color: var(--text-color);
 }
@@ -46,26 +46,26 @@
   display: flex;
   justify-content: space-around;
   text-align: center;
-  margin: 0.5rem 0;
+  margin: 0.25rem 0;
 }
 
 .stat-block__ability {
-  font-size: 0.8rem;
+  font-size: 0.8em;
 }
 
 .stat-block__ability-name {
   font-weight: 700;
   color: var(--accent-color);
-  font-size: 0.75rem;
+  font-size: 0.75em;
   text-transform: uppercase;
 }
 
 .stat-block__ability-score {
-  font-size: 0.875rem;
+  font-size: 0.875em;
 }
 
 .stat-block__section-title {
-  font-size: 1.1rem;
+  font-size: 1.1em;
   font-weight: 700;
   color: var(--accent-color);
   border-bottom: 1px solid var(--stat-block-border);
@@ -79,7 +79,7 @@
 }
 
 .stat-block__trait {
-  font-size: 0.875rem;
+  font-size: 0.875em;
   line-height: 1.4;
   margin-bottom: 0.35rem;
 }

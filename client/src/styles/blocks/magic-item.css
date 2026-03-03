@@ -10,7 +10,7 @@
 
 .magic-item__name {
   font-family: var(--heading-font);
-  font-size: 1.5rem;
+  font-size: 1.5em;
   font-weight: 700;
   color: var(--magic-item-accent);
   margin: 0;
@@ -18,7 +18,7 @@
 }
 
 .magic-item__subtitle {
-  font-size: 0.85rem;
+  font-size: 0.85em;
   font-style: italic;
   color: var(--magic-item-accent);
   margin-bottom: 0.5rem;
@@ -32,14 +32,14 @@
 }
 
 .magic-item__description {
-  font-size: 0.875rem;
+  font-size: 0.875em;
   line-height: 1.5;
   color: var(--text-color);
   margin: 0.5rem 0;
 }
 
 .magic-item__properties {
-  font-size: 0.875rem;
+  font-size: 0.875em;
   line-height: 1.5;
   color: var(--text-color);
   margin-top: 0.5rem;
