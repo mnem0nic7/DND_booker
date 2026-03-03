@@ -61,6 +61,15 @@ function createGapElement(fillHeight: number): HTMLElement {
   return el;
 }
 
+/** Transparent filler at the end of the document so the last page is full-height. */
+function createPageTailElement(fillHeight: number): HTMLElement {
+  const el = document.createElement('div');
+  el.className = 'auto-page-tail';
+  el.style.height = `${fillHeight}px`;
+  el.setAttribute('contenteditable', 'false');
+  return el;
+}
+
 /** Classify top-level nodes into spanning segments and column groups. */
 function buildSegments(doc: PMNode): Segment[] {
   const segments: Segment[] = [];
@@ -108,12 +117,17 @@ interface GapInfo {
   fillHeight: number;
 }
 
-function computeGaps(view: EditorView): GapInfo[] {
+interface ComputeResult {
+  gaps: GapInfo[];
+  lastPageFill: number;
+}
+
+function computeGaps(view: EditorView): ComputeResult {
   const { doc } = view.state;
-  if (doc.childCount === 0) return [];
+  if (doc.childCount === 0) return { gaps: [], lastPageFill: 0 };
 
   const segments = buildSegments(doc);
-  if (segments.length === 0) return [];
+  if (segments.length === 0) return { gaps: [], lastPageFill: 0 };
 
   const pmEl = view.dom as HTMLElement;
   const pmRect = pmEl.getBoundingClientRect();
@@ -232,7 +246,7 @@ function computeGaps(view: EditorView): GapInfo[] {
     }
   }
 
-  return gaps;
+  return { gaps, lastPageFill: pageFill };
 }
 
 // ── Extension ──────────────────────────────────────────────
@@ -286,13 +300,20 @@ export const AutoPagination = Extension.create({
               void editorView.dom.offsetHeight;
 
               // Phase 3: Compute gap positions
-              const gaps = computeGaps(editorView);
+              const { gaps, lastPageFill } = computeGaps(editorView);
+
+              // Compute tail height to fill the last page to full height.
+              // Only add tail when content spans multiple pages (gaps exist)
+              // and the last page is partially filled.
+              const tailHeight = (gaps.length > 0 && lastPageFill > 0)
+                ? Math.max(0, PAGE_CONTENT_HEIGHT - lastPageFill)
+                : 0;
 
               // Phase 4: Skip dispatch if gaps haven't changed (prevents oscillation)
               const newKey = gaps
                 .map((g) => `${g.pos}:${g.fillHeight}`)
-                .join('|');
-              if (newKey === lastGapKey && gaps.length > 0) {
+                .join('|') + (tailHeight > 0 ? `|tail:${tailHeight}` : '');
+              if (newKey === lastGapKey && (gaps.length > 0 || tailHeight > 0)) {
                 // Re-apply same decorations (they were cleared in phase 1)
                 const decos = gaps.map((g) =>
                   Decoration.widget(g.pos, () => createGapElement(g.fillHeight), {
@@ -300,6 +321,15 @@ export const AutoPagination = Extension.create({
                     key: `auto-gap-${g.pos}`,
                   }),
                 );
+                if (tailHeight > 0) {
+                  decos.push(
+                    Decoration.widget(
+                      editorView.state.doc.content.size,
+                      () => createPageTailElement(tailHeight),
+                      { side: 1, key: 'auto-page-tail' },
+                    ),
+                  );
+                }
                 editorView.dispatch(
                   editorView.state.tr.setMeta(
                     pluginKey,
@@ -311,13 +341,22 @@ export const AutoPagination = Extension.create({
               lastGapKey = newKey;
 
               // Phase 5: Apply new decorations
-              if (gaps.length > 0) {
+              if (gaps.length > 0 || tailHeight > 0) {
                 const decos = gaps.map((g) =>
                   Decoration.widget(g.pos, () => createGapElement(g.fillHeight), {
                     side: -1,
                     key: `auto-gap-${g.pos}`,
                   }),
                 );
+                if (tailHeight > 0) {
+                  decos.push(
+                    Decoration.widget(
+                      editorView.state.doc.content.size,
+                      () => createPageTailElement(tailHeight),
+                      { side: 1, key: 'auto-page-tail' },
+                    ),
+                  );
+                }
                 editorView.dispatch(
                   editorView.state.tr.setMeta(
                     pluginKey,

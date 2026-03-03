@@ -33,8 +33,19 @@
     inset 0 -6px 10px -4px rgba(0, 0, 0, 0.35);
 }
 
+/* Page tail — transparent filler at the end of the document so the
+   last page extends to full height instead of shrinking to content. */
+.auto-page-tail {
+  column-span: all;
+  margin: 0 -72px;
+  background: transparent;
+  pointer-events: none;
+  user-select: none;
+}
+
 @media print {
-  .auto-page-gap {
+  .auto-page-gap,
+  .auto-page-tail {
     display: none;
   }
 }
