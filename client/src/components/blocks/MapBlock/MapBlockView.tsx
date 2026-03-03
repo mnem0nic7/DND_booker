@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { NodeViewWrapper } from '@tiptap/react';
 import type { ReactNodeViewProps } from '@tiptap/react';
 import type { MapBlockAttrs } from './MapBlockExtension';
+import { AiImageGenerateButton } from '../../ai/AiImageGenerateButton';
 import { ImageUploader } from '../../editor/ImageUploader';
 
 interface KeyEntry {
@@ -111,11 +112,18 @@ export function MapBlockView({
             <div className="map-block__edit-row">
               <label>Map Image</label>
               {projectId && (
-                <ImageUploader
-                  projectId={projectId}
-                  onUpload={(url) => updateAttr('src', url)}
-                  className="mb-2"
-                />
+                <>
+                  <ImageUploader
+                    projectId={projectId}
+                    onUpload={(url) => updateAttr('src', url)}
+                    className="mb-2"
+                  />
+                  <AiImageGenerateButton
+                    projectId={projectId}
+                    blockType="mapBlock"
+                    onGenerated={(url) => updateAttr('src', url)}
+                  />
+                </>
               )}
               <input
                 value={attrs.src}

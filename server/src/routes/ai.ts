@@ -2,7 +2,7 @@ import { Router, Response } from 'express';
 import { z } from 'zod';
 import { streamText, generateText } from 'ai';
 import { requireAuth, AuthRequest } from '../middleware/auth.js';
-import { chatRateLimit, blockGenRateLimit, autoFillRateLimit, aiValidationRateLimit, wizardRateLimit, memoryRateLimit } from '../middleware/ai-rate-limit.js';
+import { chatRateLimit, blockGenRateLimit, autoFillRateLimit, aiValidationRateLimit, wizardRateLimit, memoryRateLimit, imageGenRateLimit } from '../middleware/ai-rate-limit.js';
 import { asyncHandler } from '../middleware/async-handler.js';
 import { validateUuid } from '../middleware/validate-uuid.js';
 import * as aiSettings from '../services/ai-settings.service.js';
@@ -11,6 +11,8 @@ import * as aiContent from '../services/ai-content.service.js';
 import * as aiWizard from '../services/ai-wizard.service.js';
 import * as aiPlanner from '../services/ai-planner.service.js';
 import * as aiMemoryService from '../services/ai-memory.service.js';
+import * as aiImage from '../services/ai-image.service.js';
+import * as assetService from '../services/asset.service.js';
 import { createModel, validateApiKey, validateConnection, SUPPORTED_MODELS, type AiProvider } from '../services/ai-provider.service.js';
 import { prisma } from '../config/database.js';
 import type { WizardEvent, WizardGeneratedSection } from '@dnd-booker/shared';
@@ -277,6 +279,92 @@ aiGenerateRoutes.post('/autofill', autoFillRateLimit, asyncHandler(async (req: A
   } catch (err: unknown) {
     console.error('[AI] Auto-fill failed:', err);
     res.status(500).json({ error: 'AI auto-fill failed. Please try again.' });
+  }
+}));
+
+// --- Image generation route ---
+
+const generateImageSchema = z.object({
+  projectId: z.string().uuid(),
+  prompt: z.string().min(1).max(4000),
+  model: z.enum(['dall-e-3', 'gpt-image-1']),
+  size: z.string().regex(/^\d+x\d+$/).max(20),
+  quality: z.string().max(20).optional(),
+});
+
+aiGenerateRoutes.post('/generate-image', imageGenRateLimit, asyncHandler(async (req: AuthRequest, res: Response) => {
+  const parsed = generateImageSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'Validation failed' });
+    return;
+  }
+
+  const { projectId, prompt, model, size, quality } = parsed.data;
+
+  // Verify project ownership
+  const project = await prisma.project.findFirst({
+    where: { id: projectId, userId: req.userId! },
+  });
+  if (!project) {
+    res.status(404).json({ error: 'Project not found' });
+    return;
+  }
+
+  // Image generation requires OpenAI provider
+  const settings = await aiSettings.getAiSettings(req.userId!);
+  if (!settings || settings.provider !== 'openai') {
+    res.status(400).json({ error: 'Image generation requires OpenAI as your AI provider.' });
+    return;
+  }
+  if (!settings.hasApiKey) {
+    res.status(400).json({ error: 'No API key configured. Please add your OpenAI key in AI settings.' });
+    return;
+  }
+
+  const apiKey = await aiSettings.getDecryptedApiKey(req.userId!);
+  if (!apiKey) {
+    res.status(400).json({ error: 'Failed to decrypt API key.' });
+    return;
+  }
+
+  try {
+    const result = await aiImage.generateAiImage(apiKey, { prompt, model, size, quality });
+
+    // Decode base64 to Buffer and save as asset
+    const buffer = Buffer.from(result.base64, 'base64');
+    const filename = `ai-generated-${Date.now()}.png`;
+
+    const asset = await assetService.createAsset(projectId, req.userId!, {
+      originalname: filename,
+      mimetype: result.mimeType,
+      size: buffer.length,
+      buffer,
+    });
+
+    if (!asset) {
+      res.status(500).json({ error: 'Failed to save generated image.' });
+      return;
+    }
+
+    console.log(`[AI Image] Generated image for project ${projectId} (model=${model}, size=${size}, ${buffer.length} bytes)`);
+    res.json({ url: asset.url, assetId: asset.id });
+  } catch (err: unknown) {
+    console.error('[AI Image] Generation failed:', err);
+    const message = err instanceof Error ? err.message : String(err);
+
+    // Content policy violation
+    if (message.includes('content_policy') || message.includes('safety') || message.includes('rejected')) {
+      res.status(422).json({ error: 'Image rejected by content policy. Please revise your prompt.' });
+      return;
+    }
+
+    // Auth errors
+    if (message.includes('401') || message.includes('403') || message.includes('Unauthorized')) {
+      res.status(401).json({ error: 'Invalid API key. Please check your OpenAI key in AI settings.' });
+      return;
+    }
+
+    res.status(500).json({ error: 'Image generation failed. Please try again.' });
   }
 }));
 

@@ -81,6 +81,10 @@ interface AiState {
   resetPlan: (projectId: string) => Promise<void>;
   resetWorkingMemory: (projectId: string) => Promise<void>;
 
+  // Image generation
+  isGeneratingImage: boolean;
+  generateImage: (projectId: string, prompt: string, model: string, size: string, quality?: string) => Promise<string | null>;
+
   // Settings modal
   isSettingsModalOpen: boolean;
   setSettingsModalOpen: (open: boolean) => void;
@@ -355,6 +359,26 @@ export const useAiStore = create<AiState>((set, get) => ({
         const count = s._autoFillCount - 1;
         return { _autoFillCount: count, isAutoFilling: count > 0 };
       });
+    }
+  },
+
+  // Image generation
+  isGeneratingImage: false,
+
+  generateImage: async (projectId, prompt, model, size, quality?) => {
+    set({ isGeneratingImage: true });
+    try {
+      const { data } = await api.post('/ai/generate-image', { projectId, prompt, model, size, quality });
+      return data.url as string;
+    } catch (err) {
+      if (axios.isAxiosError(err) && err.response?.data?.error) {
+        console.error('[AI] generateImage failed:', err.response.data.error);
+      } else {
+        console.error('[AI] generateImage failed:', err);
+      }
+      return null;
+    } finally {
+      set({ isGeneratingImage: false });
     }
   },
 

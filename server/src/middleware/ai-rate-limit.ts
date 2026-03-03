@@ -61,6 +61,14 @@ export const memoryRateLimit = rateLimit({
   message: { error: 'Too many memory requests. Please wait a moment.' },
 });
 
+/** Rate limit for AI image generation (expensive: external API call + file I/O). */
+export const imageGenRateLimit = rateLimit({
+  windowMs: 60 * 1000,
+  max: 5,
+  keyGenerator: (req) => (req as AuthRequest).userId || req.ip || 'unknown',
+  message: { error: 'Too many image generation requests. Please wait.' },
+});
+
 /** Strict rate limit for AI key validation (prevents enumeration). */
 export const aiValidationRateLimit = rateLimit({
   windowMs: 60 * 1000,

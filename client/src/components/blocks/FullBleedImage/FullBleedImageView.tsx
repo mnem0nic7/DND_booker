@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { NodeViewWrapper } from '@tiptap/react';
 import type { ReactNodeViewProps } from '@tiptap/react';
 import type { FullBleedImageAttrs } from './FullBleedImageExtension';
+import { AiImageGenerateButton } from '../../ai/AiImageGenerateButton';
 import { ImageUploader } from '../../editor/ImageUploader';
 
 const POSITION_OPTIONS: { value: FullBleedImageAttrs['position']; label: string }[] = [
@@ -70,11 +71,18 @@ export function FullBleedImageView({
             <div className="full-bleed-image__edit-row">
               <label>Image</label>
               {projectId && (
-                <ImageUploader
-                  projectId={projectId}
-                  onUpload={(url) => updateAttr('src', url)}
-                  className="mb-2"
-                />
+                <>
+                  <ImageUploader
+                    projectId={projectId}
+                    onUpload={(url) => updateAttr('src', url)}
+                    className="mb-2"
+                  />
+                  <AiImageGenerateButton
+                    projectId={projectId}
+                    blockType="fullBleedImage"
+                    onGenerated={(url) => updateAttr('src', url)}
+                  />
+                </>
               )}
               <input
                 value={attrs.src}

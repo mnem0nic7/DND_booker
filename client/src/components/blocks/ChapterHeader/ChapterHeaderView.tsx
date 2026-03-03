@@ -5,6 +5,7 @@ import type { ReactNodeViewProps } from '@tiptap/react';
 import type { ChapterHeaderAttrs } from './ChapterHeaderExtension';
 import { AiGenerateButton } from '../../ai/AiGenerateButton';
 import { AiAutoFillButton } from '../../ai/AiAutoFillButton';
+import { AiImageGenerateButton } from '../../ai/AiImageGenerateButton';
 import { ImageUploader } from '../../editor/ImageUploader';
 
 export function ChapterHeaderView({
@@ -101,11 +102,18 @@ export function ChapterHeaderView({
             <div className="chapter-header__edit-row">
               <label>Background</label>
               {projectId && (
-                <ImageUploader
-                  projectId={projectId}
-                  onUpload={(url) => updateAttr('backgroundImage', url)}
-                  className="mb-2"
-                />
+                <>
+                  <ImageUploader
+                    projectId={projectId}
+                    onUpload={(url) => updateAttr('backgroundImage', url)}
+                    className="mb-2"
+                  />
+                  <AiImageGenerateButton
+                    projectId={projectId}
+                    blockType="chapterHeader"
+                    onGenerated={(url) => updateAttr('backgroundImage', url)}
+                  />
+                </>
               )}
               <input
                 value={attrs.backgroundImage}

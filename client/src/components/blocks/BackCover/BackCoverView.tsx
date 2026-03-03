@@ -5,6 +5,7 @@ import type { ReactNodeViewProps } from '@tiptap/react';
 import type { BackCoverAttrs } from './BackCoverExtension';
 import { AiGenerateButton } from '../../ai/AiGenerateButton';
 import { AiAutoFillButton } from '../../ai/AiAutoFillButton';
+import { AiImageGenerateButton } from '../../ai/AiImageGenerateButton';
 import { ImageUploader } from '../../editor/ImageUploader';
 
 export function BackCoverView({
@@ -125,11 +126,18 @@ export function BackCoverView({
             <div className="back-cover__edit-row">
               <label>Author Image</label>
               {projectId && (
-                <ImageUploader
-                  projectId={projectId}
-                  onUpload={(url) => updateAttr('authorImageUrl', url)}
-                  className="mb-2"
-                />
+                <>
+                  <ImageUploader
+                    projectId={projectId}
+                    onUpload={(url) => updateAttr('authorImageUrl', url)}
+                    className="mb-2"
+                  />
+                  <AiImageGenerateButton
+                    projectId={projectId}
+                    blockType="backCover"
+                    onGenerated={(url) => updateAttr('authorImageUrl', url)}
+                  />
+                </>
               )}
               <input
                 value={attrs.authorImageUrl}

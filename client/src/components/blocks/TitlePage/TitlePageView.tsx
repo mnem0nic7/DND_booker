@@ -5,6 +5,7 @@ import type { ReactNodeViewProps } from '@tiptap/react';
 import type { TitlePageAttrs } from './TitlePageExtension';
 import { AiGenerateButton } from '../../ai/AiGenerateButton';
 import { AiAutoFillButton } from '../../ai/AiAutoFillButton';
+import { AiImageGenerateButton } from '../../ai/AiImageGenerateButton';
 import { ImageUploader } from '../../editor/ImageUploader';
 
 export function TitlePageView({
@@ -113,11 +114,18 @@ export function TitlePageView({
             <div className="title-page__edit-row">
               <label>Cover Image</label>
               {projectId && (
-                <ImageUploader
-                  projectId={projectId}
-                  onUpload={(url) => updateAttr('coverImageUrl', url)}
-                  className="mb-2"
-                />
+                <>
+                  <ImageUploader
+                    projectId={projectId}
+                    onUpload={(url) => updateAttr('coverImageUrl', url)}
+                    className="mb-2"
+                  />
+                  <AiImageGenerateButton
+                    projectId={projectId}
+                    blockType="titlePage"
+                    onGenerated={(url) => updateAttr('coverImageUrl', url)}
+                  />
+                </>
               )}
               <input
                 value={attrs.coverImageUrl}
