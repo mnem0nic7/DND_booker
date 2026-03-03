@@ -76,7 +76,42 @@ Block rules:
 - Be PROACTIVE: creature → statBlock, spell → spellCard, item → magicItem, NPC → npcProfile
 - Include a brief conversational intro alongside the JSON blocks
 - Follow D&D 5e rules. Be creative but balanced
-- For general questions or brainstorming, respond conversationally — only use JSON blocks when generating insertable content`;
+- For general questions or brainstorming, respond conversationally — only use JSON blocks when generating insertable content
+
+=== AI IMAGE GENERATION ===
+The editor supports AI image generation for 5 image-capable block types: Title Page (cover art), Full Bleed Image (illustrations), Map Block (battle maps), Back Cover (author photo/art), and Chapter Header (background banner). Users with an OpenAI API key can generate images directly in each block's edit panel using DALL-E 3 or GPT Image 1.
+
+**When to recommend DALL-E 3:**
+- Artistic illustrations, cover art, character portraits, scenic landscapes
+- When the user wants a specific artistic style (vivid, dramatic, painterly)
+- Fantasy book covers, chapter banners, atmospheric scenes
+- Best for: visual storytelling, mood-setting imagery, polished final art
+- Sizes: 1024x1024 (square), 1792x1024 (landscape), 1024x1792 (portrait)
+
+**When to recommend GPT Image 1:**
+- Maps, diagrams, technical illustrations, layouts with text/labels
+- Handout-style images (wanted posters, letters, scrolls with legible text)
+- When text rendering accuracy matters (signs, runes, inscriptions)
+- Architectural plans, dungeon cross-sections, city layouts
+- Best for: precision, text in images, technical/schematic content
+- Sizes: 1024x1024 (square), 1536x1024 (landscape), 1024x1536 (portrait)
+
+**Size recommendations by block type:**
+- Title Page → Portrait (cover art needs vertical framing)
+- Full Bleed Image → Landscape (wide illustrations fill the page)
+- Map Block → Square (battle maps are typically square grids)
+- Back Cover → Square (small author photo or spot illustration)
+- Chapter Header → Landscape (wide banner across the page top)
+
+**Prompt tips you can share with users:**
+- Be specific about style: "oil painting style", "ink and watercolor", "old parchment map"
+- Reference D&D aesthetics: "in the style of official D&D 5e sourcebook art"
+- For maps: specify "top-down view", "no text labels" or "with labeled rooms"
+- For covers: describe the focal subject, background, lighting, and mood
+- Include "fantasy RPG" or "Dungeons & Dragons" to anchor the genre
+
+When discussing cover art, maps, illustrations, or visual elements in an adventure, proactively suggest using the AI image generation feature if relevant. Guide users on which model and size to pick based on their content needs.
+=== END AI IMAGE GENERATION ===`;
 
 // --- Document outline for AI document editing ---
 
@@ -343,8 +378,14 @@ function formatPageMetrics(metrics: PageMetricsSnapshot): string {
   return lines.join('\n');
 }
 
-export function buildSystemPrompt(projectTitle?: string, documentOutline?: string | null, documentTextSample?: string | null, pageMetrics?: PageMetricsSnapshot): string {
+export function buildSystemPrompt(projectTitle?: string, documentOutline?: string | null, documentTextSample?: string | null, pageMetrics?: PageMetricsSnapshot, provider?: string | null): string {
   let prompt = SYSTEM_PROMPT;
+
+  if (provider === 'openai') {
+    prompt += `\n\nNOTE: This user has OpenAI configured — AI image generation is AVAILABLE. You can suggest using the "Generate Image with AI" button on image blocks (Title Page, Full Bleed Image, Map Block, Back Cover, Chapter Header). Proactively recommend it when discussing visual content.`;
+  } else {
+    prompt += `\n\nNOTE: This user's AI provider is ${provider || 'not configured'}. AI image generation requires an OpenAI API key. If the user asks about generating images, let them know they can enable it by switching to OpenAI in AI Settings and adding their API key.`;
+  }
 
   if (projectTitle) {
     const safeTitle = projectTitle.slice(0, 200).replace(/["\\\n\r]/g, ' ');

@@ -467,7 +467,8 @@ aiChatRoutes.post('/ai/chat', validateUuid('projectId'), chatRateLimit, asyncHan
     const planningCtx = await aiPlanner.buildPlanningContext(projectId, req.userId!);
     const documentOutline = aiContent.buildDocumentOutline(project.content);
     const documentTextSample = aiContent.buildDocumentTextSample(project.content);
-    const systemPrompt = aiContent.buildSystemPrompt(project.title, documentOutline, documentTextSample, parsed.data.pageMetrics)
+    const userSettings = await aiSettings.getAiSettings(req.userId!);
+    const systemPrompt = aiContent.buildSystemPrompt(project.title, documentOutline, documentTextSample, parsed.data.pageMetrics, userSettings?.provider)
       + aiPlanner.buildPlanningPromptSection(planningCtx);
 
     // Abort the AI call if the client disconnects
