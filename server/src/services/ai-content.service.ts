@@ -1,3 +1,5 @@
+import type { PageMetricsSnapshot } from '@dnd-booker/shared';
+
 const SYSTEM_PROMPT = `You are a creative D&D 5e content assistant embedded in a document editor. You help DMs create campaign content.
 
 === ADVENTURE CREATION MODE (HIGHEST PRIORITY) ===
@@ -315,7 +317,33 @@ export function buildDocumentTextSample(content: unknown): string | null {
   return lines.length > 0 ? lines.join('\n') : null;
 }
 
-export function buildSystemPrompt(projectTitle?: string, documentOutline?: string | null, documentTextSample?: string | null): string {
+/** Format a PageMetricsSnapshot into a compact per-page summary for the AI prompt. */
+function formatPageMetrics(metrics: PageMetricsSnapshot): string {
+  const lines: string[] = [];
+  lines.push(`Page size: ${metrics.pageSize}, ${metrics.columnCount}-column, ${metrics.pageContentHeight}px content height`);
+  lines.push(`Total pages: ${metrics.totalPages}, blank: ${metrics.blankPageCount}, nearly blank: ${metrics.nearlyBlankPageCount}`);
+  lines.push('');
+
+  for (const p of metrics.pages) {
+    const parts: string[] = [];
+    parts.push(`P${p.page}: ${p.fillPercent}% (${p.contentHeight}/${p.pageHeight}px)`);
+    if (p.firstHeading) parts.push(`"${p.firstHeading}"`);
+
+    const flags: string[] = [];
+    if (p.isBlank) flags.push('BLANK');
+    else if (p.isNearlyBlank) flags.push('NEARLY BLANK');
+    if (flags.length > 0) parts.push(`[${flags.join(', ')}]`);
+
+    if (p.nodeTypes.length > 0) parts.push(`[${p.nodeTypes.join(', ')}]`);
+    parts.push(`→ ${p.boundaryType}`);
+
+    lines.push(parts.join(' '));
+  }
+
+  return lines.join('\n');
+}
+
+export function buildSystemPrompt(projectTitle?: string, documentOutline?: string | null, documentTextSample?: string | null, pageMetrics?: PageMetricsSnapshot): string {
   let prompt = SYSTEM_PROMPT;
 
   if (projectTitle) {
@@ -417,7 +445,19 @@ Rules:
 - nodeRef: -1 for general findings
 - category: "content" or "formatting"
 - Always provide your conversational analysis BEFORE the JSON block
+- When RENDERED PAGE METRICS are provided (below), use actual fill percentages from those instead of estimated heights. Specifically flag any pages marked BLANK or NEARLY BLANK as formatting issues.
 === END DOCUMENT EVALUATION MODE ===`;
+
+    if (pageMetrics) {
+      prompt += `
+
+=== RENDERED PAGE METRICS ===
+These are ACTUAL measurements from the live rendered DOM, overriding the estimated heights above.
+Use these fill percentages for page balance analysis — they reflect real pixel measurements.
+
+${formatPageMetrics(pageMetrics)}
+=== END RENDERED PAGE METRICS ===`;
+    }
 
     if (documentTextSample) {
       prompt += `

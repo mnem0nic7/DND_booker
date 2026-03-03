@@ -305,8 +305,31 @@ aiChatRoutes.get('/ai/chat', validateUuid('projectId'), asyncHandler(async (req:
   }
 }));
 
+const pageMetricSchema = z.object({
+  page: z.number(),
+  contentHeight: z.number(),
+  pageHeight: z.number(),
+  fillPercent: z.number(),
+  isBlank: z.boolean(),
+  isNearlyBlank: z.boolean(),
+  boundaryType: z.enum(['pageBreak', 'autoGap', 'end']),
+  nodeTypes: z.array(z.string()).max(10),
+  firstHeading: z.string().nullable(),
+});
+
+const pageMetricsSchema = z.object({
+  totalPages: z.number().max(500),
+  pageSize: z.enum(['letter', 'a4', 'a5']),
+  columnCount: z.number(),
+  pageContentHeight: z.number(),
+  pages: z.array(pageMetricSchema).max(500),
+  blankPageCount: z.number(),
+  nearlyBlankPageCount: z.number(),
+});
+
 const chatMessageSchema = z.object({
   message: z.string().min(1).max(5000),
+  pageMetrics: pageMetricsSchema.optional(),
 });
 
 aiChatRoutes.post('/ai/chat', validateUuid('projectId'), chatRateLimit, asyncHandler(async (req: AuthRequest, res: Response) => {
@@ -356,7 +379,7 @@ aiChatRoutes.post('/ai/chat', validateUuid('projectId'), chatRateLimit, asyncHan
     const planningCtx = await aiPlanner.buildPlanningContext(projectId, req.userId!);
     const documentOutline = aiContent.buildDocumentOutline(project.content);
     const documentTextSample = aiContent.buildDocumentTextSample(project.content);
-    const systemPrompt = aiContent.buildSystemPrompt(project.title, documentOutline, documentTextSample)
+    const systemPrompt = aiContent.buildSystemPrompt(project.title, documentOutline, documentTextSample, parsed.data.pageMetrics)
       + aiPlanner.buildPlanningPromptSection(planningCtx);
 
     // Abort the AI call if the client disconnects

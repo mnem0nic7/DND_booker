@@ -223,12 +223,12 @@
   user-select: none;
 }
 
-.page-canvas .title-page,
-.page-canvas .credits-page,
-.page-canvas .back-cover,
-.page-canvas .table-of-contents,
-.page-canvas .chapter-header,
-.page-canvas .full-bleed-image {
+.page-canvas .ProseMirror .node-titlePage,
+.page-canvas .ProseMirror .node-creditsPage,
+.page-canvas .ProseMirror .node-backCover,
+.page-canvas .ProseMirror .node-tableOfContents,
+.page-canvas .ProseMirror .node-chapterHeader,
+.page-canvas .ProseMirror .node-fullBleedImage {
   column-span: all;
 }
 

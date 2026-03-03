@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import api, { setAccessToken, getAccessToken } from '../lib/api';
 import axios from 'axios';
-import type { WizardEvent, WizardGeneratedSection, WizardOutline, PlanningState } from '@dnd-booker/shared';
+import type { WizardEvent, WizardGeneratedSection, WizardOutline, PlanningState, PageMetricsSnapshot } from '@dnd-booker/shared';
 
 export type AiProvider = 'anthropic' | 'openai' | 'ollama';
 
@@ -52,7 +52,7 @@ interface AiState {
   chatError: string | null;
   _chatRequestId: number;
   fetchChatHistory: (projectId: string) => Promise<void>;
-  sendMessage: (projectId: string, message: string) => Promise<void>;
+  sendMessage: (projectId: string, message: string, pageMetrics?: PageMetricsSnapshot) => Promise<void>;
   cancelStream: () => void;
   clearChat: (projectId: string) => Promise<void>;
 
@@ -165,7 +165,7 @@ export const useAiStore = create<AiState>((set, get) => ({
     }
   },
 
-  sendMessage: async (projectId, message) => {
+  sendMessage: async (projectId, message, pageMetrics?) => {
     // Abort any in-flight stream before starting a new one
     _streamAbortController?.abort();
     const abortController = new AbortController();
@@ -195,7 +195,7 @@ export const useAiStore = create<AiState>((set, get) => ({
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         credentials: 'include',
-        body: JSON.stringify({ message }),
+        body: JSON.stringify({ message, ...(pageMetrics ? { pageMetrics } : {}) }),
         signal: abortController.signal,
       });
     }

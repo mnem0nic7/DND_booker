@@ -66,3 +66,27 @@ export interface PlanningStateChanges {
   planUpdates: PlanUpdateBlock['_planUpdate'][];
   remembers: RememberBlock['_remember'][];
 }
+
+/** Actual rendered measurements for a single page region. */
+export interface PageMetric {
+  page: number;              // 1-based page number
+  contentHeight: number;     // actual rendered px between boundaries
+  pageHeight: number;        // --page-content-height (864 for letter)
+  fillPercent: number;       // contentHeight / pageHeight * 100
+  isBlank: boolean;          // < 5% fill
+  isNearlyBlank: boolean;    // < 15% fill
+  boundaryType: 'pageBreak' | 'autoGap' | 'end';
+  nodeTypes: string[];       // first ~10 node types on this page
+  firstHeading: string | null;
+}
+
+/** Snapshot of all rendered page metrics for AI evaluation. */
+export interface PageMetricsSnapshot {
+  totalPages: number;
+  pageSize: 'letter' | 'a4' | 'a5';
+  columnCount: number;
+  pageContentHeight: number;
+  pages: PageMetric[];
+  blankPageCount: number;
+  nearlyBlankPageCount: number;
+}

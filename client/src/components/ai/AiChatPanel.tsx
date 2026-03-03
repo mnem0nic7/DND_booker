@@ -5,6 +5,7 @@ import { useProjectStore } from '../../stores/projectStore';
 import { AiMessageBubble } from './AiMessageBubble';
 import { AiPlanPanel } from './AiPlanPanel';
 import { WizardChatProgress } from './WizardChatProgress';
+import { collectPageMetrics } from '../../lib/collectPageMetrics';
 import type { WizardOutline, DocumentEditOperation } from '@dnd-booker/shared';
 
 /**
@@ -439,7 +440,14 @@ export function AiChatPanel({ projectId, editor }: AiChatPanelProps) {
           {messages.length > 0 && !isStreaming && !wizardProgress?.isGenerating && (
             <div className="flex gap-2 mb-2">
               <button
-                onClick={() => sendMessage(projectId, 'Please evaluate my entire document for content quality and formatting. Review pacing, completeness, D&D best practices, block placement, and page balance.')}
+                onClick={() => {
+                  const metrics = editor ? collectPageMetrics(editor) : undefined;
+                  sendMessage(
+                    projectId,
+                    'Please evaluate my entire document for content quality and formatting. Review pacing, completeness, D&D best practices, block placement, and page balance.',
+                    metrics,
+                  );
+                }}
                 className="text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-md px-2.5 py-1.5 hover:border-purple-300 hover:text-purple-600 hover:bg-purple-50 transition-all"
               >
                 Evaluate Document
