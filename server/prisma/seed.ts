@@ -11,81 +11,43 @@ const systemTemplates = [
     content: {
       type: 'doc',
       content: [
+        { type: 'titlePage', attrs: { title: 'Campaign Title', subtitle: 'A D&D 5e Adventure', author: 'Author Name', coverImageUrl: '' } },
+        { type: 'pageBreak' },
+        { type: 'tableOfContents', attrs: { title: 'Table of Contents' } },
+        { type: 'pageBreak' },
         {
           type: 'heading',
-          attrs: { level: 1, textAlign: 'center' },
-          content: [{ type: 'text', text: 'Title Page' }],
-        },
-        {
-          type: 'paragraph',
-          attrs: { textAlign: 'center' },
-          content: [{ type: 'text', text: 'Your Campaign Title' }],
-        },
-        { type: 'horizontalRule' },
-        {
-          type: 'heading',
-          attrs: { level: 2 },
-          content: [{ type: 'text', text: 'Table of Contents' }],
-        },
-        {
-          type: 'bulletList',
-          content: [
-            { type: 'listItem', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Chapter 1' }] }] },
-            { type: 'listItem', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Chapter 2' }] }] },
-            { type: 'listItem', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Chapter 3' }] }] },
-          ],
-        },
-        { type: 'horizontalRule' },
-        {
-          type: 'heading',
-          attrs: { level: 2 },
+          attrs: { level: 1 },
           content: [{ type: 'text', text: 'Chapter 1' }],
         },
         {
           type: 'paragraph',
           content: [{ type: 'text', text: 'Begin writing your first chapter here...' }],
         },
-        { type: 'horizontalRule' },
+        { type: 'pageBreak' },
         {
           type: 'heading',
-          attrs: { level: 2 },
+          attrs: { level: 1 },
           content: [{ type: 'text', text: 'Chapter 2' }],
         },
         {
           type: 'paragraph',
           content: [{ type: 'text', text: 'Continue your adventure here...' }],
         },
-        { type: 'horizontalRule' },
+        { type: 'pageBreak' },
         {
           type: 'heading',
-          attrs: { level: 2 },
+          attrs: { level: 1 },
           content: [{ type: 'text', text: 'Chapter 3' }],
         },
         {
           type: 'paragraph',
           content: [{ type: 'text', text: 'Conclude or continue your story here...' }],
         },
-        { type: 'horizontalRule' },
-        {
-          type: 'heading',
-          attrs: { level: 2 },
-          content: [{ type: 'text', text: 'Credits' }],
-        },
-        {
-          type: 'paragraph',
-          content: [{ type: 'text', text: 'Written by: [Author Name]' }],
-        },
-        { type: 'horizontalRule' },
-        {
-          type: 'heading',
-          attrs: { level: 2, textAlign: 'center' },
-          content: [{ type: 'text', text: 'Back Cover' }],
-        },
-        {
-          type: 'paragraph',
-          attrs: { textAlign: 'center' },
-          content: [{ type: 'text', text: 'A brief blurb about your campaign...' }],
-        },
+        { type: 'pageBreak' },
+        { type: 'creditsPage', attrs: { credits: 'Written by Author Name', legalText: 'This work includes material taken from the System Reference Document 5.1 ("SRD 5.1") by Wizards of the Coast LLC. The SRD 5.1 is licensed under the Creative Commons Attribution 4.0 International License.', copyrightYear: new Date().getFullYear().toString() } },
+        { type: 'pageBreak' },
+        { type: 'backCover', attrs: { blurb: 'A thrilling adventure awaits! Deep in the forgotten ruins, an ancient evil stirs. Heroes must brave deadly traps, cunning monsters, and dark sorcery to save the realm from certain doom.', authorBio: 'Author Name is a tabletop RPG designer and storyteller.', authorImageUrl: '' } },
       ],
     },
   },
@@ -97,49 +59,21 @@ const systemTemplates = [
     content: {
       type: 'doc',
       content: [
+        { type: 'titlePage', attrs: { title: 'One-Shot Title', subtitle: 'A D&D 5e One-Shot', author: 'Author Name', coverImageUrl: '' } },
+        { type: 'pageBreak' },
+        { type: 'tableOfContents', attrs: { title: 'Table of Contents' } },
+        { type: 'pageBreak' },
         {
           type: 'heading',
-          attrs: { level: 1, textAlign: 'center' },
-          content: [{ type: 'text', text: 'Title Page' }],
-        },
-        {
-          type: 'paragraph',
-          attrs: { textAlign: 'center' },
-          content: [{ type: 'text', text: 'Your One-Shot Title' }],
-        },
-        { type: 'horizontalRule' },
-        {
-          type: 'heading',
-          attrs: { level: 2 },
-          content: [{ type: 'text', text: 'Table of Contents' }],
-        },
-        {
-          type: 'bulletList',
-          content: [
-            { type: 'listItem', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'The Adventure' }] }] },
-            { type: 'listItem', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Credits' }] }] },
-          ],
-        },
-        { type: 'horizontalRule' },
-        {
-          type: 'heading',
-          attrs: { level: 2 },
+          attrs: { level: 1 },
           content: [{ type: 'text', text: 'The Adventure' }],
         },
         {
           type: 'paragraph',
           content: [{ type: 'text', text: 'Begin writing your one-shot adventure here...' }],
         },
-        { type: 'horizontalRule' },
-        {
-          type: 'heading',
-          attrs: { level: 2 },
-          content: [{ type: 'text', text: 'Credits' }],
-        },
-        {
-          type: 'paragraph',
-          content: [{ type: 'text', text: 'Written by: [Author Name]' }],
-        },
+        { type: 'pageBreak' },
+        { type: 'creditsPage', attrs: { credits: 'Written by Author Name', legalText: 'This work includes material taken from the System Reference Document 5.1 ("SRD 5.1") by Wizards of the Coast LLC. The SRD 5.1 is licensed under the Creative Commons Attribution 4.0 International License.', copyrightYear: new Date().getFullYear().toString() } },
       ],
     },
   },
@@ -151,59 +85,31 @@ const systemTemplates = [
     content: {
       type: 'doc',
       content: [
+        { type: 'titlePage', attrs: { title: 'Supplement Title', subtitle: 'A D&D 5e Supplement', author: 'Author Name', coverImageUrl: '' } },
+        { type: 'pageBreak' },
+        { type: 'tableOfContents', attrs: { title: 'Table of Contents' } },
+        { type: 'pageBreak' },
         {
           type: 'heading',
-          attrs: { level: 1, textAlign: 'center' },
-          content: [{ type: 'text', text: 'Title Page' }],
-        },
-        {
-          type: 'paragraph',
-          attrs: { textAlign: 'center' },
-          content: [{ type: 'text', text: 'Your Supplement Title' }],
-        },
-        { type: 'horizontalRule' },
-        {
-          type: 'heading',
-          attrs: { level: 2 },
-          content: [{ type: 'text', text: 'Table of Contents' }],
-        },
-        {
-          type: 'bulletList',
-          content: [
-            { type: 'listItem', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Chapter 1' }] }] },
-            { type: 'listItem', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Chapter 2' }] }] },
-          ],
-        },
-        { type: 'horizontalRule' },
-        {
-          type: 'heading',
-          attrs: { level: 2 },
+          attrs: { level: 1 },
           content: [{ type: 'text', text: 'Chapter 1' }],
         },
         {
           type: 'paragraph',
           content: [{ type: 'text', text: 'Begin your first section of supplementary content...' }],
         },
-        { type: 'horizontalRule' },
+        { type: 'pageBreak' },
         {
           type: 'heading',
-          attrs: { level: 2 },
+          attrs: { level: 1 },
           content: [{ type: 'text', text: 'Chapter 2' }],
         },
         {
           type: 'paragraph',
           content: [{ type: 'text', text: 'Continue with additional content...' }],
         },
-        { type: 'horizontalRule' },
-        {
-          type: 'heading',
-          attrs: { level: 2 },
-          content: [{ type: 'text', text: 'Credits' }],
-        },
-        {
-          type: 'paragraph',
-          content: [{ type: 'text', text: 'Written by: [Author Name]' }],
-        },
+        { type: 'pageBreak' },
+        { type: 'creditsPage', attrs: { credits: 'Written by Author Name', legalText: 'This work includes material taken from the System Reference Document 5.1 ("SRD 5.1") by Wizards of the Coast LLC. The SRD 5.1 is licensed under the Creative Commons Attribution 4.0 International License.', copyrightYear: new Date().getFullYear().toString() } },
       ],
     },
   },
@@ -215,35 +121,13 @@ const systemTemplates = [
     content: {
       type: 'doc',
       content: [
+        { type: 'titlePage', attrs: { title: 'Sourcebook Title', subtitle: 'A D&D 5e Sourcebook', author: 'Author Name', coverImageUrl: '' } },
+        { type: 'pageBreak' },
+        { type: 'tableOfContents', attrs: { title: 'Table of Contents' } },
+        { type: 'pageBreak' },
         {
           type: 'heading',
-          attrs: { level: 1, textAlign: 'center' },
-          content: [{ type: 'text', text: 'Title Page' }],
-        },
-        {
-          type: 'paragraph',
-          attrs: { textAlign: 'center' },
-          content: [{ type: 'text', text: 'Your Sourcebook Title' }],
-        },
-        { type: 'horizontalRule' },
-        {
-          type: 'heading',
-          attrs: { level: 2 },
-          content: [{ type: 'text', text: 'Table of Contents' }],
-        },
-        {
-          type: 'bulletList',
-          content: [
-            { type: 'listItem', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Chapter 1: Classes' }] }] },
-            { type: 'listItem', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Chapter 2: Subclasses' }] }] },
-            { type: 'listItem', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Chapter 3: Races' }] }] },
-            { type: 'listItem', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Chapter 4: Spells & Abilities' }] }] },
-          ],
-        },
-        { type: 'horizontalRule' },
-        {
-          type: 'heading',
-          attrs: { level: 2 },
+          attrs: { level: 1 },
           content: [{ type: 'text', text: 'Chapter 1: Classes' }],
         },
         {
@@ -259,10 +143,10 @@ const systemTemplates = [
           type: 'paragraph',
           content: [{ type: 'text', text: 'Starting at Xth level, you gain the following feature...' }],
         },
-        { type: 'horizontalRule' },
+        { type: 'pageBreak' },
         {
           type: 'heading',
-          attrs: { level: 2 },
+          attrs: { level: 1 },
           content: [{ type: 'text', text: 'Chapter 2: Subclasses' }],
         },
         {
@@ -278,10 +162,10 @@ const systemTemplates = [
           type: 'paragraph',
           content: [{ type: 'text', text: 'At Xth level, this subclass grants the following ability...' }],
         },
-        { type: 'horizontalRule' },
+        { type: 'pageBreak' },
         {
           type: 'heading',
-          attrs: { level: 2 },
+          attrs: { level: 1 },
           content: [{ type: 'text', text: 'Chapter 3: Races' }],
         },
         {
@@ -305,10 +189,10 @@ const systemTemplates = [
           type: 'paragraph',
           content: [{ type: 'text', text: 'Describe the race traits and lore here...' }],
         },
-        { type: 'horizontalRule' },
+        { type: 'pageBreak' },
         {
           type: 'heading',
-          attrs: { level: 2 },
+          attrs: { level: 1 },
           content: [{ type: 'text', text: 'Chapter 4: Spells & Abilities' }],
         },
         {
@@ -328,27 +212,10 @@ const systemTemplates = [
           type: 'paragraph',
           content: [{ type: 'text', text: 'Describe the spell or ability here...' }],
         },
-        { type: 'horizontalRule' },
-        {
-          type: 'heading',
-          attrs: { level: 2 },
-          content: [{ type: 'text', text: 'Credits' }],
-        },
-        {
-          type: 'paragraph',
-          content: [{ type: 'text', text: 'Written by: [Author Name]' }],
-        },
-        { type: 'horizontalRule' },
-        {
-          type: 'heading',
-          attrs: { level: 2, textAlign: 'center' },
-          content: [{ type: 'text', text: 'Back Cover' }],
-        },
-        {
-          type: 'paragraph',
-          attrs: { textAlign: 'center' },
-          content: [{ type: 'text', text: 'A brief blurb about your sourcebook...' }],
-        },
+        { type: 'pageBreak' },
+        { type: 'creditsPage', attrs: { credits: 'Written by Author Name', legalText: 'This work includes material taken from the System Reference Document 5.1 ("SRD 5.1") by Wizards of the Coast LLC. The SRD 5.1 is licensed under the Creative Commons Attribution 4.0 International License.', copyrightYear: new Date().getFullYear().toString() } },
+        { type: 'pageBreak' },
+        { type: 'backCover', attrs: { blurb: 'A comprehensive sourcebook for your D&D 5e campaign, featuring new classes, subclasses, races, and spells.', authorBio: 'Author Name is a tabletop RPG designer and storyteller.', authorImageUrl: '' } },
       ],
     },
   },
