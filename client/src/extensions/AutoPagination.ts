@@ -14,12 +14,19 @@ import type { Node as PMNode } from '@tiptap/pm/model';
  * Does NOT touch pageBreak nodes — those are handled by usePageAlignment.
  */
 
-// 11in at 96dpi = 1056px, minus 72px top + 72px bottom padding = 912px.
-// Reserve 48px bottom margin so content doesn't touch the gap edge.
-const PAGE_CONTENT_HEIGHT = 864;
+// Default: 11in at 96dpi = 1056px, minus 72px top + 72px bottom = 912px, minus 48px reserve = 864px.
+const DEFAULT_PAGE_CONTENT_HEIGHT = 864;
 
 // Dark gap between pages (height of the ::after pseudo-element)
 const GAP_HEIGHT = 56;
+
+/** Read --page-content-height from .page-canvas via computed style. */
+function getPageContentHeight(pmEl: HTMLElement): number {
+  const canvas = pmEl.closest('.page-canvas') as HTMLElement | null;
+  if (!canvas) return DEFAULT_PAGE_CONTENT_HEIGHT;
+  const raw = getComputedStyle(canvas).getPropertyValue('--page-content-height').trim();
+  return parseInt(raw, 10) || DEFAULT_PAGE_CONTENT_HEIGHT;
+}
 
 // Node types that use column-span: all in CSS
 const COLUMN_SPANNING_TYPES = new Set([
@@ -130,6 +137,7 @@ function computeGaps(view: EditorView): ComputeResult {
   if (segments.length === 0) return { gaps: [], lastPageFill: 0 };
 
   const pmEl = view.dom as HTMLElement;
+  const PAGE_CONTENT_HEIGHT = getPageContentHeight(pmEl);
   const pmRect = pmEl.getBoundingClientRect();
   const colCount = parseInt(window.getComputedStyle(pmEl).columnCount, 10) || 1;
 
@@ -305,8 +313,9 @@ export const AutoPagination = Extension.create({
               // Compute tail height to fill the last page to full height.
               // Only add tail when content spans multiple pages (gaps exist)
               // and the last page is partially filled.
+              const dynHeight = getPageContentHeight(editorView.dom as HTMLElement);
               const tailHeight = (gaps.length > 0 && lastPageFill > 0)
-                ? Math.max(0, PAGE_CONTENT_HEIGHT - lastPageFill)
+                ? Math.max(0, dynHeight - lastPageFill)
                 : 0;
 
               // Phase 4: Skip dispatch if gaps haven't changed (prevents oscillation)

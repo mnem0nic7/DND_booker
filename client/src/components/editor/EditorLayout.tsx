@@ -50,6 +50,8 @@ import { useAiStore } from '../../stores/aiStore';
 import { AiSettingsModal } from '../ai/AiSettingsModal';
 import { AiChatPanel } from '../ai/AiChatPanel';
 
+type PageSize = 'letter' | 'a4' | 'a5';
+
 interface EditorLayoutProps {
   projectId: string;
   content: DocumentContent;
@@ -65,6 +67,7 @@ export function EditorLayout({ projectId, content, onUpdate }: EditorLayoutProps
   const openExportDialog = useExportStore((s) => s.openDialog);
   const setSettingsModalOpen = useAiStore((s) => s.setSettingsModalOpen);
   const [columnCount, setColumnCount] = useState<1 | 2>(2);
+  const [pageSize, setPageSize] = useState<PageSize>('letter');
   const [showTexture, setShowTexture] = useState(true);
   const [sectionName, setSectionName] = useState('');
 
@@ -100,6 +103,13 @@ export function EditorLayout({ projectId, content, onUpdate }: EditorLayoutProps
     };
   }, [editor]);
 
+  // A5 is too narrow for two columns — force single column
+  useEffect(() => {
+    if (pageSize === 'a5' && columnCount === 2) {
+      setColumnCount(1);
+    }
+  }, [pageSize, columnCount]);
+
   return (
     <div className="flex h-full overflow-hidden">
       {/* Center: Toolbar + Editor */}
@@ -111,6 +121,8 @@ export function EditorLayout({ projectId, content, onUpdate }: EditorLayoutProps
               editor={editor}
               columnCount={columnCount}
               setColumnCount={setColumnCount}
+              pageSize={pageSize}
+              setPageSize={setPageSize}
               showTexture={showTexture}
               setShowTexture={setShowTexture}
               onOpenBlockPicker={() => setShowBlockPicker(true)}
@@ -194,6 +206,7 @@ export function EditorLayout({ projectId, content, onUpdate }: EditorLayoutProps
           <div
             className="page-canvas editor-themed-content"
             data-columns={columnCount}
+            {...(pageSize !== 'letter' ? { 'data-page-size': pageSize } : {})}
             {...(!showTexture ? { 'data-texture-off': '' } : {})}
           >
             {editor && (

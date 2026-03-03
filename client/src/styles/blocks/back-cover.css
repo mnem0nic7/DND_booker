@@ -4,7 +4,9 @@
   border: 2px solid #333;
   position: relative;
   color: var(--text-color);
-  min-height: 400px;
+  min-height: var(--content-height, 912px);
+  display: flex;
+  flex-direction: column;
 }
 
 .back-cover__content {
@@ -13,6 +15,7 @@
   flex-direction: column;
   align-items: center;
   text-align: center;
+  flex: 1;
 }
 
 .back-cover__blurb {

@@ -3,10 +3,14 @@
   background: var(--stat-block-bg);
   border: 1px solid var(--accent-secondary);
   position: relative;
+  min-height: var(--content-height, 912px);
+  display: flex;
+  flex-direction: column;
 }
 
 .credits-page__content {
   padding: 2rem;
+  flex: 1;
 }
 
 .credits-page__heading {

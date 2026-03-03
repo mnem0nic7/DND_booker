@@ -4,10 +4,14 @@ import type { Editor } from '@tiptap/react';
 import { useThemeStore } from '../../stores/themeStore';
 import type { ThemeName } from '../../stores/themeStore';
 
+type PageSize = 'letter' | 'a4' | 'a5';
+
 interface ToolbarProps {
   editor: Editor | null;
   columnCount: 1 | 2;
   setColumnCount: (n: 1 | 2) => void;
+  pageSize: PageSize;
+  setPageSize: (size: PageSize) => void;
   showTexture: boolean;
   setShowTexture: (v: boolean) => void;
   onOpenBlockPicker: () => void;
@@ -72,14 +76,22 @@ const HIGHLIGHT_COLORS = [
   { color: '#fecdd3', label: 'Pink' },
 ];
 
-export function Toolbar({ editor, columnCount, setColumnCount, showTexture, setShowTexture, onOpenBlockPicker }: ToolbarProps) {
+const PAGE_SIZES: { value: PageSize; label: string; dims: string }[] = [
+  { value: 'letter', label: 'Letter', dims: '8.5\u00d711 in' },
+  { value: 'a4', label: 'A4', dims: '210\u00d7297 mm' },
+  { value: 'a5', label: 'A5', dims: '148\u00d7210 mm' },
+];
+
+export function Toolbar({ editor, columnCount, setColumnCount, pageSize, setPageSize, showTexture, setShowTexture, onOpenBlockPicker }: ToolbarProps) {
   const { currentTheme, setTheme } = useThemeStore();
   const [showThemeDropdown, setShowThemeDropdown] = useState(false);
   const [showHighlightDropdown, setShowHighlightDropdown] = useState(false);
   const [showFontSizeDropdown, setShowFontSizeDropdown] = useState(false);
+  const [showPageSizeDropdown, setShowPageSizeDropdown] = useState(false);
   const themeBtnRef = useRef<HTMLDivElement>(null);
   const highlightBtnRef = useRef<HTMLDivElement>(null);
   const fontSizeBtnRef = useRef<HTMLDivElement>(null);
+  const pageSizeBtnRef = useRef<HTMLDivElement>(null);
   const [, setTick] = useState(0);
 
   useEffect(() => {
@@ -121,6 +133,17 @@ export function Toolbar({ editor, columnCount, setColumnCount, showTexture, setS
     document.addEventListener('mousedown', close);
     return () => document.removeEventListener('mousedown', close);
   }, [showFontSizeDropdown]);
+
+  useEffect(() => {
+    if (!showPageSizeDropdown) return;
+    const close = (e: MouseEvent) => {
+      if (pageSizeBtnRef.current && !pageSizeBtnRef.current.contains(e.target as Node)) {
+        setShowPageSizeDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, [showPageSizeDropdown]);
 
   if (!editor) return null;
 
@@ -343,10 +366,40 @@ export function Toolbar({ editor, columnCount, setColumnCount, showTexture, setS
         {/* Layout Group */}
         <div className="flex flex-col items-center">
           <div className="flex items-center gap-0.5">
+            <div className="relative" ref={pageSizeBtnRef}>
+              <Btn onClick={() => setShowPageSizeDropdown(!showPageSizeDropdown)} title="Page size">
+                <div className="flex items-center gap-0.5">
+                  <span className="text-[10px]">{PAGE_SIZES.find(p => p.value === pageSize)?.label}</span>
+                  <Icon d="M19 9l-7 7-7-7" />
+                </div>
+              </Btn>
+              {showPageSizeDropdown && createPortal(
+                <div
+                  className="fixed bg-white rounded-lg shadow-lg border py-1 w-40"
+                  style={{
+                    zIndex: 9999,
+                    top: (pageSizeBtnRef.current?.getBoundingClientRect().bottom ?? 0) + 4,
+                    left: pageSizeBtnRef.current?.getBoundingClientRect().left ?? 0,
+                  }}
+                >
+                  {PAGE_SIZES.map((ps) => (
+                    <button
+                      key={ps.value}
+                      onMouseDown={(e) => { e.preventDefault(); setPageSize(ps.value); setShowPageSizeDropdown(false); }}
+                      className={`w-full flex items-center justify-between px-3 py-1.5 text-xs hover:bg-gray-50 ${pageSize === ps.value ? 'bg-purple-50 text-purple-700' : 'text-gray-700'}`}
+                    >
+                      <span>{ps.label}</span>
+                      <span className="text-gray-400">{ps.dims}</span>
+                    </button>
+                  ))}
+                </div>,
+                document.body
+              )}
+            </div>
             <Btn onClick={() => setColumnCount(1)} isActive={columnCount === 1} title="Single column">
               <span className="text-[10px] font-bold">1-Col</span>
             </Btn>
-            <Btn onClick={() => setColumnCount(2)} isActive={columnCount === 2} title="Two columns">
+            <Btn onClick={() => setColumnCount(2)} isActive={columnCount === 2} disabled={pageSize === 'a5'} title={pageSize === 'a5' ? 'Two columns not available at A5 size' : 'Two columns'}>
               <span className="text-[10px] font-bold">2-Col</span>
             </Btn>
           </div>

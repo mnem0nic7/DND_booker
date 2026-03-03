@@ -3,7 +3,7 @@
   background: var(--stat-block-bg);
   border: 2px solid var(--accent-color);
   position: relative;
-  min-height: 500px;
+  min-height: var(--content-height, 912px);
   display: flex;
   flex-direction: column;
 }

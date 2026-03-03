@@ -1,13 +1,20 @@
 import { useEffect, useRef } from 'react';
 import type { Editor } from '@tiptap/core';
 
-// 11in page at 96dpi = 1056px, minus 72px top + 72px bottom padding = 912px total.
-// Reserve 48px bottom margin so content never touches the break bar directly.
-const PAGE_CONTENT_HEIGHT = 864;
+// Default: 11in at 96dpi = 1056px, minus 72px top + 72px bottom = 912px, minus 48px reserve = 864px.
+const DEFAULT_PAGE_CONTENT_HEIGHT = 864;
 
 // Pages with less than this much content collapse to a compact separator
 // instead of filling a near-blank page. ~80px ≈ one heading line.
 const MIN_CONTENT_FOR_FULL_PAGE = 80;
+
+/** Read --page-content-height from .page-canvas via computed style. */
+function getPageContentHeight(pmEl: HTMLElement): number {
+  const canvas = pmEl.closest('.page-canvas') as HTMLElement | null;
+  if (!canvas) return DEFAULT_PAGE_CONTENT_HEIGHT;
+  const raw = getComputedStyle(canvas).getPropertyValue('--page-content-height').trim();
+  return parseInt(raw, 10) || DEFAULT_PAGE_CONTENT_HEIGHT;
+}
 
 /**
  * Aligns page break nodes to 8.5x11 page boundaries by adding fill
@@ -27,6 +34,8 @@ export function usePageAlignment(editor: Editor | null) {
       const pmEl = editor.view.dom as HTMLElement;
       const pageBreaks = pmEl.querySelectorAll<HTMLElement>('.node-pageBreak');
       if (!pageBreaks.length) return;
+
+      const PAGE_CONTENT_HEIGHT = getPageContentHeight(pmEl);
 
       // Reset all fills to 0 so we measure natural positions
       pageBreaks.forEach((pb) => {

@@ -5,13 +5,13 @@
 
 .auto-page-gap {
   column-span: all;
-  /* Extend to page-canvas edges, cancelling the 72px parent padding */
-  margin: 0 -72px;
+  /* Extend to page-canvas edges, cancelling parent padding */
+  margin: 0 calc(-1 * var(--page-padding, 72px));
   /* Top margin for the next page (parchment shows through).
      Use content-box so padding-bottom adds to the inline height
      instead of eating into it (Tailwind 4 sets border-box globally). */
   box-sizing: content-box;
-  padding-bottom: 48px;
+  padding-bottom: var(--margin-reserve, 48px);
   background: transparent;
   pointer-events: none;
   user-select: none;
@@ -23,7 +23,7 @@
   display: block;
   position: absolute;
   /* Sit above the padding-bottom area */
-  bottom: 48px;
+  bottom: var(--margin-reserve, 48px);
   left: 0;
   right: 0;
   height: 56px;
@@ -37,7 +37,7 @@
    last page extends to full height instead of shrinking to content. */
 .auto-page-tail {
   column-span: all;
-  margin: 0 -72px;
+  margin: 0 calc(-1 * var(--page-padding, 72px));
   background: transparent;
   pointer-events: none;
   user-select: none;

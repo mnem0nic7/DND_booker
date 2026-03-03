@@ -105,13 +105,21 @@
 }
 
 .page-canvas {
-  width: 816px;
-  min-height: 1056px;
+  /* Page dimension custom properties — single source of truth */
+  --page-width: 816px;
+  --page-height: 1056px;
+  --page-padding: 72px;
+  --content-height: 912px;          /* page-height - 2×padding */
+  --page-content-height: 864px;     /* content-height - margin-reserve */
+  --margin-reserve: 48px;
+
+  width: var(--page-width);
+  min-height: var(--page-height);
   margin: 0 auto 2rem auto;
-  padding: 72px;
+  padding: var(--page-padding);
   background-color: var(--page-bg);
   background-image: var(--page-texture);
-  background-size: 816px 1056px;
+  background-size: var(--page-width) var(--page-height);
   background-repeat: repeat-y;
   background-position: top center;
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
@@ -124,6 +132,23 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* A4: 210×297mm ≈ 794×1123px at 96dpi */
+.page-canvas[data-page-size="a4"] {
+  --page-width: 794px;
+  --page-height: 1123px;
+  --content-height: 979px;
+  --page-content-height: 931px;
+}
+
+/* A5: 148×210mm ≈ 559×794px at 96dpi */
+.page-canvas[data-page-size="a5"] {
+  --page-width: 559px;
+  --page-height: 794px;
+  --page-padding: 48px;
+  --content-height: 698px;
+  --page-content-height: 650px;
+}
+
 .page-canvas[data-texture-off] {
   background-image: none;
 }
@@ -133,7 +158,12 @@
   column-gap: 32px;
   column-rule: 1px solid var(--column-rule-color, rgba(0,0,0,0.06));
   outline: none;
-  min-height: 912px;
+  min-height: var(--content-height);
+}
+
+/* A5 is too narrow for two columns */
+.page-canvas[data-page-size="a5"] .ProseMirror {
+  column-count: 1;
 }
 
 .page-canvas[data-columns="1"] .ProseMirror {
@@ -169,10 +199,10 @@
 .page-canvas .ProseMirror .node-pageBreak {
   column-span: all;
   /* Extend to page-canvas edges by cancelling parent padding */
-  margin: 0 -72px;
+  margin: 0 calc(-1 * var(--page-padding));
   /* paddingTop is set dynamically by usePageAlignment to fill the remaining page.
      paddingBottom creates a "top margin" on the next page (parchment shows through). */
-  padding: 0 0 48px 0;
+  padding: 0 0 var(--margin-reserve) 0;
   /* Transparent so the parchment from .page-canvas shows through the fill area */
   background: transparent;
 }
@@ -180,8 +210,8 @@
 .page-footer {
   position: absolute;
   bottom: 24px;
-  left: 72px;
-  right: 72px;
+  left: var(--page-padding);
+  right: var(--page-padding);
   font-size: 0.65rem;
   color: var(--footer-color, rgba(0,0,0,0.4));
   display: flex;
@@ -509,7 +539,7 @@
   }
   .page-canvas {
     width: 100%;
-    max-width: 816px;
+    max-width: var(--page-width);
     min-height: auto;
     padding: 48px 36px 48px 42px;
   }
