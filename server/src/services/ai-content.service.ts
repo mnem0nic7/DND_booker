@@ -272,7 +272,50 @@ export function buildDocumentOutline(content: unknown): string | null {
   return lines.join('\n');
 }
 
-export function buildSystemPrompt(projectTitle?: string, documentOutline?: string | null): string {
+const MAX_TEXT_SAMPLE_CHARS = 8000;
+
+/**
+ * Build a text content sample from TipTap JSON for evaluation.
+ * Extracts up to ~200 chars per paragraph/heading, includes key block attrs,
+ * capped at MAX_TEXT_SAMPLE_CHARS total (~2000 tokens).
+ */
+export function buildDocumentTextSample(content: unknown): string | null {
+  if (!content || typeof content !== 'object') return null;
+  const doc = content as TipTapNode;
+  if (!doc.content || !Array.isArray(doc.content) || doc.content.length === 0) return null;
+
+  const lines: string[] = [];
+  let totalChars = 0;
+
+  for (let i = 0; i < doc.content.length && totalChars < MAX_TEXT_SAMPLE_CHARS; i++) {
+    const node = doc.content[i];
+    let line: string;
+
+    if (node.type === 'paragraph' || node.type === 'heading') {
+      const text = extractTextContent(node);
+      if (!text.trim()) continue;
+      const level = node.type === 'heading' ? `H${node.attrs?.level || 1}` : 'P';
+      line = `[${i}|${level}] ${truncate(text, 200)}`;
+    } else if (node.type === 'pageBreak' || node.type === 'columnBreak' || node.type === 'horizontalRule') {
+      continue; // Skip structural-only nodes
+    } else {
+      // Block node — include key attrs
+      const name = node.attrs?.name || node.attrs?.title || '';
+      const desc = node.attrs?.description || node.attrs?.blurb || node.attrs?.content || '';
+      const namePart = name ? `: ${truncate(String(name), 80)}` : '';
+      const descPart = desc ? ` — ${truncate(String(desc), 150)}` : '';
+      line = `[${i}|${node.type}${namePart}]${descPart}`;
+    }
+
+    if (totalChars + line.length > MAX_TEXT_SAMPLE_CHARS) break;
+    lines.push(line);
+    totalChars += line.length;
+  }
+
+  return lines.length > 0 ? lines.join('\n') : null;
+}
+
+export function buildSystemPrompt(projectTitle?: string, documentOutline?: string | null, documentTextSample?: string | null): string {
   let prompt = SYSTEM_PROMPT;
 
   if (projectTitle) {
@@ -346,7 +389,45 @@ PAGINATION RULES:
 - Prefer minimal changes — only add/remove what's needed
 - The "description" field should briefly explain what you did
 - ALWAYS output the \`\`\`json block with _documentEdit — this is NOT optional
-=== END DOCUMENT EDITING MODE ===`;
+=== END DOCUMENT EDITING MODE ===
+
+=== DOCUMENT EVALUATION MODE ===
+When asked to "evaluate", "review", "critique", or "check" the document:
+
+Review two categories:
+1. CONTENT: pacing, completeness, D&D best practices, narrative flow, block variety
+2. FORMATTING: page balance (fill%), block placement, structural issues, missing elements
+
+Emit an _evaluation control block in a \`\`\`json code fence:
+\`\`\`json
+{
+  "_evaluation": true,
+  "overallScore": 7,
+  "summary": "1-2 sentence assessment",
+  "findings": [
+    {"category":"content","severity":"suggestion","nodeRef":5,"title":"Short title","detail":"Actionable detail"}
+  ]
+}
+\`\`\`
+
+Rules:
+- severity: "issue" (should fix), "suggestion" (nice to have), "praise" (well done)
+- Include 3-5 praise items alongside issues/suggestions
+- Reference nodes by [index] from document structure
+- nodeRef: -1 for general findings
+- category: "content" or "formatting"
+- Always provide your conversational analysis BEFORE the JSON block
+=== END DOCUMENT EVALUATION MODE ===`;
+
+    if (documentTextSample) {
+      prompt += `
+
+=== DOCUMENT TEXT CONTENT ===
+Sampled text from the document for evaluation (format: [nodeIndex|type] content):
+
+${documentTextSample}
+=== END DOCUMENT TEXT CONTENT ===`;
+    }
   }
 
   return prompt;

@@ -355,7 +355,8 @@ aiChatRoutes.post('/ai/chat', validateUuid('projectId'), chatRateLimit, asyncHan
     // Load planning context and append to system prompt
     const planningCtx = await aiPlanner.buildPlanningContext(projectId, req.userId!);
     const documentOutline = aiContent.buildDocumentOutline(project.content);
-    const systemPrompt = aiContent.buildSystemPrompt(project.title, documentOutline)
+    const documentTextSample = aiContent.buildDocumentTextSample(project.content);
+    const systemPrompt = aiContent.buildSystemPrompt(project.title, documentOutline, documentTextSample)
       + aiPlanner.buildPlanningPromptSection(planningCtx);
 
     // Abort the AI call if the client disconnects

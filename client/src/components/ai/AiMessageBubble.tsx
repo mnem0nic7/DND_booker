@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import Markdown from 'react-markdown';
+import { AiEvaluationCard, extractEvaluation } from './AiEvaluationCard';
 
 interface AiMessageBubbleProps {
   role: 'user' | 'assistant';
@@ -99,6 +100,9 @@ function detectStateChanges(rawContent: string): StateChangeIndicator[] {
         const count = parsed.operations?.length || 0;
         const desc = parsed.description || 'Document edited';
         indicators.push({ icon: '\u{1F4C4}', label: `Edit: ${desc} (${count} op${count !== 1 ? 's' : ''})` });
+      } else if (parsed._evaluation) {
+        const score = parsed.overallScore ?? '?';
+        indicators.push({ icon: '\u{1F4CA}', label: `Evaluation: ${score}/10` });
       }
     } catch { /* skip */ }
   }
@@ -134,6 +138,11 @@ export function AiMessageBubble({ role, content, isStreaming, onInsertBlock, raw
   const stateChanges = useMemo(
     () => (role === 'assistant' && rawContent ? detectStateChanges(rawContent) : []),
     [role, rawContent],
+  );
+
+  const evaluationBlock = useMemo(
+    () => (role === 'assistant' && rawContent && !isStreaming ? extractEvaluation(rawContent) : null),
+    [role, rawContent, isStreaming],
   );
 
   const isUser = role === 'user';
@@ -186,6 +195,9 @@ export function AiMessageBubble({ role, content, isStreaming, onInsertBlock, raw
             ))}
           </div>
         )}
+
+        {/* Evaluation card */}
+        {evaluationBlock && <AiEvaluationCard evaluation={evaluationBlock} />}
 
         {/* State change indicators */}
         {stateChanges.length > 0 && (
