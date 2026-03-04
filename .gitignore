@@ -10,3 +10,7 @@ coverage/
 output/
 uploads/
 DMGuild/
+# Playwright
+test-results/
+playwright-report/
+e2e/.auth/
