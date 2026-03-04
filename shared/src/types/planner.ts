@@ -48,9 +48,10 @@ export interface RememberBlock {
 
 /** A single document editing operation the AI can emit */
 export interface DocumentEditOperation {
-  op: 'insertBefore' | 'insertAfter' | 'remove';
+  op: 'insertBefore' | 'insertAfter' | 'remove' | 'replace' | 'updateAttrs';
   nodeIndex: number;
-  node?: { type: string; attrs?: Record<string, unknown> };
+  node?: { type: string; attrs?: Record<string, unknown>; content?: unknown[] };
+  attrs?: Record<string, unknown>;
 }
 
 /** Control block for AI-driven document structure edits */

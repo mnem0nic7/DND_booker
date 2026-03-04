@@ -176,8 +176,8 @@ function executeDocumentEdits(editor: Editor, operations: DocumentEditOperation[
     if (op.nodeIndex < 0 || op.nodeIndex >= doc.childCount) continue;
 
     // Calculate the position of the node at this index.
-    // Start at 1 to account for the doc node's opening token (position 0 = before doc).
-    let pos = 1;
+    // ProseMirror: top-level children start at position 0 in doc.descendants().
+    let pos = 0;
     for (let i = 0; i < op.nodeIndex; i++) {
       pos += doc.child(i).nodeSize;
     }
@@ -185,8 +185,26 @@ function executeDocumentEdits(editor: Editor, operations: DocumentEditOperation[
     const targetNode = doc.child(op.nodeIndex);
 
     try {
+      console.log(`[AI DocumentEdit] op=${op.op} nodeIndex=${op.nodeIndex} targetType=${targetNode.type.name} pos=${pos}`);
       if (op.op === 'remove') {
         tr.delete(pos, pos + targetNode.nodeSize);
+        applied++;
+      } else if (op.op === 'replace' && op.node) {
+        const newNode = schema.nodeFromJSON(op.node);
+        tr.replaceWith(pos, pos + targetNode.nodeSize, newNode);
+        applied++;
+      } else if (op.op === 'updateAttrs' && op.attrs) {
+        // Auto-stringify non-primitive attr values (e.g. entries arrays → JSON strings)
+        // Atom blocks store complex data as JSON strings, but AI may send parsed objects
+        const normalizedAttrs: Record<string, unknown> = {};
+        for (const [key, value] of Object.entries(op.attrs)) {
+          normalizedAttrs[key] =
+            typeof value === 'object' && value !== null
+              ? JSON.stringify(value)
+              : value;
+        }
+        console.log('[AI DocumentEdit] updateAttrs on', targetNode.type.name, 'at nodeIndex', op.nodeIndex, normalizedAttrs);
+        tr.setNodeMarkup(pos, undefined, { ...targetNode.attrs, ...normalizedAttrs });
         applied++;
       } else if (op.op === 'insertBefore' && op.node) {
         const newNode = schema.nodeFromJSON(op.node);
@@ -196,6 +214,8 @@ function executeDocumentEdits(editor: Editor, operations: DocumentEditOperation[
         const newNode = schema.nodeFromJSON(op.node);
         tr.insert(pos + targetNode.nodeSize, newNode);
         applied++;
+      } else {
+        console.warn('[AI DocumentEdit] Unhandled operation:', JSON.stringify(op));
       }
     } catch (err) {
       console.warn('[AI] Skipping invalid document edit operation:', op, err);
@@ -304,6 +324,17 @@ export function AiChatPanel({ projectId, editor }: AiChatPanelProps) {
 
     // Auto-trigger generation from the outline
     startWizardFromOutline(projectId, outline);
+
+    // Strip the wizard block from the stored message so it can't re-trigger
+    // (e.g. on panel close/reopen before fetchChatHistory replaces messages)
+    const lastIdx = messages.length - 1;
+    useAiStore.setState((s) => ({
+      messages: s.messages.map((m, i) =>
+        i === lastIdx && m.role === 'assistant'
+          ? { ...m, content: stripWizardBlock(m.content) }
+          : m,
+      ),
+    }));
   }, [messages, isStreaming, wizardProgress, projectId, startWizardFromOutline]);
 
   // Auto-execute _documentEdit blocks when streaming completes

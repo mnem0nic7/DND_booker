@@ -463,7 +463,7 @@ ${documentOutline}
 === END PAGE LAYOUT MODEL ===
 
 === DOCUMENT EDITING MODE ===
-When the user asks to "fix pagination", "add page breaks", "fix formatting", "clean up layout", "remove duplicate breaks", or similar document-level requests, you MUST modify the document structure by emitting a \`_documentEdit\` control block in a \`\`\`json code fence.
+When the user asks to "fix pagination", "add page breaks", "fix formatting", "clean up layout", "remove duplicate breaks", "update the encounter table", "change the stat block", "replace the magic item", "fix the NPC", or any request to modify existing document content, you MUST modify the document structure by emitting a \`_documentEdit\` control block in a \`\`\`json code fence.
 
 CRITICAL: You MUST always output the \`\`\`json block below. Do NOT just describe what you would do — the JSON block is what actually applies the changes. Without it, nothing happens. Even if you determine no changes are needed, output the block with an empty operations array.
 
@@ -485,11 +485,40 @@ I analyzed the document and found several pagination issues. Here's what I'm fix
 \`\`\`
 
 Supported operations:
-- "insertBefore": Insert a node before the node at nodeIndex
-- "insertAfter": Insert a node after the node at nodeIndex
+- "insertBefore": Insert a node before the node at nodeIndex. Requires "node" field.
+- "insertAfter": Insert a node after the node at nodeIndex. Requires "node" field.
 - "remove": Remove the node at nodeIndex
+- "replace": Replace the entire node at nodeIndex with a new node. Requires "node" field with full TipTap JSON structure including content array.
+- "updateAttrs": Update attributes on the node at nodeIndex without changing its content. Requires "attrs" field.
+
+IMPORTANT — Most D&D blocks are "atom" blocks: all their data is in attributes, NOT in child content nodes. To modify them, use "updateAttrs" (NOT "replace"):
+
+Atom blocks and their attrs:
+- encounterTable: environment (string), crRange (string), entries (JSON string array: [{"weight":1,"description":"1d4 shadows","cr":"1/2"},{"weight":2,"description":"1 specter","cr":"1"},...])
+- statBlock: name, type, alignment, ac, hp, speed, str, dex, con, int, wis, cha, skills, senses, languages, cr, traits (JSON string), actions (JSON string)
+- magicItem: name, rarity, type, description, attunement
+- npcProfile: name, race, occupation, description, portrait
+- readAloud: variant ("light"|"dark"), content stored as child text (use "replace" only for readAloud)
+- dmTips: content stored as child text (use "replace" only for dmTips)
+
+Example — updating an encounterTable at node 42:
+\`\`\`json
+{"op": "updateAttrs", "nodeIndex": 42, "attrs": {"environment": "Haunted Lighthouse", "crRange": "1-4", "entries": "[{\\"weight\\":1,\\"description\\":\\"1d4 shadows\\",\\"cr\\":\\"1/2\\"},{\\"weight\\":2,\\"description\\":\\"1 specter\\",\\"cr\\":\\"1\\"},{\\"weight\\":3,\\"description\\":\\"1d6 skeletons\\",\\"cr\\":\\"1/4\\"}]"}}
+\`\`\`
+
+Example — updating a statBlock name at node 10:
+\`\`\`json
+{"op": "updateAttrs", "nodeIndex": 10, "attrs": {"name": "Shadow Knight", "cr": "3"}}
+\`\`\`
+
+For "replace" operations (readAloud, dmTips, or inserting new non-atom blocks):
+\`\`\`json
+{"op": "replace", "nodeIndex": 15, "node": {"type": "readAloud", "attrs": {"variant": "dark"}, "content": [{"type": "paragraph", "content": [{"type": "text", "text": "The darkness closes in..."}]}]}}
+\`\`\`
 
 Insertable node types: pageBreak, columnBreak, horizontalRule
+Modifiable atom blocks: encounterTable, statBlock, magicItem, npcProfile (use updateAttrs)
+Modifiable content blocks: readAloud, dmTips (use replace with content array)
 
 PAGINATION RULES:
 - Auto-pagination handles all visual page separation. Use pageBreak ONLY for intentional section boundaries.
