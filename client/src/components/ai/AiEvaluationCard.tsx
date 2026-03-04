@@ -1,7 +1,7 @@
 import { useState } from 'react';
 
 export interface EvaluationFinding {
-  category: 'content' | 'formatting';
+  category: 'content' | 'formatting' | 'layout';
   severity: 'issue' | 'suggestion' | 'praise';
   nodeRef: number;
   title: string;
@@ -31,7 +31,7 @@ export function extractEvaluation(content: string): EvaluationBlock | null {
           findings: parsed.findings
             .filter((f: Record<string, unknown>) => typeof f.title === 'string' && typeof f.detail === 'string')
             .map((f: Record<string, unknown>) => ({
-              category: f.category === 'formatting' ? 'formatting' : 'content',
+              category: f.category === 'formatting' ? 'formatting' : f.category === 'layout' ? 'layout' : 'content',
               severity: ['issue', 'suggestion', 'praise'].includes(f.severity as string) ? f.severity as EvaluationFinding['severity'] : 'suggestion',
               nodeRef: typeof f.nodeRef === 'number' ? f.nodeRef : -1,
               title: String(f.title),

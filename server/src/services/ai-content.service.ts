@@ -417,7 +417,7 @@ function formatPageMetrics(metrics: PageMetricsSnapshot): string {
     else if (p.isNearlyBlank) flags.push('NEARLY BLANK');
     if (flags.length > 0) parts.push(`[${flags.join(', ')}]`);
 
-    if (p.nodeTypes.length > 0) parts.push(`[${p.nodeTypes.join(', ')}]`);
+    if (p.nodeTypes.length > 0) parts.push(`[${p.nodeTypes.join(' → ')}]`);
     parts.push(`→ ${p.boundaryType}`);
 
     lines.push(parts.join(' '));
@@ -553,9 +553,18 @@ PAGINATION RULES:
 === DOCUMENT EVALUATION MODE ===
 When asked to "evaluate", "review", "critique", or "check" the document:
 
-Review two categories:
+Review three categories:
 1. CONTENT: pacing, completeness, D&D best practices, narrative flow, block variety
-2. FORMATTING: page balance (fill%), block placement, structural issues, missing elements
+2. FORMATTING: page balance (fill%), structural issues, missing elements
+3. LAYOUT: page order, content flow, block placement relative to narrative context
+
+LAYOUT analysis checklist (use the document outline [P#] annotations and page metrics node sequences):
+- PAGE ORDER: Does content flow logically page-to-page? Introduction before encounters, encounters before resolution?
+- BLOCK PROXIMITY: Are stat blocks near the encounter that references them? Read-aloud boxes at scene starts? NPC profiles near their introduction?
+- PAGE COMPOSITION: Does each page have a good mix of narrative + visual blocks? Avoid pages that are ALL text or ALL blocks.
+- SECTION TRANSITIONS: Do pageBreaks create logical chapter boundaries? Is there a clear visual break between major sections?
+- READING FLOW: In the page metrics node sequence (shown as type → type → type), does the ordering make sense for a reader going left-to-right across columns?
+- ORPHANED BLOCKS: Any block that appears pages away from its narrative context (e.g., a "Goblin" stat block on page 8 but goblins are mentioned on page 3)?
 
 Emit an _evaluation control block in a \`\`\`json code fence:
 \`\`\`json
@@ -574,9 +583,11 @@ Rules:
 - Include 3-5 praise items alongside issues/suggestions
 - Reference nodes by [index] from document structure
 - nodeRef: -1 for general findings
-- category: "content" or "formatting"
+- category: "content", "formatting", or "layout"
 - Always provide your conversational analysis BEFORE the JSON block
 - When RENDERED PAGE METRICS are provided (below), use actual fill percentages from those instead of estimated heights. Specifically flag any pages marked BLANK or NEARLY BLANK as formatting issues.
+- Include at least 1-2 "layout" category findings analyzing page order and block placement
+- CRITICAL: You MUST end your response with the \`\`\`json code fence containing _evaluation. Without this JSON block, the evaluation card will not render for the user.
 === END DOCUMENT EVALUATION MODE ===`;
 
     if (pageMetrics) {
@@ -585,6 +596,7 @@ Rules:
 === RENDERED PAGE METRICS ===
 These are ACTUAL measurements from the live rendered DOM, overriding the estimated heights above.
 Use these fill percentages for page balance analysis — they reflect real pixel measurements.
+Node sequences per page (shown as type → type → type) represent the READING ORDER on that page — use this for layout analysis.
 
 ${formatPageMetrics(pageMetrics)}
 === END RENDERED PAGE METRICS ===`;
