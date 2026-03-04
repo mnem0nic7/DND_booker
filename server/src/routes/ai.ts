@@ -1,6 +1,8 @@
 import { Router, Response } from 'express';
 import { z } from 'zod';
-import { streamText, generateText } from 'ai';
+import { streamText, generateText, stepCountIs } from 'ai';
+import { randomUUID } from 'crypto';
+import { globalRegistry } from '../services/ai-tools/index.js';
 import { requireAuth, AuthRequest } from '../middleware/auth.js';
 import { chatRateLimit, blockGenRateLimit, autoFillRateLimit, aiValidationRateLimit, wizardRateLimit, memoryRateLimit, imageGenRateLimit } from '../middleware/ai-rate-limit.js';
 import { asyncHandler } from '../middleware/async-handler.js';
@@ -475,11 +477,18 @@ aiChatRoutes.post('/ai/chat', validateUuid('projectId'), chatRateLimit, asyncHan
     const abortController = new AbortController();
     req.on('close', () => abortController.abort());
 
-    // Stream the response
+    // Build tool context for this request
+    const requestId = randomUUID();
+    const toolCtx = { userId: req.userId!, projectId, requestId };
+    const tools = globalRegistry.getToolsForContext('project-chat', toolCtx);
+
+    // Stream the response — tools execute server-side mid-stream
     const streamResult = streamText({
       model: userModel.model,
       system: systemPrompt,
       messages,
+      tools,
+      stopWhen: stepCountIs(5),
       maxOutputTokens: userModel.maxOutputTokens,
       abortSignal: abortController.signal,
     });
