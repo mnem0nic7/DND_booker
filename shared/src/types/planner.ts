@@ -80,6 +80,45 @@ export interface PageMetric {
   firstHeading: string | null;
 }
 
+/** Target: update an image attribute on an existing document node. */
+export interface ImageTargetUpdate {
+  nodeIndex: number;
+  attr: string;
+}
+
+/** Target: insert a new image block after a document node. */
+export interface ImageTargetInsert {
+  insertAfter: number;
+  blockType: string;
+  attr: string;
+}
+
+/** A single image generation request from the AI. */
+export interface ImageGenerationRequest {
+  id: string;
+  prompt: string;
+  model: 'dall-e-3' | 'gpt-image-1';
+  size: string;
+  target: ImageTargetUpdate | ImageTargetInsert;
+}
+
+/** Progress state for a single image generation job. */
+export interface ImageGenJobProgress {
+  id: string;
+  prompt: string;
+  status: 'pending' | 'generating' | 'completed' | 'failed';
+  error?: string;
+  url?: string;
+  target: ImageTargetUpdate | ImageTargetInsert;
+}
+
+/** Batch progress for all image generations from a single AI response. */
+export interface ImageGenBatch {
+  jobs: ImageGenJobProgress[];
+  completedCount: number;
+  totalCount: number;
+}
+
 /** Snapshot of all rendered page metrics for AI evaluation. */
 export interface PageMetricsSnapshot {
   totalPages: number;

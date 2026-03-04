@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import api, { setAccessToken, getAccessToken } from '../lib/api';
 import axios from 'axios';
-import type { WizardEvent, WizardGeneratedSection, WizardOutline, PlanningState, PageMetricsSnapshot } from '@dnd-booker/shared';
+import type { WizardEvent, WizardGeneratedSection, WizardOutline, PlanningState, PageMetricsSnapshot, ImageGenBatch } from '@dnd-booker/shared';
 
 export type AiProvider = 'anthropic' | 'openai' | 'ollama';
 
@@ -84,6 +84,8 @@ interface AiState {
   // Image generation
   isGeneratingImage: boolean;
   generateImage: (projectId: string, prompt: string, model: string, size: string, quality?: string) => Promise<string | null>;
+  imageGenBatch: ImageGenBatch | null;
+  clearImageGenBatch: () => void;
 
   // Settings modal
   isSettingsModalOpen: boolean;
@@ -381,6 +383,10 @@ export const useAiStore = create<AiState>((set, get) => ({
       set({ isGeneratingImage: false });
     }
   },
+
+  // Image generation batch
+  imageGenBatch: null,
+  clearImageGenBatch: () => set({ imageGenBatch: null }),
 
   // Wizard (autonomous creation)
   wizardProgress: null,

@@ -111,6 +111,54 @@ The editor supports AI image generation for 5 image-capable block types: Title P
 - Include "fantasy RPG" or "Dungeons & Dragons" to anchor the genre
 
 When discussing cover art, maps, illustrations, or visual elements in an adventure, proactively suggest using the AI image generation feature if relevant. Guide users on which model and size to pick based on their content needs.
+
+=== IMAGE GENERATION CONTROL BLOCK ===
+When the user explicitly asks you to CREATE, GENERATE, or MAKE images for their document, you can directly trigger image generation by emitting a \`_generateImage\` control block in a \`\`\`json code fence.
+
+Format:
+\`\`\`json
+{
+  "_generateImage": true,
+  "images": [
+    {
+      "id": "img-1",
+      "prompt": "A dramatic fantasy oil painting of a dark castle...",
+      "model": "dall-e-3",
+      "size": "1024x1792",
+      "target": { "nodeIndex": 0, "attr": "coverImageUrl" }
+    },
+    {
+      "id": "img-2",
+      "prompt": "A wide fantasy landscape showing rolling hills...",
+      "model": "dall-e-3",
+      "size": "1792x1024",
+      "target": { "insertAfter": 5, "blockType": "fullBleedImage", "attr": "src" }
+    }
+  ]
+}
+\`\`\`
+
+Two target types:
+1. **Update existing block**: \`{ "nodeIndex": N, "attr": "attrName" }\` — sets the image attr on the node at index N from the document outline
+2. **Insert new block**: \`{ "insertAfter": N, "blockType": "fullBleedImage", "attr": "src" }\` — creates a new block after node N with the generated image
+
+Image attribute mapping by block type:
+- titlePage → "coverImageUrl" (cover art)
+- fullBleedImage → "src" (full-page illustration)
+- mapBlock → "src" (battle map)
+- backCover → "authorImageUrl" (author photo or back art)
+- chapterHeader → "backgroundImage" (banner image)
+
+RULES:
+- Maximum 4 images per \`_generateImage\` block
+- Write descriptive, detailed prompts (50-150 words) specifying style, composition, lighting, and D&D aesthetic
+- Always explain to the user what images you're generating BEFORE the JSON block
+- Reference node indices from the DOCUMENT STRUCTURE outline above for existing blocks
+- Only emit \`_generateImage\` when the user explicitly asks for image creation/generation
+- For existing blocks, verify the node type matches the attr (e.g., don't set coverImageUrl on a statBlock)
+- Model selection: use "dall-e-3" for artistic illustrations and "gpt-image-1" for maps/diagrams with text
+- Size selection: portrait (1024x1792) for covers, landscape (1792x1024) for wide illustrations/banners, square (1024x1024) for maps/portraits
+=== END IMAGE GENERATION CONTROL BLOCK ===
 === END AI IMAGE GENERATION ===`;
 
 // --- Document outline for AI document editing ---
@@ -382,7 +430,7 @@ export function buildSystemPrompt(projectTitle?: string, documentOutline?: strin
   let prompt = SYSTEM_PROMPT;
 
   if (provider === 'openai') {
-    prompt += `\n\nNOTE: This user has OpenAI configured — AI image generation is AVAILABLE. You can suggest using the "Generate Image with AI" button on image blocks (Title Page, Full Bleed Image, Map Block, Back Cover, Chapter Header). Proactively recommend it when discussing visual content.`;
+    prompt += `\n\nNOTE: This user has OpenAI configured — AI image generation is AVAILABLE. You can directly generate images by emitting a \`_generateImage\` control block when the user asks for images. You can also suggest the manual "Generate Image with AI" button on image blocks. Proactively recommend image generation when discussing visual content.`;
   } else {
     prompt += `\n\nNOTE: This user's AI provider is ${provider || 'not configured'}. AI image generation requires an OpenAI API key. If the user asks about generating images, let them know they can enable it by switching to OpenAI in AI Settings and adding their API key.`;
   }

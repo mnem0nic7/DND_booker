@@ -5,8 +5,9 @@ import { useProjectStore } from '../../stores/projectStore';
 import { AiMessageBubble } from './AiMessageBubble';
 import { AiPlanPanel } from './AiPlanPanel';
 import { WizardChatProgress } from './WizardChatProgress';
+import { ImageGenProgress } from './ImageGenProgress';
 import { collectPageMetrics } from '../../lib/collectPageMetrics';
-import type { WizardOutline, DocumentEditOperation } from '@dnd-booker/shared';
+import type { WizardOutline, DocumentEditOperation, ImageGenerationRequest, ImageTargetInsert, ImageGenJobProgress } from '@dnd-booker/shared';
 
 /**
  * Extract a wizardGenerate outline from an assistant message.
@@ -56,7 +57,7 @@ function stripPlanningBlocks(content: string): string {
     try {
       const parsed = JSON.parse(inner.trim());
       if (parsed && typeof parsed === 'object' && (
-        parsed._memoryUpdate || parsed._planUpdate || parsed._remember || parsed._documentEdit || parsed._evaluation
+        parsed._memoryUpdate || parsed._planUpdate || parsed._remember || parsed._documentEdit || parsed._evaluation || parsed._generateImage
       )) {
         return '';
       }
@@ -85,6 +86,74 @@ function extractDocumentEdit(content: string): { description: string; operations
     } catch { /* not valid JSON */ }
   }
   return null;
+}
+
+/** Extract a _generateImage control block from an assistant message. */
+function extractImageGenBlock(content: string): ImageGenerationRequest[] | null {
+  const fenceRegex = /```(?:json)?\s*([\s\S]*?)```/g;
+  let match: RegExpExecArray | null;
+
+  while ((match = fenceRegex.exec(content)) !== null) {
+    try {
+      const parsed = JSON.parse(match[1].trim());
+      if (parsed && parsed._generateImage === true && Array.isArray(parsed.images)) {
+        return parsed.images
+          .filter(
+            (img: Record<string, unknown>) =>
+              typeof img.id === 'string' &&
+              typeof img.prompt === 'string' &&
+              typeof img.model === 'string' &&
+              typeof img.size === 'string' &&
+              img.target && typeof img.target === 'object'
+          )
+          .slice(0, 4) as ImageGenerationRequest[];
+      }
+    } catch { /* not valid JSON */ }
+  }
+  return null;
+}
+
+/** Set an image attribute on an existing node by index. */
+function applyImageToExistingBlock(editor: Editor, nodeIndex: number, attr: string, url: string): boolean {
+  const { state } = editor.view;
+  const { doc, tr } = state;
+  if (nodeIndex < 0 || nodeIndex >= doc.childCount) return false;
+
+  let pos = 1;
+  for (let i = 0; i < nodeIndex; i++) {
+    pos += doc.child(i).nodeSize;
+  }
+
+  const node = doc.child(nodeIndex);
+  tr.setNodeMarkup(pos, undefined, { ...node.attrs, [attr]: url });
+  editor.view.dispatch(tr);
+  return true;
+}
+
+/** Insert a new block with an image after a given node index. */
+function insertImageBlock(editor: Editor, target: ImageTargetInsert, url: string): boolean {
+  const { state } = editor.view;
+  const { doc, schema, tr } = state;
+  const refIndex = target.insertAfter;
+  if (refIndex < 0 || refIndex >= doc.childCount) return false;
+
+  let pos = 1;
+  for (let i = 0; i <= refIndex; i++) {
+    pos += doc.child(i).nodeSize;
+  }
+
+  try {
+    const newNode = schema.nodeFromJSON({
+      type: target.blockType,
+      attrs: { [target.attr]: url },
+    });
+    tr.insert(pos, newNode);
+    editor.view.dispatch(tr);
+    return true;
+  } catch (err) {
+    console.warn('[AI ImageGen] Failed to insert block:', err);
+    return false;
+  }
 }
 
 /**
@@ -168,6 +237,9 @@ export function AiChatPanel({ projectId, editor }: AiChatPanelProps) {
     resetPlan,
     resetWorkingMemory,
     rememberFact,
+    imageGenBatch,
+    clearImageGenBatch,
+    generateImage,
   } = useAiStore();
 
   const [input, setInput] = useState('');
@@ -179,6 +251,8 @@ export function AiChatPanel({ projectId, editor }: AiChatPanelProps) {
   const triggeredOutlinesRef = useRef<Set<string>>(new Set());
   // Track which document edits we've already applied (by message index)
   const appliedEditsRef = useRef<Set<number>>(new Set());
+  // Track which image generation batches we've already triggered
+  const processedImageGensRef = useRef<Set<number>>(new Set());
 
   useEffect(() => {
     fetchSettings();
@@ -197,7 +271,7 @@ export function AiChatPanel({ projectId, editor }: AiChatPanelProps) {
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, streamingContent, wizardProgress]);
+  }, [messages, streamingContent, wizardProgress, imageGenBatch]);
 
   // Detect wizardGenerate blocks in completed messages and auto-trigger generation
   useEffect(() => {
@@ -244,6 +318,91 @@ export function AiChatPanel({ projectId, editor }: AiChatPanelProps) {
       setTimeout(() => setEditBanner(null), 5000);
     }
   }, [messages, isStreaming, editor]);
+
+  // Auto-process _generateImage blocks when streaming completes
+  useEffect(() => {
+    if (isStreaming || !editor || !settings?.provider) return;
+
+    const lastIdx = messages.length - 1;
+    if (lastIdx < 0) return;
+    const lastMsg = messages[lastIdx];
+    if (!lastMsg || lastMsg.role !== 'assistant') return;
+    if (processedImageGensRef.current.has(lastIdx)) return;
+
+    const images = extractImageGenBlock(lastMsg.content);
+    if (!images || images.length === 0) return;
+
+    // Only process if user has OpenAI configured (image gen requires it)
+    if (settings.provider !== 'openai') return;
+
+    processedImageGensRef.current.add(lastIdx);
+
+    // Initialize batch state
+    const initialJobs: ImageGenJobProgress[] = images.map((img) => ({
+      id: img.id,
+      prompt: img.prompt,
+      status: 'pending' as const,
+      target: img.target,
+    }));
+
+    useAiStore.setState({
+      imageGenBatch: { jobs: initialJobs, completedCount: 0, totalCount: images.length },
+    });
+
+    // Process images sequentially
+    (async () => {
+      for (let i = 0; i < images.length; i++) {
+        const img = images[i];
+
+        // Mark as generating
+        useAiStore.setState((s) => {
+          if (!s.imageGenBatch) return {};
+          const jobs = s.imageGenBatch.jobs.map((j) =>
+            j.id === img.id ? { ...j, status: 'generating' as const } : j
+          );
+          return { imageGenBatch: { ...s.imageGenBatch, jobs } };
+        });
+
+        try {
+          const url = await generateImage(projectId, img.prompt, img.model, img.size);
+
+          if (url && editor) {
+            // Apply to editor
+            const isInsert = 'insertAfter' in img.target;
+            if (isInsert) {
+              insertImageBlock(editor, img.target as ImageTargetInsert, url);
+            } else {
+              const t = img.target as { nodeIndex: number; attr: string };
+              applyImageToExistingBlock(editor, t.nodeIndex, t.attr, url);
+            }
+          }
+
+          // Mark completed or failed
+          useAiStore.setState((s) => {
+            if (!s.imageGenBatch) return {};
+            const jobs = s.imageGenBatch.jobs.map((j) =>
+              j.id === img.id
+                ? { ...j, status: (url ? 'completed' : 'failed') as 'completed' | 'failed', url: url || undefined, error: url ? undefined : 'Generation failed' }
+                : j
+            );
+            const completedCount = jobs.filter((j) => j.status === 'completed' || j.status === 'failed').length;
+            return { imageGenBatch: { ...s.imageGenBatch, jobs, completedCount } };
+          });
+        } catch (err) {
+          useAiStore.setState((s) => {
+            if (!s.imageGenBatch) return {};
+            const jobs = s.imageGenBatch.jobs.map((j) =>
+              j.id === img.id
+                ? { ...j, status: 'failed' as const, error: err instanceof Error ? err.message : 'Generation failed' }
+                : j
+            );
+            const completedCount = jobs.filter((j) => j.status === 'completed' || j.status === 'failed').length;
+            return { imageGenBatch: { ...s.imageGenBatch, jobs, completedCount } };
+          });
+        }
+      }
+    })();
+  }, [messages, isStreaming, editor, settings, projectId, generateImage]);
 
   async function handleSend() {
     const text = input.trim();
@@ -314,7 +473,9 @@ export function AiChatPanel({ projectId, editor }: AiChatPanelProps) {
                 if (window.confirm('Clear all chat history? This cannot be undone.')) {
                   clearChat(projectId);
                   clearWizard();
+                  clearImageGenBatch();
                   triggeredOutlinesRef.current.clear();
+                  processedImageGensRef.current.clear();
                 }
               }}
               className="text-xs text-gray-400 hover:text-red-500 transition-colors"
@@ -414,6 +575,12 @@ export function AiChatPanel({ projectId, editor }: AiChatPanelProps) {
                 wizardProgress={wizardProgress}
                 onApply={handleApplyWizard}
                 onCancel={handleCancelWizard}
+              />
+            )}
+            {imageGenBatch && (
+              <ImageGenProgress
+                batch={imageGenBatch}
+                onDismiss={clearImageGenBatch}
               />
             )}
           </>

@@ -103,6 +103,9 @@ function detectStateChanges(rawContent: string): StateChangeIndicator[] {
       } else if (parsed._evaluation) {
         const score = parsed.overallScore ?? '?';
         indicators.push({ icon: '\u{1F4CA}', label: `Evaluation: ${score}/10` });
+      } else if (parsed._generateImage) {
+        const count = parsed.images?.length || 0;
+        indicators.push({ icon: '\u{1F5BC}', label: `Images: ${count} queued` });
       }
     } catch { /* skip */ }
   }

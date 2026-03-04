@@ -144,7 +144,7 @@ export function stripControlBlocks(responseText: string): string {
       try {
         const parsed = JSON.parse(inner.trim());
         if (parsed && typeof parsed === 'object' && (
-          parsed._memoryUpdate || parsed._planUpdate || parsed._remember || parsed._wizardGenerate || parsed._documentEdit || parsed._evaluation
+          parsed._memoryUpdate || parsed._planUpdate || parsed._remember || parsed._wizardGenerate || parsed._documentEdit || parsed._evaluation || parsed._generateImage
         )) {
           return '';
         }
