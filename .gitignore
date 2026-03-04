@@ -5,6 +5,7 @@ build/
 *.log
 .DS_Store
 coverage/
+*.tsbuildinfo
 .turbo/
 .claude/worktrees/
 output/
