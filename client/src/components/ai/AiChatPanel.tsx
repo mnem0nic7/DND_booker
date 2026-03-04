@@ -186,7 +186,7 @@ function executeDocumentEdits(editor: Editor, operations: DocumentEditOperation[
           }
         }
         if (found >= 0) {
-          console.log(`[AI DocumentEdit] nodeIndex ${op.nodeIndex} out of bounds, resolved ${op.targetType} to index ${found}`);
+          console.debug(`[AI DocumentEdit] nodeIndex ${op.nodeIndex} out of bounds, resolved ${op.targetType} to index ${found}`);
           resolvedIndex = found;
         } else {
           console.warn(`[AI DocumentEdit] nodeIndex ${op.nodeIndex} out of bounds and targetType "${op.targetType}" not found (doc has ${doc.childCount} children)`);
@@ -207,7 +207,7 @@ function executeDocumentEdits(editor: Editor, operations: DocumentEditOperation[
           }
         }
         if (found >= 0) {
-          console.log(`[AI DocumentEdit] nodeIndex ${op.nodeIndex} out of bounds, inferred type "${inferredType}" at index ${found}`);
+          console.debug(`[AI DocumentEdit] nodeIndex ${op.nodeIndex} out of bounds, inferred type "${inferredType}" at index ${found}`);
           resolvedIndex = found;
         } else {
           console.warn(`[AI DocumentEdit] nodeIndex ${op.nodeIndex} out of bounds (doc has ${doc.childCount} children)`);
@@ -226,7 +226,7 @@ function executeDocumentEdits(editor: Editor, operations: DocumentEditOperation[
     const targetNode = doc.child(resolvedIndex);
 
     try {
-      console.log(`[AI DocumentEdit] op=${op.op} nodeIndex=${op.nodeIndex} targetType=${targetNode.type.name} pos=${pos}`);
+      console.debug(`[AI DocumentEdit] op=${op.op} nodeIndex=${resolvedIndex} type=${targetNode.type.name} pos=${pos}`);
       if (op.op === 'remove') {
         tr.delete(pos, pos + targetNode.nodeSize);
         applied++;
@@ -244,7 +244,7 @@ function executeDocumentEdits(editor: Editor, operations: DocumentEditOperation[
               ? JSON.stringify(value)
               : value;
         }
-        console.log('[AI DocumentEdit] updateAttrs on', targetNode.type.name, 'at nodeIndex', op.nodeIndex, normalizedAttrs);
+        console.debug('[AI DocumentEdit] updateAttrs on', targetNode.type.name, 'at nodeIndex', resolvedIndex, normalizedAttrs);
         tr.setNodeMarkup(pos, undefined, { ...targetNode.attrs, ...normalizedAttrs });
         applied++;
       } else if (op.op === 'insertBefore' && op.node) {
@@ -394,10 +394,10 @@ export function AiChatPanel({ projectId, editor }: AiChatPanelProps) {
       return;
     }
 
-    console.log('[AI DocumentEdit] Applying', edit.operations.length, 'operations:', edit.description, JSON.stringify(edit.operations));
+    console.debug('[AI DocumentEdit] Applying', edit.operations.length, 'ops:', edit.description);
     _appliedEdits.add(lastIdx);
     const count = executeDocumentEdits(editor, edit.operations);
-    console.log('[AI DocumentEdit] Applied', count, 'of', edit.operations.length, 'operations');
+    console.debug('[AI DocumentEdit] Applied', count, 'of', edit.operations.length);
     if (count > 0) {
       setEditBanner(`${edit.description} (${count} operation${count > 1 ? 's' : ''} applied)`);
       setTimeout(() => setEditBanner(null), 5000);
