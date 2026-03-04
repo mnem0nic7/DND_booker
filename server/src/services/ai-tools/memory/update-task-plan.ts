@@ -8,7 +8,7 @@ const taskSchema = z.object({
   description: z.string().optional().default(''),
   status: z.enum(['pending', 'in_progress', 'done', 'blocked']).default('pending'),
   dependsOn: z.array(z.string()).default([]),
-  acceptanceCriteria: z.any().optional(),
+  acceptanceCriteria: z.string().optional(),
   notes: z.string().optional(),
 });
 

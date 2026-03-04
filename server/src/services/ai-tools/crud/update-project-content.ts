@@ -11,7 +11,7 @@ export const updateProjectContent: ToolDefinition = {
     expectedUpdatedAt: z.string().describe('ISO timestamp from last read'),
     content: z.object({
       type: z.string(),
-      content: z.array(z.any()).optional(),
+      content: z.array(z.record(z.string(), z.unknown())).optional(),
     }).describe('TipTap JSON document content'),
   }),
   contexts: ['project-chat'],

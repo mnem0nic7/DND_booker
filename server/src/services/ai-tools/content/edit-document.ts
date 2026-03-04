@@ -8,7 +8,7 @@ const operationSchema = z.object({
   node: z.object({
     type: z.string(),
     attrs: z.record(z.unknown()).optional(),
-    content: z.array(z.any()).optional(),
+    content: z.array(z.record(z.string(), z.unknown())).optional(),
   }).optional(),
   attrs: z.record(z.unknown()).optional(),
 });
