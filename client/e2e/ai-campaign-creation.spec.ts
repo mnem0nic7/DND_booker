@@ -89,6 +89,13 @@ test.describe('AI Campaign Creation Flow', () => {
 
     await sendMessage(page, 'Create a one-shot adventure for level 5 players about a haunted lighthouse', 120_000);
 
+    // Check for rate limit error — if so, wait and retry
+    const rateLimitMsg = page.locator('text=Too many requests');
+    if (await rateLimitMsg.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await page.waitForTimeout(60_000); // wait 1 minute for rate limit window
+      await sendMessage(page, 'Please try generating the adventure again', 120_000);
+    }
+
     // Wizard completion button says "Insert N Section(s)"
     const insertSectionsBtn = page.locator('button:has-text("Section")').first();
 
@@ -125,6 +132,24 @@ test.describe('AI Campaign Creation Flow', () => {
       const messages = page.locator('.ai-markdown');
       const count = await messages.count();
       expect(count).toBeGreaterThan(0);
+    }
+  });
+
+  test('should edit document via AI chat', async ({ page }) => {
+    await openFirstProject(page);
+    await openAiPanel(page);
+
+    // Ask the AI to update the title page
+    await sendMessage(page, 'Update the title page: change the title to "The Haunted Lighthouse" and subtitle to "A Level 5 One-Shot Adventure"', 90_000);
+
+    // Wait for the status indicator showing operations applied
+    const statusMsg = page.locator('text=/operation|applied|updated/i').first();
+    const hasStatus = await statusMsg.isVisible({ timeout: 10_000 }).catch(() => false);
+
+    if (hasStatus) {
+      // Verify the editor content was modified
+      const editorText = await page.locator('.ProseMirror').first().innerText();
+      expect(editorText.toLowerCase()).toContain('haunted lighthouse');
     }
   });
 

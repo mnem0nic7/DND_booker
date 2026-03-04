@@ -5,6 +5,7 @@ export default defineConfig({
   timeout: 120_000,
   expect: { timeout: 15_000 },
   fullyParallel: false, // AI tests are sequential by nature
+  workers: 1, // single worker — all tests share one user with rate limits
   retries: 0,
   reporter: [['html', { open: 'never' }], ['list']],
   use: {
