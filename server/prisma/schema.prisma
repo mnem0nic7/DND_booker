@@ -71,6 +71,7 @@ model Project {
   workingMemories AiWorkingMemory[]
   memoryItems     AiMemoryItem[]
   taskPlans       AiTaskPlan[]
+  contentChunks   ContentChunk[]
 
   @@index([userId])
   @@map("projects")
@@ -239,4 +240,44 @@ model AiTaskPlan {
 
   @@unique([projectId, userId])
   @@map("ai_task_plans")
+}
+
+model AiToolAudit {
+  id              String    @id @default(uuid())
+  requestId       String    @map("request_id")
+  userId          String    @map("user_id")
+  projectId       String?   @map("project_id")
+  toolName        String    @map("tool_name")
+  inputHash       String    @map("input_hash")
+  resultStatus    String    @map("result_status")
+  oldContentHash  String?   @map("old_content_hash")
+  newContentHash  String?   @map("new_content_hash")
+  oldUpdatedAt    DateTime? @map("old_updated_at")
+  newUpdatedAt    DateTime? @map("new_updated_at")
+  latencyMs       Int       @map("latency_ms")
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@index([projectId])
+  @@index([toolName])
+  @@index([createdAt])
+  @@map("ai_tool_audits")
+}
+
+model ContentChunk {
+  id          String   @id @default(uuid())
+  projectId   String   @map("project_id")
+  chunkId     String   @map("chunk_id")
+  blockType   String   @map("block_type")
+  headingPath String   @map("heading_path")
+  text        String
+  attrs       Json     @default("{}")
+  nodeIndex   Int      @map("node_index")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, chunkId])
+  @@index([projectId])
+  @@map("content_chunks")
 }
