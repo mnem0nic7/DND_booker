@@ -209,6 +209,22 @@ function executeDocumentEdits(editor: Editor, operations: DocumentEditOperation[
   return applied;
 }
 
+// --- Module-level tracking sets (persist across component unmount/remount) ---
+// Keyed by projectId so switching projects resets correctly.
+let _trackedProjectId = '';
+const _triggeredOutlines = new Set<string>();
+const _appliedEdits = new Set<number>();
+const _processedImageGens = new Set<number>();
+
+function resetTrackingSets(projectId: string) {
+  if (projectId !== _trackedProjectId) {
+    _trackedProjectId = projectId;
+    _triggeredOutlines.clear();
+    _appliedEdits.clear();
+    _processedImageGens.clear();
+  }
+}
+
 interface AiChatPanelProps {
   projectId: string;
   editor: Editor | null;
@@ -247,12 +263,9 @@ export function AiChatPanel({ projectId, editor }: AiChatPanelProps) {
   const [showPlanPanel, setShowPlanPanel] = useState(false);
   const [editBanner, setEditBanner] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  // Track which wizard outlines we've already triggered generation for
-  const triggeredOutlinesRef = useRef<Set<string>>(new Set());
-  // Track which document edits we've already applied (by message index)
-  const appliedEditsRef = useRef<Set<number>>(new Set());
-  // Track which image generation batches we've already triggered
-  const processedImageGensRef = useRef<Set<number>>(new Set());
+
+  // Reset module-level tracking sets when project changes
+  resetTrackingSets(projectId);
 
   useEffect(() => {
     fetchSettings();
@@ -286,8 +299,8 @@ export function AiChatPanel({ projectId, editor }: AiChatPanelProps) {
 
     // Don't re-trigger if we already started this one
     const outlineKey = `${outline.adventureTitle}-${outline.sections.length}`;
-    if (triggeredOutlinesRef.current.has(outlineKey)) return;
-    triggeredOutlinesRef.current.add(outlineKey);
+    if (_triggeredOutlines.has(outlineKey)) return;
+    _triggeredOutlines.add(outlineKey);
 
     // Auto-trigger generation from the outline
     startWizardFromOutline(projectId, outline);
@@ -301,7 +314,7 @@ export function AiChatPanel({ projectId, editor }: AiChatPanelProps) {
     if (lastIdx < 0) return;
     const lastMsg = messages[lastIdx];
     if (!lastMsg || lastMsg.role !== 'assistant') return;
-    if (appliedEditsRef.current.has(lastIdx)) return;
+    if (_appliedEdits.has(lastIdx)) return;
 
     const edit = extractDocumentEdit(lastMsg.content);
     if (!edit || edit.operations.length === 0) {
@@ -310,7 +323,7 @@ export function AiChatPanel({ projectId, editor }: AiChatPanelProps) {
     }
 
     console.log('[AI DocumentEdit] Applying', edit.operations.length, 'operations:', edit.description);
-    appliedEditsRef.current.add(lastIdx);
+    _appliedEdits.add(lastIdx);
     const count = executeDocumentEdits(editor, edit.operations);
     console.log('[AI DocumentEdit] Applied', count, 'of', edit.operations.length, 'operations');
     if (count > 0) {
@@ -327,7 +340,7 @@ export function AiChatPanel({ projectId, editor }: AiChatPanelProps) {
     if (lastIdx < 0) return;
     const lastMsg = messages[lastIdx];
     if (!lastMsg || lastMsg.role !== 'assistant') return;
-    if (processedImageGensRef.current.has(lastIdx)) return;
+    if (_processedImageGens.has(lastIdx)) return;
 
     const images = extractImageGenBlock(lastMsg.content);
     if (!images || images.length === 0) return;
@@ -335,7 +348,7 @@ export function AiChatPanel({ projectId, editor }: AiChatPanelProps) {
     // Only process if user has OpenAI configured (image gen requires it)
     if (settings.provider !== 'openai') return;
 
-    processedImageGensRef.current.add(lastIdx);
+    _processedImageGens.add(lastIdx);
 
     // Initialize batch state
     const initialJobs: ImageGenJobProgress[] = images.map((img) => ({
@@ -474,8 +487,8 @@ export function AiChatPanel({ projectId, editor }: AiChatPanelProps) {
                   clearChat(projectId);
                   clearWizard();
                   clearImageGenBatch();
-                  triggeredOutlinesRef.current.clear();
-                  processedImageGensRef.current.clear();
+                  _triggeredOutlines.clear();
+                  _processedImageGens.clear();
                 }
               }}
               className="text-xs text-gray-400 hover:text-red-500 transition-colors"
