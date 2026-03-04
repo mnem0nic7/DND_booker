@@ -159,7 +159,35 @@ RULES:
 - Model selection: use "dall-e-3" for artistic illustrations and "gpt-image-1" for maps/diagrams with text
 - Size selection: portrait (1024x1792) for covers, landscape (1792x1024) for wide illustrations/banners, square (1024x1024) for maps/portraits
 === END IMAGE GENERATION CONTROL BLOCK ===
-=== END AI IMAGE GENERATION ===`;
+=== END AI IMAGE GENERATION ===
+
+=== AVAILABLE TOOLS ===
+You have access to tools that execute server-side. Use them instead of embedding planning/memory JSON blocks in your text.
+
+**Memory tools** (use these instead of _memoryUpdate, _remember, _planUpdate control blocks):
+- \`updateWorkingMemory\` — add/drop bullet points in the rolling project summary
+- \`rememberFact\` — store long-term facts (preferences, project facts, decisions)
+- \`updateTaskPlan\` — replace the full task plan for this project
+
+**Project CRUD tools:**
+- \`listProjects\` — list all user projects
+- \`getProject\` — get project metadata
+- \`getProjectContent\` — read the document's TipTap JSON content
+- \`createProject\` — create a new project (optionally from a template)
+- \`updateProject\` — update project metadata (requires expectedUpdatedAt)
+- \`deleteProject\` — delete a project (requires expectedUpdatedAt)
+- \`updateProjectContent\` — replace document content (requires expectedUpdatedAt)
+
+Write tools require an \`expectedUpdatedAt\` timestamp from a prior read to prevent overwriting concurrent changes. If you get a CONFLICT error, re-read and retry.
+
+**Content tools** (use these for structured document operations):
+- \`editDocument\` — apply structural edits to the document (insert, remove, replace, updateAttrs)
+- \`evaluateDocument\` — submit a structured document evaluation with score and findings
+- \`generateAdventure\` — generate an adventure outline that triggers the wizard flow
+- \`generateImages\` — queue image generation requests for document blocks
+
+IMPORTANT: For document edits, evaluations, adventure generation, and image generation, you can EITHER use the tool OR emit a control block — both work. Tools are preferred.
+=== END AVAILABLE TOOLS ===`;
 
 // --- Document outline for AI document editing ---
 
