@@ -172,17 +172,58 @@ function executeDocumentEdits(editor: Editor, operations: DocumentEditOperation[
   const sorted = [...operations].sort((a, b) => b.nodeIndex - a.nodeIndex);
 
   for (const op of sorted) {
-    // Bounds check
-    if (op.nodeIndex < 0 || op.nodeIndex >= doc.childCount) continue;
+    let resolvedIndex = op.nodeIndex;
+
+    // Bounds check with type-based fallback
+    if (resolvedIndex < 0 || resolvedIndex >= doc.childCount) {
+      // Try to find the node by targetType if provided
+      if (op.targetType) {
+        let found = -1;
+        for (let i = 0; i < doc.childCount; i++) {
+          if (doc.child(i).type.name === op.targetType) {
+            found = i;
+            break;
+          }
+        }
+        if (found >= 0) {
+          console.log(`[AI DocumentEdit] nodeIndex ${op.nodeIndex} out of bounds, resolved ${op.targetType} to index ${found}`);
+          resolvedIndex = found;
+        } else {
+          console.warn(`[AI DocumentEdit] nodeIndex ${op.nodeIndex} out of bounds and targetType "${op.targetType}" not found (doc has ${doc.childCount} children)`);
+          continue;
+        }
+      } else {
+        // No targetType hint — try to infer from node/attrs for updateAttrs/replace ops
+        const inferredType = op.node?.type || (op.attrs && op.op === 'updateAttrs' ? undefined : undefined);
+        if (!inferredType) {
+          console.warn(`[AI DocumentEdit] nodeIndex ${op.nodeIndex} out of bounds (doc has ${doc.childCount} children)`);
+          continue;
+        }
+        let found = -1;
+        for (let i = 0; i < doc.childCount; i++) {
+          if (doc.child(i).type.name === inferredType) {
+            found = i;
+            break;
+          }
+        }
+        if (found >= 0) {
+          console.log(`[AI DocumentEdit] nodeIndex ${op.nodeIndex} out of bounds, inferred type "${inferredType}" at index ${found}`);
+          resolvedIndex = found;
+        } else {
+          console.warn(`[AI DocumentEdit] nodeIndex ${op.nodeIndex} out of bounds (doc has ${doc.childCount} children)`);
+          continue;
+        }
+      }
+    }
 
     // Calculate the position of the node at this index.
     // ProseMirror: top-level children start at position 0 in doc.descendants().
     let pos = 0;
-    for (let i = 0; i < op.nodeIndex; i++) {
+    for (let i = 0; i < resolvedIndex; i++) {
       pos += doc.child(i).nodeSize;
     }
 
-    const targetNode = doc.child(op.nodeIndex);
+    const targetNode = doc.child(resolvedIndex);
 
     try {
       console.log(`[AI DocumentEdit] op=${op.op} nodeIndex=${op.nodeIndex} targetType=${targetNode.type.name} pos=${pos}`);
@@ -353,7 +394,7 @@ export function AiChatPanel({ projectId, editor }: AiChatPanelProps) {
       return;
     }
 
-    console.log('[AI DocumentEdit] Applying', edit.operations.length, 'operations:', edit.description);
+    console.log('[AI DocumentEdit] Applying', edit.operations.length, 'operations:', edit.description, JSON.stringify(edit.operations));
     _appliedEdits.add(lastIdx);
     const count = executeDocumentEdits(editor, edit.operations);
     console.log('[AI DocumentEdit] Applied', count, 'of', edit.operations.length, 'operations');

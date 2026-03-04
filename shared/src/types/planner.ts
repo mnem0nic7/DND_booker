@@ -50,6 +50,8 @@ export interface RememberBlock {
 export interface DocumentEditOperation {
   op: 'insertBefore' | 'insertAfter' | 'remove' | 'replace' | 'updateAttrs';
   nodeIndex: number;
+  /** Optional hint: if nodeIndex is out of bounds, search for the first node of this type */
+  targetType?: string;
   node?: { type: string; attrs?: Record<string, unknown>; content?: unknown[] };
   attrs?: Record<string, unknown>;
 }

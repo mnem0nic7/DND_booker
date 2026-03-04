@@ -478,8 +478,8 @@ I analyzed the document and found several pagination issues. Here's what I'm fix
   "_documentEdit": true,
   "description": "Fixed pagination: added break before Chapter 3, removed duplicate at node 22",
   "operations": [
-    {"op": "insertBefore", "nodeIndex": 45, "node": {"type": "pageBreak"}},
-    {"op": "remove", "nodeIndex": 22}
+    {"op": "insertBefore", "nodeIndex": 45, "targetType": "heading", "node": {"type": "pageBreak"}},
+    {"op": "remove", "nodeIndex": 22, "targetType": "pageBreak"}
   ]
 }
 \`\`\`
@@ -491,33 +491,46 @@ Supported operations:
 - "replace": Replace the entire node at nodeIndex with a new node. Requires "node" field with full TipTap JSON structure including content array.
 - "updateAttrs": Update attributes on the node at nodeIndex without changing its content. Requires "attrs" field.
 
+ALWAYS include "targetType" in every operation — the block type name at that index (e.g. "titlePage", "statBlock", "heading"). This is a safety net: if the nodeIndex is wrong, the system will search for the first matching node of that type.
+
 IMPORTANT — Most D&D blocks are "atom" blocks: all their data is in attributes, NOT in child content nodes. To modify them, use "updateAttrs" (NOT "replace"):
 
 Atom blocks and their attrs:
-- encounterTable: environment (string), crRange (string), entries (JSON string array: [{"weight":1,"description":"1d4 shadows","cr":"1/2"},{"weight":2,"description":"1 specter","cr":"1"},...])
+- titlePage: title (string), subtitle (string), author (string), coverImageUrl (string)
+- backCover: blurb (string), authorBio (string), authorImageUrl (string)
+- chapterHeader: title (string), subtitle (string), chapterNumber (string), backgroundImage (string)
 - statBlock: name, type, alignment, ac, hp, speed, str, dex, con, int, wis, cha, skills, senses, languages, cr, traits (JSON string), actions (JSON string)
+- encounterTable: environment (string), crRange (string), entries (JSON string array: [{"weight":1,"description":"1d4 shadows","cr":"1/2"},{"weight":2,"description":"1 specter","cr":"1"},...])
 - magicItem: name, rarity, type, description, attunement
 - npcProfile: name, race, occupation, description, portrait
+- spellCard: name, level (number), school, castingTime, range, components, duration, description, higherLevels
+- randomTable: title (string), dieType (string), entries (JSON string: [{"roll":"1","result":"..."},{"roll":"2","result":"..."},...])
+- fullBleedImage: src (string), caption (string), position ("full"|"half"|"quarter")
 - readAloud: variant ("light"|"dark"), content stored as child text (use "replace" only for readAloud)
 - dmTips: content stored as child text (use "replace" only for dmTips)
 
 Example — updating an encounterTable at node 42:
 \`\`\`json
-{"op": "updateAttrs", "nodeIndex": 42, "attrs": {"environment": "Haunted Lighthouse", "crRange": "1-4", "entries": "[{\\"weight\\":1,\\"description\\":\\"1d4 shadows\\",\\"cr\\":\\"1/2\\"},{\\"weight\\":2,\\"description\\":\\"1 specter\\",\\"cr\\":\\"1\\"},{\\"weight\\":3,\\"description\\":\\"1d6 skeletons\\",\\"cr\\":\\"1/4\\"}]"}}
+{"op": "updateAttrs", "nodeIndex": 42, "targetType": "encounterTable", "attrs": {"environment": "Haunted Lighthouse", "crRange": "1-4", "entries": "[{\\"weight\\":1,\\"description\\":\\"1d4 shadows\\",\\"cr\\":\\"1/2\\"},{\\"weight\\":2,\\"description\\":\\"1 specter\\",\\"cr\\":\\"1\\"},{\\"weight\\":3,\\"description\\":\\"1d6 skeletons\\",\\"cr\\":\\"1/4\\"}]"}}
+\`\`\`
+
+Example — updating a titlePage at node 0:
+\`\`\`json
+{"op": "updateAttrs", "nodeIndex": 0, "targetType": "titlePage", "attrs": {"title": "Dragon's Lair Heist", "subtitle": "A Level 5 One-Shot Adventure"}}
 \`\`\`
 
 Example — updating a statBlock name at node 10:
 \`\`\`json
-{"op": "updateAttrs", "nodeIndex": 10, "attrs": {"name": "Shadow Knight", "cr": "3"}}
+{"op": "updateAttrs", "nodeIndex": 10, "targetType": "statBlock", "attrs": {"name": "Shadow Knight", "cr": "3"}}
 \`\`\`
 
 For "replace" operations (readAloud, dmTips, or inserting new non-atom blocks):
 \`\`\`json
-{"op": "replace", "nodeIndex": 15, "node": {"type": "readAloud", "attrs": {"variant": "dark"}, "content": [{"type": "paragraph", "content": [{"type": "text", "text": "The darkness closes in..."}]}]}}
+{"op": "replace", "nodeIndex": 15, "targetType": "readAloud", "node": {"type": "readAloud", "attrs": {"variant": "dark"}, "content": [{"type": "paragraph", "content": [{"type": "text", "text": "The darkness closes in..."}]}]}}
 \`\`\`
 
 Insertable node types: pageBreak, columnBreak, horizontalRule
-Modifiable atom blocks: encounterTable, statBlock, magicItem, npcProfile (use updateAttrs)
+Modifiable atom blocks: titlePage, backCover, chapterHeader, statBlock, encounterTable, magicItem, npcProfile, spellCard, randomTable, fullBleedImage (use updateAttrs)
 Modifiable content blocks: readAloud, dmTips (use replace with content array)
 
 PAGINATION RULES:
