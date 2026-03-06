@@ -3,6 +3,7 @@ import { z } from 'zod';
 import type { BibleContent, ChapterOutline } from '@dnd-booker/shared';
 import { prisma } from '../../config/database.js';
 import { publishGenerationEvent } from './pubsub.service.js';
+import { parseJsonResponse } from './parse-json.js';
 import {
   buildChapterOutlineSystemPrompt,
   buildChapterOutlineUserPrompt,
@@ -97,16 +98,4 @@ export async function executeOutlineGeneration(
   });
 
   return { outline, artifactId: artifact.id };
-}
-
-function parseJsonResponse(text: string): unknown {
-  let cleaned = text.trim();
-  if (cleaned.startsWith('```')) {
-    const firstNewline = cleaned.indexOf('\n');
-    cleaned = cleaned.slice(firstNewline + 1);
-    const lastFence = cleaned.lastIndexOf('```');
-    if (lastFence > 0) cleaned = cleaned.slice(0, lastFence);
-    cleaned = cleaned.trim();
-  }
-  return JSON.parse(cleaned);
 }

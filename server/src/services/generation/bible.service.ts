@@ -3,6 +3,7 @@ import { z } from 'zod';
 import type { NormalizedInput, BibleContent } from '@dnd-booker/shared';
 import { prisma } from '../../config/database.js';
 import { publishGenerationEvent } from './pubsub.service.js';
+import { parseJsonResponse } from './parse-json.js';
 import {
   buildCampaignBibleSystemPrompt,
   buildCampaignBibleUserPrompt,
@@ -178,22 +179,4 @@ export async function executeBibleGeneration(
       canonicalName: e.canonicalName,
     })),
   };
-}
-
-/**
- * Parse a JSON response from the AI, handling common issues.
- */
-function parseJsonResponse(text: string): unknown {
-  let cleaned = text.trim();
-
-  // Strip markdown fences if present
-  if (cleaned.startsWith('```')) {
-    const firstNewline = cleaned.indexOf('\n');
-    cleaned = cleaned.slice(firstNewline + 1);
-    const lastFence = cleaned.lastIndexOf('```');
-    if (lastFence > 0) cleaned = cleaned.slice(0, lastFence);
-    cleaned = cleaned.trim();
-  }
-
-  return JSON.parse(cleaned);
 }
