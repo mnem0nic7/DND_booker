@@ -14,6 +14,7 @@ export * from './types/generated-artifact';
 export * from './types/artifact-evaluation';
 export * from './types/canon-entity';
 export * from './types/campaign-bible';
+export * from './types/normalized-input';
 export * from './types/assembly-manifest';
 export * from './types/project-document';
 export * from './types/generation-events';
