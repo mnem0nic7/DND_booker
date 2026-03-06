@@ -7,6 +7,61 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum RunStatus {
+  queued
+  planning
+  generating_assets
+  generating_prose
+  evaluating
+  revising
+  assembling
+  completed
+  failed
+  paused
+  cancelled
+}
+
+enum GenerationMode {
+  one_shot
+  module
+  campaign
+  sourcebook
+}
+
+enum GenerationQuality {
+  quick
+  polished
+}
+
+enum TaskStatus {
+  queued
+  blocked
+  running
+  completed
+  failed
+  cancelled
+}
+
+enum ArtifactStatus {
+  queued
+  generating
+  generated
+  evaluating
+  passed
+  failed_evaluation
+  revising
+  accepted
+  rejected
+  assembled
+}
+
+enum DocumentKind {
+  front_matter
+  chapter
+  appendix
+  back_matter
+}
+
 model User {
   id           String      @id @default(uuid())
   email        String      @unique
@@ -32,6 +87,7 @@ model User {
   workingMemories AiWorkingMemory[]
   memoryItems     AiMemoryItem[]
   taskPlans       AiTaskPlan[]
+  generationRuns  GenerationRun[]
 
   @@map("users")
 }
@@ -72,6 +128,11 @@ model Project {
   memoryItems     AiMemoryItem[]
   taskPlans       AiTaskPlan[]
   contentChunks   ContentChunk[]
+  generationRuns  GenerationRun[]
+  campaignBibles  CampaignBible[]
+  canonEntities   CanonEntity[]
+  artifacts       GeneratedArtifact[]
+  documents       ProjectDocument[]
 
   @@index([userId])
   @@map("projects")
@@ -280,4 +341,259 @@ model ContentChunk {
   @@unique([projectId, chunkId])
   @@index([projectId])
   @@map("content_chunks")
+}
+
+model GenerationRun {
+  id              String            @id @default(uuid())
+  projectId       String            @map("project_id")
+  userId          String            @map("user_id")
+  mode            GenerationMode
+  quality         GenerationQuality @default(quick)
+  status          RunStatus         @default(queued)
+  currentStage    String?           @map("current_stage")
+  inputPrompt     String            @map("input_prompt")
+  inputParameters Json?             @map("input_parameters")
+  progressPercent Int               @default(0) @map("progress_percent")
+  estimatedPages  Int?              @map("estimated_pages")
+  estimatedTokens Int?              @map("estimated_tokens")
+  estimatedCost   Float?            @map("estimated_cost")
+  actualTokens    Int               @default(0) @map("actual_tokens")
+  actualCost      Float             @default(0) @map("actual_cost")
+  failureReason   String?           @map("failure_reason")
+  metricsJson     Json?             @map("metrics_json")
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+  startedAt       DateTime?         @map("started_at")
+  completedAt     DateTime?         @map("completed_at")
+
+  project         Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tasks           GenerationTask[]
+  bible           CampaignBible?
+  artifacts       GeneratedArtifact[]
+  canonEntities   CanonEntity[]
+  manifests       AssemblyManifest[]
+
+  @@index([projectId])
+  @@index([userId])
+  @@index([status])
+  @@map("generation_runs")
+}
+
+model GenerationTask {
+  id              String      @id @default(uuid())
+  runId           String      @map("run_id")
+  parentTaskId    String?     @map("parent_task_id")
+  taskType        String      @map("task_type")
+  artifactType    String?     @map("artifact_type")
+  artifactKey     String?     @map("artifact_key")
+  status          TaskStatus  @default(queued)
+  priority        Int         @default(0)
+  attemptCount    Int         @default(0) @map("attempt_count")
+  maxAttempts     Int         @default(2) @map("max_attempts")
+  dependsOn       Json        @default("[]") @map("depends_on")
+  inputPayload    Json?       @map("input_payload")
+  resultPayload   Json?       @map("result_payload")
+  errorMessage    String?     @map("error_message")
+  tokenCount      Int?        @map("token_count")
+  costEstimate    Float?      @map("cost_estimate")
+  startedAt       DateTime?   @map("started_at")
+  completedAt     DateTime?   @map("completed_at")
+  createdAt       DateTime    @default(now()) @map("created_at")
+  updatedAt       DateTime    @updatedAt @map("updated_at")
+
+  run             GenerationRun  @relation(fields: [runId], references: [id], onDelete: Cascade)
+  parentTask      GenerationTask? @relation("TaskParent", fields: [parentTaskId], references: [id])
+  childTasks      GenerationTask[] @relation("TaskParent")
+
+  @@index([runId])
+  @@index([runId, status])
+  @@index([parentTaskId])
+  @@map("generation_tasks")
+}
+
+model CampaignBible {
+  id              String    @id @default(uuid())
+  runId           String    @unique @map("run_id")
+  projectId       String    @map("project_id")
+  version         Int       @default(1)
+  title           String
+  summary         String
+  premise         String?
+  worldRules      Json?     @map("world_rules")
+  actStructure    Json?     @map("act_structure")
+  timeline        Json?
+  levelProgression Json?    @map("level_progression")
+  pageBudget      Json?     @map("page_budget")
+  styleGuide      Json?     @map("style_guide")
+  openThreads     Json?     @map("open_threads")
+  status          String    @default("draft")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  run             GenerationRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  project         Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@map("campaign_bibles")
+}
+
+model CanonEntity {
+  id              String    @id @default(uuid())
+  projectId       String    @map("project_id")
+  runId           String    @map("run_id")
+  entityType      String    @map("entity_type")
+  slug            String
+  canonicalName   String    @map("canonical_name")
+  aliases         Json      @default("[]")
+  canonicalData   Json      @map("canonical_data")
+  summary         String
+  sourceArtifactId String?  @map("source_artifact_id")
+  status          String    @default("active")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  project         Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  run             GenerationRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  references      CanonReference[]
+
+  @@unique([runId, entityType, slug])
+  @@index([projectId])
+  @@index([runId])
+  @@index([entityType])
+  @@map("canon_entities")
+}
+
+model CanonReference {
+  id              String    @id @default(uuid())
+  entityId        String    @map("entity_id")
+  artifactId      String    @map("artifact_id")
+  referenceType   String    @map("reference_type")
+  metadata        Json?
+
+  entity          CanonEntity @relation(fields: [entityId], references: [id], onDelete: Cascade)
+  artifact        GeneratedArtifact @relation(fields: [artifactId], references: [id], onDelete: Cascade)
+
+  @@index([entityId])
+  @@index([artifactId])
+  @@map("canon_references")
+}
+
+model GeneratedArtifact {
+  id               String         @id @default(uuid())
+  runId            String         @map("run_id")
+  projectId        String         @map("project_id")
+  sourceTaskId     String?        @map("source_task_id")
+  artifactType     String         @map("artifact_type")
+  artifactKey      String         @map("artifact_key")
+  parentArtifactId String?        @map("parent_artifact_id")
+  status           ArtifactStatus @default(queued)
+  version          Int            @default(1)
+  title            String
+  summary          String?
+  jsonContent      Json?          @map("json_content")
+  markdownContent  String?        @map("markdown_content")
+  tiptapContent    Json?          @map("tiptap_content")
+  metadata         Json?
+  pageEstimate     Int?           @map("page_estimate")
+  tokenCount       Int?           @map("token_count")
+  createdAt        DateTime       @default(now()) @map("created_at")
+  updatedAt        DateTime       @updatedAt @map("updated_at")
+
+  run              GenerationRun  @relation(fields: [runId], references: [id], onDelete: Cascade)
+  project          Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  parentArtifact   GeneratedArtifact? @relation("ArtifactParent", fields: [parentArtifactId], references: [id])
+  childArtifacts   GeneratedArtifact[] @relation("ArtifactParent")
+  evaluations      ArtifactEvaluation[]
+  revisions        ArtifactRevision[] @relation("RevisionTarget")
+  canonReferences  CanonReference[]
+
+  @@unique([runId, artifactType, artifactKey, version])
+  @@index([runId])
+  @@index([projectId])
+  @@index([artifactType])
+  @@index([status])
+  @@map("generated_artifacts")
+}
+
+model ArtifactEvaluation {
+  id                     String   @id @default(uuid())
+  artifactId             String   @map("artifact_id")
+  artifactVersion        Int      @map("artifact_version")
+  evaluationType         String   @map("evaluation_type")
+  overallScore           Float    @map("overall_score")
+  structuralCompleteness Float?   @map("structural_completeness")
+  continuityScore        Float?   @map("continuity_score")
+  dndSanity              Float?   @map("dnd_sanity")
+  editorialQuality       Float?   @map("editorial_quality")
+  publicationFit         Float?   @map("publication_fit")
+  passed                 Boolean
+  findings               Json
+  recommendedActions     Json?    @map("recommended_actions")
+  evaluatorModel         String?  @map("evaluator_model")
+  tokenCount             Int?     @map("token_count")
+  createdAt              DateTime @default(now()) @map("created_at")
+
+  artifact               GeneratedArtifact @relation(fields: [artifactId], references: [id], onDelete: Cascade)
+
+  @@index([artifactId])
+  @@map("artifact_evaluations")
+}
+
+model ArtifactRevision {
+  id              String   @id @default(uuid())
+  artifactId      String   @map("artifact_id")
+  fromVersion     Int      @map("from_version")
+  toVersion       Int      @map("to_version")
+  reason          String
+  findingCodes    Json?    @map("finding_codes")
+  revisionPrompt  String?  @map("revision_prompt")
+  tokenCount      Int?     @map("token_count")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  artifact        GeneratedArtifact @relation("RevisionTarget", fields: [artifactId], references: [id], onDelete: Cascade)
+
+  @@index([artifactId])
+  @@map("artifact_revisions")
+}
+
+model AssemblyManifest {
+  id            String    @id @default(uuid())
+  runId         String    @map("run_id")
+  projectId     String    @map("project_id")
+  version       Int       @default(1)
+  documents     Json
+  assemblyRules Json?     @map("assembly_rules")
+  status        String    @default("draft")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  run           GenerationRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@index([runId])
+  @@map("assembly_manifests")
+}
+
+model ProjectDocument {
+  id               String       @id @default(uuid())
+  projectId        String       @map("project_id")
+  runId            String?      @map("run_id")
+  kind             DocumentKind
+  title            String
+  slug             String
+  sortOrder        Int          @map("sort_order")
+  targetPageCount  Int?         @map("target_page_count")
+  outlineJson      Json?        @map("outline_json")
+  content          Json         @default("{}")
+  status           String       @default("draft")
+  sourceArtifactId String?      @map("source_artifact_id")
+  createdAt        DateTime     @default(now()) @map("created_at")
+  updatedAt        DateTime     @updatedAt @map("updated_at")
+
+  project          Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, slug])
+  @@index([projectId])
+  @@index([projectId, sortOrder])
+  @@map("project_documents")
 }
