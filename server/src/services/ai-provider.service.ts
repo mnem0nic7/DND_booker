@@ -5,20 +5,25 @@ import { generateText, type LanguageModel } from 'ai';
 export type AiProvider = 'anthropic' | 'openai' | 'ollama';
 
 const DEFAULT_MODELS: Record<AiProvider, string> = {
-  anthropic: 'claude-sonnet-4-20250514',
+  anthropic: 'claude-sonnet-4-6',
   openai: 'gpt-4o',
   ollama: 'llama3.1:8b',
 };
 
 export const SUPPORTED_MODELS: Record<AiProvider, string[]> = {
   anthropic: [
+    'claude-opus-4-6',
+    'claude-sonnet-4-6',
+    'claude-haiku-4-5-20251001',
     'claude-opus-4-20250514',
     'claude-sonnet-4-20250514',
-    'claude-haiku-4-20250414',
     'claude-3-7-sonnet-20250219',
     'claude-3-5-haiku-20241022',
   ],
   openai: [
+    'gpt-5.4',
+    'gpt-5.4-pro',
+    'gpt-5.2',
     'gpt-4o',
     'gpt-4o-mini',
     'gpt-4.1',

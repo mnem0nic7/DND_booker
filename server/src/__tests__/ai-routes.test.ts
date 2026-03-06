@@ -83,7 +83,7 @@ describe('AI Routes', () => {
       const res = await request(app)
         .post('/api/ai/settings')
         .set('Authorization', `Bearer ${accessToken}`)
-        .send({ provider: 'anthropic', model: 'claude-sonnet-4-20250514' });
+        .send({ provider: 'anthropic', model: 'claude-sonnet-4-6' });
 
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
@@ -93,7 +93,7 @@ describe('AI Routes', () => {
         .get('/api/ai/settings')
         .set('Authorization', `Bearer ${accessToken}`);
       expect(getRes.body.provider).toBe('anthropic');
-      expect(getRes.body.model).toBe('claude-sonnet-4-20250514');
+      expect(getRes.body.model).toBe('claude-sonnet-4-6');
       expect(getRes.body.hasApiKey).toBe(false);
     });
 

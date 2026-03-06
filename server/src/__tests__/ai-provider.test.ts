@@ -13,7 +13,7 @@ describe('AI Provider Service', () => {
 
     it('should have Anthropic models', () => {
       expect(SUPPORTED_MODELS.anthropic.length).toBeGreaterThan(0);
-      expect(SUPPORTED_MODELS.anthropic).toContain('claude-sonnet-4-20250514');
+      expect(SUPPORTED_MODELS.anthropic).toContain('claude-sonnet-4-6');
     });
 
     it('should have OpenAI models', () => {
