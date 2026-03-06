@@ -215,6 +215,113 @@ generationRoutes.get(
   }),
 );
 
+// GET /ai/generation-runs/:runId/artifacts/:artifactId — Artifact detail with evaluations
+generationRoutes.get(
+  '/ai/generation-runs/:runId/artifacts/:artifactId',
+  requireAuth,
+  validateUuid('projectId', 'runId', 'artifactId'),
+  asyncHandler(async (req, res) => {
+    const authReq = req as AuthRequest;
+    const runId = req.params.runId as string;
+    const artifactId = req.params.artifactId as string;
+
+    const run = await getRun(runId, authReq.userId!);
+    if (!run) {
+      res.status(404).json({ error: 'Run not found' });
+      return;
+    }
+
+    const artifact = await prisma.generatedArtifact.findFirst({
+      where: { id: artifactId, runId },
+      include: { evaluations: { orderBy: { createdAt: 'desc' } } },
+    });
+
+    if (!artifact) {
+      res.status(404).json({ error: 'Artifact not found' });
+      return;
+    }
+
+    res.json(artifact);
+  }),
+);
+
+// GET /ai/generation-runs/:runId/canon — Canon entity list
+generationRoutes.get(
+  '/ai/generation-runs/:runId/canon',
+  requireAuth,
+  validateUuid('projectId', 'runId'),
+  asyncHandler(async (req, res) => {
+    const authReq = req as AuthRequest;
+    const runId = req.params.runId as string;
+
+    const run = await getRun(runId, authReq.userId!);
+    if (!run) {
+      res.status(404).json({ error: 'Run not found' });
+      return;
+    }
+
+    const entities = await prisma.canonEntity.findMany({
+      where: { runId },
+      orderBy: [{ entityType: 'asc' }, { canonicalName: 'asc' }],
+    });
+
+    res.json(entities);
+  }),
+);
+
+// GET /ai/generation-runs/:runId/evaluations — All evaluations for this run
+generationRoutes.get(
+  '/ai/generation-runs/:runId/evaluations',
+  requireAuth,
+  validateUuid('projectId', 'runId'),
+  asyncHandler(async (req, res) => {
+    const authReq = req as AuthRequest;
+    const runId = req.params.runId as string;
+
+    const run = await getRun(runId, authReq.userId!);
+    if (!run) {
+      res.status(404).json({ error: 'Run not found' });
+      return;
+    }
+
+    const evaluations = await prisma.artifactEvaluation.findMany({
+      where: { artifact: { runId } },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    res.json(evaluations);
+  }),
+);
+
+// GET /ai/generation-runs/:runId/assembly — Latest assembly manifest
+generationRoutes.get(
+  '/ai/generation-runs/:runId/assembly',
+  requireAuth,
+  validateUuid('projectId', 'runId'),
+  asyncHandler(async (req, res) => {
+    const authReq = req as AuthRequest;
+    const runId = req.params.runId as string;
+
+    const run = await getRun(runId, authReq.userId!);
+    if (!run) {
+      res.status(404).json({ error: 'Run not found' });
+      return;
+    }
+
+    const manifest = await prisma.assemblyManifest.findFirst({
+      where: { runId },
+      orderBy: { version: 'desc' },
+    });
+
+    if (!manifest) {
+      res.status(404).json({ error: 'No assembly manifest found' });
+      return;
+    }
+
+    res.json(manifest);
+  }),
+);
+
 // GET /ai/generation-runs/:runId/stream — SSE progress
 generationRoutes.get(
   '/ai/generation-runs/:runId/stream',
