@@ -49,12 +49,25 @@ export async function processExportJob(job: Job<ExportJobData>): Promise<void> {
     await job.updateProgress(20);
 
     const theme = (exportJob.project.settings as Record<string, unknown>)?.theme as string || 'classic-parchment';
-    // Single-element docs array for backward compatibility with assemblers
-    const docs = [{
-      title: exportJob.project.title,
-      content: exportJob.project.content as DocumentContent | null,
-      sortOrder: 0,
-    }];
+
+    // Use per-chapter ProjectDocuments when available, fall back to monolithic Project.content
+    const projectDocuments = await prisma.projectDocument.findMany({
+      where: { projectId: exportJob.projectId },
+      orderBy: { sortOrder: 'asc' },
+      select: { title: true, content: true, sortOrder: true },
+    });
+
+    const docs = projectDocuments.length > 0
+      ? projectDocuments.map(doc => ({
+          title: doc.title,
+          content: doc.content as DocumentContent | null,
+          sortOrder: doc.sortOrder,
+        }))
+      : [{
+          title: exportJob.project.title,
+          content: exportJob.project.content as DocumentContent | null,
+          sortOrder: 0,
+        }];
 
     await job.updateProgress(50);
 
