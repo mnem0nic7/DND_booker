@@ -49,9 +49,11 @@ enum ArtifactStatus {
   evaluating
   passed
   failed_evaluation
+  needs_revision
   revising
   accepted
   rejected
+  needs_review
   assembled
 }
 

@@ -189,8 +189,10 @@ export async function evaluateArtifact(
     type: 'artifact_evaluated',
     runId: run.id,
     artifactId: artifact.id,
+    artifactType: artifact.artifactType,
     overallScore,
     passed,
+    findingCount: evalResponse.findings.length,
   });
 
   return {
