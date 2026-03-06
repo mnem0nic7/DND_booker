@@ -5,6 +5,10 @@ import type {
   GenerationRunSummary,
   GenerationEvent,
   RunStatus,
+  GeneratedArtifact,
+  ArtifactEvaluation,
+  CanonEntity,
+  AssemblyManifest,
 } from '@dnd-booker/shared';
 
 // Active statuses that indicate a run is still in progress
@@ -28,6 +32,24 @@ interface GenerationState {
   artifactCount: number;
   _eventSource: AbortController | null;
 
+  // Artifacts
+  artifacts: GeneratedArtifact[];
+  selectedArtifactId: string | null;
+  artifactDetail: (GeneratedArtifact & { evaluations?: ArtifactEvaluation[] }) | null;
+  isLoadingArtifacts: boolean;
+
+  // Canon
+  canonEntities: CanonEntity[];
+  isLoadingCanon: boolean;
+
+  // Evaluations
+  evaluations: ArtifactEvaluation[];
+  isLoadingEvaluations: boolean;
+
+  // Assembly
+  assemblyManifest: AssemblyManifest | null;
+  isLoadingAssembly: boolean;
+
   startRun: (
     projectId: string,
     prompt: string,
@@ -43,6 +65,12 @@ interface GenerationState {
   subscribeToRun: (projectId: string, runId: string) => void;
   unsubscribe: () => void;
   reset: () => void;
+  fetchArtifacts: (projectId: string, runId: string) => Promise<void>;
+  fetchArtifactDetail: (projectId: string, runId: string, artifactId: string) => Promise<void>;
+  fetchCanonEntities: (projectId: string, runId: string) => Promise<void>;
+  fetchEvaluations: (projectId: string, runId: string) => Promise<void>;
+  fetchAssemblyManifest: (projectId: string, runId: string) => Promise<void>;
+  selectArtifact: (artifactId: string | null) => void;
 }
 
 export const useGenerationStore = create<GenerationState>((set, get) => ({
@@ -54,6 +82,16 @@ export const useGenerationStore = create<GenerationState>((set, get) => ({
   events: [],
   artifactCount: 0,
   _eventSource: null,
+  artifacts: [],
+  selectedArtifactId: null,
+  artifactDetail: null,
+  isLoadingArtifacts: false,
+  canonEntities: [],
+  isLoadingCanon: false,
+  evaluations: [],
+  isLoadingEvaluations: false,
+  assemblyManifest: null,
+  isLoadingAssembly: false,
 
   startRun: async (projectId, prompt, mode = 'one_shot', quality = 'quick', pageTarget) => {
     set({
@@ -255,6 +293,65 @@ export const useGenerationStore = create<GenerationState>((set, get) => ({
     }
   },
 
+  fetchArtifacts: async (projectId, runId) => {
+    set({ isLoadingArtifacts: true });
+    try {
+      const { data } = await api.get(`/projects/${projectId}/ai/generation-runs/${runId}/artifacts`);
+      set({ artifacts: data, isLoadingArtifacts: false });
+    } catch {
+      set({ isLoadingArtifacts: false });
+    }
+  },
+
+  fetchArtifactDetail: async (projectId, runId, artifactId) => {
+    try {
+      const { data } = await api.get(
+        `/projects/${projectId}/ai/generation-runs/${runId}/artifacts/${artifactId}`,
+      );
+      set({ artifactDetail: data, selectedArtifactId: artifactId });
+    } catch (err: unknown) {
+      const message =
+        err && typeof err === 'object' && 'response' in err
+          ? (err as { response?: { data?: { error?: string } } }).response?.data?.error
+          : undefined;
+      set({ error: message || 'Failed to fetch artifact detail' });
+    }
+  },
+
+  fetchCanonEntities: async (projectId, runId) => {
+    set({ isLoadingCanon: true });
+    try {
+      const { data } = await api.get(`/projects/${projectId}/ai/generation-runs/${runId}/canon`);
+      set({ canonEntities: data, isLoadingCanon: false });
+    } catch {
+      set({ isLoadingCanon: false });
+    }
+  },
+
+  fetchEvaluations: async (projectId, runId) => {
+    set({ isLoadingEvaluations: true });
+    try {
+      const { data } = await api.get(`/projects/${projectId}/ai/generation-runs/${runId}/evaluations`);
+      set({ evaluations: data, isLoadingEvaluations: false });
+    } catch {
+      set({ isLoadingEvaluations: false });
+    }
+  },
+
+  fetchAssemblyManifest: async (projectId, runId) => {
+    set({ isLoadingAssembly: true });
+    try {
+      const { data } = await api.get(`/projects/${projectId}/ai/generation-runs/${runId}/assembly`);
+      set({ assemblyManifest: data, isLoadingAssembly: false });
+    } catch {
+      set({ isLoadingAssembly: false, assemblyManifest: null });
+    }
+  },
+
+  selectArtifact: (artifactId) => {
+    set({ selectedArtifactId: artifactId, artifactDetail: null });
+  },
+
   reset: () => {
     get().unsubscribe();
     set({
@@ -265,6 +362,16 @@ export const useGenerationStore = create<GenerationState>((set, get) => ({
       currentStage: null,
       events: [],
       artifactCount: 0,
+      artifacts: [],
+      selectedArtifactId: null,
+      artifactDetail: null,
+      isLoadingArtifacts: false,
+      canonEntities: [],
+      isLoadingCanon: false,
+      evaluations: [],
+      isLoadingEvaluations: false,
+      assemblyManifest: null,
+      isLoadingAssembly: false,
     });
   },
 }));
