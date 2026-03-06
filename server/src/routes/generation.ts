@@ -11,6 +11,7 @@ import {
 } from '../services/generation/run.service.js';
 import { listTasksForRun } from '../services/generation/task.service.js';
 import { prisma } from '../config/database.js';
+import { subscribeToRun } from '../services/generation/pubsub.service.js';
 
 const generationRoutes = Router({ mergeParams: true });
 
@@ -211,6 +212,45 @@ generationRoutes.get(
     });
 
     res.json(artifacts);
+  }),
+);
+
+// GET /ai/generation-runs/:runId/stream — SSE progress
+generationRoutes.get(
+  '/ai/generation-runs/:runId/stream',
+  requireAuth,
+  validateUuid('projectId', 'runId'),
+  asyncHandler(async (req, res) => {
+    const authReq = req as AuthRequest;
+    const runId = req.params.runId as string;
+
+    const run = await getRun(runId, authReq.userId!);
+    if (!run) {
+      res.status(404).json({ error: 'Run not found' });
+      return;
+    }
+
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+    res.flushHeaders();
+
+    // Send initial state
+    res.write(`data: ${JSON.stringify({ type: 'run_status', runId, status: run.status, stage: run.currentStage, progressPercent: run.progressPercent })}\n\n`);
+
+    const { unsubscribe } = await subscribeToRun(runId, (event) => {
+      try {
+        res.write(`data: ${JSON.stringify(event)}\n\n`);
+      } catch {
+        // Client disconnected
+      }
+    });
+
+    req.on('close', async () => {
+      await unsubscribe();
+      res.end();
+    });
   }),
 );
 
