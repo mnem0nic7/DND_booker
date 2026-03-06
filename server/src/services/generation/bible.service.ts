@@ -94,7 +94,7 @@ export async function executeBibleGeneration(
   const parsed = parseJsonResponse(text);
   const bibleContent = BibleContentSchema.parse(parsed) as BibleContent;
 
-  const totalTokens = (usage?.promptTokens ?? 0) + (usage?.completionTokens ?? 0);
+  const totalTokens = (usage?.inputTokens ?? 0) + (usage?.outputTokens ?? 0);
 
   // Create CampaignBible record
   const bible = await prisma.campaignBible.create({

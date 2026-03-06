@@ -64,7 +64,7 @@ export async function executeIntake(
   const parsed = parseJsonResponse(text);
   const normalizedInput = NormalizedInputSchema.parse(parsed) as NormalizedInput;
 
-  const totalTokens = (usage?.promptTokens ?? 0) + (usage?.completionTokens ?? 0);
+  const totalTokens = (usage?.inputTokens ?? 0) + (usage?.outputTokens ?? 0);
 
   // Create the project_profile artifact
   const artifact = await prisma.generatedArtifact.create({

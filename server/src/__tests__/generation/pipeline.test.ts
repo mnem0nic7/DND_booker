@@ -109,11 +109,11 @@ describe('Intake → Bible Pipeline', () => {
     mockGenerateText
       .mockResolvedValueOnce({
         text: JSON.stringify(INTAKE_RESPONSE),
-        usage: { promptTokens: 500, completionTokens: 300 },
+        usage: { inputTokens: 500, outputTokens: 300 },
       } as any)
       .mockResolvedValueOnce({
         text: JSON.stringify(BIBLE_RESPONSE),
-        usage: { promptTokens: 1500, completionTokens: 3000 },
+        usage: { inputTokens: 1500, outputTokens: 3000 },
       } as any);
 
     const run = await createRun({
@@ -168,7 +168,7 @@ describe('Intake → Bible Pipeline', () => {
 
     mockGenerateText.mockResolvedValueOnce({
       text: JSON.stringify(BIBLE_RESPONSE),
-      usage: { promptTokens: 1000, completionTokens: 2000 },
+      usage: { inputTokens: 1000, outputTokens: 2000 },
     } as any);
 
     const run = await createRun({

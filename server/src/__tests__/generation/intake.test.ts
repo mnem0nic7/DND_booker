@@ -65,7 +65,7 @@ describe('Intake Service — executeIntake', () => {
   it('should parse a valid AI response and create a project_profile artifact', async () => {
     mockGenerateText.mockResolvedValueOnce({
       text: JSON.stringify(VALID_AI_RESPONSE),
-      usage: { promptTokens: 500, completionTokens: 300 },
+      usage: { inputTokens: 500, outputTokens: 300 },
     } as any);
 
     const run = await createRun({
@@ -92,7 +92,7 @@ describe('Intake Service — executeIntake', () => {
   it('should update the run with inferred mode and page estimates', async () => {
     mockGenerateText.mockResolvedValueOnce({
       text: JSON.stringify(VALID_AI_RESPONSE),
-      usage: { promptTokens: 500, completionTokens: 300 },
+      usage: { inputTokens: 500, outputTokens: 300 },
     } as any);
 
     const run = await createRun({
@@ -111,7 +111,7 @@ describe('Intake Service — executeIntake', () => {
   it('should pass user constraints to the prompt', async () => {
     mockGenerateText.mockResolvedValueOnce({
       text: JSON.stringify(VALID_AI_RESPONSE),
-      usage: { promptTokens: 500, completionTokens: 300 },
+      usage: { inputTokens: 500, outputTokens: 300 },
     } as any);
 
     const run = await createRun({
@@ -131,7 +131,7 @@ describe('Intake Service — executeIntake', () => {
   it('should throw on malformed AI response', async () => {
     mockGenerateText.mockResolvedValueOnce({
       text: 'This is not JSON at all',
-      usage: { promptTokens: 500, completionTokens: 100 },
+      usage: { inputTokens: 500, outputTokens: 100 },
     } as any);
 
     const run = await createRun({
@@ -152,7 +152,7 @@ describe('Intake Service — executeIntake', () => {
 
     mockGenerateText.mockResolvedValueOnce({
       text: JSON.stringify(responseWithExtras),
-      usage: { promptTokens: 500, completionTokens: 300 },
+      usage: { inputTokens: 500, outputTokens: 300 },
     } as any);
 
     const run = await createRun({
@@ -168,7 +168,7 @@ describe('Intake Service — executeIntake', () => {
   it('should record token usage on the artifact', async () => {
     mockGenerateText.mockResolvedValueOnce({
       text: JSON.stringify(VALID_AI_RESPONSE),
-      usage: { promptTokens: 500, completionTokens: 300 },
+      usage: { inputTokens: 500, outputTokens: 300 },
     } as any);
 
     const run = await createRun({

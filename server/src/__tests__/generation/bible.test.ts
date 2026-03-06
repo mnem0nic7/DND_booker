@@ -146,7 +146,7 @@ describe('Bible Service — executeBibleGeneration', () => {
   it('should create a CampaignBible record from valid AI response', async () => {
     mockGenerateText.mockResolvedValueOnce({
       text: JSON.stringify(VALID_BIBLE_RESPONSE),
-      usage: { promptTokens: 1000, completionTokens: 2000 },
+      usage: { inputTokens: 1000, outputTokens: 2000 },
     } as any);
 
     const run = await createRun({
@@ -169,7 +169,7 @@ describe('Bible Service — executeBibleGeneration', () => {
   it('should create a campaign_bible artifact', async () => {
     mockGenerateText.mockResolvedValueOnce({
       text: JSON.stringify(VALID_BIBLE_RESPONSE),
-      usage: { promptTokens: 1000, completionTokens: 2000 },
+      usage: { inputTokens: 1000, outputTokens: 2000 },
     } as any);
 
     const run = await createRun({
@@ -192,7 +192,7 @@ describe('Bible Service — executeBibleGeneration', () => {
   it('should create CanonEntity records for each entity in the bible', async () => {
     mockGenerateText.mockResolvedValueOnce({
       text: JSON.stringify(VALID_BIBLE_RESPONSE),
-      usage: { promptTokens: 1000, completionTokens: 2000 },
+      usage: { inputTokens: 1000, outputTokens: 2000 },
     } as any);
 
     const run = await createRun({
@@ -220,7 +220,7 @@ describe('Bible Service — executeBibleGeneration', () => {
   it('should store structured JSON fields on the CampaignBible', async () => {
     mockGenerateText.mockResolvedValueOnce({
       text: JSON.stringify(VALID_BIBLE_RESPONSE),
-      usage: { promptTokens: 1000, completionTokens: 2000 },
+      usage: { inputTokens: 1000, outputTokens: 2000 },
     } as any);
 
     const run = await createRun({
@@ -244,7 +244,7 @@ describe('Bible Service — executeBibleGeneration', () => {
   it('should throw on malformed AI response', async () => {
     mockGenerateText.mockResolvedValueOnce({
       text: 'Not valid JSON',
-      usage: { promptTokens: 500, completionTokens: 100 },
+      usage: { inputTokens: 500, outputTokens: 100 },
     } as any);
 
     const run = await createRun({
@@ -261,7 +261,7 @@ describe('Bible Service — executeBibleGeneration', () => {
   it('should update run token count', async () => {
     mockGenerateText.mockResolvedValueOnce({
       text: JSON.stringify(VALID_BIBLE_RESPONSE),
-      usage: { promptTokens: 1000, completionTokens: 2000 },
+      usage: { inputTokens: 1000, outputTokens: 2000 },
     } as any);
 
     const run = await createRun({
@@ -279,7 +279,7 @@ describe('Bible Service — executeBibleGeneration', () => {
   it('should include NormalizedInput context in the AI prompt', async () => {
     mockGenerateText.mockResolvedValueOnce({
       text: JSON.stringify(VALID_BIBLE_RESPONSE),
-      usage: { promptTokens: 1000, completionTokens: 2000 },
+      usage: { inputTokens: 1000, outputTokens: 2000 },
     } as any);
 
     const run = await createRun({
