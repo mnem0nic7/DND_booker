@@ -127,14 +127,14 @@ describe('AI Routes', () => {
       expect(res.body.error).toBe('Validation failed');
     });
 
-    it('should reject unsupported model for provider', async () => {
+    it('should accept any model string for provider (dynamic model lists)', async () => {
       const res = await request(app)
         .post('/api/ai/settings')
         .set('Authorization', `Bearer ${accessToken}`)
-        .send({ provider: 'anthropic', model: 'gpt-4o' }); // gpt-4o is not an Anthropic model
+        .send({ provider: 'anthropic', model: 'gpt-4o' }); // cross-provider models allowed (dynamic lists)
 
-      expect(res.status).toBe(400);
-      expect(res.body.error).toBe('Validation failed');
+      // No longer rejected — model validation is relaxed for dynamic model fetching
+      expect(res.status).toBe(200);
     });
 
     it('should reject API key that is too short', async () => {

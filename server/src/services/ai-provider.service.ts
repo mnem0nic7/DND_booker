@@ -12,17 +12,66 @@ const DEFAULT_MODELS: Record<AiProvider, string> = {
 
 export const SUPPORTED_MODELS: Record<AiProvider, string[]> = {
   anthropic: [
+    'claude-opus-4-20250514',
     'claude-sonnet-4-20250514',
     'claude-haiku-4-20250414',
+    'claude-3-7-sonnet-20250219',
+    'claude-3-5-haiku-20241022',
   ],
   openai: [
     'gpt-4o',
     'gpt-4o-mini',
     'gpt-4.1',
     'gpt-4.1-mini',
+    'gpt-4.1-nano',
+    'o3',
+    'o3-mini',
+    'o4-mini',
   ],
   ollama: [],
 };
+
+// --- Dynamic OpenAI model fetching with cache ---
+let _openAiModelCache: { models: string[]; expiresAt: number } | null = null;
+const OPENAI_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
+
+const OPENAI_CHAT_PREFIXES = ['gpt-', 'o1', 'o3', 'o4', 'chatgpt-'];
+
+export async function fetchOpenAiModels(apiKey: string): Promise<string[]> {
+  // Return cache if still valid
+  if (_openAiModelCache && Date.now() < _openAiModelCache.expiresAt) {
+    return _openAiModelCache.models;
+  }
+
+  try {
+    const res = await fetch('https://api.openai.com/v1/models', {
+      headers: { Authorization: `Bearer ${apiKey}` },
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!res.ok) return SUPPORTED_MODELS.openai;
+
+    const data = (await res.json()) as { data?: { id: string }[] };
+    const allModels = (data.data ?? []).map((m) => m.id);
+
+    // Filter to chat-capable models and sort
+    const chatModels = allModels
+      .filter((id) => OPENAI_CHAT_PREFIXES.some((p) => id.startsWith(p)))
+      .filter((id) => !id.includes('realtime') && !id.includes('audio') && !id.includes('transcri'))
+      .sort((a, b) => a.localeCompare(b));
+
+    const models = chatModels.length > 0 ? chatModels : SUPPORTED_MODELS.openai;
+
+    _openAiModelCache = { models, expiresAt: Date.now() + OPENAI_CACHE_TTL_MS };
+    return models;
+  } catch {
+    return SUPPORTED_MODELS.openai;
+  }
+}
+
+/** @internal — exposed for tests */
+export function _resetModelCache() {
+  _openAiModelCache = null;
+}
 
 export function createModel(
   provider: AiProvider,

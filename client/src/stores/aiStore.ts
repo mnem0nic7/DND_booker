@@ -44,6 +44,7 @@ interface AiState {
   removeApiKey: () => Promise<void>;
   validateKey: (provider: AiProvider, apiKey: string) => Promise<boolean>;
   validateOllama: (baseUrl: string) => Promise<{ valid: boolean; models: string[] }>;
+  fetchModels: (provider: AiProvider, apiKey: string) => Promise<string[]>;
 
   // Chat
   messages: ChatMessage[];
@@ -136,6 +137,11 @@ export const useAiStore = create<AiState>((set, get) => ({
   validateOllama: async (baseUrl) => {
     const { data } = await api.post('/ai/settings/validate-ollama', { baseUrl });
     return data;
+  },
+
+  fetchModels: async (provider, apiKey) => {
+    const { data } = await api.post('/ai/settings/models', { provider, apiKey });
+    return data.models as string[];
   },
 
   // Chat

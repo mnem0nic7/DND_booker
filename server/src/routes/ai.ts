@@ -15,7 +15,7 @@ import * as aiPlanner from '../services/ai-planner.service.js';
 import * as aiMemoryService from '../services/ai-memory.service.js';
 import * as aiImage from '../services/ai-image.service.js';
 import * as assetService from '../services/asset.service.js';
-import { createModel, validateApiKey, validateConnection, SUPPORTED_MODELS, type AiProvider } from '../services/ai-provider.service.js';
+import { createModel, validateApiKey, validateConnection, SUPPORTED_MODELS, fetchOpenAiModels, type AiProvider } from '../services/ai-provider.service.js';
 import { prisma } from '../config/database.js';
 import type { WizardEvent, WizardGeneratedSection } from '@dnd-booker/shared';
 
@@ -39,7 +39,23 @@ aiSettingsRoutes.get('/settings', asyncHandler(async (req: AuthRequest, res: Res
       res.status(404).json({ error: 'User not found' });
       return;
     }
-    res.json({ ...settings, supportedModels: SUPPORTED_MODELS });
+
+    // Build dynamic model lists
+    const supportedModels = { ...SUPPORTED_MODELS };
+
+    // Fetch live OpenAI models if user has an OpenAI key
+    if (settings.provider === 'openai' && settings.hasApiKey) {
+      try {
+        const apiKey = await aiSettings.getDecryptedApiKey(req.userId!);
+        if (apiKey) {
+          supportedModels.openai = await fetchOpenAiModels(apiKey);
+        }
+      } catch {
+        // Fall back to hardcoded list on error
+      }
+    }
+
+    res.json({ ...settings, supportedModels });
   } catch (err) {
     console.error('[AI] Failed to get settings:', err);
     res.status(500).json({ error: 'Failed to load AI settings.' });
@@ -51,13 +67,7 @@ const saveSettingsSchema = z.object({
   model: z.string().min(1).max(100),
   apiKey: z.string().min(10).max(300).optional(),
   baseUrl: z.string().url().max(500).optional(),
-}).refine(
-  (data) => {
-    if (data.provider === 'ollama') return true;
-    return SUPPORTED_MODELS[data.provider]?.includes(data.model);
-  },
-  { message: 'Unsupported model for the selected provider', path: ['model'] }
-);
+});
 
 aiSettingsRoutes.post('/settings', asyncHandler(async (req: AuthRequest, res: Response) => {
   const parsed = saveSettingsSchema.safeParse(req.body);
@@ -72,6 +82,30 @@ aiSettingsRoutes.post('/settings', asyncHandler(async (req: AuthRequest, res: Re
   } catch (err) {
     console.error('[AI] Failed to save settings:', err);
     res.status(500).json({ error: 'Failed to save AI settings.' });
+  }
+}));
+
+// Fetch live model list for a provider using an API key
+const fetchModelsSchema = z.object({
+  provider: z.enum(['anthropic', 'openai']),
+  apiKey: z.string().min(10).max(300),
+});
+
+aiSettingsRoutes.post('/settings/models', asyncHandler(async (req: AuthRequest, res: Response) => {
+  const parsed = fetchModelsSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'Validation failed' });
+    return;
+  }
+
+  const { provider, apiKey } = parsed.data;
+
+  if (provider === 'openai') {
+    const models = await fetchOpenAiModels(apiKey);
+    res.json({ models });
+  } else {
+    // Anthropic doesn't have a model list API — return curated list
+    res.json({ models: SUPPORTED_MODELS.anthropic });
   }
 }));
 

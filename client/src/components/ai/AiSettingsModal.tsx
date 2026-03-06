@@ -11,6 +11,7 @@ export function AiSettingsModal() {
     removeApiKey,
     validateKey,
     validateOllama,
+    fetchModels,
   } = useAiStore();
 
   const [provider, setProvider] = useState<AiProvider>('anthropic');
@@ -18,6 +19,7 @@ export function AiSettingsModal() {
   const [apiKey, setApiKey] = useState('');
   const [baseUrl, setBaseUrl] = useState('http://localhost:11434');
   const [ollamaModels, setOllamaModels] = useState<string[]>([]);
+  const [liveModels, setLiveModels] = useState<Record<string, string[]>>({});
   const [isSaving, setIsSaving] = useState(false);
   const [isValidating, setIsValidating] = useState(false);
   const [validationResult, setValidationResult] = useState<boolean | null>(null);
@@ -61,7 +63,7 @@ export function AiSettingsModal() {
   const isOllama = provider === 'ollama';
   const models = isOllama
     ? ollamaModels
-    : (settings?.supportedModels?.[provider] ?? []);
+    : (liveModels[provider] ?? settings?.supportedModels?.[provider] ?? []);
 
   async function handleSave() {
     setIsSaving(true);
@@ -89,6 +91,18 @@ export function AiSettingsModal() {
     try {
       const valid = await validateKey(provider, apiKey);
       setValidationResult(valid);
+      // On success, fetch live model list for this provider
+      if (valid) {
+        try {
+          const models = await fetchModels(provider, apiKey);
+          if (models.length > 0) {
+            setLiveModels((prev) => ({ ...prev, [provider]: models }));
+            if (!models.includes(model)) setModel(models[0]);
+          }
+        } catch {
+          // Fall back to hardcoded list silently
+        }
+      }
     } catch {
       setValidationResult(false);
     } finally {
