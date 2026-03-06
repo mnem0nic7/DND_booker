@@ -5,6 +5,7 @@ import { useProjectStore } from '../stores/projectStore';
 import { useAuthStore } from '../stores/authStore';
 import { useThemeStore } from '../stores/themeStore';
 import { EditorLayout } from '../components/editor/EditorLayout';
+import { DocumentNavigator } from '../components/editor/DocumentNavigator';
 
 export default function EditorPage() {
   const { id: projectId } = useParams<{ id: string }>();
@@ -21,6 +22,12 @@ export default function EditorPage() {
     flushPendingSave,
     cancelPendingSave,
     retrySave,
+    documents,
+    activeDocument,
+    isLoadingDocument,
+    fetchDocuments,
+    updateDocumentContent,
+    clearActiveDocument,
   } = useProjectStore();
 
   const { loadProjectTheme } = useThemeStore();
@@ -34,11 +41,13 @@ export default function EditorPage() {
           loadProjectTheme(projectId, project.settings);
         }
       });
+      fetchDocuments(projectId);
     }
     return () => {
       flushPendingSave();
+      clearActiveDocument();
     };
-  }, [projectId, fetchProject, loadProjectTheme, cancelPendingSave, flushPendingSave]);
+  }, [projectId, fetchProject, fetchDocuments, loadProjectTheme, cancelPendingSave, flushPendingSave, clearActiveDocument]);
 
   // Warn user about unsaved changes when closing/navigating away
   useEffect(() => {
@@ -56,6 +65,13 @@ export default function EditorPage() {
       updateContent(content);
     },
     [updateContent],
+  );
+
+  const handleDocumentContentUpdate = useCallback(
+    (content: DocumentContent) => {
+      updateDocumentContent(content);
+    },
+    [updateDocumentContent],
   );
 
   return (
@@ -118,10 +134,24 @@ export default function EditorPage() {
 
       {/* Main editor area */}
       <div className="flex flex-1 overflow-hidden">
+        {documents.length > 0 && (
+          <DocumentNavigator projectId={projectId!} />
+        )}
         <div className="flex-1 overflow-hidden">
           {isLoadingProject ? (
             <div className="flex items-center justify-center h-full text-gray-400">
               Loading...
+            </div>
+          ) : documents.length > 0 && activeDocument ? (
+            <EditorLayout
+              key={activeDocument.id}
+              projectId={projectId!}
+              content={activeDocument.content as DocumentContent}
+              onUpdate={handleDocumentContentUpdate}
+            />
+          ) : documents.length > 0 && !activeDocument ? (
+            <div className="flex items-center justify-center h-full text-gray-400">
+              {isLoadingDocument ? 'Loading document...' : 'Select a document from the sidebar to begin editing.'}
             </div>
           ) : currentProject?.content ? (
             <EditorLayout

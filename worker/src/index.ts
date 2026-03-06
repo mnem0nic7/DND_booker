@@ -2,6 +2,7 @@ import { Worker, Queue, type ConnectionOptions } from 'bullmq';
 import IORedis from 'ioredis';
 import { processExportJob } from './jobs/export.job.js';
 import { cleanupExportFiles } from './jobs/cleanup.job.js';
+import { processGenerationJob } from './jobs/generation-orchestrator.job.js';
 
 const connection = new IORedis({
   host: process.env.REDIS_HOST || 'localhost',
@@ -23,6 +24,11 @@ const cleanupWorker = new Worker('cleanup', async () => {
   concurrency: 1,
 });
 
+const generationWorker = new Worker('generation', processGenerationJob, {
+  connection: connection as unknown as ConnectionOptions,
+  concurrency: 1,
+});
+
 // Schedule cleanup to run every hour
 const cleanupQueue = new Queue('cleanup', {
   connection: connection as unknown as ConnectionOptions,
@@ -39,6 +45,9 @@ worker.on('completed', (job) => console.log(`Job ${job.id} completed`));
 worker.on('failed', (job, err) => console.error(`Job ${job?.id} failed:`, err.message));
 worker.on('error', (err) => console.error('[Worker] Error:', err.message));
 cleanupWorker.on('error', (err) => console.error('[Cleanup Worker] Error:', err.message));
+generationWorker.on('completed', (job) => console.log(`Generation job ${job.id} completed`));
+generationWorker.on('failed', (job, err) => console.error(`Generation job ${job?.id} failed:`, err.message));
+generationWorker.on('error', (err) => console.error('[Generation Worker] Error:', err.message));
 
 async function shutdown() {
   console.log('Shutting down worker...');
@@ -50,6 +59,7 @@ async function shutdown() {
   forceExit.unref();
 
   try {
+    await generationWorker.close();
     await worker.close();
     await cleanupWorker.close();
     await cleanupQueue.close();
@@ -63,4 +73,4 @@ async function shutdown() {
 process.on('SIGTERM', shutdown);
 process.on('SIGINT', shutdown);
 
-console.log('PDF Worker running...');
+console.log('Workers running (export + generation)...');

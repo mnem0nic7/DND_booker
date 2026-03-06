@@ -19,6 +19,7 @@ import { editDocument } from './content/edit-document.js';
 import { evaluateDocument } from './content/evaluate-document.js';
 import { generateAdventure } from './content/generate-adventure.js';
 import { generateImages } from './content/generate-images.js';
+import { startGenerationRun } from './content/start-generation-run.js';
 
 /** Singleton registry with all tools registered. */
 export function createRegistry(): ToolRegistry {
@@ -43,6 +44,7 @@ export function createRegistry(): ToolRegistry {
   registry.register(evaluateDocument);
   registry.register(generateAdventure);
   registry.register(generateImages);
+  registry.register(startGenerationRun);
 
   return registry;
 }
