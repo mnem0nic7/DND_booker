@@ -20,3 +20,4 @@ export * from './types/project-document';
 export * from './types/generation-events';
 export * from './types/chapter-outline';
 export * from './types/chapter-plan';
+export * from './types/reference-artifacts';
