@@ -12,8 +12,8 @@ RUN npm ci
 COPY tsconfig.json ./
 COPY shared/ shared/
 COPY worker/ worker/
-# Copy prisma schema from server (needed for prisma generate)
-COPY server/prisma/ server/prisma/
+# Copy server source (generation-orchestrator imports server services at runtime)
+COPY server/ server/
 WORKDIR /app/server
 RUN npx prisma generate
 # Build shared package to dist/ (plain node can't load raw .ts files)
@@ -22,10 +22,10 @@ RUN npm run build
 RUN sed -i 's|"main": "src/index.ts"|"main": "dist/index.js"|' package.json && \
     sed -i 's|"types": "src/index.ts"|"types": "dist/index.d.ts"|' package.json
 WORKDIR /app/worker
-RUN npm run build
 
 # Run as non-root user for security
 RUN addgroup -g 1001 -S nodejs && adduser -S nodeapp -u 1001 -G nodejs
 USER nodeapp
 
-CMD ["node", "dist/index.js"]
+# Use tsx for runtime TS execution (generation-orchestrator cross-imports server services)
+CMD ["npx", "tsx", "src/index.ts"]
