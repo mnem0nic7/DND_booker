@@ -20,4 +20,41 @@ describe('generation layout-estimate service', () => {
     expect(codes).toContain('CHAPTER_HEADING_MID_PAGE');
     expect(codes).toContain('CONSECUTIVE_PAGE_BREAKS');
   });
+
+  it('detects reference blocks stranded behind removable manual page breaks', () => {
+    const content = {
+      type: 'doc',
+      content: [
+        { type: 'paragraph', content: [{ type: 'text', text: 'A'.repeat(900) }] },
+        { type: 'pageBreak' },
+        { type: 'statBlock', attrs: { name: 'Goblin Skirmisher' } },
+      ],
+    };
+
+    const result = analyzeEstimatedArtifactLayout(content);
+    expect(result).not.toBeNull();
+
+    expect(result!.findings).toContainEqual(expect.objectContaining({
+      code: 'REFERENCE_BLOCK_STRANDED_AFTER_BREAK',
+      affectedScope: 'node-2',
+    }));
+  });
+
+  it('treats chapterHeader blocks as chapter openers for mid-page detection', () => {
+    const content = {
+      type: 'doc',
+      content: [
+        { type: 'paragraph', content: [{ type: 'text', text: 'A'.repeat(2400) }] },
+        { type: 'chapterHeader', attrs: { title: 'Chapter Two', chapterNumber: '2' } },
+      ],
+    };
+
+    const result = analyzeEstimatedArtifactLayout(content);
+    expect(result).not.toBeNull();
+
+    expect(result!.findings).toContainEqual(expect.objectContaining({
+      code: 'CHAPTER_HEADING_MID_PAGE',
+      affectedScope: 'node-1',
+    }));
+  });
 });

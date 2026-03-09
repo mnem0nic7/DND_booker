@@ -23,7 +23,8 @@ export type TaskType =
   | 'evaluate_artifact'
   | 'revise_artifact'
   | 'assemble_documents'
-  | 'run_preflight';
+  | 'run_preflight'
+  | 'run_publication_polish';
 
 export interface GenerationTask {
   id: string;

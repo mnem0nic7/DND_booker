@@ -10,7 +10,7 @@ export interface GenerationJobData {
 /**
  * Main orchestrator job for autonomous generation.
  *
- * Drives the pipeline: intake -> bible -> outline -> canon -> plans -> drafts -> eval -> revise -> assemble -> preflight.
+ * Drives the pipeline: intake -> bible -> outline -> canon -> plans -> drafts -> eval -> revise -> assemble -> preflight -> publication polish.
  *
  * NOTE: Generation services are imported dynamically from the server package.
  * This works with tsx in development. For production, services should be
@@ -21,7 +21,7 @@ export async function processGenerationJob(job: Job<GenerationJobData>): Promise
   const run = { id: runId, projectId, userId };
 
   // Dynamic imports to avoid cross-package resolution issues at module load time
-  const { transitionRunStatus } = await import('../../../server/src/services/generation/run.service.js');
+  const { transitionRunStatus, updateRunProgress } = await import('../../../server/src/services/generation/run.service.js');
   const { publishGenerationEvent } = await import('../../../server/src/services/generation/pubsub.service.js');
   const { executeBibleGeneration } = await import('../../../server/src/services/generation/bible.service.js');
   const { executeOutlineGeneration } = await import('../../../server/src/services/generation/outline.service.js');
@@ -32,13 +32,15 @@ export async function processGenerationJob(job: Job<GenerationJobData>): Promise
   const { reviseArtifact } = await import('../../../server/src/services/generation/reviser.service.js');
   const { assembleDocuments } = await import('../../../server/src/services/generation/assembler.service.js');
   const { runPreflight } = await import('../../../server/src/services/generation/preflight.service.js');
+  const { executePublicationPolish } = await import('../../../server/src/services/generation/publication-polish.service.js');
   const { executeIntakeNormalization } = await import('../../../server/src/services/generation/intake.service.js');
 
-  async function publishProgress(stage: string, percent: number) {
+  async function publishProgress(status: string, stage: string, percent: number) {
+    await updateRunProgress(runId, userId, stage, percent);
     await publishGenerationEvent(runId, {
       type: 'run_status',
       runId,
-      status: stage as any,
+      status: status as any,
       stage,
       progressPercent: percent,
     });
@@ -49,13 +51,13 @@ export async function processGenerationJob(job: Job<GenerationJobData>): Promise
 
     // Stage 1: Planning
     await transitionRunStatus(runId, userId, 'planning');
-    await publishProgress('planning', 5);
+    await publishProgress('planning', 'planning', 5);
 
     const { normalizedInput } = await executeIntakeNormalization(run, projectId, model, maxOutputTokens);
-    await publishProgress('planning', 15);
+    await publishProgress('planning', 'planning', 15);
 
     const { bible, entities } = await executeBibleGeneration(run, normalizedInput, model, maxOutputTokens);
-    await publishProgress('planning', 30);
+    await publishProgress('planning', 'planning', 30);
 
     const bibleRecord = await prisma.campaignBible.findFirst({
       where: { runId, projectId },
@@ -64,13 +66,13 @@ export async function processGenerationJob(job: Job<GenerationJobData>): Promise
     const bibleContent = loadBibleContent(bibleRecord);
 
     const { outline } = await executeOutlineGeneration(run, bibleContent, model, maxOutputTokens);
-    await publishProgress('planning', 40);
+    await publishProgress('planning', 'planning', 40);
 
     // Stage 2: Asset Generation
     await transitionRunStatus(runId, userId, 'generating_assets');
 
     await expandAllCanonEntities(run, bibleContent.entities, bibleContent, model, maxOutputTokens);
-    await publishProgress('generating_assets', 55);
+    await publishProgress('generating_assets', 'generating_assets', 55);
 
     const enrichedEntities = await prisma.canonEntity.findMany({
       where: { runId, projectId },
@@ -82,7 +84,7 @@ export async function processGenerationJob(job: Job<GenerationJobData>): Promise
 
     for (let i = 0; i < outline.chapters.length; i++) {
       await executeChapterPlanGeneration(run, outline.chapters[i], bibleContent, entitySummaries, model, maxOutputTokens);
-      await publishProgress('generating_assets', 55 + Math.round((i + 1) / outline.chapters.length * 10));
+      await publishProgress('generating_assets', 'generating_assets', 55 + Math.round((i + 1) / outline.chapters.length * 10));
     }
 
     // Stage 3: Prose Generation
@@ -100,7 +102,7 @@ export async function processGenerationJob(job: Job<GenerationJobData>): Promise
         continue;
       }
       await executeChapterDraftGeneration(run, chapter, planArtifact.jsonContent as any, bibleContent, priorSlugs, model, maxOutputTokens);
-      await publishProgress('generating_prose', 65 + Math.round((i + 1) / outline.chapters.length * 15));
+      await publishProgress('generating_prose', 'generating_prose', 65 + Math.round((i + 1) / outline.chapters.length * 15));
     }
 
     // Stage 4: Evaluation + Revision
@@ -133,8 +135,35 @@ export async function processGenerationJob(job: Job<GenerationJobData>): Promise
     // Stage 5: Assembly + Preflight
     await transitionRunStatus(runId, userId, 'assembling');
     await assembleDocuments(run);
+    await publishProgress('assembling', 'assembly', 90);
 
-    const preflight = await runPreflight(run);
+    let preflight = await runPreflight(run);
+
+    await publishProgress('assembling', 'publication_polish', 94);
+
+    const polish = await executePublicationPolish(run, preflight);
+
+    if (polish.operationsApplied > 0) {
+      await publishGenerationEvent(runId, {
+        type: 'run_warning',
+        runId,
+        message: `Publication polish applied ${polish.operationsApplied} structural fix(es) across ${polish.documentsUpdated} document(s).`,
+        severity: 'info',
+      });
+    } else if (polish.polishableIssuesSeen > 0) {
+      await publishGenerationEvent(runId, {
+        type: 'run_warning',
+        runId,
+        message: `Publication polish found ${polish.polishableIssuesSeen} polishable issue(s) but no safe automatic fixes were available.`,
+        severity: 'warning',
+      });
+    }
+
+    if (polish.documentsUpdated > 0) {
+      await publishProgress('assembling', 'preflight_recheck', 97);
+      preflight = await runPreflight(run);
+    }
+
     const warningMsgs = preflight.issues
       .filter((i: any) => i.severity === 'warning')
       .map((i: any) => i.message)

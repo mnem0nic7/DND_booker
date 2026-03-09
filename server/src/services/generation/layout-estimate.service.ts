@@ -48,6 +48,15 @@ const REFERENCE_BLOCK_TYPES = new Set([
   'sidebarCallout',
 ]);
 
+function getEffectiveNodeContribution(node: TipTapNode): number {
+  return Math.ceil(estimateNodeHeight(node) * 0.55);
+}
+
+function isChapterOpener(node: TipTapNode): boolean {
+  return node.type === 'chapterHeader'
+    || (node.type === 'heading' && Number((node.attrs?.level as number | undefined) ?? 1) === 1);
+}
+
 function extractTextContent(node: TipTapNode): string {
   if (node.text) return node.text;
   if (!node.content) return '';
@@ -177,6 +186,22 @@ export function analyzeEstimatedArtifactLayout(content: unknown): EstimatedLayou
         });
       }
 
+      const nextNode = doc.content[i + 1];
+      if (
+        nextNode
+        && REFERENCE_BLOCK_TYPES.has(nextNode.type)
+        && fillPercent >= 15
+        && pageFill + getEffectiveNodeContribution(nextNode) <= PAGE_HEIGHT
+      ) {
+        findings.push({
+          severity: 'minor',
+          code: 'REFERENCE_BLOCK_STRANDED_AFTER_BREAK',
+          message: `${nextNode.type} at node ${i + 1} is separated from its preceding content by a manual page break even though it should still fit on page ${currentPage}.`,
+          affectedScope: `node-${i + 1}`,
+          suggestedFix: 'Remove the manual page break before the support block so it stays closer to the related scene or heading.',
+        });
+      }
+
       finalizePage('pageBreak');
       currentPage++;
       pageFill = 0;
@@ -186,10 +211,6 @@ export function analyzeEstimatedArtifactLayout(content: unknown): EstimatedLayou
     }
 
     const startFill = pageFill + Math.ceil(columnBuffer * 0.55);
-    const headingLevel = nodeType === 'heading'
-      ? Number((node.attrs?.level as number | undefined) ?? 1)
-      : null;
-
     if (isColumnSpanning) {
       flushColumnBuffer();
 
@@ -199,13 +220,13 @@ export function analyzeEstimatedArtifactLayout(content: unknown): EstimatedLayou
         pageFill = 0;
       }
 
-      if (nodeType === 'heading' && headingLevel === 1 && toFillPercent(pageFill) > 10) {
+      if (isChapterOpener(node) && toFillPercent(pageFill) > 10) {
         findings.push({
           severity: 'major',
           code: 'CHAPTER_HEADING_MID_PAGE',
-          message: `A level-1 heading is estimated to start mid-page around node ${i}.`,
+          message: `A chapter opener is estimated to start mid-page around node ${i}.`,
           affectedScope: `node-${i}`,
-          suggestedFix: 'Start major headings at the top of a fresh page or move nearby content so the heading begins near the page top.',
+          suggestedFix: 'Start major chapter openers at the top of a fresh page or move nearby content so the opener begins near the page top.',
         });
       }
 
@@ -216,7 +237,7 @@ export function analyzeEstimatedArtifactLayout(content: unknown): EstimatedLayou
         pageFill -= PAGE_HEIGHT;
       }
     } else {
-      const effectiveContribution = Math.ceil(nodeHeight * 0.55);
+      const effectiveContribution = getEffectiveNodeContribution(node);
 
       if (startFill > 0 && startFill + effectiveContribution > PAGE_HEIGHT && pageFill > 0) {
         finalizePage('auto');
@@ -226,13 +247,13 @@ export function analyzeEstimatedArtifactLayout(content: unknown): EstimatedLayou
       }
 
       const effectiveStart = pageFill + Math.ceil(columnBuffer * 0.55);
-      if (nodeType === 'heading' && headingLevel === 1 && toFillPercent(effectiveStart) > 10) {
+      if (isChapterOpener(node) && toFillPercent(effectiveStart) > 10) {
         findings.push({
           severity: 'major',
           code: 'CHAPTER_HEADING_MID_PAGE',
-          message: `A level-1 heading is estimated to start mid-page around node ${i}.`,
+          message: `A chapter opener is estimated to start mid-page around node ${i}.`,
           affectedScope: `node-${i}`,
-          suggestedFix: 'Start major headings at the top of a fresh page or move nearby content so the heading begins near the page top.',
+          suggestedFix: 'Start major chapter openers at the top of a fresh page or move nearby content so the opener begins near the page top.',
         });
       }
 
@@ -267,4 +288,3 @@ export function analyzeEstimatedArtifactLayout(content: unknown): EstimatedLayou
     summary,
   };
 }
-

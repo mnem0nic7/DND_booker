@@ -87,3 +87,24 @@ export async function transitionRunStatus(
     data,
   });
 }
+
+export async function updateRunProgress(
+  runId: string,
+  userId: string,
+  currentStage: string | null,
+  progressPercent: number,
+) {
+  const run = await prisma.generationRun.findFirst({
+    where: { id: runId, userId },
+    select: { id: true },
+  });
+  if (!run) return null;
+
+  return prisma.generationRun.update({
+    where: { id: runId },
+    data: {
+      currentStage,
+      progressPercent: Math.max(0, Math.min(100, Math.round(progressPercent))),
+    },
+  });
+}
