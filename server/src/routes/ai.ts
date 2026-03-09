@@ -438,7 +438,35 @@ const pageMetricSchema = z.object({
   isNearlyBlank: z.boolean(),
   boundaryType: z.enum(['pageBreak', 'autoGap', 'end']),
   nodeTypes: z.array(z.string()).max(10),
+  nodeIndices: z.array(z.number().int()).max(200).optional(),
+  nodeSummaries: z.array(z.string().max(160)).max(16).optional(),
   firstHeading: z.string().nullable(),
+});
+
+const layoutNodeSchema = z.object({
+  nodeIndex: z.number().int().min(0),
+  nodeType: z.string().min(1).max(100),
+  page: z.number().int().min(1).max(500),
+  column: z.number().int().min(1).max(8).nullable(),
+  topPx: z.number(),
+  bottomPx: z.number(),
+  heightPx: z.number(),
+  isColumnSpanning: z.boolean(),
+  isNearPageTop: z.boolean(),
+  isNearPageBottom: z.boolean(),
+  isSplit: z.boolean(),
+  headingLevel: z.number().int().min(1).max(6).nullable().optional(),
+  textPreview: z.string().max(120).nullable(),
+  label: z.string().max(120).nullable(),
+  sectionHeading: z.string().max(120).nullable(),
+});
+
+const layoutFindingSchema = z.object({
+  code: z.string().min(1).max(100),
+  severity: z.enum(['warning', 'info']),
+  message: z.string().min(1).max(240),
+  page: z.number().int().min(1).max(500).nullable(),
+  nodeIndex: z.number().int().min(0).nullable(),
 });
 
 const pageMetricsSchema = z.object({
@@ -449,6 +477,8 @@ const pageMetricsSchema = z.object({
   pages: z.array(pageMetricSchema).max(500),
   blankPageCount: z.number(),
   nearlyBlankPageCount: z.number(),
+  nodes: z.array(layoutNodeSchema).max(1000).optional(),
+  findings: z.array(layoutFindingSchema).max(200).optional(),
 });
 
 const chatMessageSchema = z.object({

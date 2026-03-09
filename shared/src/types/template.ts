@@ -1,5 +1,5 @@
-import { ProjectType } from './project';
-import { DocumentContent } from './document';
+import { ProjectType } from './project.js';
+import { DocumentContent } from './document.js';
 
 export interface Template {
   id: string;

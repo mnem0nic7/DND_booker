@@ -1,5 +1,5 @@
-import type { RunStatus } from './generation-run';
-import type { TaskStatus } from './generation-task';
+import type { RunStatus } from './generation-run.js';
+import type { TaskStatus } from './generation-task.js';
 
 export type GenerationEvent =
   | { type: 'run_status'; runId: string; status: RunStatus; stage: string | null; progressPercent: number }

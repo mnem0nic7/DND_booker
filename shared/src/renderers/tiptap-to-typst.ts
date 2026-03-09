@@ -10,7 +10,7 @@
  */
 
 import type { DocumentContent } from '../types/document';
-import { escapeTypst, escapeTypstUrl } from './utils';
+import { escapeTypst, escapeTypstUrl } from './utils.js';
 
 type TipTapNode = DocumentContent;
 

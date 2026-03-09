@@ -5,6 +5,11 @@ import { EVALUATION_WEIGHTS, ACCEPTANCE_THRESHOLDS } from '@dnd-booker/shared';
 import { prisma } from '../../config/database.js';
 import { publishGenerationEvent } from './pubsub.service.js';
 import { parseJsonResponse } from './parse-json.js';
+import { analyzeEstimatedArtifactLayout } from './layout-estimate.service.js';
+import {
+  applyDeterministicPublicationPenalty,
+  mergeEvaluationFindings,
+} from './evaluator-layout-helpers.js';
 import {
   buildEvaluateArtifactSystemPrompt,
   buildEvaluateArtifactUserPrompt,
@@ -49,6 +54,21 @@ export interface EvaluationResult {
   passed: boolean;
   findings: EvaluationFinding[];
   recommendedActions: string[];
+}
+
+function mergeRecommendedActions(
+  recommendedActions: string[],
+  findings: EvaluationFinding[],
+): string[] {
+  const merged = [...recommendedActions];
+
+  for (const finding of findings) {
+    if (finding.suggestedFix && !merged.includes(finding.suggestedFix)) {
+      merged.push(finding.suggestedFix);
+    }
+  }
+
+  return merged;
 }
 
 /**
@@ -124,6 +144,10 @@ export async function evaluateArtifact(
 
   // Get the artifact content for evaluation
   const content = artifact.markdownContent ?? artifact.jsonContent;
+  const layoutAnalysis = analyzeEstimatedArtifactLayout(
+    (artifact.tiptapContent as unknown) ?? artifact.jsonContent,
+  );
+  const deterministicLayoutFindings = layoutAnalysis?.findings ?? [];
 
   const system = buildEvaluateArtifactSystemPrompt();
   const prompt = buildEvaluateArtifactUserPrompt(
@@ -131,6 +155,8 @@ export async function evaluateArtifact(
     artifact.title,
     content,
     bible,
+    layoutAnalysis?.summary ?? null,
+    deterministicLayoutFindings,
   );
 
   const { text, usage } = await generateText({
@@ -139,17 +165,32 @@ export async function evaluateArtifact(
 
   const parsed = parseJsonResponse(text);
   const evalResponse = EvaluationResponseSchema.parse(parsed);
+  const mergedFindings = mergeEvaluationFindings(
+    evalResponse.findings as EvaluationFinding[],
+    deterministicLayoutFindings,
+  );
+  const adjustedPublicationFit = applyDeterministicPublicationPenalty(
+    evalResponse.publicationFit,
+    deterministicLayoutFindings,
+  );
+  const mergedRecommendedActions = mergeRecommendedActions(
+    evalResponse.recommendedActions,
+    deterministicLayoutFindings,
+  );
 
-  const overallScore = calculateOverallScore(evalResponse, weights);
+  const overallScore = calculateOverallScore({
+    ...evalResponse,
+    publicationFit: adjustedPublicationFit,
+  }, weights);
   const passed = checkAcceptance(
     {
       structuralCompleteness: evalResponse.structuralCompleteness,
       continuityScore: evalResponse.continuityScore,
-      publicationFit: evalResponse.publicationFit,
+      publicationFit: adjustedPublicationFit,
     },
     overallScore,
     threshold,
-    evalResponse.findings as EvaluationFinding[],
+    mergedFindings,
   );
 
   const totalTokens = (usage?.inputTokens ?? 0) + (usage?.outputTokens ?? 0);
@@ -164,10 +205,10 @@ export async function evaluateArtifact(
       continuityScore: evalResponse.continuityScore,
       dndSanity: evalResponse.dndSanity,
       editorialQuality: evalResponse.editorialQuality,
-      publicationFit: evalResponse.publicationFit,
+      publicationFit: adjustedPublicationFit,
       passed,
-      findings: evalResponse.findings as any,
-      recommendedActions: evalResponse.recommendedActions as any,
+      findings: mergedFindings as any,
+      recommendedActions: mergedRecommendedActions as any,
       tokenCount: totalTokens,
     },
   });
@@ -192,14 +233,14 @@ export async function evaluateArtifact(
     artifactType: artifact.artifactType,
     overallScore,
     passed,
-    findingCount: evalResponse.findings.length,
+    findingCount: mergedFindings.length,
   });
 
   return {
     evaluationId: evaluation.id,
     overallScore,
     passed,
-    findings: evalResponse.findings as EvaluationFinding[],
-    recommendedActions: evalResponse.recommendedActions,
+    findings: mergedFindings,
+    recommendedActions: mergedRecommendedActions,
   };
 }

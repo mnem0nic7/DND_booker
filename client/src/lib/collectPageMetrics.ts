@@ -1,7 +1,20 @@
 import type { Editor } from '@tiptap/core';
-import type { PageMetric, PageMetricsSnapshot } from '@dnd-booker/shared';
+import { analyzePageMetrics, type LayoutNodeMetric, type PageMetric, type PageMetricsSnapshot } from '@dnd-booker/shared';
 
 const DEFAULT_PAGE_CONTENT_HEIGHT = 864;
+const NEAR_PAGE_EDGE_THRESHOLD_PX = 96;
+const NODE_SUMMARY_LIMIT = 16;
+const TEXT_PREVIEW_LIMIT = 80;
+
+const COLUMN_SPANNING_TYPES = new Set([
+  'pageBreak',
+  'titlePage',
+  'creditsPage',
+  'backCover',
+  'tableOfContents',
+  'chapterHeader',
+  'fullBleedImage',
+]);
 
 /** Read --page-content-height from .page-canvas via computed style. */
 function getPageContentHeight(pmEl: HTMLElement): number {
@@ -27,6 +40,69 @@ function getColumnCount(pmEl: HTMLElement): number {
 interface Boundary {
   y: number;
   type: 'pageBreak' | 'autoGap' | 'start';
+}
+
+interface PageRegion {
+  page: number;
+  top: number;
+  bottom: number;
+  boundaryType: PageMetric['boundaryType'];
+}
+
+function truncateText(text: string, limit = TEXT_PREVIEW_LIMIT): string {
+  const normalized = text.replace(/\s+/g, ' ').trim();
+  if (!normalized) return '';
+  if (normalized.length <= limit) return normalized;
+  return `${normalized.slice(0, Math.max(0, limit - 1))}\u2026`;
+}
+
+function inferColumn(
+  rect: DOMRect,
+  pmRect: DOMRect,
+  columnCount: number,
+  isColumnSpanning: boolean,
+): number | null {
+  if (isColumnSpanning || columnCount <= 1) return isColumnSpanning ? null : 1;
+  const relativeLeft = Math.max(0, rect.left - pmRect.left);
+  const estimatedColumnWidth = pmRect.width / columnCount;
+  const rawColumn = Math.floor(relativeLeft / Math.max(1, estimatedColumnWidth)) + 1;
+  return Math.min(columnCount, Math.max(1, rawColumn));
+}
+
+function getRegionIndex(y: number, regions: PageRegion[]): number {
+  for (let i = 0; i < regions.length; i++) {
+    const region = regions[i];
+    if (y >= region.top && y < region.bottom) return i;
+  }
+  return Math.max(0, regions.length - 1);
+}
+
+function buildNodeLabel(
+  nodeType: string,
+  textPreview: string | null,
+  attrs: Record<string, unknown> | null | undefined,
+): string | null {
+  if (nodeType === 'heading' && textPreview) {
+    return `heading: ${textPreview}`;
+  }
+  if (nodeType === 'paragraph' && textPreview) {
+    return `paragraph: ${textPreview}`;
+  }
+
+  const namedAttr = attrs?.name || attrs?.title || attrs?.adventureTitle;
+  if (typeof namedAttr === 'string' && namedAttr.trim()) {
+    return `${nodeType}: ${truncateText(namedAttr, 60)}`;
+  }
+
+  return textPreview ? `${nodeType}: ${textPreview}` : nodeType;
+}
+
+function buildNodeSummary(node: LayoutNodeMetric): string {
+  const parts = [`[${node.nodeIndex}]`, node.nodeType, `P${node.page}`];
+  if (node.column) parts.push(`C${node.column}`);
+  if (node.isSplit) parts.push('split');
+  if (node.label) parts.push(`"${truncateText(node.label, 50)}"`);
+  return parts.join(' ');
 }
 
 /**
@@ -61,31 +137,59 @@ export function collectPageMetrics(editor: Editor): PageMetricsSnapshot {
 
   boundaries.sort((a, b) => a.y - b.y);
 
-  // Build a map of Y-position → node type for top-level nodes
-  interface NodeInfo {
-    y: number;
-    typeName: string;
-    headingText: string | null;
-  }
+  const pageRegions: PageRegion[] = boundaries.map((boundary, index) => ({
+    page: index + 1,
+    top: boundary.y,
+    bottom: index + 1 < boundaries.length ? boundaries[index + 1].y : pmRect.bottom,
+    boundaryType: index + 1 < boundaries.length
+      ? boundaries[index + 1].type === 'pageBreak'
+        ? 'pageBreak'
+        : 'autoGap'
+      : 'end',
+  }));
 
-  const nodeInfos: NodeInfo[] = [];
+  const nodeInfos: LayoutNodeMetric[] = [];
   const { doc } = view.state;
+  let currentSectionHeading: string | null = null;
+  let nodeIndex = 0;
 
   doc.forEach((node, offset) => {
     const dom = view.nodeDOM(offset) as HTMLElement | null;
+    const currentIndex = nodeIndex++;
     if (!dom) return;
     const rect = dom.getBoundingClientRect();
-
-    let headingText: string | null = null;
-    if (node.type.name === 'heading') {
-      headingText = node.textContent.slice(0, 60) || null;
-    }
+    const nodeType = node.type.name;
+    const textPreview = truncateText(node.textContent || '') || null;
+    const headingLevel = nodeType === 'heading'
+      ? Number((node.attrs as { level?: number } | null | undefined)?.level ?? 1)
+      : null;
+    const topRegionIndex = getRegionIndex(rect.top, pageRegions);
+    const bottomRegionIndex = getRegionIndex(Math.max(rect.top, rect.bottom - 1), pageRegions);
+    const region = pageRegions[topRegionIndex];
+    const isColumnSpanning = COLUMN_SPANNING_TYPES.has(nodeType);
+    const sectionHeading = nodeType === 'heading' ? textPreview : currentSectionHeading;
 
     nodeInfos.push({
-      y: rect.top,
-      typeName: node.type.name,
-      headingText,
+      nodeIndex: currentIndex,
+      nodeType,
+      page: region.page,
+      column: inferColumn(rect, pmRect, columnCount, isColumnSpanning),
+      topPx: Math.round(rect.top - pmRect.top),
+      bottomPx: Math.round(rect.bottom - pmRect.top),
+      heightPx: Math.max(0, Math.round(rect.height)),
+      isColumnSpanning,
+      isNearPageTop: rect.top - region.top <= NEAR_PAGE_EDGE_THRESHOLD_PX,
+      isNearPageBottom: region.bottom - rect.bottom <= NEAR_PAGE_EDGE_THRESHOLD_PX,
+      isSplit: topRegionIndex !== bottomRegionIndex,
+      headingLevel,
+      textPreview,
+      label: buildNodeLabel(nodeType, textPreview, node.attrs as Record<string, unknown> | null | undefined),
+      sectionHeading,
     });
+
+    if (nodeType === 'heading' && textPreview) {
+      currentSectionHeading = textPreview;
+    }
   });
 
   // For each region between consecutive boundaries, build a PageMetric
@@ -104,18 +208,9 @@ export function collectPageMetrics(editor: Editor): PageMetricsSnapshot {
     const isBlank = fillPercent < 5;
     const isNearlyBlank = fillPercent < 15;
 
-    // Determine boundary type (what ends this page region)
-    let boundaryType: PageMetric['boundaryType'] = 'end';
-    if (i + 1 < boundaries.length) {
-      boundaryType = boundaries[i + 1].type === 'pageBreak' ? 'pageBreak' : 'autoGap';
-    }
-
-    // Find nodes whose Y falls within this region
-    const regionNodes = nodeInfos.filter(
-      (n) => n.y >= regionTop && n.y < regionBottom,
-    );
-    const nodeTypes = regionNodes.slice(0, 10).map((n) => n.typeName);
-    const firstHeading = regionNodes.find((n) => n.headingText)?.headingText ?? null;
+    const regionNodes = nodeInfos.filter((n) => n.page === i + 1);
+    const nodeTypes = regionNodes.slice(0, 10).map((n) => n.nodeType);
+    const firstHeading = regionNodes.find((n) => n.nodeType === 'heading')?.textPreview ?? null;
 
     if (isBlank) blankCount++;
     if (isNearlyBlank) nearlyBlankCount++;
@@ -127,11 +222,18 @@ export function collectPageMetrics(editor: Editor): PageMetricsSnapshot {
       fillPercent,
       isBlank,
       isNearlyBlank,
-      boundaryType,
+      boundaryType: pageRegions[i]?.boundaryType ?? 'end',
       nodeTypes,
+      nodeIndices: regionNodes.map((n) => n.nodeIndex),
+      nodeSummaries: regionNodes.slice(0, NODE_SUMMARY_LIMIT).map(buildNodeSummary),
       firstHeading,
     });
   }
+
+  const findings = analyzePageMetrics({
+    pages,
+    nodes: nodeInfos,
+  });
 
   return {
     totalPages: pages.length,
@@ -141,5 +243,7 @@ export function collectPageMetrics(editor: Editor): PageMetricsSnapshot {
     pages,
     blankPageCount: blankCount,
     nearlyBlankPageCount: nearlyBlankCount,
+    nodes: nodeInfos,
+    findings,
   };
 }

@@ -135,9 +135,23 @@ export async function processGenerationJob(job: Job<GenerationJobData>): Promise
     await assembleDocuments(run);
 
     const preflight = await runPreflight(run);
+    const warningMsgs = preflight.issues
+      .filter((i: any) => i.severity === 'warning')
+      .map((i: any) => i.message)
+      .join('; ');
+
+    if (warningMsgs) {
+      await publishGenerationEvent(runId, {
+        type: 'run_warning',
+        runId,
+        message: `Preflight warnings: ${warningMsgs}`,
+        severity: 'warning',
+      });
+    }
+
     if (!preflight.passed) {
       const errorMsgs = preflight.issues.filter((i: any) => i.severity === 'error').map((i: any) => i.message).join('; ');
-      await publishGenerationEvent(runId, { type: 'run_warning', runId, message: `Preflight issues: ${errorMsgs}`, severity: 'warning' });
+      throw new Error(`Preflight failed: ${errorMsgs || 'compiled document validation reported blocking issues'}`);
     }
 
     // Complete

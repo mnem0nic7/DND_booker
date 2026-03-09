@@ -4,7 +4,7 @@
  * stylesheet, Google Fonts, and all rendered document content.
  */
 
-import { DocumentContent } from '@dnd-booker/shared';
+import { DocumentContent, extractTocEntriesFromDocuments } from '@dnd-booker/shared';
 import { tiptapToHtml } from './tiptap-to-html.js';
 import { escapeHtml } from './utils.js';
 
@@ -222,64 +222,10 @@ function getThemeVariables(theme: string): string {
   return themes[theme] || themes['classic-parchment'];
 }
 
-interface TocEntry {
-  level: number; // 1 = chapter header / h1, 2 = h2, 3 = h3
-  prefix: string; // e.g. "Chapter 3" or ""
-  title: string;
-}
-
-/**
- * Recursively scan TipTap JSON for chapterHeader and heading nodes
- * across all documents to build a hierarchical table of contents.
- */
-function extractTocEntries(docs: AssembleOptions['documents']): TocEntry[] {
-  const entries: TocEntry[] = [];
-
-  function walk(node: DocumentContent) {
-    if (node.type === 'chapterHeader') {
-      const num = String(node.attrs?.chapterNumber || '');
-      entries.push({
-        level: 1,
-        prefix: num ? `${num}.` : '',
-        title: String(node.attrs?.title || 'Untitled Chapter'),
-      });
-    } else if (node.type === 'heading') {
-      const level = Number(node.attrs?.level ?? 2);
-      if (level >= 1 && level <= 3) {
-        // Extract text content from heading children
-        const text = extractTextContent(node);
-        if (text) {
-          entries.push({ level, prefix: '', title: text });
-        }
-      }
-    }
-    if (node.content) {
-      for (const child of node.content) {
-        walk(child);
-      }
-    }
-  }
-
-  for (const doc of docs) {
-    if (doc.content) {
-      walk(doc.content);
-    }
-  }
-
-  return entries;
-}
-
-/** Extract plain text from a TipTap node and its children. */
-function extractTextContent(node: DocumentContent): string {
-  if (node.type === 'text') return node.text || '';
-  if (!node.content) return '';
-  return node.content.map((c) => extractTextContent(c)).join('');
-}
-
 /**
  * Build TOC entry HTML from extracted entries with indentation by level.
  */
-function buildTocEntriesHtml(entries: TocEntry[]): string {
+function buildTocEntriesHtml(entries: Array<{ level: number; prefix: string; title: string }>): string {
   if (entries.length === 0) {
     return `<p class="table-of-contents__note">No chapters or headings found.</p>`;
   }
@@ -305,7 +251,7 @@ export function assembleHtml(options: AssembleOptions): string {
   const sorted = [...documents].sort((a, b) => a.sortOrder - b.sortOrder);
 
   // Extract chapter headers and headings for TOC population
-  const tocEntries = extractTocEntries(sorted);
+  const tocEntries = extractTocEntriesFromDocuments(sorted);
 
   // Render each document's TipTap JSON to HTML
   const documentHtmlParts = sorted.map((doc) => {
@@ -1269,4 +1215,3 @@ export function assembleHtml(options: AssembleOptions): string {
 </body>
 </html>`;
 }
-

@@ -1,0 +1,132 @@
+import { describe, expect, it } from 'vitest';
+import { analyzePageMetrics, type PageMetricsSnapshot } from '@dnd-booker/shared';
+
+describe('layout-analysis', () => {
+  it('detects blank pages, consecutive breaks, and mid-page chapter headings', () => {
+    const snapshot: PageMetricsSnapshot = {
+      totalPages: 3,
+      pageSize: 'letter',
+      columnCount: 2,
+      pageContentHeight: 864,
+      blankPageCount: 1,
+      nearlyBlankPageCount: 1,
+      pages: [
+        {
+          page: 1,
+          contentHeight: 720,
+          pageHeight: 864,
+          fillPercent: 83,
+          isBlank: false,
+          isNearlyBlank: false,
+          boundaryType: 'pageBreak',
+          nodeTypes: ['heading', 'paragraph'],
+          nodeIndices: [0, 1],
+          nodeSummaries: [],
+          firstHeading: 'Chapter 1',
+        },
+        {
+          page: 2,
+          contentHeight: 0,
+          pageHeight: 864,
+          fillPercent: 0,
+          isBlank: true,
+          isNearlyBlank: true,
+          boundaryType: 'pageBreak',
+          nodeTypes: ['pageBreak', 'pageBreak', 'heading'],
+          nodeIndices: [2, 3, 4],
+          nodeSummaries: [],
+          firstHeading: 'Chapter 2',
+        },
+        {
+          page: 3,
+          contentHeight: 120,
+          pageHeight: 864,
+          fillPercent: 14,
+          isBlank: false,
+          isNearlyBlank: true,
+          boundaryType: 'end',
+          nodeTypes: ['heading'],
+          nodeIndices: [4],
+          nodeSummaries: [],
+          firstHeading: 'Chapter 2',
+        },
+      ],
+      nodes: [
+        {
+          nodeIndex: 0,
+          nodeType: 'heading',
+          page: 1,
+          column: 1,
+          topPx: 0,
+          bottomPx: 40,
+          heightPx: 40,
+          isColumnSpanning: false,
+          isNearPageTop: true,
+          isNearPageBottom: false,
+          isSplit: false,
+          headingLevel: 1,
+          textPreview: 'Chapter 1',
+          label: 'heading: Chapter 1',
+          sectionHeading: 'Chapter 1',
+        },
+        {
+          nodeIndex: 2,
+          nodeType: 'pageBreak',
+          page: 2,
+          column: null,
+          topPx: 860,
+          bottomPx: 916,
+          heightPx: 56,
+          isColumnSpanning: true,
+          isNearPageTop: false,
+          isNearPageBottom: true,
+          isSplit: false,
+          textPreview: null,
+          label: 'pageBreak',
+          sectionHeading: 'Chapter 1',
+        },
+        {
+          nodeIndex: 3,
+          nodeType: 'pageBreak',
+          page: 2,
+          column: null,
+          topPx: 916,
+          bottomPx: 972,
+          heightPx: 56,
+          isColumnSpanning: true,
+          isNearPageTop: false,
+          isNearPageBottom: true,
+          isSplit: false,
+          textPreview: null,
+          label: 'pageBreak',
+          sectionHeading: 'Chapter 1',
+        },
+        {
+          nodeIndex: 4,
+          nodeType: 'heading',
+          page: 3,
+          column: 1,
+          topPx: 1050,
+          bottomPx: 1090,
+          heightPx: 40,
+          isColumnSpanning: false,
+          isNearPageTop: false,
+          isNearPageBottom: false,
+          isSplit: false,
+          headingLevel: 1,
+          textPreview: 'Chapter 2',
+          label: 'heading: Chapter 2',
+          sectionHeading: 'Chapter 2',
+        },
+      ],
+      findings: [],
+    };
+
+    const findings = analyzePageMetrics(snapshot);
+    const codes = findings.map((finding) => finding.code);
+
+    expect(codes).toContain('blank_page');
+    expect(codes).toContain('consecutive_page_breaks');
+    expect(codes).toContain('chapter_heading_mid_page');
+  });
+});

@@ -18,6 +18,7 @@ export function buildReviseArtifactUserPrompt(
   artifactContent: unknown,
   findings: EvaluationFinding[],
   bible: BibleContent,
+  estimatedLayoutSummary?: string | null,
 ): string {
   const parts: string[] = [
     `Artifact to revise: "${artifactTitle}" (type: ${artifactType})`,
@@ -59,6 +60,15 @@ export function buildReviseArtifactUserPrompt(
     `Setting: ${bible.worldRules.setting}`,
     `Tone: ${bible.worldRules.toneDescriptors.join(', ')}`,
   );
+
+  if (estimatedLayoutSummary) {
+    parts.push(
+      '',
+      '## Deterministic Estimated Layout Context',
+      'Use this structural estimate while revising layout, formatting, and block placement issues.',
+      estimatedLayoutSummary,
+    );
+  }
 
   return parts.join('\n');
 }

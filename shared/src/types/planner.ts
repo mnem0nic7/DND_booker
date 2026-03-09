@@ -48,10 +48,14 @@ export interface RememberBlock {
 
 /** A single document editing operation the AI can emit */
 export interface DocumentEditOperation {
-  op: 'insertBefore' | 'insertAfter' | 'remove' | 'replace' | 'updateAttrs';
+  op: 'insertBefore' | 'insertAfter' | 'remove' | 'replace' | 'updateAttrs' | 'moveBefore' | 'moveAfter';
   nodeIndex: number;
   /** Optional hint: if nodeIndex is out of bounds, search for the first node of this type */
   targetType?: string;
+  /** Destination index for move operations. */
+  destinationIndex?: number;
+  /** Optional hint for move destinations. */
+  destinationType?: string;
   node?: { type: string; attrs?: Record<string, unknown>; content?: unknown[] };
   attrs?: Record<string, unknown>;
 }
@@ -80,7 +84,37 @@ export interface PageMetric {
   isNearlyBlank: boolean;    // < 15% fill
   boundaryType: 'pageBreak' | 'autoGap' | 'end';
   nodeTypes: string[];       // first ~10 node types on this page
+  nodeIndices?: number[];    // top-level node indices that start on this page
+  nodeSummaries?: string[];  // compact summaries in reading order
   firstHeading: string | null;
+}
+
+/** Actual rendered measurements for a top-level document node. */
+export interface LayoutNodeMetric {
+  nodeIndex: number;
+  nodeType: string;
+  page: number;
+  column: number | null;
+  topPx: number;
+  bottomPx: number;
+  heightPx: number;
+  isColumnSpanning: boolean;
+  isNearPageTop: boolean;
+  isNearPageBottom: boolean;
+  isSplit: boolean;
+  headingLevel?: number | null;
+  textPreview: string | null;
+  label: string | null;
+  sectionHeading: string | null;
+}
+
+/** Deterministic layout issue detected from rendered metrics. */
+export interface LayoutFinding {
+  code: string;
+  severity: 'warning' | 'info';
+  message: string;
+  page: number | null;
+  nodeIndex: number | null;
 }
 
 /** Target: update an image attribute on an existing document node. */
@@ -131,4 +165,6 @@ export interface PageMetricsSnapshot {
   pages: PageMetric[];
   blankPageCount: number;
   nearlyBlankPageCount: number;
+  nodes?: LayoutNodeMetric[];
+  findings?: LayoutFinding[];
 }

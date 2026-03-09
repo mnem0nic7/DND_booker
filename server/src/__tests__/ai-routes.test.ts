@@ -357,6 +357,53 @@ describe('AI Routes', () => {
       expect(res.status).toBe(400);
     });
 
+    it('should reject malformed layout snapshot payloads', async () => {
+      const res = await request(app)
+        .post(`/api/projects/${projectId}/ai/chat`)
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({
+          message: 'Evaluate the layout',
+          pageMetrics: {
+            totalPages: 1,
+            pageSize: 'letter',
+            columnCount: 2,
+            pageContentHeight: 864,
+            blankPageCount: 0,
+            nearlyBlankPageCount: 0,
+            pages: [{
+              page: 1,
+              contentHeight: 300,
+              pageHeight: 864,
+              fillPercent: 35,
+              isBlank: false,
+              isNearlyBlank: false,
+              boundaryType: 'end',
+              nodeTypes: ['heading'],
+              firstHeading: 'Intro',
+            }],
+            nodes: [{
+              nodeIndex: 'bad-index',
+              nodeType: 'heading',
+              page: 1,
+              column: 1,
+              topPx: 0,
+              bottomPx: 40,
+              heightPx: 40,
+              isColumnSpanning: false,
+              isNearPageTop: true,
+              isNearPageBottom: false,
+              isSplit: false,
+              textPreview: 'Intro',
+              label: 'heading: Intro',
+              sectionHeading: 'Intro',
+            }],
+          },
+        });
+
+      expect(res.status).toBe(400);
+      expect(res.body.error).toBe('Validation failed');
+    });
+
     it('should return 404 for non-existent project', async () => {
       const res = await request(app)
         .post('/api/projects/00000000-0000-0000-0000-000000000000/ai/chat')

@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import type { PageMetricsSnapshot } from '@dnd-booker/shared';
 import {
   buildSystemPrompt,
   buildBlockPrompt,
@@ -45,7 +46,82 @@ describe('AI Content Service', () => {
       expect(prompt).toContain('statBlock');
       expect(prompt).toContain('spellCard');
       expect(prompt).toContain('npcProfile');
+      expect(prompt).toContain('moveBefore');
+      expect(prompt).toContain('moveAfter');
       expect(prompt).toContain('```json');
+    });
+
+    it('should include rendered node layout and deterministic findings when provided', () => {
+      const metrics: PageMetricsSnapshot = {
+        totalPages: 2,
+        pageSize: 'letter',
+        columnCount: 2,
+        pageContentHeight: 864,
+        blankPageCount: 0,
+        nearlyBlankPageCount: 1,
+        pages: [
+          {
+            page: 1,
+            contentHeight: 780,
+            pageHeight: 864,
+            fillPercent: 90,
+            isBlank: false,
+            isNearlyBlank: false,
+            boundaryType: 'autoGap',
+            nodeTypes: ['heading', 'paragraph', 'statBlock'],
+            nodeIndices: [0, 1, 2],
+            nodeSummaries: ['[0] heading P1 C1 "heading: Chapter 1"', '[2] statBlock P1 C2 "statBlock: Goblin"'],
+            firstHeading: 'Chapter 1',
+          },
+          {
+            page: 2,
+            contentHeight: 100,
+            pageHeight: 864,
+            fillPercent: 12,
+            isBlank: false,
+            isNearlyBlank: true,
+            boundaryType: 'pageBreak',
+            nodeTypes: ['pageBreak', 'heading'],
+            nodeIndices: [3, 4],
+            nodeSummaries: ['[4] heading P2 C1 "heading: Chapter 2"'],
+            firstHeading: 'Chapter 2',
+          },
+        ],
+        nodes: [
+          {
+            nodeIndex: 4,
+            nodeType: 'heading',
+            page: 2,
+            column: 1,
+            topPx: 940,
+            bottomPx: 980,
+            heightPx: 40,
+            isColumnSpanning: false,
+            isNearPageTop: false,
+            isNearPageBottom: false,
+            isSplit: false,
+            headingLevel: 1,
+            textPreview: 'Chapter 2',
+            label: 'heading: Chapter 2',
+            sectionHeading: 'Chapter 2',
+          },
+        ],
+        findings: [
+          {
+            code: 'chapter_heading_mid_page',
+            severity: 'warning',
+            message: 'Heading at node 4 starts mid-page instead of near the top of page 2.',
+            page: 2,
+            nodeIndex: 4,
+          },
+        ],
+      };
+
+      const prompt = buildSystemPrompt('Test Project', '[0] heading(1): "Chapter 1" (~50px) [P1 6%]', null, metrics);
+      expect(prompt).toContain('=== RENDERED NODE LAYOUT ===');
+      expect(prompt).toContain('heading: Chapter 2');
+      expect(prompt).toContain('=== DETERMINISTIC LAYOUT FINDINGS ===');
+      expect(prompt).toContain('chapter_heading_mid_page');
     });
   });
 

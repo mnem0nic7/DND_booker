@@ -4,6 +4,7 @@ import { prisma } from '../../config/database.js';
 import { publishGenerationEvent } from './pubsub.service.js';
 import { parseJsonResponse } from './parse-json.js';
 import { markdownToTipTap } from '../ai-wizard.service.js';
+import { analyzeEstimatedArtifactLayout } from './layout-estimate.service.js';
 import {
   buildReviseArtifactSystemPrompt,
   buildReviseArtifactUserPrompt,
@@ -80,6 +81,9 @@ export async function reviseArtifact(
   // Get the content to revise
   const content = artifact.markdownContent ?? artifact.jsonContent;
   const isMarkdown = artifact.markdownContent !== null;
+  const layoutAnalysis = analyzeEstimatedArtifactLayout(
+    (artifact.tiptapContent as unknown) ?? artifact.jsonContent,
+  );
 
   const system = buildReviseArtifactSystemPrompt();
   const prompt = buildReviseArtifactUserPrompt(
@@ -88,6 +92,7 @@ export async function reviseArtifact(
     content,
     findings,
     bible,
+    layoutAnalysis?.summary ?? null,
   );
 
   const { text, usage } = await generateText({

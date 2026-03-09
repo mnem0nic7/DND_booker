@@ -1,4 +1,4 @@
-import type { DocumentContent } from './document';
+import type { DocumentContent } from './document.js';
 
 export type ProjectType = 'campaign' | 'one_shot' | 'supplement' | 'sourcebook';
 export type ProjectStatus = 'draft' | 'in_progress' | 'review' | 'published';

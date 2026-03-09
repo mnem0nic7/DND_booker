@@ -6,7 +6,7 @@
  */
 
 import type { DocumentContent } from '../types/document';
-import { escapeHtml, safeUrl, safeCssUrl } from './utils';
+import { escapeHtml, safeUrl, safeCssUrl } from './utils.js';
 
 type TipTapNode = DocumentContent;
 

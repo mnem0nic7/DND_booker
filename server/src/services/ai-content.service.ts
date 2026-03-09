@@ -1,4 +1,4 @@
-import type { PageMetricsSnapshot } from '@dnd-booker/shared';
+import type { LayoutFinding, LayoutNodeMetric, PageMetricsSnapshot } from '@dnd-booker/shared';
 
 const SYSTEM_PROMPT = `You are a creative D&D 5e content assistant embedded in a document editor. You help DMs create campaign content.
 
@@ -181,7 +181,7 @@ You have access to tools that execute server-side. Use them instead of embedding
 Write tools require an \`expectedUpdatedAt\` timestamp from a prior read to prevent overwriting concurrent changes. If you get a CONFLICT error, re-read and retry.
 
 **Content tools** (use these for structured document operations):
-- \`editDocument\` — apply structural edits to the document (insert, remove, replace, updateAttrs)
+- \`editDocument\` — apply structural edits to the document (insert, remove, replace, updateAttrs, moveBefore, moveAfter)
 - \`evaluateDocument\` — submit a structured document evaluation with score and findings
 - \`generateAdventure\` — generate an adventure outline that triggers the wizard flow
 - \`generateImages\` — queue image generation requests for document blocks
@@ -446,12 +446,62 @@ function formatPageMetrics(metrics: PageMetricsSnapshot): string {
     if (flags.length > 0) parts.push(`[${flags.join(', ')}]`);
 
     if (p.nodeTypes.length > 0) parts.push(`[${p.nodeTypes.join(' → ')}]`);
+    if (p.nodeSummaries && p.nodeSummaries.length > 0) parts.push(`nodes: ${p.nodeSummaries.join(' | ')}`);
     parts.push(`→ ${p.boundaryType}`);
 
     lines.push(parts.join(' '));
   }
 
   return lines.join('\n');
+}
+
+const MAX_RENDERED_LAYOUT_NODES = 120;
+
+function formatRenderedLayoutNodes(nodes: LayoutNodeMetric[]): string {
+  const lines: string[] = [];
+  const visibleNodes = nodes.slice(0, MAX_RENDERED_LAYOUT_NODES);
+
+  for (const node of visibleNodes) {
+    const parts: string[] = [];
+    parts.push(`[${node.nodeIndex}]`);
+    parts.push(node.nodeType);
+    parts.push(`P${node.page}`);
+    if (node.column) parts.push(`C${node.column}`);
+
+    const flags: string[] = [];
+    if (node.isColumnSpanning) flags.push('span');
+    if (node.isSplit) flags.push('split');
+    if (node.isNearPageTop) flags.push('near-top');
+    if (node.isNearPageBottom) flags.push('near-bottom');
+    if (flags.length > 0) parts.push(`[${flags.join(', ')}]`);
+
+    if (node.sectionHeading) parts.push(`section="${truncate(node.sectionHeading, 40)}"`);
+    if (node.label) parts.push(`label="${truncate(node.label, 60)}"`);
+    else if (node.textPreview) parts.push(`text="${truncate(node.textPreview, 60)}"`);
+
+    lines.push(parts.join(' '));
+  }
+
+  if (visibleNodes.length < nodes.length) {
+    lines.push(`... (${nodes.length - visibleNodes.length} more rendered node entries truncated)`);
+  }
+
+  return lines.join('\n');
+}
+
+function formatLayoutFindings(findings: LayoutFinding[]): string {
+  if (findings.length === 0) return 'No deterministic layout findings.';
+
+  return findings
+    .slice(0, 40)
+    .map((finding) => {
+      const location: string[] = [];
+      if (finding.page) location.push(`P${finding.page}`);
+      if (finding.nodeIndex !== null && finding.nodeIndex !== undefined) location.push(`node ${finding.nodeIndex}`);
+      const locationLabel = location.length > 0 ? ` (${location.join(', ')})` : '';
+      return `- [${finding.severity}] ${finding.code}${locationLabel}: ${finding.message}`;
+    })
+    .join('\n');
 }
 
 export function buildSystemPrompt(projectTitle?: string, documentOutline?: string | null, documentTextSample?: string | null, pageMetrics?: PageMetricsSnapshot, provider?: string | null): string {
@@ -488,6 +538,7 @@ ${documentOutline}
 - Manual pageBreak nodes serve as INTENTIONAL SECTION STARTERS (e.g., new chapters, fresh pages for important content). They force content to the next page.
 - Do NOT add pageBreak nodes just to prevent content overflow — auto-pagination already handles visual page separation gracefully.
 - Height estimates (~Npx) and fill percentages (N%) are approximate. "Auto-paginated boundaries" in the summary indicate where auto-page-gaps will appear — these are NOT problems to fix.
+- When rendered node metrics are present below, they are more authoritative than these estimated heights. Prefer rendered page/node data over outline estimates when they conflict.
 === END PAGE LAYOUT MODEL ===
 
 === DOCUMENT EDITING MODE ===
@@ -507,7 +558,8 @@ I analyzed the document and found several pagination issues. Here's what I'm fix
   "description": "Fixed pagination: added break before Chapter 3, removed duplicate at node 22",
   "operations": [
     {"op": "insertBefore", "nodeIndex": 45, "targetType": "heading", "node": {"type": "pageBreak"}},
-    {"op": "remove", "nodeIndex": 22, "targetType": "pageBreak"}
+    {"op": "remove", "nodeIndex": 22, "targetType": "pageBreak"},
+    {"op": "moveAfter", "nodeIndex": 31, "targetType": "statBlock", "destinationIndex": 28, "destinationType": "heading"}
   ]
 }
 \`\`\`
@@ -518,8 +570,11 @@ Supported operations:
 - "remove": Remove the node at nodeIndex
 - "replace": Replace the entire node at nodeIndex with a new node. Requires "node" field with full TipTap JSON structure including content array.
 - "updateAttrs": Update attributes on the node at nodeIndex without changing its content. Requires "attrs" field.
+- "moveBefore": Move the existing node at nodeIndex so it appears before destinationIndex. Requires "destinationIndex".
+- "moveAfter": Move the existing node at nodeIndex so it appears after destinationIndex. Requires "destinationIndex".
 
 ALWAYS include "targetType" in every operation — the block type name at that index (e.g. "titlePage", "statBlock", "heading"). This is a safety net: if the nodeIndex is wrong, the system will search for the first matching node of that type.
+For move operations, include "destinationType" when possible so the system can recover if destinationIndex drifts.
 
 IMPORTANT — Most D&D blocks are "atom" blocks: all their data is in attributes, NOT in child content nodes. To modify them, use "updateAttrs" (NOT "replace"):
 
@@ -557,6 +612,11 @@ For "replace" operations (readAloud, dmTips, or inserting new non-atom blocks):
 {"op": "replace", "nodeIndex": 15, "targetType": "readAloud", "node": {"type": "readAloud", "attrs": {"variant": "dark"}, "content": [{"type": "paragraph", "content": [{"type": "text", "text": "The darkness closes in..."}]}]}}
 \`\`\`
 
+For relocating an existing block closer to its scene or heading:
+\`\`\`json
+{"op": "moveAfter", "nodeIndex": 18, "targetType": "statBlock", "destinationIndex": 16, "destinationType": "heading"}
+\`\`\`
+
 Insertable node types: pageBreak, columnBreak, horizontalRule
 Modifiable atom blocks: titlePage, backCover, chapterHeader, statBlock, encounterTable, magicItem, npcProfile, spellCard, randomTable, fullBleedImage (use updateAttrs)
 Modifiable content blocks: readAloud, dmTips (use replace with content array)
@@ -565,14 +625,16 @@ PAGINATION RULES:
 - Auto-pagination handles all visual page separation. Use pageBreak ONLY for intentional section boundaries.
 - Don't treat overflow points or auto-paginated boundaries in the outline as problems — auto-gaps handle them.
 - Reference nodes by their [index] from the document structure above
+- If rendered node layout is provided below, use those page and column placements as the authoritative source for formatting and block-placement decisions.
 - WHEN TO INSERT pageBreak:
   - Before a chapter heading (H1) that isn't already at the start of a page (fill% > ~10%) — chapters deserve fresh pages
   - Only when the user specifically asks to start a block or section on a fresh page
 - WHEN TO REMOVE pageBreak:
-  - Remove pageBreak nodes that create nearly-empty pages (less than ~15% content before the next break)
-  - Remove consecutive/duplicate pageBreak nodes
+- Remove pageBreak nodes that create nearly-empty pages (less than ~15% content before the next break)
+- Remove consecutive/duplicate pageBreak nodes
 - NEVER insert a break before the very first node (index 0)
 - NEVER insert a break right after an existing pageBreak
+- Prefer moving orphaned stat blocks, NPC profiles, and read-aloud content closer to their related heading before rewriting them.
 - Prefer minimal changes — only add/remove what's needed
 - The "description" field should briefly explain what you did
 - ALWAYS output the \`\`\`json block with _documentEdit — this is NOT optional
@@ -614,6 +676,8 @@ Rules:
 - category: "content", "formatting", or "layout"
 - Always provide your conversational analysis BEFORE the JSON block
 - When RENDERED PAGE METRICS are provided (below), use actual fill percentages from those instead of estimated heights. Specifically flag any pages marked BLANK or NEARLY BLANK as formatting issues.
+- When RENDERED NODE LAYOUT is provided (below), use those node-to-page and node-to-column placements for block proximity, orphaning, and reading-order analysis.
+- When DETERMINISTIC LAYOUT FINDINGS are provided (below), treat them as precomputed layout signals derived from the rendered document, not speculative hints.
 - Include at least 1-2 "layout" category findings analyzing page order and block placement
 - CRITICAL: You MUST end your response with the \`\`\`json code fence containing _evaluation. Without this JSON block, the evaluation card will not render for the user.
 === END DOCUMENT EVALUATION MODE ===`;
@@ -628,6 +692,28 @@ Node sequences per page (shown as type → type → type) represent the READING 
 
 ${formatPageMetrics(pageMetrics)}
 === END RENDERED PAGE METRICS ===`;
+
+      if (pageMetrics.nodes && pageMetrics.nodes.length > 0) {
+        prompt += `
+
+=== RENDERED NODE LAYOUT ===
+These are ACTUAL rendered placements for top-level document nodes.
+Use them to reason about which node appears on which page, which column it starts in, whether it is near the page top or bottom, and whether it spans a page boundary.
+
+${formatRenderedLayoutNodes(pageMetrics.nodes)}
+=== END RENDERED NODE LAYOUT ===`;
+      }
+
+      if (pageMetrics.findings) {
+        prompt += `
+
+=== DETERMINISTIC LAYOUT FINDINGS ===
+These findings were computed from the rendered layout before you were called.
+Prefer these findings over guesswork when deciding what to fix or praise.
+
+${formatLayoutFindings(pageMetrics.findings)}
+=== END DETERMINISTIC LAYOUT FINDINGS ===`;
+      }
     }
 
     if (documentTextSample) {

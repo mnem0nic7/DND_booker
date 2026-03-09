@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import type { Editor } from '@tiptap/core';
+import type { Node as PMNode } from '@tiptap/pm/model';
 import { useAiStore } from '../../stores/aiStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { AiMessageBubble } from './AiMessageBubble';
@@ -158,8 +159,8 @@ function insertImageBlock(editor: Editor, target: ImageTargetInsert, url: string
 
 /**
  * Execute document edit operations against the TipTap editor.
- * Processes in descending nodeIndex order so earlier indices remain valid.
- * Runs as a single ProseMirror transaction (one undo step).
+ * Resolves indices against the original document the AI saw, then maps those
+ * positions through the transaction as edits accumulate.
  */
 function executeDocumentEdits(editor: Editor, operations: DocumentEditOperation[]): number {
   if (operations.length === 0) return 0;
@@ -168,73 +169,67 @@ function executeDocumentEdits(editor: Editor, operations: DocumentEditOperation[
   const { doc, schema, tr } = state;
   let applied = 0;
 
-  // Sort by nodeIndex descending so later ops don't shift earlier positions
-  const sorted = [...operations].sort((a, b) => b.nodeIndex - a.nodeIndex);
+  function findFirstIndexByType(targetDoc: PMNode, typeName?: string): number {
+    if (!typeName) return -1;
+    for (let i = 0; i < targetDoc.childCount; i++) {
+      if (targetDoc.child(i).type.name === typeName) return i;
+    }
+    return -1;
+  }
 
-  for (const op of sorted) {
-    let resolvedIndex = op.nodeIndex;
+  function resolveIndex(
+    targetDoc: PMNode,
+    rawIndex: number,
+    typeHint?: string,
+    role: 'source' | 'destination' = 'source',
+  ): number {
+    if (rawIndex >= 0 && rawIndex < targetDoc.childCount) return rawIndex;
 
-    // Bounds check with type-based fallback
-    if (resolvedIndex < 0 || resolvedIndex >= doc.childCount) {
-      // Try to find the node by targetType if provided
-      if (op.targetType) {
-        let found = -1;
-        for (let i = 0; i < doc.childCount; i++) {
-          if (doc.child(i).type.name === op.targetType) {
-            found = i;
-            break;
-          }
-        }
-        if (found >= 0) {
-          console.debug(`[AI DocumentEdit] nodeIndex ${op.nodeIndex} out of bounds, resolved ${op.targetType} to index ${found}`);
-          resolvedIndex = found;
-        } else {
-          console.warn(`[AI DocumentEdit] nodeIndex ${op.nodeIndex} out of bounds and targetType "${op.targetType}" not found (doc has ${doc.childCount} children)`);
-          continue;
-        }
-      } else {
-        // No targetType hint — try to infer from node/attrs for updateAttrs/replace ops
-        const inferredType = op.node?.type || (op.attrs && op.op === 'updateAttrs' ? undefined : undefined);
-        if (!inferredType) {
-          console.warn(`[AI DocumentEdit] nodeIndex ${op.nodeIndex} out of bounds (doc has ${doc.childCount} children)`);
-          continue;
-        }
-        let found = -1;
-        for (let i = 0; i < doc.childCount; i++) {
-          if (doc.child(i).type.name === inferredType) {
-            found = i;
-            break;
-          }
-        }
-        if (found >= 0) {
-          console.debug(`[AI DocumentEdit] nodeIndex ${op.nodeIndex} out of bounds, inferred type "${inferredType}" at index ${found}`);
-          resolvedIndex = found;
-        } else {
-          console.warn(`[AI DocumentEdit] nodeIndex ${op.nodeIndex} out of bounds (doc has ${doc.childCount} children)`);
-          continue;
-        }
-      }
+    const fallbackIndex = findFirstIndexByType(targetDoc, typeHint);
+    if (fallbackIndex >= 0) {
+      console.debug(`[AI DocumentEdit] ${role} index ${rawIndex} out of bounds, resolved ${typeHint} to index ${fallbackIndex}`);
+      return fallbackIndex;
     }
 
-    // Calculate the position of the node at this index.
-    // ProseMirror: top-level children start at position 0 in doc.descendants().
+    console.warn(`[AI DocumentEdit] ${role} index ${rawIndex} out of bounds and type "${typeHint ?? 'unknown'}" not found (doc has ${targetDoc.childCount} children)`);
+    return -1;
+  }
+
+  function getChildPos(targetDoc: PMNode, childIndex: number): number {
     let pos = 0;
-    for (let i = 0; i < resolvedIndex; i++) {
-      pos += doc.child(i).nodeSize;
+    for (let i = 0; i < childIndex; i++) {
+      pos += targetDoc.child(i).nodeSize;
     }
+    return pos;
+  }
 
-    const targetNode = doc.child(resolvedIndex);
+  for (const op of operations) {
+    const sourceTypeHint = op.targetType || op.node?.type;
+    const resolvedIndex = resolveIndex(doc, op.nodeIndex, sourceTypeHint, 'source');
+    if (resolvedIndex < 0) continue;
+
+    const sourceNode = doc.child(resolvedIndex);
+    const sourcePos = getChildPos(doc, resolvedIndex);
 
     try {
-      console.debug(`[AI DocumentEdit] op=${op.op} nodeIndex=${resolvedIndex} type=${targetNode.type.name} pos=${pos}`);
+      console.debug(`[AI DocumentEdit] op=${op.op} nodeIndex=${resolvedIndex} type=${sourceNode.type.name} pos=${sourcePos}`);
       if (op.op === 'remove') {
-        tr.delete(pos, pos + targetNode.nodeSize);
+        const mappedFrom = tr.mapping.map(sourcePos, 1);
+        const mappedTo = tr.mapping.map(sourcePos + sourceNode.nodeSize, -1);
+        if (mappedTo <= mappedFrom) continue;
+        tr.delete(mappedFrom, mappedTo);
         applied++;
       } else if (op.op === 'replace' && op.node) {
+        const mappedFrom = tr.mapping.map(sourcePos, 1);
+        const mappedTo = tr.mapping.map(sourcePos + sourceNode.nodeSize, -1);
+        if (mappedTo <= mappedFrom) continue;
         const newNode = schema.nodeFromJSON(op.node);
-        tr.replaceWith(pos, pos + targetNode.nodeSize, newNode);
+        tr.replaceWith(mappedFrom, mappedTo, newNode);
         applied++;
       } else if (op.op === 'updateAttrs' && op.attrs) {
+        const mappedPos = tr.mapping.map(sourcePos, 1);
+        const currentNode = tr.doc.nodeAt(mappedPos);
+        if (!currentNode) continue;
         // Auto-stringify non-primitive attr values (e.g. entries arrays → JSON strings)
         // Atom blocks store complex data as JSON strings, but AI may send parsed objects
         const normalizedAttrs: Record<string, unknown> = {};
@@ -244,16 +239,41 @@ function executeDocumentEdits(editor: Editor, operations: DocumentEditOperation[
               ? JSON.stringify(value)
               : value;
         }
-        console.debug('[AI DocumentEdit] updateAttrs on', targetNode.type.name, 'at nodeIndex', resolvedIndex, normalizedAttrs);
-        tr.setNodeMarkup(pos, undefined, { ...targetNode.attrs, ...normalizedAttrs });
+        console.debug('[AI DocumentEdit] updateAttrs on', currentNode.type.name, 'at nodeIndex', resolvedIndex, normalizedAttrs);
+        tr.setNodeMarkup(mappedPos, undefined, { ...currentNode.attrs, ...normalizedAttrs });
         applied++;
       } else if (op.op === 'insertBefore' && op.node) {
+        const mappedPos = tr.mapping.map(sourcePos, 1);
         const newNode = schema.nodeFromJSON(op.node);
-        tr.insert(pos, newNode);
+        tr.insert(mappedPos, newNode);
         applied++;
       } else if (op.op === 'insertAfter' && op.node) {
+        const mappedPos = tr.mapping.map(sourcePos + sourceNode.nodeSize, 1);
         const newNode = schema.nodeFromJSON(op.node);
-        tr.insert(pos + targetNode.nodeSize, newNode);
+        tr.insert(mappedPos, newNode);
+        applied++;
+      } else if ((op.op === 'moveBefore' || op.op === 'moveAfter') && typeof op.destinationIndex === 'number') {
+        const destinationIndex = resolveIndex(doc, op.destinationIndex, op.destinationType, 'destination');
+        if (destinationIndex < 0) continue;
+
+        if (destinationIndex === resolvedIndex) continue;
+        if (op.op === 'moveBefore' && destinationIndex === resolvedIndex + 1) continue;
+        if (op.op === 'moveAfter' && destinationIndex + 1 === resolvedIndex) continue;
+
+        const destinationNode = doc.child(destinationIndex);
+        const destinationPos = getChildPos(doc, destinationIndex);
+        const mappedSourceFrom = tr.mapping.map(sourcePos, 1);
+        const mappedSourceTo = tr.mapping.map(sourcePos + sourceNode.nodeSize, -1);
+        if (mappedSourceTo <= mappedSourceFrom) continue;
+
+        const currentSourceNode = tr.doc.nodeAt(mappedSourceFrom) ?? sourceNode;
+        tr.delete(mappedSourceFrom, mappedSourceTo);
+
+        const originalInsertPos = op.op === 'moveBefore'
+          ? destinationPos
+          : destinationPos + destinationNode.nodeSize;
+        const mappedInsertPos = tr.mapping.map(originalInsertPos, op.op === 'moveAfter' ? 1 : -1);
+        tr.insert(mappedInsertPos, currentSourceNode);
         applied++;
       } else {
         console.warn('[AI DocumentEdit] Unhandled operation:', JSON.stringify(op));
@@ -489,6 +509,10 @@ export function AiChatPanel({ projectId, editor }: AiChatPanelProps) {
     })();
   }, [messages, isStreaming, editor, settings, projectId, generateImage]);
 
+  function getLayoutSnapshot() {
+    return editor ? collectPageMetrics(editor) : undefined;
+  }
+
   async function handleSend() {
     const text = input.trim();
     if (!text || isStreaming || wizardProgress?.isGenerating) return;
@@ -497,7 +521,7 @@ export function AiChatPanel({ projectId, editor }: AiChatPanelProps) {
     // All messages go through the normal chat — the AI's system prompt
     // handles creation requests by asking questions first, then outputting
     // a _wizardGenerate block when ready
-    await sendMessage(projectId, text);
+    await sendMessage(projectId, text, getLayoutSnapshot());
   }
 
   function handleInsertBlock(blockType: string, attrs: Record<string, unknown>) {
@@ -616,7 +640,7 @@ export function AiChatPanel({ projectId, editor }: AiChatPanelProps) {
               ].map((suggestion, i) => (
                 <button
                   key={suggestion}
-                  onClick={() => sendMessage(projectId, suggestion)}
+                  onClick={() => sendMessage(projectId, suggestion, getLayoutSnapshot())}
                   className="block w-full text-left text-xs text-gray-500 bg-white border border-gray-200 rounded-md px-3 py-2 hover:border-purple-300 hover:text-purple-600 hover:shadow-sm transition-all animate-[fadeSlideIn_0.3s_ease-out_both]"
                   style={{ animationDelay: `${i * 80}ms` }}
                 >
@@ -693,11 +717,10 @@ export function AiChatPanel({ projectId, editor }: AiChatPanelProps) {
             <div className="flex gap-2 mb-2">
               <button
                 onClick={() => {
-                  const metrics = editor ? collectPageMetrics(editor) : undefined;
                   sendMessage(
                     projectId,
                     'Please evaluate my entire document for content quality and formatting. Review pacing, completeness, D&D best practices, block placement, and page balance.',
-                    metrics,
+                    getLayoutSnapshot(),
                   );
                 }}
                 className="text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-md px-2.5 py-1.5 hover:border-purple-300 hover:text-purple-600 hover:bg-purple-50 transition-all"

@@ -1,4 +1,4 @@
-import type { BibleContent } from '@dnd-booker/shared';
+import type { BibleContent, EvaluationFinding } from '@dnd-booker/shared';
 
 export function buildEvaluateArtifactSystemPrompt(): string {
   return `You are a D&D content editor and quality reviewer. You evaluate generated artifacts against a 5-dimension rubric. Your evaluation must be thorough, fair, and actionable.
@@ -41,7 +41,8 @@ Rules:
 - Every score below 80 must have at least one finding explaining why
 - Critical findings must have a suggestedFix
 - Finding codes should be uppercase snake_case (e.g., MISSING_SECTION, NPC_INCONSISTENCY)
-- Include at least one informational finding with positive feedback`;
+- Include at least one informational finding with positive feedback
+- When deterministic layout findings are provided in the user prompt, treat them as factual signals and reflect them in publicationFit and findings rather than ignoring them`;
 }
 
 export function buildEvaluateArtifactUserPrompt(
@@ -49,6 +50,8 @@ export function buildEvaluateArtifactUserPrompt(
   artifactTitle: string,
   artifactContent: unknown,
   bible: BibleContent,
+  estimatedLayoutSummary?: string | null,
+  deterministicLayoutFindings?: EvaluationFinding[],
 ): string {
   const parts: string[] = [
     `Artifact to evaluate: "${artifactTitle}" (type: ${artifactType})`,
@@ -79,6 +82,25 @@ export function buildEvaluateArtifactUserPrompt(
     parts.push('', 'Canonical entities:');
     for (const e of bible.entities) {
       parts.push(`  - ${e.name} (${e.entityType}, ${e.slug}): ${e.summary}`);
+    }
+  }
+
+  if (estimatedLayoutSummary) {
+    parts.push(
+      '',
+      '## Deterministic Estimated Layout Context',
+      'This estimate was computed from the structured document before evaluation.',
+      estimatedLayoutSummary,
+    );
+  }
+
+  if (deterministicLayoutFindings && deterministicLayoutFindings.length > 0) {
+    parts.push('', 'Deterministic layout findings:');
+    for (const finding of deterministicLayoutFindings) {
+      parts.push(`  - [${finding.severity}] ${finding.code} (${finding.affectedScope}): ${finding.message}`);
+      if (finding.suggestedFix) {
+        parts.push(`    Fix: ${finding.suggestedFix}`);
+      }
     }
   }
 
