@@ -65,6 +65,28 @@ export async function createProject(
 }
 
 /**
+ * Open a named project from the dashboard, or create it if it does not exist yet.
+ */
+export async function openProjectByTitleOrCreate(
+  page: Page,
+  name: string,
+  template: 'one-shot' | 'campaign' | 'supplement' | 'sourcebook' | 'blank' = 'one-shot',
+) {
+  await goToDashboard(page);
+
+  const existingProject = page.locator('main h3').filter({ hasText: name }).first();
+  const hasExistingProject = await existingProject.isVisible({ timeout: 3_000 }).catch(() => false);
+
+  if (hasExistingProject) {
+    await existingProject.click();
+    await expect(page.locator('.ProseMirror').first()).toBeVisible({ timeout: 10_000 });
+    return;
+  }
+
+  await createProject(page, name, template);
+}
+
+/**
  * Open the first project card from the dashboard.
  */
 export async function openFirstProject(page: Page) {
@@ -210,6 +232,50 @@ export async function settleGenerationRun(page: Page, completionTimeoutMs = 45_0
   }
 
   return 'running';
+}
+
+/**
+ * Clear any stale generation panel before starting a new run.
+ */
+export async function clearGenerationRunPanel(page: Page) {
+  const dismissButton = page.getByRole('button', { name: 'Dismiss' }).first();
+  if (await dismissButton.isVisible({ timeout: 1_000 }).catch(() => false)) {
+    await dismissButton.click();
+    await expect(dismissButton).not.toBeVisible({ timeout: 5_000 });
+    return;
+  }
+
+  const cancelButton = page.getByRole('button', { name: 'Cancel' }).first();
+  if (await cancelButton.isVisible({ timeout: 1_000 }).catch(() => false)) {
+    await cancelButton.click();
+    await expect(dismissButton).toBeVisible({ timeout: 10_000 });
+    await dismissButton.click();
+    await expect(dismissButton).not.toBeVisible({ timeout: 5_000 });
+  }
+}
+
+/**
+ * Wait for a real completed generation run, then dismiss the panel.
+ */
+export async function waitForGenerationCompletion(page: Page, timeoutMs = 240_000) {
+  const dismissButton = page.getByRole('button', { name: 'Dismiss' }).first();
+  const completeStatus = page.getByText('Complete', { exact: true }).first();
+  const cancelledStatus = page.getByText('Cancelled', { exact: true }).first();
+  const failedStatus = page.getByText('Failed', { exact: true }).first();
+
+  await expect
+    .poll(async () => {
+      if (await failedStatus.isVisible().catch(() => false)) return 'failed';
+      if (await cancelledStatus.isVisible().catch(() => false)) return 'cancelled';
+      const hasCompleteStatus = await completeStatus.isVisible().catch(() => false);
+      const hasDismissButton = await dismissButton.isVisible().catch(() => false);
+      if (hasCompleteStatus && hasDismissButton) return 'completed';
+      return 'running';
+    }, { timeout: timeoutMs })
+    .toBe('completed');
+
+  await dismissButton.click();
+  await expect(dismissButton).not.toBeVisible({ timeout: 5_000 });
 }
 
 /**
