@@ -9,7 +9,6 @@ import * as projectService from '../services/project.service.js';
 
 const router = Router();
 router.use(requireAuth);
-router.use(crudRateLimit);
 
 const createSchema = z.object({
   title: z.string().min(1).max(200),
@@ -42,7 +41,7 @@ const updateSchema = z.object({
   settings: settingsSchema.optional(),
 });
 
-router.post('/', asyncHandler(async (req: AuthRequest, res: Response) => {
+router.post('/', crudRateLimit, asyncHandler(async (req: AuthRequest, res: Response) => {
   const parsed = createSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: 'Validation failed' });
@@ -53,12 +52,12 @@ router.post('/', asyncHandler(async (req: AuthRequest, res: Response) => {
   res.status(201).json(project);
 }));
 
-router.get('/', asyncHandler(async (req: AuthRequest, res: Response) => {
+router.get('/', crudRateLimit, asyncHandler(async (req: AuthRequest, res: Response) => {
   const projects = await projectService.getUserProjects(req.userId!);
   res.json(projects);
 }));
 
-router.get('/:id', validateUuid('id'), asyncHandler(async (req: AuthRequest, res: Response) => {
+router.get('/:id', crudRateLimit, validateUuid('id'), asyncHandler(async (req: AuthRequest, res: Response) => {
   const project = await projectService.getProject(req.params.id as string, req.userId!);
   if (!project) {
     res.status(404).json({ error: 'Project not found' });
@@ -67,7 +66,7 @@ router.get('/:id', validateUuid('id'), asyncHandler(async (req: AuthRequest, res
   res.json(project);
 }));
 
-router.put('/:id', validateUuid('id'), asyncHandler(async (req: AuthRequest, res: Response) => {
+router.put('/:id', crudRateLimit, validateUuid('id'), asyncHandler(async (req: AuthRequest, res: Response) => {
   const parsed = updateSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: 'Validation failed' });
@@ -86,7 +85,7 @@ router.put('/:id', validateUuid('id'), asyncHandler(async (req: AuthRequest, res
   res.json(project);
 }));
 
-router.put('/:id/content', validateUuid('id'), asyncHandler(async (req: AuthRequest, res: Response) => {
+router.put('/:id/content', crudRateLimit, validateUuid('id'), asyncHandler(async (req: AuthRequest, res: Response) => {
   const parsed = tiptapContentSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: 'Validation failed' });
@@ -105,7 +104,7 @@ router.put('/:id/content', validateUuid('id'), asyncHandler(async (req: AuthRequ
   res.json(project);
 }));
 
-router.delete('/:id', validateUuid('id'), asyncHandler(async (req: AuthRequest, res: Response) => {
+router.delete('/:id', crudRateLimit, validateUuid('id'), asyncHandler(async (req: AuthRequest, res: Response) => {
   const project = await projectService.deleteProject(req.params.id as string, req.userId!);
   if (!project) {
     res.status(404).json({ error: 'Project not found' });

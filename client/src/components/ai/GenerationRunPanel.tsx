@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useGenerationStore } from '../../stores/generationStore';
-import type { GenerationEvent, RunStatus } from '@dnd-booker/shared';
+import { RUN_STATUS_TRANSITIONS, type GenerationEvent, type RunStatus } from '@dnd-booker/shared';
 
 const STAGE_LABELS: Record<RunStatus, string> = {
   queued: 'Queued',
@@ -88,6 +88,10 @@ export function GenerationRunPanel({ projectId }: Props) {
   const isFailed = status === 'failed';
   const isCancelled = status === 'cancelled';
   const isTerminal = isDone || isFailed || isCancelled;
+  const canPause = RUN_STATUS_TRANSITIONS[status]?.includes('paused') ?? false;
+  const canCancel = RUN_STATUS_TRANSITIONS[status]?.includes('cancelled') ?? false;
+  const canResume = isPaused && Boolean(currentRun.currentStage)
+    && (RUN_STATUS_TRANSITIONS.paused?.includes(currentRun.currentStage as RunStatus) ?? false);
 
   const stageLabel =
     STAGE_LABELS[(currentStage as RunStatus) ?? status] ?? STAGE_LABELS[status] ?? status;
@@ -150,7 +154,7 @@ export function GenerationRunPanel({ projectId }: Props) {
 
       {/* Controls */}
       <div className="flex gap-2">
-        {isActive && (
+        {isActive && canPause && (
           <>
             <button
               onClick={() => pauseRun(projectId, currentRun.id)}
@@ -158,27 +162,23 @@ export function GenerationRunPanel({ projectId }: Props) {
             >
               Pause
             </button>
-            <button
-              onClick={() => cancelRun(projectId, currentRun.id)}
-              className="text-xs px-2 py-1 rounded bg-red-100 text-red-700 hover:bg-red-200 transition-colors"
-            >
-              Cancel
-            </button>
           </>
         )}
-        {isPaused && (
+        {(isActive || isPaused) && canCancel && (
+          <button
+            onClick={() => cancelRun(projectId, currentRun.id)}
+            className="text-xs px-2 py-1 rounded bg-red-100 text-red-700 hover:bg-red-200 transition-colors"
+          >
+            Cancel
+          </button>
+        )}
+        {canResume && (
           <>
             <button
               onClick={() => resumeRun(projectId, currentRun.id)}
               className="text-xs px-2 py-1 rounded bg-purple-100 text-purple-700 hover:bg-purple-200 transition-colors"
             >
               Resume
-            </button>
-            <button
-              onClick={() => cancelRun(projectId, currentRun.id)}
-              className="text-xs px-2 py-1 rounded bg-red-100 text-red-700 hover:bg-red-200 transition-colors"
-            >
-              Cancel
             </button>
           </>
         )}

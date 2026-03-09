@@ -7,6 +7,7 @@ import { AiMessageBubble } from './AiMessageBubble';
 import { AiPlanPanel } from './AiPlanPanel';
 import { WizardChatProgress } from './WizardChatProgress';
 import { ImageGenProgress } from './ImageGenProgress';
+import { GenerationRunPanel } from './GenerationRunPanel';
 import { collectPageMetrics } from '../../lib/collectPageMetrics';
 import type { WizardOutline, DocumentEditOperation, ImageGenerationRequest, ImageTargetInsert, ImageGenJobProgress } from '@dnd-booker/shared';
 
@@ -607,6 +608,10 @@ export function AiChatPanel({ projectId, editor }: AiChatPanelProps) {
           onRememberFact={(type, content) => rememberFact(projectId, type, content)}
         />
       )}
+
+      <div className="px-3 pt-3">
+        <GenerationRunPanel projectId={projectId} />
+      </div>
 
       {/* Messages area */}
       <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">

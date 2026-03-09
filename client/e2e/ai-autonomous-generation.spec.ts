@@ -46,16 +46,16 @@ async function openAiPanel(page: import('@playwright/test').Page) {
  * Open the Generate Content dialog.
  * Returns true if the dialog was opened, false if the button was not found.
  */
-async function openGenerateDialog(page: import('@playwright/test').Page): Promise<boolean> {
-  // The Generate Content button may be in the AI panel or editor toolbar
-  const genButton = page.locator('button:has-text("Generate Content"), button:has-text("Generate")').first();
+async function openGenerateDialog(page: import('@playwright/test').Page) {
+  const genButton = page.getByRole('button', { name: 'Generate Content' });
   const hasGenButton = await genButton.isVisible({ timeout: 5000 }).catch(() => false);
 
-  if (!hasGenButton) return false;
+  if (!hasGenButton) return null;
 
   await genButton.click();
-  await expect(page.locator('text=Generate Content')).toBeVisible({ timeout: 5000 });
-  return true;
+  const dialog = page.getByRole('dialog', { name: 'Generate Content' });
+  await expect(dialog).toBeVisible({ timeout: 5000 });
+  return dialog;
 }
 
 test.describe('Autonomous Generation UI', () => {
@@ -67,33 +67,33 @@ test.describe('Autonomous Generation UI', () => {
     await createProject(page, 'Gen Dialog Test');
     await openAiPanel(page);
 
-    const opened = await openGenerateDialog(page);
-    if (!opened) {
+    const dialog = await openGenerateDialog(page);
+    if (!dialog) {
       test.skip(true, 'Generate Content button not found in UI');
       return;
     }
 
     // Prompt textarea
-    await expect(page.locator('textarea')).toBeVisible();
+    await expect(dialog.locator('textarea')).toBeVisible();
 
     // Mode buttons (rendered as lowercase with space: "one shot", "module", etc.)
-    await expect(page.locator('button:has-text("one shot")')).toBeVisible();
-    await expect(page.locator('button:has-text("module")')).toBeVisible();
-    await expect(page.locator('button:has-text("campaign")')).toBeVisible();
-    await expect(page.locator('button:has-text("sourcebook")')).toBeVisible();
+    await expect(dialog.getByRole('button', { name: 'one shot' })).toBeVisible();
+    await expect(dialog.getByRole('button', { name: 'module' })).toBeVisible();
+    await expect(dialog.getByRole('button', { name: 'campaign' })).toBeVisible();
+    await expect(dialog.getByRole('button', { name: 'sourcebook' })).toBeVisible();
 
     // Quality buttons
-    await expect(page.locator('button:has-text("Quick Draft")')).toBeVisible();
-    await expect(page.locator('button:has-text("Polished")')).toBeVisible();
+    await expect(dialog.getByRole('button', { name: 'Quick Draft' })).toBeVisible();
+    await expect(dialog.getByRole('button', { name: 'Polished' })).toBeVisible();
 
     // Page target input
-    await expect(page.locator('input[type="number"]')).toBeVisible();
+    await expect(dialog.locator('input[type="number"]')).toBeVisible();
 
     // Cancel button
-    await expect(page.locator('button:has-text("Cancel")')).toBeVisible();
+    await expect(dialog.getByRole('button', { name: 'Cancel' })).toBeVisible();
 
     // Generate button (disabled without prompt)
-    const generateBtn = page.locator('button:has-text("Generate")').last();
+    const generateBtn = dialog.getByRole('button', { name: 'Generate' });
     await expect(generateBtn).toBeDisabled();
   });
 
@@ -101,18 +101,18 @@ test.describe('Autonomous Generation UI', () => {
     await createProject(page, 'Gen Enable Test');
     await openAiPanel(page);
 
-    const opened = await openGenerateDialog(page);
-    if (!opened) {
+    const dialog = await openGenerateDialog(page);
+    if (!dialog) {
       test.skip(true, 'Generate Content button not found in UI');
       return;
     }
 
     // Type a prompt
-    const textarea = page.locator('textarea');
+    const textarea = dialog.locator('textarea');
     await textarea.fill('A level 4 goblin cave adventure for new players');
 
     // Generate button should now be enabled
-    const generateBtn = page.locator('button:has-text("Generate")').last();
+    const generateBtn = dialog.getByRole('button', { name: 'Generate' });
     await expect(generateBtn).toBeEnabled();
   });
 
@@ -120,51 +120,51 @@ test.describe('Autonomous Generation UI', () => {
     await createProject(page, 'Gen Cancel Test');
     await openAiPanel(page);
 
-    const opened = await openGenerateDialog(page);
-    if (!opened) {
+    const dialog = await openGenerateDialog(page);
+    if (!dialog) {
       test.skip(true, 'Generate Content button not found in UI');
       return;
     }
 
     // Click Cancel
-    await page.locator('button:has-text("Cancel")').click();
+    await dialog.getByRole('button', { name: 'Cancel' }).click();
 
     // Dialog should close
-    await expect(page.locator('text=Generate Content')).not.toBeVisible({ timeout: 3000 });
+    await expect(dialog).not.toBeVisible({ timeout: 3000 });
   });
 
   test('should select different mode and quality options', async ({ page }) => {
     await createProject(page, 'Gen Options Test');
     await openAiPanel(page);
 
-    const opened = await openGenerateDialog(page);
-    if (!opened) {
+    const dialog = await openGenerateDialog(page);
+    if (!dialog) {
       test.skip(true, 'Generate Content button not found in UI');
       return;
     }
 
     // Select campaign mode
-    await page.locator('button:has-text("campaign")').click();
+    await dialog.getByRole('button', { name: 'campaign' }).click();
 
     // Select polished quality
-    await page.locator('button:has-text("Polished")').click();
+    await dialog.getByRole('button', { name: 'Polished' }).click();
 
     // Set page target
-    await page.locator('input[type="number"]').fill('120');
+    await dialog.locator('input[type="number"]').fill('120');
 
     // Verify selections are visually active (purple border indicates selected state)
-    const campaignBtn = page.locator('button:has-text("campaign")');
+    const campaignBtn = dialog.getByRole('button', { name: 'campaign' });
     await expect(campaignBtn).toHaveClass(/border-purple-500/);
 
-    const polishedBtn = page.locator('button:has-text("Polished")');
+    const polishedBtn = dialog.getByRole('button', { name: 'Polished' });
     await expect(polishedBtn).toHaveClass(/border-purple-500/);
 
     // "one shot" (default) should no longer be active
-    const oneShotBtn = page.locator('button:has-text("one shot")');
+    const oneShotBtn = dialog.getByRole('button', { name: 'one shot' });
     await expect(oneShotBtn).not.toHaveClass(/border-purple-500/);
 
     // "Quick Draft" should no longer be active
-    const quickBtn = page.locator('button:has-text("Quick Draft")');
+    const quickBtn = dialog.getByRole('button', { name: 'Quick Draft' });
     await expect(quickBtn).not.toHaveClass(/border-purple-500/);
   });
 
@@ -174,25 +174,25 @@ test.describe('Autonomous Generation UI', () => {
     await createProject(page, 'Gen Run Test');
     await openAiPanel(page);
 
-    const opened = await openGenerateDialog(page);
-    if (!opened) {
+    const dialog = await openGenerateDialog(page);
+    if (!dialog) {
       test.skip(true, 'Generate Content button not found in UI');
       return;
     }
 
     // Fill prompt and start
-    await page.locator('textarea').fill('A simple goblin cave adventure for new players');
-    const generateBtn = page.locator('button:has-text("Generate")').last();
+    await dialog.locator('textarea').fill('A simple goblin cave adventure for new players');
+    const generateBtn = dialog.getByRole('button', { name: 'Generate' });
     await generateBtn.click();
 
     // Dialog should close after successful start
-    await expect(page.locator('h2:has-text("Generate Content")')).not.toBeVisible({ timeout: 10_000 });
+    await expect(dialog).not.toBeVisible({ timeout: 10_000 });
 
     // Progress panel should appear with a status indicator.
     // The GenerationRunPanel shows stage labels from STAGE_LABELS:
     // Queued, Planning Campaign, Creating Assets, Writing Chapters, etc.
-    const progressIndicator = page.locator(
-      'text=Queued, text=Planning Campaign, text=Creating Assets, text=Writing Chapters, text=Quality Review, text=Assembling Documents',
+    const progressIndicator = page.getByText(
+      /Queued|Planning Campaign|Creating Assets|Writing Chapters|Quality Review|Assembling Documents/,
     ).first();
     await expect(progressIndicator).toBeVisible({ timeout: 30_000 });
 
@@ -212,14 +212,14 @@ test.describe('Autonomous Generation UI', () => {
     await createProject(page, 'Gen Cancel Run Test');
     await openAiPanel(page);
 
-    const opened = await openGenerateDialog(page);
-    if (!opened) {
+    const dialog = await openGenerateDialog(page);
+    if (!dialog) {
       test.skip(true, 'Generate Content button not found in UI');
       return;
     }
 
-    await page.locator('textarea').fill('A quick test adventure');
-    await page.locator('button:has-text("Generate")').last().click();
+    await dialog.locator('textarea').fill('A quick test adventure');
+    await dialog.getByRole('button', { name: 'Generate' }).click();
 
     // Wait for progress to appear
     await page.waitForTimeout(3000);
@@ -231,8 +231,8 @@ test.describe('Autonomous Generation UI', () => {
       await cancelBtn.click();
 
       // Should show Cancelled status and Dismiss button
-      const dismissOrCancelled = page.locator('text=Cancelled, button:has-text("Dismiss")').first();
-      await expect(dismissOrCancelled).toBeVisible({ timeout: 10_000 });
+      await expect(page.getByText('Cancelled', { exact: true }).first()).toBeVisible({ timeout: 10_000 });
+      await expect(page.getByRole('button', { name: 'Dismiss' })).toBeVisible({ timeout: 10_000 });
     }
   });
 
@@ -242,14 +242,14 @@ test.describe('Autonomous Generation UI', () => {
     await createProject(page, 'Gen Pause Test');
     await openAiPanel(page);
 
-    const opened = await openGenerateDialog(page);
-    if (!opened) {
+    const dialog = await openGenerateDialog(page);
+    if (!dialog) {
       test.skip(true, 'Generate Content button not found in UI');
       return;
     }
 
-    await page.locator('textarea').fill('A haunted forest adventure with undead encounters');
-    await page.locator('button:has-text("Generate")').last().click();
+    await dialog.locator('textarea').fill('A haunted forest adventure with undead encounters');
+    await dialog.getByRole('button', { name: 'Generate' }).click();
 
     // Wait for active status
     await page.waitForTimeout(3000);
@@ -281,15 +281,15 @@ test.describe('Autonomous Generation UI', () => {
     await createProject(page, 'Gen Complete Test');
     await openAiPanel(page);
 
-    const opened = await openGenerateDialog(page);
-    if (!opened) {
+    const dialog = await openGenerateDialog(page);
+    if (!dialog) {
       test.skip(true, 'Generate Content button not found in UI');
       return;
     }
 
-    await page.locator('textarea').fill('A very simple level 1 goblin encounter one-shot');
+    await dialog.locator('textarea').fill('A very simple level 1 goblin encounter one-shot');
     // Use quick quality for speed (it's the default)
-    await page.locator('button:has-text("Generate")').last().click();
+    await dialog.getByRole('button', { name: 'Generate' }).click();
 
     // Wait for completion — this could take a while
     const dismissBtn = page.locator('button:has-text("Dismiss")');

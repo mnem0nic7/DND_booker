@@ -25,9 +25,14 @@ export function AutonomousGenerationDialog({ projectId, isOpen, onClose }: Props
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="autonomous-generation-title"
+      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+    >
       <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-5">
-        <h2 className="text-lg font-semibold text-gray-800 mb-4">Generate Content</h2>
+        <h2 id="autonomous-generation-title" className="text-lg font-semibold text-gray-800 mb-4">Generate Content</h2>
 
         {/* Prompt */}
         <label className="block text-sm font-medium text-gray-700 mb-1">
