@@ -293,6 +293,23 @@ describe('TipTap-to-Typst Renderer', () => {
       expect(result).toContain('Actions');
       expect(result).toContain('*Scimitar.*');
     });
+
+    it('should render stat block entries that use legacy desc fields', () => {
+      const result = renderTypstNode(node({
+        type: 'statBlock',
+        attrs: {
+          name: 'Gravel Guardian',
+          traits: JSON.stringify([{ name: 'Immutable Form', desc: 'The guardian cannot be reshaped.' }]),
+          actions: JSON.stringify([{ name: 'Slam', desc: 'Melee Weapon Attack: +6 to hit.' }]),
+          reactions: JSON.stringify([{ name: 'Stone Shield', desc: 'Gain +2 AC until the start of its next turn.' }]),
+        },
+      }));
+
+      expect(result).toContain('Immutable Form');
+      expect(result).toContain('The guardian cannot be reshaped.');
+      expect(result).toContain('Melee Weapon Attack: +6 to hit.');
+      expect(result).toContain('Gain +2 AC until the start of its next turn.');
+    });
   });
 
   describe('readAloudBox', () => {

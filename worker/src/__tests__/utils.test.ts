@@ -183,3 +183,22 @@ describe('renderNode — inline marks', () => {
     expect(html).not.toContain('<script>');
   });
 });
+
+describe('renderNode — stat block compatibility', () => {
+  it('should render legacy desc fields in stat block entries', () => {
+    const html = renderNode({
+      type: 'statBlock',
+      attrs: {
+        name: 'Gravel Guardian',
+        traits: JSON.stringify([{ name: 'Immutable Form', desc: 'The guardian cannot be reshaped.' }]),
+        actions: JSON.stringify([{ name: 'Slam', desc: 'Melee Weapon Attack: +6 to hit.' }]),
+        reactions: JSON.stringify([{ name: 'Stone Shield', desc: 'Gain +2 AC until the start of its next turn.' }]),
+      },
+    } as any);
+
+    expect(html).toContain('Immutable Form');
+    expect(html).toContain('The guardian cannot be reshaped.');
+    expect(html).toContain('Melee Weapon Attack: +6 to hit.');
+    expect(html).toContain('Gain +2 AC until the start of its next turn.');
+  });
+});

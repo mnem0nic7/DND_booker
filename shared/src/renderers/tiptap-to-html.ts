@@ -12,7 +12,8 @@ type TipTapNode = DocumentContent;
 
 interface NameDesc {
   name: string;
-  description: string;
+  description?: string;
+  desc?: string;
 }
 
 function getModifier(score: number): string {
@@ -27,6 +28,10 @@ function parseJsonArray<T>(json: string): T[] {
   } catch {
     return [];
   }
+}
+
+function getNameDescDescription(entry: NameDesc | null | undefined): string {
+  return String(entry?.description ?? entry?.desc ?? '');
 }
 
 function levelLabel(level: number, school: string): string {
@@ -308,7 +313,7 @@ function renderStatBlock(attrs: Record<string, unknown>): string {
   if (traits.length > 0) {
     html += `<hr class="stat-block__divider" />`;
     for (const trait of traits) {
-      html += `<div class="stat-block__trait"><span class="stat-block__trait-name">${escapeHtml(trait.name)}.</span> ${escapeHtml(trait.description)}</div>`;
+      html += `<div class="stat-block__trait"><span class="stat-block__trait-name">${escapeHtml(trait.name)}.</span> ${escapeHtml(getNameDescDescription(trait))}</div>`;
     }
   }
 
@@ -317,7 +322,7 @@ function renderStatBlock(attrs: Record<string, unknown>): string {
   if (actions.length > 0) {
     html += `<div class="stat-block__section-title">Actions</div>`;
     for (const action of actions) {
-      html += `<div class="stat-block__trait"><span class="stat-block__trait-name">${escapeHtml(action.name)}.</span> ${escapeHtml(action.description)}</div>`;
+      html += `<div class="stat-block__trait"><span class="stat-block__trait-name">${escapeHtml(action.name)}.</span> ${escapeHtml(getNameDescDescription(action))}</div>`;
     }
   }
 
@@ -326,7 +331,7 @@ function renderStatBlock(attrs: Record<string, unknown>): string {
   if (reactions.length > 0) {
     html += `<div class="stat-block__section-title">Reactions</div>`;
     for (const reaction of reactions) {
-      html += `<div class="stat-block__trait"><span class="stat-block__trait-name">${escapeHtml(reaction.name)}.</span> ${escapeHtml(reaction.description)}</div>`;
+      html += `<div class="stat-block__trait"><span class="stat-block__trait-name">${escapeHtml(reaction.name)}.</span> ${escapeHtml(getNameDescDescription(reaction))}</div>`;
     }
   }
 
@@ -339,7 +344,7 @@ function renderStatBlock(attrs: Record<string, unknown>): string {
       html += `<div class="stat-block__trait">${escapeHtml(legendaryDescription)}</div>`;
     }
     for (const la of legendaryActions) {
-      html += `<div class="stat-block__trait"><span class="stat-block__trait-name">${escapeHtml(la.name)}.</span> ${escapeHtml(la.description)}</div>`;
+      html += `<div class="stat-block__trait"><span class="stat-block__trait-name">${escapeHtml(la.name)}.</span> ${escapeHtml(getNameDescDescription(la))}</div>`;
     }
   }
 
@@ -591,7 +596,7 @@ function renderRaceBlock(attrs: Record<string, unknown>): string {
     html += `<hr class="race-block__divider" />`;
     html += `<div class="race-block__section-title">Racial Features</div>`;
     for (const feature of features) {
-      html += `<div class="race-block__feature"><span class="race-block__feature-name">${escapeHtml(feature.name)}.</span> ${escapeHtml(feature.description)}</div>`;
+      html += `<div class="race-block__feature"><span class="race-block__feature-name">${escapeHtml(feature.name)}.</span> ${escapeHtml(getNameDescDescription(feature))}</div>`;
     }
   }
 

@@ -1,7 +1,7 @@
 FROM node:20-alpine
 
 # Pandoc for ePub generation (Chromium no longer needed — PDF uses Typst NAPI)
-RUN apk add --no-cache pandoc
+RUN apk add --no-cache pandoc su-exec
 
 WORKDIR /app
 COPY package*.json ./
@@ -14,6 +14,7 @@ COPY shared/ shared/
 COPY worker/ worker/
 # Copy server source (generation-orchestrator imports server services at runtime)
 COPY server/ server/
+COPY worker/docker-entrypoint.sh /usr/local/bin/worker-entrypoint.sh
 WORKDIR /app/server
 RUN npx prisma generate
 # Build shared package to dist/ (plain node can't load raw .ts files)
@@ -25,7 +26,8 @@ WORKDIR /app/worker
 
 # Run as non-root user for security
 RUN addgroup -g 1001 -S nodejs && adduser -S nodeapp -u 1001 -G nodejs
-USER nodeapp
+RUN chmod +x /usr/local/bin/worker-entrypoint.sh
 
 # Use tsx for runtime TS execution (generation-orchestrator cross-imports server services)
+ENTRYPOINT ["/usr/local/bin/worker-entrypoint.sh"]
 CMD ["npx", "tsx", "src/index.ts"]

@@ -16,7 +16,8 @@ type TipTapNode = DocumentContent;
 
 interface NameDesc {
   name: string;
-  description: string;
+  description?: string;
+  desc?: string;
 }
 
 // ── Helper Functions ──
@@ -33,6 +34,10 @@ function parseJsonArray<T>(json: string): T[] {
   } catch {
     return [];
   }
+}
+
+function getNameDescDescription(entry: NameDesc | null | undefined): string {
+  return String(entry?.description ?? entry?.desc ?? '');
 }
 
 function levelLabel(level: number, school: string): string {
@@ -352,7 +357,7 @@ function renderStatBlock(attrs: Record<string, unknown>): string {
   if (traits.length > 0) {
     t += `  #line(length: 100%, stroke: 1.5pt + theme-primary)\n`;
     for (const trait of traits) {
-      t += `  _*${escapeTypst(trait.name)}.*_ ${escapeTypst(trait.description)}\n\n`;
+      t += `  _*${escapeTypst(trait.name)}.*_ ${escapeTypst(getNameDescDescription(trait))}\n\n`;
     }
   }
 
@@ -362,7 +367,7 @@ function renderStatBlock(attrs: Record<string, unknown>): string {
     t += `  #text(size: 14pt, weight: "bold", fill: theme-primary)[Actions]\n`;
     t += `  #line(length: 100%, stroke: 0.5pt + theme-primary)\n`;
     for (const action of actions) {
-      t += `  _*${escapeTypst(action.name)}.*_ ${escapeTypst(action.description)}\n\n`;
+      t += `  _*${escapeTypst(action.name)}.*_ ${escapeTypst(getNameDescDescription(action))}\n\n`;
     }
   }
 
@@ -372,7 +377,7 @@ function renderStatBlock(attrs: Record<string, unknown>): string {
     t += `  #text(size: 14pt, weight: "bold", fill: theme-primary)[Reactions]\n`;
     t += `  #line(length: 100%, stroke: 0.5pt + theme-primary)\n`;
     for (const reaction of reactions) {
-      t += `  _*${escapeTypst(reaction.name)}.*_ ${escapeTypst(reaction.description)}\n\n`;
+      t += `  _*${escapeTypst(reaction.name)}.*_ ${escapeTypst(getNameDescDescription(reaction))}\n\n`;
     }
   }
 
@@ -386,7 +391,7 @@ function renderStatBlock(attrs: Record<string, unknown>): string {
       t += `  ${escapeTypst(legendaryDescription)}\n\n`;
     }
     for (const la of legendaryActions) {
-      t += `  _*${escapeTypst(la.name)}.*_ ${escapeTypst(la.description)}\n\n`;
+      t += `  _*${escapeTypst(la.name)}.*_ ${escapeTypst(getNameDescDescription(la))}\n\n`;
     }
   }
 
@@ -633,7 +638,7 @@ function renderRaceBlock(attrs: Record<string, unknown>): string {
     t += `  #line(length: 100%, stroke: theme-divider)\n`;
     t += `  #text(size: 14pt, weight: "bold")[Racial Features]\n`;
     for (const feature of features) {
-      t += `  *${escapeTypst(feature.name)}.* ${escapeTypst(feature.description)}\n\n`;
+      t += `  *${escapeTypst(feature.name)}.* ${escapeTypst(getNameDescDescription(feature))}\n\n`;
     }
   }
 
