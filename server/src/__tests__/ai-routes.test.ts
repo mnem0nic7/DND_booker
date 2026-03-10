@@ -215,7 +215,7 @@ describe('AI Routes', () => {
       const res = await request(app)
         .post('/api/ai/settings')
         .set('Authorization', `Bearer ${accessToken}`)
-        .send({ provider: 'ollama', model: 'llama3.1:8b', baseUrl: 'http://localhost:11434' });
+        .send({ provider: 'ollama', model: 'llama3.1:8b', baseUrl: 'http://host.docker.internal:11434' });
 
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
@@ -225,7 +225,7 @@ describe('AI Routes', () => {
         .set('Authorization', `Bearer ${accessToken}`);
       expect(getRes.body.provider).toBe('ollama');
       expect(getRes.body.model).toBe('llama3.1:8b');
-      expect(getRes.body.baseUrl).toBe('http://localhost:11434');
+      expect(getRes.body.baseUrl).toBe('http://host.docker.internal:11434');
     });
 
     it('should accept ollama without API key and clear stale key', async () => {
@@ -334,10 +334,12 @@ describe('AI Routes', () => {
 
   describe('POST /api/projects/:projectId/ai/chat', () => {
     it('should return 400 when AI is not configured (no API key)', async () => {
-      // Ensure no API key is set
-      await request(app)
-        .delete('/api/ai/settings/key')
-        .set('Authorization', `Bearer ${accessToken}`);
+      // Clear provider entirely so getModelForUser returns null
+      // (deleting just the key isn't enough — Ollama doesn't require one)
+      await prisma.user.update({
+        where: { email: TEST_USER.email },
+        data: { aiProvider: null, aiModel: null, aiBaseUrl: null, aiApiKeyEnc: null, aiApiKeyIv: null, aiApiKeyTag: null },
+      });
 
       const res = await request(app)
         .post(`/api/projects/${projectId}/ai/chat`)
@@ -442,6 +444,12 @@ describe('AI Routes', () => {
 
   describe('POST /api/ai/generate-block', () => {
     it('should return 400 when AI is not configured', async () => {
+      // Ensure provider is fully cleared (Ollama doesn't need a key)
+      await prisma.user.update({
+        where: { email: TEST_USER.email },
+        data: { aiProvider: null, aiModel: null, aiBaseUrl: null, aiApiKeyEnc: null, aiApiKeyIv: null, aiApiKeyTag: null },
+      });
+
       const res = await request(app)
         .post('/api/ai/generate-block')
         .set('Authorization', `Bearer ${accessToken}`)
@@ -498,6 +506,12 @@ describe('AI Routes', () => {
 
   describe('POST /api/ai/autofill', () => {
     it('should return 400 when AI is not configured', async () => {
+      // Ensure provider is fully cleared (Ollama doesn't need a key)
+      await prisma.user.update({
+        where: { email: TEST_USER.email },
+        data: { aiProvider: null, aiModel: null, aiBaseUrl: null, aiApiKeyEnc: null, aiApiKeyIv: null, aiApiKeyTag: null },
+      });
+
       const res = await request(app)
         .post('/api/ai/autofill')
         .set('Authorization', `Bearer ${accessToken}`)

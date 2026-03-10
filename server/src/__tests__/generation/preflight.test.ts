@@ -353,14 +353,19 @@ describe('Preflight Service', () => {
         slug: 'ch-two',
         sortOrder: 1,
         targetPageCount: 8,
-        content: {} as any,
+        content: {
+          type: 'doc',
+          content: [
+            { type: 'paragraph', content: [{ type: 'text', text: 'Chapter Two content' }] },
+          ],
+        } as any,
       },
     });
 
     const result = await runPreflight(run!);
 
     expect(result.passed).toBe(true);
-    expect(result.stats.layoutDocumentsAnalyzed).toBe(1);
+    expect(result.stats.layoutDocumentsAnalyzed).toBe(2);
     expect(result.stats.bookStructureDocumentsAnalyzed).toBe(2);
     expect(result.issues).toContainEqual(
       expect.objectContaining({

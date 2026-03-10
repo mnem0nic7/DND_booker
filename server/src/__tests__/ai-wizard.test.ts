@@ -370,7 +370,7 @@ describe('AI Wizard Routes', () => {
       await request(app)
         .post('/api/ai/settings')
         .set('Authorization', `Bearer ${accessToken}`)
-        .send({ provider: 'ollama', model: 'llama3.1:8b', baseUrl: 'http://localhost:11434' });
+        .send({ provider: 'ollama', model: 'llama3.1:8b', baseUrl: 'http://host.docker.internal:11434' });
 
       const res = await request(app)
         .post(`/api/projects/${projectId}/ai/wizard/parameters`)
