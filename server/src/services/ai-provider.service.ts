@@ -8,7 +8,7 @@ export type AiProvider = 'anthropic' | 'openai' | 'ollama';
 const DEFAULT_MODELS: Record<AiProvider, string> = {
   anthropic: 'claude-sonnet-4-6',
   openai: 'gpt-4o',
-  ollama: 'qwen3.5:9b',
+  ollama: 'llama3.2:3b',
 };
 
 export const SUPPORTED_MODELS: Record<AiProvider, string[]> = {
@@ -43,6 +43,7 @@ const OPENAI_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 
 const OPENAI_CHAT_PREFIXES = ['gpt-', 'o1', 'o3', 'o4', 'chatgpt-'];
 const OLLAMA_CONNECT_TIMEOUT_MS = 30_000;
+const DEFAULT_OLLAMA_BASE_URL = 'http://localhost:11434';
 
 const ollamaDispatcher = new Agent({
   connectTimeout: OLLAMA_CONNECT_TIMEOUT_MS,
@@ -57,6 +58,111 @@ const ollamaFetch = ((
   ...(init as Record<string, unknown> | undefined),
   dispatcher: ollamaDispatcher,
 }) as unknown as Promise<Response>) as typeof fetch;
+
+export type OllamaChatMessage = {
+  role: 'system' | 'user' | 'assistant';
+  content: string;
+};
+
+function normalizeOllamaBaseUrl(baseUrl?: string): string {
+  return (baseUrl || DEFAULT_OLLAMA_BASE_URL).replace(/\/+$/, '');
+}
+
+export function resolveOllamaModelId(model?: string): string {
+  return model && !model.startsWith('claude-') && !model.startsWith('gpt-')
+    ? model
+    : DEFAULT_MODELS.ollama;
+}
+
+type OllamaChatChunk = {
+  error?: string;
+  done?: boolean;
+  message?: {
+    content?: string;
+  };
+};
+
+export function parseOllamaChatChunk(line: string): string | null {
+  const trimmed = line.trim();
+  if (!trimmed) return null;
+
+  const chunk = JSON.parse(trimmed) as OllamaChatChunk;
+  if (chunk.error) {
+    throw new Error(`[Ollama] ${chunk.error}`);
+  }
+
+  const content = chunk.message?.content;
+  return typeof content === 'string' && content.length > 0 ? content : null;
+}
+
+export async function* streamOllamaChatText({
+  model,
+  messages,
+  maxOutputTokens,
+  baseUrl,
+  abortSignal,
+}: {
+  model: string;
+  messages: OllamaChatMessage[];
+  maxOutputTokens: number;
+  baseUrl?: string;
+  abortSignal?: AbortSignal;
+}): AsyncGenerator<string, void, void> {
+  const response = await ollamaFetch(`${normalizeOllamaBaseUrl(baseUrl)}/api/chat`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model,
+      messages,
+      think: false,
+      stream: true,
+      options: {
+        num_predict: maxOutputTokens,
+      },
+    }),
+    signal: abortSignal,
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => '');
+    throw new Error(`[Ollama] Chat request failed with ${response.status}${errorText ? `: ${errorText}` : ''}`);
+  }
+
+  if (!response.body) {
+    throw new Error('[Ollama] Chat response body was empty');
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    let newlineIndex = buffer.indexOf('\n');
+    while (newlineIndex >= 0) {
+      const line = buffer.slice(0, newlineIndex);
+      buffer = buffer.slice(newlineIndex + 1);
+
+      const content = parseOllamaChatChunk(line);
+      if (content) {
+        yield content;
+      }
+
+      newlineIndex = buffer.indexOf('\n');
+    }
+  }
+
+  buffer += decoder.decode();
+  const trailingContent = parseOllamaChatChunk(buffer);
+  if (trailingContent) {
+    yield trailingContent;
+  }
+}
 
 export async function fetchOpenAiModels(apiKey: string): Promise<string[]> {
   // Return cache if still valid
@@ -110,7 +216,7 @@ export function createModel(
   if (provider === 'ollama') {
     const ollama = createOpenAI({
       apiKey: 'ollama',
-      baseURL: `${baseUrl || 'http://localhost:11434'}/v1`,
+      baseURL: `${normalizeOllamaBaseUrl(baseUrl)}/v1`,
       fetch: ollamaFetch,
       name: 'ollama',
     });

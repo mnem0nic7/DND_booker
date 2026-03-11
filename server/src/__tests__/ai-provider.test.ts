@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { createModel, SUPPORTED_MODELS, validateConnection } from '../services/ai-provider.service.js';
+import {
+  createModel,
+  parseOllamaChatChunk,
+  resolveOllamaModelId,
+  SUPPORTED_MODELS,
+  validateConnection,
+} from '../services/ai-provider.service.js';
 
 // Pure unit tests for ai-provider.service — no real API calls.
 
@@ -49,6 +55,32 @@ describe('AI Provider Service', () => {
     it('should accept custom model names', () => {
       expect(() => createModel('openai', 'sk-test', 'gpt-4o-mini')).not.toThrow();
       expect(() => createModel('anthropic', 'sk-ant-test', 'claude-haiku-4-20250414')).not.toThrow();
+    });
+  });
+
+  describe('resolveOllamaModelId', () => {
+    it('should keep valid Ollama model ids', () => {
+      expect(resolveOllamaModelId('llama3.2:3b')).toBe('llama3.2:3b');
+    });
+
+    it('should fall back to the default Ollama model for non-Ollama ids', () => {
+      expect(resolveOllamaModelId('gpt-4o')).toBe('llama3.2:3b');
+      expect(resolveOllamaModelId('claude-sonnet-4-6')).toBe('llama3.2:3b');
+    });
+  });
+
+  describe('parseOllamaChatChunk', () => {
+    it('should extract streamed assistant text', () => {
+      expect(parseOllamaChatChunk('{"message":{"content":"Hello"}}')).toBe('Hello');
+    });
+
+    it('should ignore empty or done-only chunks', () => {
+      expect(parseOllamaChatChunk('{"done":true}')).toBeNull();
+      expect(parseOllamaChatChunk('   ')).toBeNull();
+    });
+
+    it('should throw for Ollama error chunks', () => {
+      expect(() => parseOllamaChatChunk('{"error":"bad request"}')).toThrow('[Ollama] bad request');
     });
   });
 

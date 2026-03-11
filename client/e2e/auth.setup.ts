@@ -3,7 +3,7 @@ import { test as setup, expect, type Page } from '@playwright/test';
 const TEST_EMAIL = 'm7.ga.77@gmail.com';
 const TEST_PASSWORD = '2Rickie2!';
 const AUTH_FILE = 'e2e/.auth/user.json';
-const OLLAMA_MODEL = 'qwen3.5:9b';
+const OLLAMA_MODEL = 'llama3.2:3b';
 const OLLAMA_BASE_URL = 'http://host.docker.internal:11434';
 
 async function configureOllamaForTests(page: Page) {

@@ -9,15 +9,145 @@ const AI_PROGRESS_POLL_MS = 1_000;
 const DEFAULT_AI_STALL_TIMEOUT_MS = 120_000;
 const DEFAULT_AI_MAX_WAIT_MS = 30 * 60 * 1_000;
 const OLLAMA_LIVENESS_POLL_MS = 10_000;
-const TEST_OLLAMA_MODEL = 'qwen3.5:9b';
+const TEST_OLLAMA_MODEL = 'llama3.2:3b';
 const execFileAsync = promisify(execFile);
+
+type ProjectLookup = {
+  id: string;
+  documentCount: number;
+};
 
 async function isOllamaGenerationActive(model = TEST_OLLAMA_MODEL): Promise<boolean> {
   try {
     const { stdout } = await execFileAsync('ollama', ['ps']);
-    return stdout.includes(model);
+    return stdout
+      .split('\n')
+      .some((line) => line.includes(model) && !line.includes('Stopping...'));
   } catch {
     return false;
+  }
+}
+
+async function getAccessToken(page: Page): Promise<string> {
+  const result = await page.evaluate(async () => {
+    const refreshResponse = await fetch('/api/auth/refresh', {
+      method: 'POST',
+      credentials: 'include',
+    });
+
+    if (!refreshResponse.ok) {
+      return {
+        ok: false,
+        step: 'refresh',
+        status: refreshResponse.status,
+        body: await refreshResponse.text(),
+      };
+    }
+
+    const refreshData = await refreshResponse.json() as { accessToken?: string };
+    if (!refreshData.accessToken) {
+      return {
+        ok: false,
+        step: 'refresh',
+        status: refreshResponse.status,
+        body: 'Missing access token in refresh response',
+      };
+    }
+
+    return {
+      ok: true,
+      accessToken: refreshData.accessToken,
+    };
+  });
+
+  if (!result.ok) {
+    throw new Error(`Failed to get auth token during ${result.step}: ${result.status} ${result.body}`);
+  }
+
+  return result.accessToken;
+}
+
+async function findProjectByTitle(page: Page, title: string): Promise<ProjectLookup | null> {
+  const accessToken = await getAccessToken(page);
+  const result = await page.evaluate(async ({ projectTitle, token }) => {
+    const projectsResponse = await fetch('/api/projects', {
+      credentials: 'include',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!projectsResponse.ok) {
+      return {
+        ok: false,
+        step: 'list-projects',
+        status: projectsResponse.status,
+        body: await projectsResponse.text(),
+      };
+    }
+
+    const projects = await projectsResponse.json() as Array<{ id: string; title: string }>;
+    const project = projects.find((entry) => entry.title === projectTitle);
+    if (!project) {
+      return {
+        ok: true,
+        project: null,
+      };
+    }
+
+    const documentsResponse = await fetch(`/api/projects/${project.id}/documents`, {
+      credentials: 'include',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!documentsResponse.ok) {
+      return {
+        ok: false,
+        step: 'list-documents',
+        status: documentsResponse.status,
+        body: await documentsResponse.text(),
+      };
+    }
+
+    const documents = await documentsResponse.json() as unknown[];
+    return {
+      ok: true,
+      project: {
+        id: project.id,
+        documentCount: Array.isArray(documents) ? documents.length : 0,
+      },
+    };
+  }, { projectTitle: title, token: accessToken });
+
+  if (!result.ok) {
+    throw new Error(`Failed to inspect shared project during ${result.step}: ${result.status} ${result.body}`);
+  }
+
+  return result.project as ProjectLookup | null;
+}
+
+async function deleteProjectById(page: Page, projectId: string) {
+  const accessToken = await getAccessToken(page);
+  const result = await page.evaluate(async ({ id, token }) => {
+    const response = await fetch(`/api/projects/${id}`, {
+      method: 'DELETE',
+      credentials: 'include',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    return {
+      ok: response.ok,
+      status: response.status,
+      body: response.status === 204 ? '' : await response.text(),
+    };
+  }, { id: projectId, token: accessToken });
+
+  if (!result.ok) {
+    throw new Error(`Failed to delete stale shared project: ${result.status} ${result.body}`);
   }
 }
 
@@ -91,6 +221,12 @@ export async function openProjectByTitleOrCreate(
 ) {
   await goToDashboard(page);
 
+  const existingProjectMeta = await findProjectByTitle(page, name);
+  if (existingProjectMeta && existingProjectMeta.documentCount === 0) {
+    await deleteProjectById(page, existingProjectMeta.id);
+    await goToDashboard(page);
+  }
+
   const existingProject = page.locator('main h3').filter({ hasText: name }).first();
   const hasExistingProject = await existingProject.isVisible({ timeout: 3_000 }).catch(() => false);
 
@@ -134,9 +270,7 @@ async function ensureEditorReady(page: Page) {
     });
 
   if (readyState === 'select-document') {
-    const firstDocumentButton = page
-      .getByRole('button', { name: /^(?!Back to Dashboard$)(?!Logout$).+/ })
-      .first();
+    const firstDocumentButton = page.locator('button[title]').first();
     await expect(firstDocumentButton).toBeVisible({ timeout: 5_000 });
     await firstDocumentButton.click();
   }
@@ -148,12 +282,13 @@ async function ensureEditorReady(page: Page) {
  * Ensure the AI chat panel is open.
  */
 export async function openAiPanel(page: Page) {
-  const textarea = page.locator('textarea').first();
-  if (await textarea.isVisible({ timeout: 1000 }).catch(() => false)) {
+  const chatInput = page.getByPlaceholder('Ask about your campaign...').first();
+  if (await chatInput.isVisible({ timeout: 1_000 }).catch(() => false)) {
     return;
   }
-  await page.locator('button:has-text("AI"), [aria-label*="AI"]').first().click();
+  await page.getByRole('button', { name: /Show AI assistant|Hide AI assistant/ }).first().click();
   await expect(page.locator('text=AI Assistant').first()).toBeVisible({ timeout: 5000 });
+  await expect(chatInput).toBeVisible({ timeout: 10_000 });
 }
 
 /**
@@ -239,11 +374,14 @@ export async function waitForChatHistory(page: Page, minimumCount: number, timeo
  */
 export async function sendAiMessage(page: Page, message: string, stallTimeoutMs = DEFAULT_AI_STALL_TIMEOUT_MS) {
   await openAiPanel(page);
-  const input = page.locator('textarea[placeholder*="Ask"], textarea[placeholder*="message"], input[placeholder*="Ask"]').first();
+  const input = page.getByPlaceholder('Ask about your campaign...').first();
+  const sendButton = page.getByRole('button', { name: 'Send message' }).first();
   const messages = page.locator('.ai-markdown');
   const previousCount = await messages.count();
+  await expect(input).toBeVisible({ timeout: 10_000 });
   await input.fill(message);
-  await input.press('Enter');
+  await expect(sendButton).toBeEnabled({ timeout: 10_000 });
+  await sendButton.click();
   await waitForAiResponse(page, previousCount, stallTimeoutMs);
 }
 
@@ -254,6 +392,9 @@ export async function clearAiChatHistory(page: Page) {
   await openAiPanel(page);
   const clearButton = page.getByRole('button', { name: 'Clear chat history' }).first();
   if (await clearButton.isVisible({ timeout: 3_000 }).catch(() => false)) {
+    page.once('dialog', async (dialog) => {
+      await dialog.accept();
+    });
     await clearButton.click();
     await expect(page.locator('.ai-markdown')).toHaveCount(0, { timeout: 5_000 });
   }

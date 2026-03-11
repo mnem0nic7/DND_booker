@@ -45,7 +45,7 @@ services:
       - AI_KEY_ENCRYPTION_SECRET=${AI_KEY_ENCRYPTION_SECRET:?AI_KEY_ENCRYPTION_SECRET must be set in .env}
       - NODE_ENV=production
       - PORT=4000
-      - OLLAMA_MAX_RESPONSE_TOKENS=${OLLAMA_MAX_RESPONSE_TOKENS:-512}
+      - OLLAMA_MAX_RESPONSE_TOKENS=${OLLAMA_MAX_RESPONSE_TOKENS:-256}
       - EXPORT_OUTPUT_DIR=/app/worker/output
     volumes:
       - export-output:/app/worker/output

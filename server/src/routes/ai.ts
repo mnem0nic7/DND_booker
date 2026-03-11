@@ -15,7 +15,7 @@ import * as aiPlanner from '../services/ai-planner.service.js';
 import * as aiMemoryService from '../services/ai-memory.service.js';
 import * as aiImage from '../services/ai-image.service.js';
 import * as assetService from '../services/asset.service.js';
-import { createModel, validateApiKey, validateConnection, SUPPORTED_MODELS, fetchOpenAiModels, type AiProvider } from '../services/ai-provider.service.js';
+import { createModel, validateApiKey, validateConnection, SUPPORTED_MODELS, fetchOpenAiModels, resolveOllamaModelId, streamOllamaChatText, type AiProvider } from '../services/ai-provider.service.js';
 import { prisma } from '../config/database.js';
 import type { WizardEvent, WizardGeneratedSection } from '@dnd-booker/shared';
 
@@ -24,7 +24,7 @@ const MAX_CHAT_CONTEXT_MESSAGES = 30;
 const MAX_SESSION_MESSAGES = 200; // hard cap per session
 const MAX_AI_RESPONSE_TOKENS = 4096;
 const MIN_OUTPUT_TOKENS = 64; // floor to prevent Ollama "below minimum" errors
-const DEFAULT_OLLAMA_RESPONSE_TOKENS = 512;
+const DEFAULT_OLLAMA_RESPONSE_TOKENS = 256;
 const parsedOllamaResponseTokenLimit = Number.parseInt(process.env.OLLAMA_MAX_RESPONSE_TOKENS ?? '', 10);
 const MAX_OLLAMA_RESPONSE_TOKENS = Number.isFinite(parsedOllamaResponseTokenLimit)
   && parsedOllamaResponseTokenLimit >= MIN_OUTPUT_TOKENS
@@ -540,6 +540,10 @@ aiChatRoutes.post('/ai/chat', validateUuid('projectId'), chatRateLimit, asyncHan
     const savedMsg = await aiChat.addMessage(session.id, 'user', parsed.data.message);
     savedUserMsgId = savedMsg.id;
 
+    const userSettings = await aiSettings.getAiSettings(req.userId!);
+    const toolsEnabled = shouldEnableProjectChatTools(userSettings?.provider as AiProvider | null | undefined, parsed.data.message);
+    const useCompactOllamaPrompt = userSettings?.provider === 'ollama' && !toolsEnabled;
+
     // Build message history — limited to recent messages for context window safety
     const history = await aiChat.getRecentMessages(session.id, MAX_CHAT_CONTEXT_MESSAGES);
     const messages = history.map((m) => ({
@@ -547,21 +551,24 @@ aiChatRoutes.post('/ai/chat', validateUuid('projectId'), chatRateLimit, asyncHan
       content: m.content,
     }));
 
-    // Load planning context and append to system prompt
-    const planningCtx = await aiPlanner.buildPlanningContext(projectId, req.userId!);
-    const documentOutline = aiContent.buildDocumentOutline(project.content);
-    const documentTextSample = aiContent.buildDocumentTextSample(project.content);
-    const userSettings = await aiSettings.getAiSettings(req.userId!);
-    const toolsEnabled = shouldEnableProjectChatTools(userSettings?.provider as AiProvider | null | undefined, parsed.data.message);
+    const planningCtx = useCompactOllamaPrompt
+      ? null
+      : await aiPlanner.buildPlanningContext(projectId, req.userId!);
+    const documentOutline = useCompactOllamaPrompt
+      ? null
+      : aiContent.buildDocumentOutline(project.content);
+    const documentTextSample = useCompactOllamaPrompt
+      ? null
+      : aiContent.buildDocumentTextSample(project.content);
     const systemPrompt = aiContent.buildSystemPrompt(
       project.title,
       documentOutline,
       documentTextSample,
-      parsed.data.pageMetrics,
+      useCompactOllamaPrompt ? undefined : parsed.data.pageMetrics,
       userSettings?.provider,
       toolsEnabled,
     )
-      + aiPlanner.buildPlanningPromptSection(planningCtx);
+      + (planningCtx ? aiPlanner.buildPlanningPromptSection(planningCtx) : '');
 
     // Abort the AI call if the client disconnects
     const abortController = new AbortController();
@@ -573,6 +580,50 @@ aiChatRoutes.post('/ai/chat', validateUuid('projectId'), chatRateLimit, asyncHan
     const tools = toolsEnabled
       ? globalRegistry.getToolsForContext('project-chat', toolCtx)
       : undefined;
+
+    if (userSettings?.provider === 'ollama' && !toolsEnabled) {
+      let fullResponse = '';
+      let totalBytes = 0;
+
+      res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+      res.setHeader('Transfer-Encoding', 'chunked');
+
+      for await (const chunk of streamOllamaChatText({
+        model: resolveOllamaModelId(userSettings.model ?? undefined),
+        baseUrl: userSettings.baseUrl ?? undefined,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          ...messages,
+        ],
+        maxOutputTokens: userModel.maxOutputTokens,
+        abortSignal: abortController.signal,
+      })) {
+        if (abortController.signal.aborted) break;
+        totalBytes += Buffer.byteLength(chunk, 'utf8');
+        if (totalBytes > MAX_SSE_BYTES) {
+          res.write('\n\n[Stream limit reached]');
+          break;
+        }
+        fullResponse += chunk;
+        res.write(chunk);
+      }
+
+      res.end();
+
+      try {
+        const { visibleText } = await aiPlanner.processAssistantResponse(
+          fullResponse, projectId, req.userId!,
+        );
+        await aiChat.addMessage(session.id, 'assistant', visibleText.slice(0, MAX_STORED_CONTENT));
+      } catch (postErr) {
+        console.error('[AI] Post-stream processing failed:', postErr);
+        await aiChat.addMessage(session.id, 'assistant', fullResponse.slice(0, MAX_STORED_CONTENT)).catch((saveErr) => {
+          console.error('[AI] Failed to save fallback message:', saveErr);
+        });
+      }
+
+      return;
+    }
 
     // Stream the response — tools execute server-side mid-stream
     const streamResult = streamText({
@@ -1261,10 +1312,7 @@ async function getModelForUser(userId: string) {
 
   // Ollama doesn't require an API key
   if (settings.provider === 'ollama') {
-    // Guard: if a non-Ollama model was saved (e.g. user switched from Anthropic), ignore it
-    const ollamaModel = settings.model && !settings.model.startsWith('claude-') && !settings.model.startsWith('gpt-')
-      ? settings.model
-      : undefined;
+    const ollamaModel = resolveOllamaModelId(settings.model ?? undefined);
     return { model: createModel(settings.provider, 'ollama', ollamaModel, settings.baseUrl ?? undefined), maxOutputTokens };
   }
 

@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import {
+  clearAiChatHistory,
   getEditorText,
   insertFirstGeneratedBlock,
   openProjectByTitleOrCreate,
@@ -7,14 +8,15 @@ import {
   startExportAndWaitForCompletion,
 } from './helpers';
 
-const REVIEW_PROJECT_TITLE = 'AI Local Model Review Workspace';
-const REVIEW_PROJECT_TEMPLATE = 'blank' as const;
+const REVIEW_PROJECT_TITLE = 'AI Local Model Review Workspace One Shot';
+const REVIEW_PROJECT_TEMPLATE = 'one-shot' as const;
 
 test.describe('AI Full Campaign Flow', () => {
   test('should generate a single shared review artifact and export it', async ({ page }) => {
     test.setTimeout(30 * 60 * 1000);
 
     await openProjectByTitleOrCreate(page, REVIEW_PROJECT_TITLE, REVIEW_PROJECT_TEMPLATE);
+    await clearAiChatHistory(page);
     const initialText = await getEditorText(page);
     const initialGuardianMentions = initialText.match(/Gravel Guardian/g)?.length ?? 0;
     const initialTextLength = initialText.length;
