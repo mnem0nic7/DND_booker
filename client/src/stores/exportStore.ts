@@ -1,18 +1,7 @@
 import { create } from 'zustand';
 import { AxiosError } from 'axios';
+import type { ExportJob } from '@dnd-booker/shared';
 import api from '../lib/api';
-
-interface ExportJob {
-  id: string;
-  projectId: string;
-  format: string;
-  status: 'queued' | 'processing' | 'completed' | 'failed';
-  progress: number;
-  outputUrl: string | null;
-  errorMessage: string | null;
-  createdAt: string;
-  completedAt: string | null;
-}
 
 interface ExportState {
   isOpen: boolean;

@@ -1,6 +1,7 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useGenerationStore } from '../../stores/generationStore';
 import { RUN_STATUS_TRANSITIONS, type GenerationEvent, type RunStatus } from '@dnd-booker/shared';
+import { ArtifactReviewPanel } from './ArtifactReviewPanel';
 
 const STAGE_LABELS: Record<RunStatus, string> = {
   queued: 'Queued',
@@ -58,6 +59,7 @@ interface Props {
 }
 
 export function GenerationRunPanel({ projectId }: Props) {
+  const [showArtifacts, setShowArtifacts] = useState(false);
   const {
     currentRun,
     progressPercent,
@@ -78,6 +80,16 @@ export function GenerationRunPanel({ projectId }: Props) {
       useGenerationStore.getState().unsubscribe();
     };
   }, [projectId, fetchLatestRun]);
+
+  useEffect(() => {
+    setShowArtifacts(false);
+  }, [currentRun?.id]);
+
+  useEffect(() => {
+    if (currentRun?.status === 'completed') {
+      setShowArtifacts(true);
+    }
+  }, [currentRun?.status]);
 
   if (!currentRun) return null;
 
@@ -184,6 +196,14 @@ export function GenerationRunPanel({ projectId }: Props) {
         )}
         {isTerminal && (
           <button
+            onClick={() => setShowArtifacts((value) => !value)}
+            className="text-xs px-2 py-1 rounded bg-purple-100 text-purple-700 hover:bg-purple-200 transition-colors"
+          >
+            {showArtifacts ? 'Hide Review' : 'Review Output'}
+          </button>
+        )}
+        {isTerminal && (
+          <button
             onClick={() => reset()}
             className="text-xs px-2 py-1 rounded bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
           >
@@ -191,6 +211,12 @@ export function GenerationRunPanel({ projectId }: Props) {
           </button>
         )}
       </div>
+
+      {showArtifacts && (
+        <div className="mt-3 pt-3 border-t border-gray-200">
+          <ArtifactReviewPanel projectId={projectId} runId={currentRun.id} />
+        </div>
+      )}
     </div>
   );
 }

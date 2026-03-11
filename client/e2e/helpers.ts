@@ -1,8 +1,25 @@
 import { Page, expect } from '@playwright/test';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 
 // Test credentials (Docker DB test account)
 export const TEST_EMAIL = 'm7.ga.77@gmail.com';
 export const TEST_PASSWORD = '2Rickie2!';
+const AI_PROGRESS_POLL_MS = 1_000;
+const DEFAULT_AI_STALL_TIMEOUT_MS = 120_000;
+const DEFAULT_AI_MAX_WAIT_MS = 30 * 60 * 1_000;
+const OLLAMA_LIVENESS_POLL_MS = 10_000;
+const TEST_OLLAMA_MODEL = 'qwen3.5:9b';
+const execFileAsync = promisify(execFile);
+
+async function isOllamaGenerationActive(model = TEST_OLLAMA_MODEL): Promise<boolean> {
+  try {
+    const { stdout } = await execFileAsync('ollama', ['ps']);
+    return stdout.includes(model);
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Navigate to the dashboard and retry once if the first load stalls.
@@ -61,7 +78,7 @@ export async function createProject(
   await expect(page.getByText('Project Details').first()).toBeVisible({ timeout: 5000 });
   await page.locator('input[placeholder*="title"]').first().fill(name);
   await page.getByRole('button', { name: 'Create Project' }).click();
-  await expect(page.locator('.ProseMirror').first()).toBeVisible({ timeout: 15_000 });
+  await ensureEditorReady(page);
 }
 
 /**
@@ -79,11 +96,13 @@ export async function openProjectByTitleOrCreate(
 
   if (hasExistingProject) {
     await existingProject.click();
-    await expect(page.locator('.ProseMirror').first()).toBeVisible({ timeout: 10_000 });
+    await ensureEditorReady(page);
+    await clearGenerationRunPanel(page);
     return;
   }
 
   await createProject(page, name, template);
+  await clearGenerationRunPanel(page);
 }
 
 /**
@@ -92,7 +111,37 @@ export async function openProjectByTitleOrCreate(
 export async function openFirstProject(page: Page) {
   const projectHeading = page.locator('main h3').first();
   await projectHeading.click();
-  await expect(page.locator('.ProseMirror').first()).toBeVisible({ timeout: 10_000 });
+  await ensureEditorReady(page);
+}
+
+async function ensureEditorReady(page: Page) {
+  const editor = page.locator('.ProseMirror').first();
+  if (await editor.isVisible().catch(() => false)) {
+    return;
+  }
+
+  const selectPrompt = page.getByText('Select a document from the sidebar to begin editing.').first();
+  const readyState = await expect
+    .poll(async () => {
+      if (await editor.isVisible().catch(() => false)) return 'editor';
+      if (await selectPrompt.isVisible().catch(() => false)) return 'select-document';
+      return 'pending';
+    }, { timeout: 15_000 })
+    .not.toBe('pending')
+    .then(async () => {
+      if (await editor.isVisible().catch(() => false)) return 'editor';
+      return 'select-document';
+    });
+
+  if (readyState === 'select-document') {
+    const firstDocumentButton = page
+      .getByRole('button', { name: /^(?!Back to Dashboard$)(?!Logout$).+/ })
+      .first();
+    await expect(firstDocumentButton).toBeVisible({ timeout: 5_000 });
+    await firstDocumentButton.click();
+  }
+
+  await expect(editor).toBeVisible({ timeout: 15_000 });
 }
 
 /**
@@ -109,24 +158,62 @@ export async function openAiPanel(page: Page) {
 
 /**
  * Wait for an assistant response to finish streaming and become visible in chat.
+ * Slow local inference is allowed; we only fail when progress stalls.
  */
-export async function waitForAiResponse(page: Page, previousCount: number, timeoutMs = 90_000) {
+export async function waitForAiResponse(page: Page, previousCount: number, stallTimeoutMs = DEFAULT_AI_STALL_TIMEOUT_MS) {
   const messages = page.locator('.ai-markdown');
   const stopButton = page.getByRole('button', { name: 'Stop generating' }).first();
   const spinner = page.locator('.animate-bounce').first();
   const editBanner = page.locator('text=/operation|applied|updated/i').first();
+  const startTime = Date.now();
+  let lastProgressAt = startTime;
+  let lastKnownLiveAt = startTime;
+  let lastOllamaPollAt = 0;
+  let lastSignature = '';
 
-  await expect
-    .poll(async () => {
-      const hasStop = await stopButton.isVisible().catch(() => false);
-      const hasSpinner = await spinner.isVisible().catch(() => false);
-      const count = await messages.count();
-      if (hasStop || hasSpinner) return 'streaming';
-      if (await editBanner.isVisible().catch(() => false)) return 'done';
-      if (count > previousCount) return 'done';
-      return 'pending';
-    }, { timeout: timeoutMs })
-    .toBe('done');
+  while (Date.now() - startTime < DEFAULT_AI_MAX_WAIT_MS) {
+    const now = Date.now();
+    const hasStop = await stopButton.isVisible().catch(() => false);
+    const hasSpinner = await spinner.isVisible().catch(() => false);
+    const hasEditBanner = await editBanner.isVisible().catch(() => false);
+    const count = await messages.count();
+    const newestMessageText = count > 0
+      ? await messages.last().innerText().catch(() => '')
+      : '';
+
+    if (hasEditBanner || (count > previousCount && !hasStop && !hasSpinner && newestMessageText.trim().length > 0)) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      count,
+      newestMessageLength: newestMessageText.length,
+      newestMessageTail: newestMessageText.slice(-120),
+      hasStop,
+      hasSpinner,
+      hasEditBanner,
+    });
+
+    if (signature !== lastSignature) {
+      lastSignature = signature;
+      lastProgressAt = now;
+    }
+
+    if (now - lastOllamaPollAt >= OLLAMA_LIVENESS_POLL_MS) {
+      lastOllamaPollAt = now;
+      if (await isOllamaGenerationActive()) {
+        lastKnownLiveAt = now;
+      }
+    }
+
+    if (now - Math.max(lastProgressAt, lastKnownLiveAt) > stallTimeoutMs) {
+      throw new Error(`AI response stalled for more than ${Math.round(stallTimeoutMs / 1000)}s`);
+    }
+
+    await page.waitForTimeout(AI_PROGRESS_POLL_MS);
+  }
+
+  throw new Error(`AI response exceeded the hard ceiling of ${Math.round(DEFAULT_AI_MAX_WAIT_MS / 60_000)} minutes`);
 }
 
 /**
@@ -142,14 +229,26 @@ export async function waitForChatHistory(page: Page, minimumCount: number, timeo
 /**
  * Send a message in the AI chat and wait for the response to complete streaming.
  */
-export async function sendAiMessage(page: Page, message: string, timeoutMs = 90_000) {
+export async function sendAiMessage(page: Page, message: string, stallTimeoutMs = DEFAULT_AI_STALL_TIMEOUT_MS) {
   await openAiPanel(page);
   const input = page.locator('textarea[placeholder*="Ask"], textarea[placeholder*="message"], input[placeholder*="Ask"]').first();
   const messages = page.locator('.ai-markdown');
   const previousCount = await messages.count();
   await input.fill(message);
   await input.press('Enter');
-  await waitForAiResponse(page, previousCount, timeoutMs);
+  await waitForAiResponse(page, previousCount, stallTimeoutMs);
+}
+
+/**
+ * Clear the current AI chat history if the control is available.
+ */
+export async function clearAiChatHistory(page: Page) {
+  await openAiPanel(page);
+  const clearButton = page.getByRole('button', { name: 'Clear chat history' }).first();
+  if (await clearButton.isVisible({ timeout: 3_000 }).catch(() => false)) {
+    await clearButton.click();
+    await expect(page.locator('.ai-markdown')).toHaveCount(0, { timeout: 5_000 });
+  }
 }
 
 /**
@@ -239,14 +338,14 @@ export async function settleGenerationRun(page: Page, completionTimeoutMs = 45_0
  */
 export async function clearGenerationRunPanel(page: Page) {
   const dismissButton = page.getByRole('button', { name: 'Dismiss' }).first();
-  if (await dismissButton.isVisible({ timeout: 1_000 }).catch(() => false)) {
+  if (await dismissButton.isVisible({ timeout: 3_000 }).catch(() => false)) {
     await dismissButton.click();
     await expect(dismissButton).not.toBeVisible({ timeout: 5_000 });
     return;
   }
 
   const cancelButton = page.getByRole('button', { name: 'Cancel' }).first();
-  if (await cancelButton.isVisible({ timeout: 1_000 }).catch(() => false)) {
+  if (await cancelButton.isVisible({ timeout: 3_000 }).catch(() => false)) {
     await cancelButton.click();
     await expect(dismissButton).toBeVisible({ timeout: 10_000 });
     await dismissButton.click();
@@ -289,7 +388,7 @@ export async function insertFirstGeneratedBlock(
 ) {
   const timeoutMs = options?.timeoutMs ?? 10_000;
   const editor = page.locator('.ProseMirror').first();
-  const insertButton = page.getByRole('button', { name: 'Insert' }).first();
+  const insertButton = page.getByRole('button', { name: 'Insert' }).last();
   const initialMarkup = await editor.evaluate((el) => el.innerHTML);
 
   const editorTail = page.locator('.ProseMirror p').last();
@@ -367,7 +466,10 @@ export async function insertAllSections(page: Page) {
  * Count blocks of a specific type in the editor.
  */
 export async function countBlocks(page: Page, blockType: string): Promise<number> {
-  return page.locator(`[data-type="${blockType}"]`).count();
+  const selectorByBlockType: Record<string, string> = {
+    statBlock: 'div[data-stat-block]',
+  };
+  return page.locator(selectorByBlockType[blockType] ?? `[data-type="${blockType}"], .node-${blockType}`).count();
 }
 
 /**

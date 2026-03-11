@@ -31,7 +31,7 @@ services:
       context: .
       dockerfile: server/Dockerfile
     extra_hosts:
-      - "host.docker.internal:172.31.65.137"
+      - "host.docker.internal:host-gateway"
     # Port not exposed to host in production — only accessible via nginx proxy
     # Uncomment for local development: ports: ['4000:4000']
     environment:
@@ -45,6 +45,7 @@ services:
       - AI_KEY_ENCRYPTION_SECRET=${AI_KEY_ENCRYPTION_SECRET:?AI_KEY_ENCRYPTION_SECRET must be set in .env}
       - NODE_ENV=production
       - PORT=4000
+      - OLLAMA_MAX_RESPONSE_TOKENS=${OLLAMA_MAX_RESPONSE_TOKENS:-512}
       - EXPORT_OUTPUT_DIR=/app/worker/output
     volumes:
       - export-output:/app/worker/output
@@ -63,6 +64,8 @@ services:
     build:
       context: .
       dockerfile: worker/Dockerfile
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
       - DATABASE_URL=postgresql://dnd_booker:dnd_booker_dev@postgres:5432/dnd_booker
       - REDIS_HOST=redis

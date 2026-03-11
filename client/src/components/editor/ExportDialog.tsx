@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import type { ExportReview } from '@dnd-booker/shared';
 import { useExportStore } from '../../stores/exportStore';
 
 interface ExportDialogProps {
@@ -27,6 +28,25 @@ function formatDate(iso: string): string {
   return new Date(iso).toLocaleString(undefined, {
     month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
   });
+}
+
+function getReviewBadgeClasses(review: ExportReview | null): string {
+  if (!review) return 'bg-gray-100 text-gray-600';
+  if (review.status === 'passed') return 'bg-green-100 text-green-700';
+  if (review.status === 'needs_attention') return 'bg-amber-100 text-amber-700';
+  return 'bg-gray-100 text-gray-600';
+}
+
+function getReviewLabel(review: ExportReview | null): string {
+  if (!review) return 'No review';
+  if (review.status === 'passed') return 'Looks good';
+  if (review.status === 'needs_attention') return 'Needs attention';
+  return 'Review unavailable';
+}
+
+function formatPercent(value: number | null | undefined): string | null {
+  if (value == null || Number.isNaN(value)) return null;
+  return `${Math.round(value * 100)}%`;
 }
 
 export function ExportDialog({ projectId }: ExportDialogProps) {
@@ -180,6 +200,48 @@ export function ExportDialog({ projectId }: ExportDialogProps) {
               <p className="text-xs text-gray-500 mb-4">
                 Your {FORMAT_OPTIONS.find((f) => f.value === job.format)?.label || job.format} file is ready.
               </p>
+              {job.review && (
+                <div className="mb-4 rounded-lg border border-gray-200 bg-gray-50 p-3 text-left">
+                  <div className="mb-2 flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">Export Review</p>
+                      <p className="text-xs text-gray-500">{job.review.summary}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-semibold text-gray-900">{job.review.score}/100</p>
+                      <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium ${getReviewBadgeClasses(job.review)}`}>
+                        {getReviewLabel(job.review)}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="mb-2 flex flex-wrap gap-3 text-[11px] text-gray-500">
+                    <span>{job.review.metrics.pageCount} pages</span>
+                    <span>Review passes: {job.review.passCount}</span>
+                    {formatPercent(job.review.metrics.lastPageFillRatio) && (
+                      <span>Last page fill: {formatPercent(job.review.metrics.lastPageFillRatio)}</span>
+                    )}
+                  </div>
+                  {job.review.appliedFixes.length > 0 && (
+                    <p className="mb-2 text-[11px] text-gray-500">
+                      Auto-fixes applied: {job.review.appliedFixes.join(', ')}
+                    </p>
+                  )}
+                  {job.review.findings.length > 0 ? (
+                    <div className="space-y-1.5">
+                      {job.review.findings.slice(0, 4).map((finding, index) => (
+                        <div key={`${finding.code}-${finding.page ?? 'none'}-${index}`} className="rounded border border-amber-200 bg-amber-50 px-2 py-1.5">
+                          <p className="text-xs font-medium text-amber-900">
+                            {finding.page ? `Page ${finding.page}` : 'Export'}
+                          </p>
+                          <p className="text-xs text-amber-800">{finding.message}</p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-green-700">No export-layout issues were detected in the final PDF.</p>
+                  )}
+                </div>
+              )}
               {job.outputUrl && (
                 <a
                   href={`/api/export-jobs/${job.id}/download`}
@@ -229,6 +291,11 @@ export function ExportDialog({ projectId }: ExportDialogProps) {
                         {FORMAT_OPTIONS.find((f) => f.value === historyJob.format)?.label || historyJob.format}
                       </span>
                       <span className="text-gray-400">{formatDate(historyJob.createdAt)}</span>
+                      {historyJob.review && (
+                        <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium ${getReviewBadgeClasses(historyJob.review)}`}>
+                          {getReviewLabel(historyJob.review)}
+                        </span>
+                      )}
                     </div>
                     {historyJob.status === 'completed' ? (
                       <a

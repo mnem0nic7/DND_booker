@@ -55,6 +55,7 @@ describe('Export Routes', () => {
       expect(res.body.format).toBe('pdf');
       expect(res.body.projectId).toBe(projectId);
       expect(res.body.status).toBe('queued');
+      expect(res.body.review).toBeNull();
     });
 
     it('should accept epub format', async () => {
@@ -128,6 +129,7 @@ describe('Export Routes', () => {
       expect(res.body[0].projectId).toBe(projectId);
       expect(res.body[0].format).toBeDefined();
       expect(res.body[0].status).toBeDefined();
+      expect(res.body[0]).toHaveProperty('review');
     });
 
     it('should return 404 for non-existent project', async () => {
@@ -167,6 +169,58 @@ describe('Export Routes', () => {
       expect(res.body.id).toBe(exportJobId);
       expect(res.body.format).toBe('pdf');
       expect(res.body.status).toBeDefined();
+      expect(res.body.review).toBeNull();
+    });
+
+    it('should return completed export review data when present', async () => {
+      const reviewedJob = await prisma.exportJob.create({
+        data: {
+          projectId,
+          userId: (await prisma.user.findUnique({ where: { email: TEST_USER.email } }))!.id,
+          format: 'pdf',
+          status: 'completed',
+          progress: 100,
+          outputUrl: '/output/reviewed.pdf',
+          reviewJson: {
+            status: 'needs_attention',
+            score: 72,
+            generatedAt: new Date().toISOString(),
+            summary: 'Export review found 2 layout issues.',
+            passCount: 1,
+            appliedFixes: [],
+            findings: [
+              {
+                code: 'EXPORT_CHAPTER_OPENER_LOW',
+                severity: 'warning',
+                page: 6,
+                message: 'Chapter 2 starts too low on page 6.',
+                details: { topRatio: 0.41 },
+              },
+            ],
+            metrics: {
+              pageCount: 26,
+              pageWidthPts: 612,
+              pageHeightPts: 792,
+              lastPageFillRatio: 0.28,
+              sectionStarts: [],
+            },
+          },
+          completedAt: new Date(),
+        },
+      });
+
+      try {
+        const res = await request(app)
+          .get(`/api/export-jobs/${reviewedJob.id}`)
+          .set('Authorization', `Bearer ${accessToken}`);
+
+        expect(res.status).toBe(200);
+        expect(res.body.review).toBeTruthy();
+        expect(res.body.review.score).toBe(72);
+        expect(res.body.review.findings[0].code).toBe('EXPORT_CHAPTER_OPENER_LOW');
+      } finally {
+        await prisma.exportJob.delete({ where: { id: reviewedJob.id } });
+      }
     });
 
     it('should return 404 for non-existent job', async () => {

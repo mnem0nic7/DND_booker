@@ -23,8 +23,13 @@ const SUPPORTED_BLOCK_TYPES = aiContent.getSupportedBlockTypes();
 const MAX_CHAT_CONTEXT_MESSAGES = 30;
 const MAX_SESSION_MESSAGES = 200; // hard cap per session
 const MAX_AI_RESPONSE_TOKENS = 4096;
-const MAX_OLLAMA_RESPONSE_TOKENS = 2048;
 const MIN_OUTPUT_TOKENS = 64; // floor to prevent Ollama "below minimum" errors
+const DEFAULT_OLLAMA_RESPONSE_TOKENS = 512;
+const parsedOllamaResponseTokenLimit = Number.parseInt(process.env.OLLAMA_MAX_RESPONSE_TOKENS ?? '', 10);
+const MAX_OLLAMA_RESPONSE_TOKENS = Number.isFinite(parsedOllamaResponseTokenLimit)
+  && parsedOllamaResponseTokenLimit >= MIN_OUTPUT_TOKENS
+  ? parsedOllamaResponseTokenLimit
+  : DEFAULT_OLLAMA_RESPONSE_TOKENS;
 const MAX_STORED_CONTENT = 100_000;
 const MAX_SSE_BYTES = 512_000; // 500KB cap on SSE stream output
 

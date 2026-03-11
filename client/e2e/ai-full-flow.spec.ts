@@ -1,33 +1,38 @@
 import { test, expect } from '@playwright/test';
 import {
-  clearGenerationRunPanel,
   getEditorText,
+  insertFirstGeneratedBlock,
   openProjectByTitleOrCreate,
+  sendAiMessage,
   startExportAndWaitForCompletion,
-  startAutonomousGeneration,
-  waitForGenerationCompletion,
-  waitForGenerationRun,
 } from './helpers';
 
-const REVIEW_PROJECT_TITLE = 'AI Generation Review Output';
+const REVIEW_PROJECT_TITLE = 'AI Local Model Review Workspace';
+const REVIEW_PROJECT_TEMPLATE = 'blank' as const;
 
 test.describe('AI Full Campaign Flow', () => {
-  test('should create the single shared generation artifact and export it', async ({ page }) => {
-    test.setTimeout(600_000);
+  test('should generate a single shared review artifact and export it', async ({ page }) => {
+    test.setTimeout(30 * 60 * 1000);
 
-    await openProjectByTitleOrCreate(page, REVIEW_PROJECT_TITLE);
-    await clearGenerationRunPanel(page);
+    await openProjectByTitleOrCreate(page, REVIEW_PROJECT_TITLE, REVIEW_PROJECT_TEMPLATE);
+    const initialText = await getEditorText(page);
+    const initialGuardianMentions = initialText.match(/Gravel Guardian/g)?.length ?? 0;
+    const initialTextLength = initialText.length;
 
-    await startAutonomousGeneration(
+    await sendAiMessage(
       page,
-      'Create a simple level 3 one-shot adventure about a cursed mine. Include a villain, a signature encounter, and a memorable treasure.',
+      'Generate only a fenced ```json``` code block for an insertable D&D 5e stat block. Do not include any prose before or after it. The creature is a CR 3 Stone Golem named Gravel Guardian for a cursed mine one-shot adventure.',
+      10 * 60 * 1000,
     );
-    await waitForGenerationRun(page, 30_000);
-    await waitForGenerationCompletion(page, 480_000);
+    await insertFirstGeneratedBlock(page);
+
+    await expect
+      .poll(async () => (await getEditorText(page)).match(/Gravel Guardian/g)?.length ?? 0, { timeout: 15_000 })
+      .toBeGreaterThan(initialGuardianMentions);
 
     const editorText = await getEditorText(page);
-    expect(editorText.length).toBeGreaterThan(100);
+    expect(editorText.length).toBeGreaterThan(initialTextLength);
 
-    await startExportAndWaitForCompletion(page, 'pdf', 120_000);
+    await startExportAndWaitForCompletion(page, 'pdf', 10 * 60 * 1000);
   });
 });

@@ -7,7 +7,7 @@ export type AiProvider = 'anthropic' | 'openai' | 'ollama';
 const DEFAULT_MODELS: Record<AiProvider, string> = {
   anthropic: 'claude-sonnet-4-6',
   openai: 'gpt-4o',
-  ollama: 'llama3.1:8b',
+  ollama: 'qwen3.5:9b',
 };
 
 export const SUPPORTED_MODELS: Record<AiProvider, string[]> = {

@@ -6,6 +6,8 @@ import type {
   ArtifactStatus,
   ArtifactEvaluation,
   FindingSeverity,
+  ExportReview,
+  ExportReviewSeverity,
 } from '@dnd-booker/shared';
 import { ARTIFACT_CATEGORY_MAP } from '@dnd-booker/shared';
 
@@ -36,6 +38,20 @@ const SEVERITY_COLORS: Record<FindingSeverity, string> = {
   minor: 'bg-yellow-100 text-yellow-700 border-yellow-200',
   informational: 'bg-blue-100 text-blue-700 border-blue-200',
 };
+
+const EXPORT_SEVERITY_COLORS: Record<ExportReviewSeverity, string> = {
+  error: 'bg-red-100 text-red-700 border-red-200',
+  warning: 'bg-yellow-100 text-yellow-700 border-yellow-200',
+  info: 'bg-blue-100 text-blue-700 border-blue-200',
+};
+
+function getExportReview(artifact: Pick<GeneratedArtifact, 'artifactType' | 'jsonContent'>): ExportReview | null {
+  if (artifact.artifactType !== 'export_review' || !artifact.jsonContent) return null;
+  const review = artifact.jsonContent as Partial<ExportReview>;
+  if (typeof review !== 'object' || review == null) return null;
+  if (!Array.isArray(review.findings) || typeof review.score !== 'number' || !review.metrics) return null;
+  return review as ExportReview;
+}
 
 interface Props {
   projectId: string;
@@ -96,6 +112,7 @@ export function ArtifactReviewPanel({ projectId, runId }: Props) {
     const detail = artifactDetail;
     const evaluation =
       detail.evaluations?.[0] ?? evalByArtifact.get(detail.id) ?? null;
+    const exportReview = getExportReview(detail);
     const statusStyle = STATUS_STYLES[detail.status] ?? STATUS_STYLES.queued;
 
     return (
@@ -191,6 +208,65 @@ export function ArtifactReviewPanel({ projectId, runId }: Props) {
           </div>
         )}
 
+        {exportReview && (
+          <div className="border border-gray-200 rounded-lg p-2 mb-3">
+            <div className="flex items-center gap-2 mb-1">
+              <div
+                className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white ${
+                  exportReview.score >= 85
+                    ? 'bg-green-500'
+                    : exportReview.score >= 70
+                      ? 'bg-yellow-500'
+                      : 'bg-red-500'
+                }`}
+              >
+                {Math.round(exportReview.score)}
+              </div>
+              <span className="text-xs font-medium text-gray-700">
+                Export review: {exportReview.status.replace('_', ' ')}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-1 text-[10px] text-gray-500 mb-2">
+              <span>Pages: {exportReview.metrics.pageCount}</span>
+              <span>Passes: {exportReview.passCount}</span>
+              {exportReview.metrics.lastPageFillRatio != null && (
+                <span>Last page fill: {Math.round(exportReview.metrics.lastPageFillRatio * 100)}%</span>
+              )}
+              <span>Fixes: {exportReview.appliedFixes.length}</span>
+            </div>
+
+            {exportReview.appliedFixes.length > 0 && (
+              <div className="mb-2 flex flex-wrap gap-1">
+                {exportReview.appliedFixes.map((fix) => (
+                  <span
+                    key={fix}
+                    className="text-[10px] px-1.5 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200"
+                  >
+                    {fix.replaceAll('_', ' ')}
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {exportReview.findings.length > 0 ? (
+              <div className="space-y-1">
+                {exportReview.findings.map((finding, i) => (
+                  <div
+                    key={`${finding.code}-${finding.page ?? 'na'}-${i}`}
+                    className={`text-xs px-2 py-1 rounded border ${EXPORT_SEVERITY_COLORS[finding.severity]}`}
+                  >
+                    <span className="font-medium">{finding.code}</span>
+                    {finding.page != null && ` (page ${finding.page})`}: {finding.message}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-xs text-gray-500">No export-review findings.</div>
+            )}
+          </div>
+        )}
+
         {/* Content preview: markdown */}
         {detail.markdownContent && (
           <div className="border border-gray-200 rounded-lg p-2">
@@ -203,7 +279,7 @@ export function ArtifactReviewPanel({ projectId, runId }: Props) {
         )}
 
         {/* Content preview: JSON fallback */}
-        {detail.jsonContent != null && !detail.markdownContent && (
+        {detail.jsonContent != null && !detail.markdownContent && !exportReview && (
           <div className="border border-gray-200 rounded-lg p-2">
             <div className="text-[10px] font-medium text-gray-500 mb-1">Structured Data</div>
             <pre className="text-xs text-gray-700 whitespace-pre-wrap max-h-60 overflow-y-auto font-mono">
@@ -241,7 +317,7 @@ export function ArtifactReviewPanel({ projectId, runId }: Props) {
         >
           All
         </button>
-        {(['planning', 'reference', 'written'] as const).map((cat) => (
+        {(['planning', 'reference', 'written', 'evaluation'] as const).map((cat) => (
           <button
             key={cat}
             onClick={() => setFilterCategory(cat)}
@@ -268,6 +344,8 @@ export function ArtifactReviewPanel({ projectId, runId }: Props) {
               {items.map((a) => {
                 const statusStyle = STATUS_STYLES[a.status] ?? STATUS_STYLES.queued;
                 const ev = evalByArtifact.get(a.id);
+                const exportReview = getExportReview(a);
+                const score = exportReview?.score ?? ev?.overallScore ?? null;
                 return (
                   <button
                     key={a.id}
@@ -286,17 +364,17 @@ export function ArtifactReviewPanel({ projectId, runId }: Props) {
                       </div>
                     </div>
                     <div className="flex items-center gap-1.5 shrink-0">
-                      {ev && (
+                      {score != null && (
                         <span
                           className={`text-[10px] font-medium ${
-                            ev.overallScore >= 85
+                            score >= 85
                               ? 'text-green-600'
-                              : ev.overallScore >= 70
+                              : score >= 70
                                 ? 'text-yellow-600'
                                 : 'text-red-600'
                           }`}
                         >
-                          {Math.round(ev.overallScore)}
+                          {Math.round(score)}
                         </span>
                       )}
                       <span

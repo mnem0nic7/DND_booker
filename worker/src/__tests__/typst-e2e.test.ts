@@ -152,6 +152,140 @@ describe('Typst E2E Pipeline', () => {
     expect(header).toBe('%PDF-');
   }, 30_000);
 
+  it('should generate a PDF for a long-form export with synthetic front matter', async () => {
+    const source = assembleTypst({
+      documents: [
+        {
+          title: 'Foreword',
+          sortOrder: 1,
+          kind: 'front_matter',
+          content: {
+            type: 'doc' as const,
+            content: [
+              {
+                type: 'paragraph',
+                content: [
+                  {
+                    type: 'text',
+                    text: 'This adventure was written for tables that enjoy careful investigation and high-stakes travel.',
+                  },
+                ],
+              },
+            ],
+          },
+        },
+        {
+          title: 'Arrival at Dawn',
+          sortOrder: 2,
+          kind: 'chapter',
+          content: {
+            type: 'doc' as const,
+            content: [
+              {
+                type: 'paragraph',
+                content: [
+                  {
+                    type: 'text',
+                    text: 'The caravan reaches the valley just as the first light spills over the old watchtower.',
+                  },
+                ],
+              },
+            ],
+          },
+        },
+        {
+          title: 'Into the Wilds',
+          sortOrder: 3,
+          kind: 'chapter',
+          content: {
+            type: 'doc' as const,
+            content: [
+              {
+                type: 'paragraph',
+                content: [
+                  {
+                    type: 'text',
+                    text: 'Beyond the farms, the old road narrows into a track hemmed in by thorn and mist.',
+                  },
+                ],
+              },
+            ],
+          },
+        },
+      ],
+      theme: 'classic-parchment',
+      projectTitle: 'The Ember Road',
+    });
+
+    const pdf = await generateTypstPdf(source, [fontsDir], assetsDir);
+
+    expect(pdf).toBeInstanceOf(Buffer);
+    expect(pdf.length).toBeGreaterThan(1000);
+
+    const header = pdf.subarray(0, 5).toString('ascii');
+    expect(header).toBe('%PDF-');
+  }, 30_000);
+
+  it('should generate a PDF with dedicated chapter opener pages during export polish', async () => {
+    const source = assembleTypst({
+      documents: [
+        {
+          title: 'Arrival at Dawn',
+          sortOrder: 1,
+          kind: 'chapter',
+          content: {
+            type: 'doc' as const,
+            content: [
+              {
+                type: 'chapterHeader',
+                attrs: {
+                  title: 'Arrival at Dawn',
+                  chapterNumber: 'Chapter 1',
+                },
+              },
+              {
+                type: 'paragraph',
+                content: [
+                  {
+                    type: 'text',
+                    text: 'The caravan reaches the valley just as the first light spills over the old watchtower.',
+                  },
+                ],
+              },
+            ],
+          },
+        },
+        {
+          title: 'Into the Wilds',
+          sortOrder: 2,
+          kind: 'chapter',
+          content: {
+            type: 'doc' as const,
+            content: [
+              {
+                type: 'paragraph',
+                content: [
+                  {
+                    type: 'text',
+                    text: 'Beyond the farms, the old road narrows into a track hemmed in by thorn and mist.',
+                  },
+                ],
+              },
+            ],
+          },
+        },
+      ],
+      theme: 'classic-parchment',
+      projectTitle: 'The Ember Road',
+      exportPolish: {
+        chapterOpenerMode: 'dedicated_page',
+      },
+    });
+
+    const pdf = await generateTypstPdf(source, [fontsDir], assetsDir);
+    expect(pdf.subarray(0, 5).toString('ascii')).toBe('%PDF-');
+  }, 30_000);
+
   it('should generate a PDF with all 6 themes', async () => {
     const themes = [
       'classic-parchment',

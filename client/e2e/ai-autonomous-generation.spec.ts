@@ -1,11 +1,11 @@
 import { test, expect } from '@playwright/test';
 import { openGenerateDialog, openProjectByTitleOrCreate } from './helpers';
 
-const REVIEW_PROJECT_TITLE = 'AI Generation Review Output';
+const REVIEW_PROJECT_TITLE = 'AI Local Model Review Workspace';
 
 test.describe('Autonomous Generation Dialog', () => {
   test.beforeEach(async ({ page }) => {
-    await openProjectByTitleOrCreate(page, REVIEW_PROJECT_TITLE);
+    await openProjectByTitleOrCreate(page, REVIEW_PROJECT_TITLE, 'blank');
   });
 
   test('should show Generate Content dialog with all options', async ({ page }) => {

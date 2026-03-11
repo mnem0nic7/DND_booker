@@ -1,7 +1,7 @@
 FROM node:20-alpine
 
 # Pandoc for ePub generation (Chromium no longer needed — PDF uses Typst NAPI)
-RUN apk add --no-cache pandoc su-exec
+RUN apk add --no-cache pandoc poppler-utils su-exec
 
 WORKDIR /app
 COPY package*.json ./
