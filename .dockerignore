@@ -6,6 +6,7 @@ build
 */build
 .git
 .env
+server/.env
 *.log
 coverage
 .turbo
