@@ -8,11 +8,19 @@ coverage/
 *.tsbuildinfo
 .turbo/
 .claude/worktrees/
+.vscode/
 output/
+tmp/
 uploads/
 DMGuild/
 # Playwright
 test-results/
 playwright-report/
 e2e/.auth/
+client/test-results/
+client/playwright-report/
+client/e2e/.auth/
+e2e-*.png
+evaluation-*.png
+ai-panel-state.png
 dump.rdb

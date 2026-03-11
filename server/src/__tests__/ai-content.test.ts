@@ -51,6 +51,20 @@ describe('AI Content Service', () => {
       expect(prompt).toContain('```json');
     });
 
+    it('should omit tool instructions when tools are disabled', () => {
+      const prompt = buildSystemPrompt(
+        'Test Project',
+        '[0] paragraph: "Intro text" (~32px) [P1 4%]',
+        null,
+        undefined,
+        'ollama',
+        false,
+      );
+      expect(prompt).not.toContain('=== AVAILABLE TOOLS ===');
+      expect(prompt).not.toContain('Project CRUD tools');
+      expect(prompt).toContain('DOCUMENT EDITING MODE');
+    });
+
     it('should include rendered node layout and deterministic findings when provided', () => {
       const metrics: PageMetricsSnapshot = {
         totalPages: 2,

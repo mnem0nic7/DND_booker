@@ -33,6 +33,19 @@ const MAX_OLLAMA_RESPONSE_TOKENS = Number.isFinite(parsedOllamaResponseTokenLimi
 const MAX_STORED_CONTENT = 100_000;
 const MAX_SSE_BYTES = 512_000; // 500KB cap on SSE stream output
 
+function shouldEnableProjectChatTools(provider: AiProvider | null | undefined, message: string): boolean {
+  if (provider !== 'ollama') return true;
+
+  return [
+    /\b(edit|update|replace|remove|delete|move|insert|reorder|fix)\b.*\b(document|content|layout|formatting|page|pages|section|chapter|heading|block|stat block|magic item|npc|encounter|table)\b/i,
+    /\b(evaluate|review|critique|check|score)\b.*\b(document|content|layout|formatting|page|pages)\b/i,
+    /\b(remember|store|save|forget)\b.*\b(memory|fact|preference|decision)\b/i,
+    /\b(update|reset|show|rebuild)\b.*\b(plan|working memory)\b/i,
+    /\b(generate|create|make)\b.*\b(image|images|cover art|illustration|map|maps|banner)\b/i,
+    /\b(create|update|delete|list|get)\b.*\bproject\b/i,
+  ].some((pattern) => pattern.test(message));
+}
+
 // --- Settings routes (no project context) ---
 export const aiSettingsRoutes = Router();
 aiSettingsRoutes.use(requireAuth);
@@ -539,7 +552,15 @@ aiChatRoutes.post('/ai/chat', validateUuid('projectId'), chatRateLimit, asyncHan
     const documentOutline = aiContent.buildDocumentOutline(project.content);
     const documentTextSample = aiContent.buildDocumentTextSample(project.content);
     const userSettings = await aiSettings.getAiSettings(req.userId!);
-    const systemPrompt = aiContent.buildSystemPrompt(project.title, documentOutline, documentTextSample, parsed.data.pageMetrics, userSettings?.provider)
+    const toolsEnabled = shouldEnableProjectChatTools(userSettings?.provider as AiProvider | null | undefined, parsed.data.message);
+    const systemPrompt = aiContent.buildSystemPrompt(
+      project.title,
+      documentOutline,
+      documentTextSample,
+      parsed.data.pageMetrics,
+      userSettings?.provider,
+      toolsEnabled,
+    )
       + aiPlanner.buildPlanningPromptSection(planningCtx);
 
     // Abort the AI call if the client disconnects
@@ -549,7 +570,9 @@ aiChatRoutes.post('/ai/chat', validateUuid('projectId'), chatRateLimit, asyncHan
     // Build tool context for this request
     const requestId = randomUUID();
     const toolCtx = { userId: req.userId!, projectId, requestId };
-    const tools = globalRegistry.getToolsForContext('project-chat', toolCtx);
+    const tools = toolsEnabled
+      ? globalRegistry.getToolsForContext('project-chat', toolCtx)
+      : undefined;
 
     // Stream the response — tools execute server-side mid-stream
     const streamResult = streamText({

@@ -165,6 +165,7 @@ export async function waitForAiResponse(page: Page, previousCount: number, stall
   const stopButton = page.getByRole('button', { name: 'Stop generating' }).first();
   const spinner = page.locator('.animate-bounce').first();
   const editBanner = page.locator('text=/operation|applied|updated/i').first();
+  const chatError = page.locator('text=/Chat failed\\.|Response interrupted\\.|Session expired\\.|Failed to load chat history\\./i').first();
   const startTime = Date.now();
   let lastProgressAt = startTime;
   let lastKnownLiveAt = startTime;
@@ -176,10 +177,16 @@ export async function waitForAiResponse(page: Page, previousCount: number, stall
     const hasStop = await stopButton.isVisible().catch(() => false);
     const hasSpinner = await spinner.isVisible().catch(() => false);
     const hasEditBanner = await editBanner.isVisible().catch(() => false);
+    const hasChatError = await chatError.isVisible().catch(() => false);
     const count = await messages.count();
     const newestMessageText = count > 0
       ? await messages.last().innerText().catch(() => '')
       : '';
+
+    if (hasChatError) {
+      const errorText = await chatError.innerText().catch(() => 'Chat failed. Please try again.');
+      throw new Error(errorText.trim() || 'Chat failed. Please try again.');
+    }
 
     if (hasEditBanner || (count > previousCount && !hasStop && !hasSpinner && newestMessageText.trim().length > 0)) {
       return;
@@ -192,6 +199,7 @@ export async function waitForAiResponse(page: Page, previousCount: number, stall
       hasStop,
       hasSpinner,
       hasEditBanner,
+      hasChatError,
     });
 
     if (signature !== lastSignature) {

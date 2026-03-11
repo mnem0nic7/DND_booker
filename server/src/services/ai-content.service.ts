@@ -188,6 +188,7 @@ Write tools require an \`expectedUpdatedAt\` timestamp from a prior read to prev
 
 IMPORTANT: For document edits, evaluations, adventure generation, and image generation, you can EITHER use the tool OR emit a control block — both work. Tools are preferred.
 === END AVAILABLE TOOLS ===`;
+const TOOL_SECTION_REGEX = /\n=== AVAILABLE TOOLS ===[\s\S]*?=== END AVAILABLE TOOLS ===/;
 
 // --- Document outline for AI document editing ---
 
@@ -504,8 +505,15 @@ function formatLayoutFindings(findings: LayoutFinding[]): string {
     .join('\n');
 }
 
-export function buildSystemPrompt(projectTitle?: string, documentOutline?: string | null, documentTextSample?: string | null, pageMetrics?: PageMetricsSnapshot, provider?: string | null): string {
-  let prompt = SYSTEM_PROMPT;
+export function buildSystemPrompt(
+  projectTitle?: string,
+  documentOutline?: string | null,
+  documentTextSample?: string | null,
+  pageMetrics?: PageMetricsSnapshot,
+  provider?: string | null,
+  toolsEnabled = true,
+): string {
+  let prompt = toolsEnabled ? SYSTEM_PROMPT : SYSTEM_PROMPT.replace(TOOL_SECTION_REGEX, '');
 
   if (provider === 'openai') {
     prompt += `\n\nNOTE: This user has OpenAI configured — AI image generation is AVAILABLE. You can directly generate images by emitting a \`_generateImage\` control block when the user asks for images. You can also suggest the manual "Generate Image with AI" button on image blocks. Proactively recommend image generation when discussing visual content.`;

@@ -1,6 +1,7 @@
 import { createAnthropic } from '@ai-sdk/anthropic';
 import { createOpenAI } from '@ai-sdk/openai';
 import { generateText, type LanguageModel } from 'ai';
+import { Agent, fetch as undiciFetch } from 'undici';
 
 export type AiProvider = 'anthropic' | 'openai' | 'ollama';
 
@@ -41,6 +42,21 @@ let _openAiModelCache: { models: string[]; expiresAt: number } | null = null;
 const OPENAI_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 
 const OPENAI_CHAT_PREFIXES = ['gpt-', 'o1', 'o3', 'o4', 'chatgpt-'];
+const OLLAMA_CONNECT_TIMEOUT_MS = 30_000;
+
+const ollamaDispatcher = new Agent({
+  connectTimeout: OLLAMA_CONNECT_TIMEOUT_MS,
+  headersTimeout: 0,
+  bodyTimeout: 0,
+});
+
+const ollamaFetch = ((
+  input: Parameters<typeof fetch>[0],
+  init?: Parameters<typeof fetch>[1],
+) => undiciFetch(input as never, {
+  ...(init as Record<string, unknown> | undefined),
+  dispatcher: ollamaDispatcher,
+}) as unknown as Promise<Response>) as typeof fetch;
 
 export async function fetchOpenAiModels(apiKey: string): Promise<string[]> {
   // Return cache if still valid
@@ -95,6 +111,8 @@ export function createModel(
     const ollama = createOpenAI({
       apiKey: 'ollama',
       baseURL: `${baseUrl || 'http://localhost:11434'}/v1`,
+      fetch: ollamaFetch,
+      name: 'ollama',
     });
     return ollama.chat(modelId);
   }
