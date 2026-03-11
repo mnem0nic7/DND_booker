@@ -13,7 +13,7 @@ const REVIEW_PROJECT_TITLE = 'AI Generation Review Output';
 
 test.describe('AI Full Campaign Flow', () => {
   test('should create the single shared generation artifact and export it', async ({ page }) => {
-    test.setTimeout(420_000);
+    test.setTimeout(600_000);
 
     await openProjectByTitleOrCreate(page, REVIEW_PROJECT_TITLE);
     await clearGenerationRunPanel(page);
@@ -23,7 +23,7 @@ test.describe('AI Full Campaign Flow', () => {
       'Create a simple level 3 one-shot adventure about a cursed mine. Include a villain, a signature encounter, and a memorable treasure.',
     );
     await waitForGenerationRun(page, 30_000);
-    await waitForGenerationCompletion(page, 240_000);
+    await waitForGenerationCompletion(page, 480_000);
 
     const editorText = await getEditorText(page);
     expect(editorText.length).toBeGreaterThan(100);

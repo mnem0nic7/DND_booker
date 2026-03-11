@@ -69,6 +69,7 @@ services:
       - REDIS_PORT=6379
       - REDIS_PASSWORD=${REDIS_PASSWORD:-dev-redis-password}
       - SERVER_BASE_URL=http://server:4000
+      - AI_KEY_ENCRYPTION_SECRET=${AI_KEY_ENCRYPTION_SECRET:?AI_KEY_ENCRYPTION_SECRET must be set in .env}
       - NODE_ENV=production
     volumes:
       - export-output:/app/worker/output

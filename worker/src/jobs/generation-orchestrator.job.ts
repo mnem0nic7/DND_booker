@@ -18,7 +18,11 @@ export interface GenerationJobData {
  */
 export async function processGenerationJob(job: Job<GenerationJobData>): Promise<void> {
   const { runId, userId, projectId } = job.data;
-  const run = { id: runId, projectId, userId };
+
+  // Fetch the full run record so we have inputPrompt/inputParameters for intake
+  const fullRun = await prisma.generationRun.findUniqueOrThrow({ where: { id: runId } });
+  const run = { id: runId, projectId, userId, inputPrompt: fullRun.inputPrompt, inputParameters: fullRun.inputParameters };
+  const isPolished = fullRun.quality === 'polished';
 
   // Dynamic imports to avoid cross-package resolution issues at module load time
   const { transitionRunStatus, updateRunProgress } = await import('../../../server/src/services/generation/run.service.js');
@@ -33,7 +37,7 @@ export async function processGenerationJob(job: Job<GenerationJobData>): Promise
   const { assembleDocuments } = await import('../../../server/src/services/generation/assembler.service.js');
   const { runPreflight } = await import('../../../server/src/services/generation/preflight.service.js');
   const { executePublicationPolish } = await import('../../../server/src/services/generation/publication-polish.service.js');
-  const { executeIntakeNormalization } = await import('../../../server/src/services/generation/intake.service.js');
+  const { executeIntake } = await import('../../../server/src/services/generation/intake.service.js');
 
   async function publishProgress(status: string, stage: string, percent: number) {
     await updateRunProgress(runId, userId, stage, percent);
@@ -53,7 +57,7 @@ export async function processGenerationJob(job: Job<GenerationJobData>): Promise
     await transitionRunStatus(runId, userId, 'planning');
     await publishProgress('planning', 'planning', 5);
 
-    const { normalizedInput } = await executeIntakeNormalization(run, projectId, model, maxOutputTokens);
+    const { normalizedInput } = await executeIntake(run, model, maxOutputTokens);
     await publishProgress('planning', 'planning', 15);
 
     const { bible, entities } = await executeBibleGeneration(run, normalizedInput, model, maxOutputTokens);
@@ -105,31 +109,39 @@ export async function processGenerationJob(job: Job<GenerationJobData>): Promise
       await publishProgress('generating_prose', 'generating_prose', 65 + Math.round((i + 1) / outline.chapters.length * 15));
     }
 
-    // Stage 4: Evaluation + Revision
-    await transitionRunStatus(runId, userId, 'evaluating');
+    // Stage 4: Evaluation + Revision (polished quality only)
+    if (isPolished) {
+      await transitionRunStatus(runId, userId, 'evaluating');
 
-    const generatedArtifacts = await prisma.generatedArtifact.findMany({
-      where: { runId, status: 'generated' },
-      orderBy: { createdAt: 'asc' },
-    });
+      const generatedArtifacts = await prisma.generatedArtifact.findMany({
+        where: { runId, status: 'generated' },
+        orderBy: { createdAt: 'asc' },
+      });
 
-    for (const artifact of generatedArtifacts) {
-      const evalResult = await evaluateArtifact({ id: runId }, artifact.id, bibleContent, model, maxOutputTokens);
+      for (const artifact of generatedArtifacts) {
+        const evalResult = await evaluateArtifact({ id: runId }, artifact.id, bibleContent, model, maxOutputTokens);
 
-      if (!evalResult.passed) {
-        await transitionRunStatus(runId, userId, 'revising');
-        const revised = await reviseArtifact({ id: runId }, artifact.id, evalResult.findings, bibleContent, model, maxOutputTokens);
-        if (revised) {
-          const reEval = await evaluateArtifact({ id: runId }, revised.newArtifactId, bibleContent, model, maxOutputTokens);
-          if (!reEval.passed) {
-            const revised2 = await reviseArtifact({ id: runId }, revised.newArtifactId, reEval.findings, bibleContent, model, maxOutputTokens);
-            if (revised2) {
-              await evaluateArtifact({ id: runId }, revised2.newArtifactId, bibleContent, model, maxOutputTokens);
+        if (!evalResult.passed) {
+          await transitionRunStatus(runId, userId, 'revising');
+          const revised = await reviseArtifact({ id: runId }, artifact.id, evalResult.findings, bibleContent, model, maxOutputTokens);
+          if (revised) {
+            const reEval = await evaluateArtifact({ id: runId }, revised.newArtifactId, bibleContent, model, maxOutputTokens);
+            if (!reEval.passed) {
+              const revised2 = await reviseArtifact({ id: runId }, revised.newArtifactId, reEval.findings, bibleContent, model, maxOutputTokens);
+              if (revised2) {
+                await evaluateArtifact({ id: runId }, revised2.newArtifactId, bibleContent, model, maxOutputTokens);
+              }
             }
           }
+          await transitionRunStatus(runId, userId, 'evaluating');
         }
-        await transitionRunStatus(runId, userId, 'evaluating');
       }
+    } else {
+      // Quick mode: accept all generated artifacts as-is
+      await prisma.generatedArtifact.updateMany({
+        where: { runId, status: 'generated' },
+        data: { status: 'accepted' },
+      });
     }
 
     // Stage 5: Assembly + Preflight

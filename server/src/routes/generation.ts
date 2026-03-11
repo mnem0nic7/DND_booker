@@ -12,6 +12,7 @@ import {
 import { listTasksForRun } from '../services/generation/task.service.js';
 import { prisma } from '../config/database.js';
 import { subscribeToRun } from '../services/generation/pubsub.service.js';
+import { enqueueGenerationRun } from '../services/generation/queue.service.js';
 
 const generationRoutes = Router({ mergeParams: true });
 
@@ -59,6 +60,8 @@ generationRoutes.post(
       res.status(404).json({ error: 'Project not found' });
       return;
     }
+
+    await enqueueGenerationRun(run.id, authReq.userId!, projectId);
 
     res.status(201).json(run);
   }),
