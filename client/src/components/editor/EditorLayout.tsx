@@ -42,6 +42,7 @@ import { usePageAlignment } from '../../hooks/usePageAlignment';
 import { Toolbar } from './Toolbar';
 import { FloatingBlockPicker } from './FloatingBlockPicker';
 import { ExportDialog } from './ExportDialog';
+import { ProjectAssetGalleryDialog } from './ProjectAssetGalleryDialog';
 import { PropertiesPanel } from './PropertiesPanel';
 import { PreviewPanel } from '../preview/PreviewPanel';
 import { useThemeStore } from '../../stores/themeStore';
@@ -65,6 +66,7 @@ export function EditorLayout({ projectId, content, onUpdate }: EditorLayoutProps
   const [showPreview, setShowPreview] = useState(false);
   const [showAiChat, setShowAiChat] = useState(false);
   const [showGenerationDialog, setShowGenerationDialog] = useState(false);
+  const [showAssetGallery, setShowAssetGallery] = useState(false);
   const currentTheme = useThemeStore((s) => s.currentTheme);
   const openExportDialog = useExportStore((s) => s.openDialog);
   const setSettingsModalOpen = useAiStore((s) => s.setSettingsModalOpen);
@@ -140,6 +142,19 @@ export function EditorLayout({ projectId, content, onUpdate }: EditorLayoutProps
               <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
             </svg>
             Export
+          </button>
+          <button
+            onClick={() => setShowAssetGallery(true)}
+            title="Project images"
+            aria-label="Project images"
+            className="px-3 py-1.5 text-sm text-gray-600 hover:text-purple-700 hover:bg-purple-50 transition-colors rounded mr-1 flex items-center gap-1"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5V6.75A2.25 2.25 0 015.25 4.5h13.5A2.25 2.25 0 0121 6.75v10.5A2.25 2.25 0 0118.75 19.5H5.25A2.25 2.25 0 013 17.25v-.75z" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 15l4.5-4.5a2.121 2.121 0 013 0L15 15m-1.5-1.5l1.629-1.629a2.121 2.121 0 013 0L21 15" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 9.75h.008v.008H8.25V9.75z" />
+            </svg>
+            Images
           </button>
           <button
             onClick={() => setShowGenerationDialog(true)}
@@ -261,6 +276,11 @@ export function EditorLayout({ projectId, content, onUpdate }: EditorLayoutProps
 
       {/* Export Dialog */}
       <ExportDialog projectId={projectId} />
+      <ProjectAssetGalleryDialog
+        projectId={projectId}
+        isOpen={showAssetGallery}
+        onClose={() => setShowAssetGallery(false)}
+      />
       <AutonomousGenerationDialog
         projectId={projectId}
         isOpen={showGenerationDialog}
