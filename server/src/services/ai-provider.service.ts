@@ -1,6 +1,7 @@
 import { createAnthropic } from '@ai-sdk/anthropic';
 import { createOpenAI } from '@ai-sdk/openai';
 import { generateText, type LanguageModel } from 'ai';
+import { existsSync } from 'fs';
 import { Agent, fetch as undiciFetch } from 'undici';
 
 export type AiProvider = 'anthropic' | 'openai' | 'ollama';
@@ -43,7 +44,10 @@ const OPENAI_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 
 const OPENAI_CHAT_PREFIXES = ['gpt-', 'o1', 'o3', 'o4', 'chatgpt-'];
 const OLLAMA_CONNECT_TIMEOUT_MS = 30_000;
+const LOOPBACK_OLLAMA_PORT = '11434';
 const DEFAULT_OLLAMA_BASE_URL = 'http://localhost:11434';
+const DOCKER_OLLAMA_BASE_URL = 'http://host.docker.internal:11434';
+const RUNNING_IN_CONTAINER = existsSync('/.dockerenv');
 
 const ollamaDispatcher = new Agent({
   connectTimeout: OLLAMA_CONNECT_TIMEOUT_MS,
@@ -64,8 +68,20 @@ export type OllamaChatMessage = {
   content: string;
 };
 
-function normalizeOllamaBaseUrl(baseUrl?: string): string {
-  return (baseUrl || DEFAULT_OLLAMA_BASE_URL).replace(/\/+$/, '');
+export function normalizeOllamaBaseUrl(baseUrl?: string): string {
+  const fallback = RUNNING_IN_CONTAINER ? DOCKER_OLLAMA_BASE_URL : DEFAULT_OLLAMA_BASE_URL;
+  const parsed = new URL((baseUrl || fallback).trim());
+
+  if (RUNNING_IN_CONTAINER) {
+    const hostname = parsed.hostname.toLowerCase();
+    if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1') {
+      parsed.protocol = 'http:';
+      parsed.hostname = 'host.docker.internal';
+      parsed.port = LOOPBACK_OLLAMA_PORT;
+    }
+  }
+
+  return parsed.toString().replace(/\/+$/, '');
 }
 
 export function resolveOllamaModelId(model?: string): string {
@@ -232,13 +248,14 @@ export function createModel(
  * Prevents SSRF attacks via user-controlled Ollama base URLs.
  */
 export function assertSafeUrl(rawUrl: string): void {
-  const parsed = new URL(rawUrl);
+  const parsed = new URL(normalizeOllamaBaseUrl(rawUrl));
   if (!['http:', 'https:'].includes(parsed.protocol)) {
     throw new Error('Only http/https protocols are allowed');
   }
   const hostname = parsed.hostname.toLowerCase();
   // Block loopback
   if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1' || hostname === '[::1]') {
+    if (parsed.port === LOOPBACK_OLLAMA_PORT) return;
     throw new Error('Loopback addresses are not allowed');
   }
   // Block common metadata endpoints
@@ -263,7 +280,8 @@ export function assertSafeUrl(rawUrl: string): void {
 export async function validateConnection(baseUrl: string): Promise<{ valid: boolean; models: string[] }> {
   try {
     assertSafeUrl(baseUrl);
-    const res = await fetch(`${baseUrl}/api/tags`, { signal: AbortSignal.timeout(5000) });
+    const normalizedBaseUrl = normalizeOllamaBaseUrl(baseUrl);
+    const res = await ollamaFetch(`${normalizedBaseUrl}/api/tags`, { signal: AbortSignal.timeout(5000) });
     if (!res.ok) return { valid: false, models: [] };
     const data = await res.json() as { models?: { name: string }[] };
     const models = (data.models ?? []).map((m: { name: string }) => m.name);

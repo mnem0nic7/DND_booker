@@ -217,6 +217,9 @@ export function AiSettingsModal() {
             >
               {isValidating ? 'Connecting...' : 'Connect & Load Models'}
             </button>
+            <p className="text-xs mt-1 text-gray-500">
+              If the app is running in Docker, <code>localhost</code> will be mapped to your host Ollama automatically.
+            </p>
             {validationResult === true && ollamaModels.length > 0 && (
               <p className="text-xs mt-1 text-green-600">
                 Connected! Found {ollamaModels.length} model{ollamaModels.length !== 1 ? 's' : ''}.

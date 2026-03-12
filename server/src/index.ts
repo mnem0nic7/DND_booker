@@ -14,7 +14,7 @@ import { aiSettingsRoutes, aiGenerateRoutes, aiChatRoutes, aiWizardRoutes } from
 import generationRoutes from './routes/generation.js';
 import documentRoutes from './routes/documents.js';
 import { publicRateLimit } from './middleware/ai-rate-limit.js';
-import { requireAuth, type AuthRequest } from './middleware/auth.js';
+import { requireAuth, requireAuthOrRefreshCookie, type AuthRequest } from './middleware/auth.js';
 
 // Validate required env vars in production
 if (process.env.NODE_ENV === 'production') {
@@ -91,7 +91,7 @@ app.use('/api/projects/:projectId', generationRoutes);
 app.use('/api/projects/:projectId', documentRoutes);
 
 // Serve uploaded files with auth — verify the requesting user owns the project
-app.use('/uploads/:projectId/:filename', requireAuth, async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+app.use('/uploads/:projectId/:filename', requireAuthOrRefreshCookie, async (req: express.Request, res: express.Response, next: express.NextFunction) => {
   const authReq = req as AuthRequest;
   const projectId = String(req.params.projectId);
   const filename = String(req.params.filename);

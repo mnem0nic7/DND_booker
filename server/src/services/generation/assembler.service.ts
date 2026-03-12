@@ -1,6 +1,7 @@
 import type { ChapterOutline, AssemblyDocumentSpec } from '@dnd-booker/shared';
 import { prisma } from '../../config/database.js';
 import { publishGenerationEvent } from './pubsub.service.js';
+import { resolveOutlineArtifact } from './outline-artifact.service.js';
 
 export interface AssemblyResult {
   manifestId: string;
@@ -91,14 +92,20 @@ export async function assembleDocuments(
   run: { id: string; projectId: string },
 ): Promise<AssemblyResult> {
   // 1. Get the chapter outline
-  const outlineArtifact = await prisma.generatedArtifact.findFirst({
-    where: { runId: run.id, artifactType: 'chapter_outline', status: 'accepted' },
-    orderBy: { version: 'desc' },
-  });
-  if (!outlineArtifact?.jsonContent) {
-    throw new Error('No accepted chapter outline found for run');
+  const resolvedOutline = await resolveOutlineArtifact(run.id);
+  if (!resolvedOutline) {
+    throw new Error('No chapter outline found for run');
   }
-  const outline = outlineArtifact.jsonContent as unknown as ChapterOutline;
+  const outline = resolvedOutline.outline as ChapterOutline;
+
+  if (!resolvedOutline.accepted) {
+    await publishGenerationEvent(run.id, {
+      type: 'run_warning',
+      runId: run.id,
+      message: `Using chapter outline v${resolvedOutline.version} with status "${resolvedOutline.status}" because no accepted outline was available.`,
+      severity: 'warning',
+    });
+  }
 
   // 2. Get all accepted artifacts
   const accepted = await getAcceptedArtifacts(run.id);

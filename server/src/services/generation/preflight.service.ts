@@ -2,6 +2,7 @@ import type { ChapterOutline, EvaluationFinding } from '@dnd-booker/shared';
 import { prisma } from '../../config/database.js';
 import { analyzeEstimatedArtifactLayout } from './layout-estimate.service.js';
 import { analyzeCompiledBookStructure, type BookStructureReport } from './book-structure-preflight.service.js';
+import { resolveOutlineArtifact } from './outline-artifact.service.js';
 
 export type PreflightSeverity = 'error' | 'warning' | 'info';
 
@@ -121,20 +122,23 @@ export async function runPreflight(
   const docsBySlug = new Map(documents.map((d) => [d.slug, d]));
 
   // Load outline for expected structure
-  const outlineArtifact = await prisma.generatedArtifact.findFirst({
-    where: { runId: run.id, artifactType: 'chapter_outline', status: 'accepted' },
-    orderBy: { version: 'desc' },
-  });
-
   let outline: ChapterOutline | null = null;
-  if (!outlineArtifact?.jsonContent) {
+  const resolvedOutline = await resolveOutlineArtifact(run.id);
+  if (!resolvedOutline) {
     issues.push({
       severity: 'error',
       code: 'NO_OUTLINE',
-      message: 'No accepted chapter outline found',
+      message: 'No chapter outline found',
     });
   } else {
-    outline = outlineArtifact.jsonContent as unknown as ChapterOutline;
+    outline = resolvedOutline.outline;
+    if (!resolvedOutline.accepted) {
+      issues.push({
+        severity: 'warning',
+        code: 'OUTLINE_NOT_ACCEPTED',
+        message: `Using chapter outline v${resolvedOutline.version} with status "${resolvedOutline.status}" because no accepted outline was available`,
+      });
+    }
   }
 
   // Check 1: Completeness — every chapter in outline has a document

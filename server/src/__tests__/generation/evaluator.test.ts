@@ -306,4 +306,52 @@ describe('Evaluator — evaluateArtifact', () => {
     expect(result.findings).toHaveLength(1);
     expect(result.findings[0].suggestedFix).toBeUndefined();
   });
+
+  it('should recover from evaluator responses that use JS-style object syntax', async () => {
+    mockGenerateText.mockResolvedValueOnce({
+      text: `{
+        structuralCompleteness: 84,
+        continuityScore: 82,
+        dndSanity: 85,
+        editorialQuality: 81,
+        publicationFit: 79,
+        findings: [
+          {
+            severity: 'major',
+            code: 'HOOK_CLARITY',
+            message: 'The chapter opener should more clearly frame the stakes.',
+            affectedScope: 'chapter-1',
+            suggestedFix: 'Tighten the opening hook and state the immediate threat.',
+          },
+        ],
+        recommendedActions: ['Clarify the opening stakes',],
+      }`,
+      usage: { inputTokens: 1000, outputTokens: 500 },
+    } as any);
+
+    const run = await createRun({
+      projectId: testProject.id,
+      userId: testUser.id,
+      prompt: 'test',
+    });
+
+    const artifact = await prisma.generatedArtifact.create({
+      data: {
+        runId: run!.id,
+        projectId: run!.projectId,
+        artifactType: 'chapter_draft',
+        artifactKey: 'test-js-style-eval',
+        status: 'generated',
+        version: 1,
+        title: 'JS Style Eval',
+        jsonContent: { test: true } as any,
+      },
+    });
+
+    const result = await evaluateArtifact(run!, artifact.id, SAMPLE_BIBLE, {} as any, 4096);
+
+    expect(result.findings).toHaveLength(1);
+    expect(result.findings[0].code).toBe('HOOK_CLARITY');
+    expect(result.recommendedActions).toContain('Clarify the opening stakes');
+  });
 });

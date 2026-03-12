@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
+  assertSafeUrl,
   createModel,
+  normalizeOllamaBaseUrl,
   parseOllamaChatChunk,
   resolveOllamaModelId,
   SUPPORTED_MODELS,
@@ -66,6 +68,22 @@ describe('AI Provider Service', () => {
     it('should fall back to the default Ollama model for non-Ollama ids', () => {
       expect(resolveOllamaModelId('gpt-4o')).toBe('llama3.2:3b');
       expect(resolveOllamaModelId('claude-sonnet-4-6')).toBe('llama3.2:3b');
+    });
+  });
+
+  describe('normalizeOllamaBaseUrl', () => {
+    it('trims trailing slashes', () => {
+      expect(normalizeOllamaBaseUrl('http://example.com:11434///')).toBe('http://example.com:11434');
+    });
+  });
+
+  describe('assertSafeUrl', () => {
+    it('allows localhost on the Ollama default port', () => {
+      expect(() => assertSafeUrl('http://localhost:11434')).not.toThrow();
+    });
+
+    it('rejects localhost on other ports', () => {
+      expect(() => assertSafeUrl('http://localhost:4000')).toThrow('Loopback addresses are not allowed');
     });
   });
 

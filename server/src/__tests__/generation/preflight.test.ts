@@ -67,7 +67,7 @@ afterEach(async () => {
 });
 
 describe('Preflight Service', () => {
-  it('returns error when no accepted outline exists', async () => {
+  it('returns error when no outline exists', async () => {
     const run = await createRun({
       projectId: testProject.id,
       userId: testUser.id,
@@ -87,6 +87,88 @@ describe('Preflight Service', () => {
       orderBy: { version: 'desc' },
     });
     expect(report?.status).toBe('failed_evaluation');
+  });
+
+  it('warns but continues when only a non-accepted outline exists', async () => {
+    const run = await createRun({
+      projectId: testProject.id,
+      userId: testUser.id,
+      prompt: 'fallback outline',
+    });
+
+    await prisma.generatedArtifact.create({
+      data: {
+        runId: run!.id,
+        projectId: run!.projectId,
+        artifactType: 'chapter_outline',
+        artifactKey: 'chapter-outline',
+        status: 'failed_evaluation',
+        version: 2,
+        title: 'Outline',
+        jsonContent: SAMPLE_OUTLINE as any,
+      },
+    });
+
+    await prisma.projectDocument.create({
+      data: {
+        projectId: run!.projectId,
+        runId: run!.id,
+        kind: 'chapter',
+        title: 'Chapter One',
+        slug: 'ch-one',
+        sortOrder: 0,
+        targetPageCount: 10,
+        content: {
+          type: 'doc',
+          content: [
+            {
+              type: 'heading',
+              attrs: { level: 1 },
+              content: [{ type: 'text', text: 'Chapter One' }],
+            },
+            {
+              type: 'paragraph',
+              content: [{ type: 'text', text: 'The first chapter opens cleanly.' }],
+            },
+          ],
+        } as any,
+      },
+    });
+    await prisma.projectDocument.create({
+      data: {
+        projectId: run!.projectId,
+        runId: run!.id,
+        kind: 'chapter',
+        title: 'Chapter Two',
+        slug: 'ch-two',
+        sortOrder: 1,
+        targetPageCount: 8,
+        content: {
+          type: 'doc',
+          content: [
+            {
+              type: 'heading',
+              attrs: { level: 1 },
+              content: [{ type: 'text', text: 'Chapter Two' }],
+            },
+            {
+              type: 'paragraph',
+              content: [{ type: 'text', text: 'The second chapter follows.' }],
+            },
+          ],
+        } as any,
+      },
+    });
+
+    const result = await runPreflight(run!);
+
+    expect(result.passed).toBe(true);
+    expect(result.issues).toContainEqual(
+      expect.objectContaining({ code: 'OUTLINE_NOT_ACCEPTED', severity: 'warning' }),
+    );
+    expect(result.issues).not.toContainEqual(
+      expect.objectContaining({ code: 'NO_OUTLINE' }),
+    );
   });
 
   it('detects missing chapters', async () => {

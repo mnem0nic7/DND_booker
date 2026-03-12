@@ -235,7 +235,45 @@ describe('Assembler — assembleDocuments', () => {
     expect(docs).toHaveLength(3);
   });
 
-  it('throws when no accepted outline exists', async () => {
+  it('falls back to the latest non-accepted outline when needed', async () => {
+    const run = await createRun({
+      projectId: testProject.id,
+      userId: testUser.id,
+      prompt: 'fallback outline test',
+    });
+
+    await prisma.generatedArtifact.create({
+      data: {
+        runId: run!.id,
+        projectId: run!.projectId,
+        artifactType: 'chapter_outline',
+        artifactKey: 'chapter-outline',
+        status: 'failed_evaluation',
+        version: 2,
+        title: 'Outline',
+        jsonContent: SAMPLE_OUTLINE as any,
+      },
+    });
+
+    await prisma.generatedArtifact.create({
+      data: {
+        runId: run!.id,
+        projectId: run!.projectId,
+        artifactType: 'chapter_draft',
+        artifactKey: 'chapter-draft-goblin-ambush',
+        status: 'accepted',
+        version: 1,
+        title: 'The Goblin Ambush',
+        tiptapContent: { type: 'doc', content: [{ type: 'paragraph' }] } as any,
+        jsonContent: { wordCount: 2500 } as any,
+      },
+    });
+
+    const result = await assembleDocuments(run!);
+    expect(result.documentIds).toHaveLength(3);
+  });
+
+  it('throws when no outline exists at all', async () => {
     const run = await createRun({
       projectId: testProject.id,
       userId: testUser.id,
@@ -243,7 +281,7 @@ describe('Assembler — assembleDocuments', () => {
     });
 
     await expect(assembleDocuments(run!)).rejects.toThrow(
-      'No accepted chapter outline found',
+      'No chapter outline found',
     );
   });
 });
