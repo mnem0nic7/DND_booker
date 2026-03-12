@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { NodeViewWrapper } from '@tiptap/react';
 import type { ReactNodeViewProps } from '@tiptap/react';
@@ -19,6 +19,7 @@ export function FullBleedImageView({
 }: ReactNodeViewProps) {
   const { id: projectId } = useParams<{ id: string }>();
   const attrs = node.attrs as FullBleedImageAttrs;
+  const [editing, setEditing] = useState(false);
 
   const updateAttr = useCallback(
     (key: string, value: string) => {
@@ -33,15 +34,25 @@ export function FullBleedImageView({
         className={`full-bleed-image full-bleed-image--${attrs.position}${selected ? ' full-bleed-image--selected' : ''}`}
         contentEditable={false}
       >
-        {/* Delete button */}
-        <button
-          className="block-delete-btn"
-          onClick={deleteNode}
-          type="button"
-          title="Delete image block"
-        >
-          Delete
-        </button>
+        {selected && (
+          <div className="block-action-bar">
+            <button
+              type="button"
+              className="block-edit-btn"
+              onClick={() => setEditing((value) => !value)}
+            >
+              {editing ? 'Done' : 'Edit'}
+            </button>
+            <button
+              className="block-delete-btn"
+              onClick={deleteNode}
+              type="button"
+              title="Delete image block"
+            >
+              Delete
+            </button>
+          </div>
+        )}
 
         {/* Drag handle + image area */}
         <div data-drag-handle="" className="full-bleed-image__drag-handle">
@@ -65,7 +76,7 @@ export function FullBleedImageView({
         )}
 
         {/* Edit panel when selected */}
-        {selected && (
+        {selected && editing && (
           <div className="full-bleed-image__edit-panel">
             <div className="full-bleed-image__edit-row">
               <label>Image</label>

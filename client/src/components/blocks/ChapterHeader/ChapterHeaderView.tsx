@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { NodeViewWrapper } from '@tiptap/react';
 import type { ReactNodeViewProps } from '@tiptap/react';
@@ -15,6 +15,7 @@ export function ChapterHeaderView({
 }: ReactNodeViewProps) {
   const { id: projectId } = useParams<{ id: string }>();
   const attrs = node.attrs as ChapterHeaderAttrs;
+  const [editing, setEditing] = useState(false);
 
   const updateAttr = useCallback(
     (key: string, value: string) => {
@@ -38,15 +39,25 @@ export function ChapterHeaderView({
             : undefined
         }
       >
-        {/* Delete button */}
-        <button
-          className="block-delete-btn"
-          onClick={deleteNode}
-          type="button"
-          title="Delete chapter header"
-        >
-          Delete
-        </button>
+        {selected && (
+          <div className="block-action-bar">
+            <button
+              type="button"
+              className="block-edit-btn"
+              onClick={() => setEditing((value) => !value)}
+            >
+              {editing ? 'Done' : 'Edit'}
+            </button>
+            <button
+              className="block-delete-btn"
+              onClick={deleteNode}
+              type="button"
+              title="Delete chapter header"
+            >
+              Delete
+            </button>
+          </div>
+        )}
 
         {/* Drag handle */}
         <div data-drag-handle="" className="chapter-header__drag-handle">
@@ -68,7 +79,7 @@ export function ChapterHeaderView({
         </div>
 
         {/* Edit panel when selected */}
-        {selected && (
+        {selected && editing && (
           <div className="chapter-header__edit-panel">
             <div className="chapter-header__edit-row">
               <label>Chapter #</label>

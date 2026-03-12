@@ -465,6 +465,21 @@
   z-index: 5;
 }
 
+.block-action-bar {
+  position: absolute;
+  top: 0.35rem;
+  right: 0.35rem;
+  display: flex;
+  gap: 0.35rem;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  z-index: 6;
+}
+
+.block-action-bar .block-delete-btn {
+  position: static;
+}
+
 /* Show on block hover — each block CSS defines its own :hover rule;
    this catch-all covers any wrapper with position:relative */
 .stat-block:hover .block-delete-btn,
@@ -484,7 +499,25 @@
 .full-bleed-image:hover .block-delete-btn,
 .map-block:hover .block-delete-btn,
 .page-border:hover .block-delete-btn,
-.sidebar-callout:hover .block-delete-btn {
+.sidebar-callout:hover .block-delete-btn,
+.stat-block:hover .block-action-bar,
+.spell-card:hover .block-action-bar,
+.magic-item:hover .block-action-bar,
+.npc-profile:hover .block-action-bar,
+.random-table:hover .block-action-bar,
+.encounter-table:hover .block-action-bar,
+.class-feature:hover .block-action-bar,
+.race-block:hover .block-action-bar,
+.chapter-header:hover .block-action-bar,
+.title-page:hover .block-action-bar,
+.credits-page:hover .block-action-bar,
+.back-cover:hover .block-action-bar,
+.table-of-contents:hover .block-action-bar,
+.handout:hover .block-action-bar,
+.full-bleed-image:hover .block-action-bar,
+.map-block:hover .block-action-bar,
+.page-border:hover .block-action-bar,
+.sidebar-callout:hover .block-action-bar {
   opacity: 1;
 }
 
