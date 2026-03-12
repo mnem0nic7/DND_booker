@@ -10,7 +10,7 @@ const DEFAULT_PROJECT_SETTINGS = {
   pageSize: 'letter',
   margins: { top: 1, right: 1, bottom: 1, left: 1 },
   columns: 1,
-  theme: 'classic-parchment',
+  theme: 'gilded-folio',
   fonts: { heading: 'Cinzel', body: 'Crimson Text' },
 };
 

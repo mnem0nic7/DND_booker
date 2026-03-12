@@ -33,7 +33,7 @@ export const createProject: ToolDefinition = {
         title,
         description: description || '',
         type: resolvedType as any,
-        settings: { pageSize: 'letter', margins: { top: 1, right: 1, bottom: 1, left: 1 }, columns: 1, theme: 'classic-parchment', fonts: { heading: 'Cinzel', body: 'Crimson Text' } },
+        settings: { pageSize: 'letter', margins: { top: 1, right: 1, bottom: 1, left: 1 }, columns: 1, theme: 'gilded-folio', fonts: { heading: 'Cinzel', body: 'Crimson Text' } },
         content: (templateContent as any) ?? { type: 'doc', content: [{ type: 'paragraph' }] },
       },
       select: { id: true, title: true, type: true, updatedAt: true },

@@ -14,6 +14,12 @@ interface ThemeOption {
 
 const themes: ThemeOption[] = [
   {
+    id: 'gilded-folio',
+    label: 'Gilded Folio',
+    description: 'Publisher-style fantasy folio',
+    colors: { bg: '#EEE5CE', text: '#1a1a1a', accent: '#58180D', secondary: '#C9AD6A' },
+  },
+  {
     id: 'classic-parchment',
     label: 'Classic Parchment',
     description: 'Traditional D&D look',
@@ -42,12 +48,6 @@ const themes: ThemeOption[] = [
     label: 'Infernal',
     description: 'Demon & hellfire theme',
     colors: { bg: '#1c1517', text: '#e8d5c4', accent: '#dc2626', secondary: '#ea580c' },
-  },
-  {
-    id: 'dmguild',
-    label: 'DMGuild',
-    description: "Player's Handbook style",
-    colors: { bg: '#EEE5CE', text: '#1a1a1a', accent: '#58180D', secondary: '#C9AD6A' },
   },
 ];
 

@@ -5,7 +5,7 @@
  * from the HTML assembler (html-assembler.ts → getThemeVariables()).
  *
  * Theme names must match client ThemeName type:
- * 'classic-parchment' | 'dark-tome' | 'clean-modern' | 'fey-wild' | 'infernal' | 'dmguild'
+ * 'classic-parchment' | 'gilded-folio' | 'dark-tome' | 'clean-modern' | 'fey-wild' | 'infernal' | 'dmguild'
  */
 
 interface ThemeDefinition {
@@ -52,6 +52,29 @@ const themes: Record<string, ThemeDefinition> = {
     headingFont: 'Mr Eaves Small Caps',
     bodyFont: 'Bookinsanity',
     texture: 'parchment-classic.jpg',
+    titleFont: 'Nodesto Caps Condensed',
+    statFont: 'Scaly Sans',
+    headerUnderline: '#C0AD6A',
+  },
+  'gilded-folio': {
+    primary: '#58180D',
+    secondary: '#C9AD6A',
+    bg: '#EEE5CE',
+    text: '#1a1a1a',
+    statBlockBg: '#F2E5B5',
+    statBlockBorder: '#E69A28',
+    readAloudBg: '#FAF7EA',
+    readAloudBorder: '#58180D',
+    sidebarBg: '#E0E5C1',
+    tableHeaderBg: '#58180D',
+    tableStripeBg: '#E0E5C1',
+    divider: '#9C2B1B',
+    spellCardAccent: '#58180D',
+    magicItemAccent: '#58180D',
+    classFeatureAccent: '#58180D',
+    headingFont: 'Mr Eaves Small Caps',
+    bodyFont: 'Bookinsanity',
+    texture: 'parchment-dmguild.jpg',
     titleFont: 'Nodesto Caps Condensed',
     statFont: 'Scaly Sans',
     headerUnderline: '#C0AD6A',

@@ -17,6 +17,9 @@ D&D block markers (use these for special content):
 - :::encounterTable {"name":"...", "difficulty":"...", ...} ::: — Encounter details
 - :::npcProfile {"name":"...", "race":"...", ...} ::: — NPC reference cards
 - :::magicItem {"name":"...", "rarity":"...", ...} ::: — Magic item cards
+- :::spellCard {"name":"...", "level":1, ...} ::: — Spell reference cards
+- :::randomTable {"title":"...", "dieType":"d20", ...} ::: — Random table or lookup table
+- :::handout {"title":"...", "style":"letter", "content":"..."} ::: — Player-facing letters, clues, or prop text
 - :::sidebarCallout ... ::: — Sidebar notes and callouts
 
 Content rules:
@@ -26,7 +29,13 @@ Content rules:
 - Reference entities by their canonical names
 - Maintain continuity with prior chapter events
 - Include encounter details where the plan specifies encounter sections
-- End sections with narrative hooks to the next section
+- Treat this as DM-facing adventure copy, not fiction. Most paragraphs should help run the table.
+- Every section should make clear: what is happening, what the players can do, what checks or tactics matter, and what changes next.
+- Social sections should surface leverage, asks, tells, and likely reactions.
+- Exploration sections should surface clues, hazards, discoveries, and consequences.
+- Encounter sections should surface terrain, enemy tactics, triggers, rewards, and aftermath.
+- Keep connective prose lean. Avoid long atmospheric passages unless they are boxed read-aloud text.
+- End sections with actionable hooks, stakes, or consequences for the next section
 - Do NOT include JSON wrapping — output raw markdown only`;
 }
 
@@ -63,6 +72,10 @@ export function buildChapterDraftUserPrompt(
     parts.push(
       `### ${section.title} (${section.contentType}, ~${section.targetWords} words)`,
       `Outline: ${section.outline}`,
+      `Scene purpose: ${section.scenePurpose ?? 'Deliver clear, table-usable play guidance for this scene.'}`,
+      `Player objective: ${section.playerObjective ?? 'Advance the chapter by making a meaningful choice or discovery.'}`,
+      `Decision point: ${section.decisionPoint ?? 'Surface a concrete choice, risk, or tradeoff.'}`,
+      `Consequence summary: ${section.consequenceSummary ?? 'Show how success, failure, or delay changes the chapter.'}`,
       `Key beats: ${section.keyBeats.join('; ')}`,
       `Blocks needed: ${section.blocksNeeded.join(', ') || 'none'}`,
       `Entity references: ${section.entityReferences.join(', ') || 'none'}`,
@@ -107,6 +120,7 @@ export function buildChapterDraftUserPrompt(
     `## Instructions`,
     `Write the full chapter prose. Target: ${plan.readAloudCount} read-aloud boxes, ${plan.dmTipCount} DM tips.`,
     `Difficulty progression: ${plan.difficultyProgression}`,
+    'Prioritize reusable DM utility. If a point can be delivered with a stat block, table, NPC profile, handout, or short callout, use the block instead of extra exposition.',
   );
 
   return parts.join('\n');

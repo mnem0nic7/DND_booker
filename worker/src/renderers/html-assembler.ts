@@ -16,7 +16,7 @@ export interface AssembleOptions {
 
 /** Map theme name to CSS custom property overrides.
  * Theme names must match client ThemeName type:
- * 'classic-parchment' | 'dark-tome' | 'clean-modern' | 'fey-wild' | 'infernal' | 'dmguild'
+ * 'classic-parchment' | 'gilded-folio' | 'dark-tome' | 'clean-modern' | 'fey-wild' | 'infernal' | 'dmguild'
  */
 /**
  * Returns CSS custom properties for the given theme.
@@ -66,6 +66,36 @@ function getThemeVariables(theme: string): string {
       --color-divider: #8b1a1a;
       --font-heading: 'Cinzel', serif;
       --font-body: 'Crimson Text', serif;
+    `,
+    'gilded-folio': `
+      --page-bg: #EEE5CE;
+      --text-color: #1a1a1a;
+      --heading-font: 'Cinzel Decorative', 'Cinzel', serif;
+      --body-font: 'Libre Baskerville', serif;
+      --accent-color: #58180D;
+      --accent-secondary: #C9AD6A;
+      --stat-block-bg: #FDF1DC;
+      --stat-block-border: #E69A28;
+      --callout-bg: #E0E5C1;
+      --read-aloud-bg: #FAF7EA;
+      --read-aloud-border: #58180D;
+      --sidebar-bg: #E0E5C1;
+      --table-header-bg: #58180D;
+      --table-stripe-bg: #FDF1DC;
+      --border-decoration: #9C2B1B;
+      --spell-card-accent: #58180D;
+      --magic-item-accent: #58180D;
+      --class-feature-accent: #58180D;
+      --encounter-accent: #58180D;
+      --color-primary: #58180D;
+      --color-secondary: #C9AD6A;
+      --color-bg: #FDF1DC;
+      --color-text: #1a1a1a;
+      --color-accent: #E0E5C1;
+      --color-heading: #58180D;
+      --color-divider: #9C2B1B;
+      --font-heading: 'Cinzel Decorative', 'Cinzel', serif;
+      --font-body: 'Libre Baskerville', serif;
     `,
     'dark-tome': `
       --page-bg: #1a1a2e;

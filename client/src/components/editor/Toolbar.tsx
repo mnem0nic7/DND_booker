@@ -54,8 +54,8 @@ function GroupDivider() {
 }
 
 const THEMES: { value: ThemeName; label: string; swatch: string }[] = [
+  { value: 'gilded-folio', label: 'Gilded Folio', swatch: '#EEE5CE' },
   { value: 'classic-parchment', label: 'Classic Parchment', swatch: '#f4e4c1' },
-  { value: 'dmguild', label: 'DMGuild', swatch: '#EEE5CE' },
   { value: 'dark-tome', label: 'Dark Tome', swatch: '#1a1a2e' },
   { value: 'clean-modern', label: 'Clean Modern', swatch: '#ffffff' },
   { value: 'fey-wild', label: 'Fey Wild', swatch: '#e8f5e9' },

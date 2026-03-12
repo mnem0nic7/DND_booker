@@ -28,6 +28,20 @@ describe('Typst Theme Variables', () => {
     expect(vars).toContain('#let theme-texture = "parchment-classic.jpg"');
   });
 
+  it('should return gilded-folio variables', () => {
+    const vars = getTypstThemeVariables('gilded-folio');
+
+    expect(vars).toContain('#let theme-primary = rgb("#58180D")');
+    expect(vars).toContain('#let theme-secondary = rgb("#C9AD6A")');
+    expect(vars).toContain('#let theme-bg = rgb("#EEE5CE")');
+    expect(vars).toContain('#let theme-text = rgb("#1a1a1a")');
+    expect(vars).toContain('#let heading-font = "Mr Eaves Small Caps"');
+    expect(vars).toContain('#let body-font = "Bookinsanity"');
+    expect(vars).toContain('#let title-font = "Nodesto Caps Condensed"');
+    expect(vars).toContain('#let stat-font = "Scaly Sans"');
+    expect(vars).toContain('#let theme-texture = "parchment-dmguild.jpg"');
+  });
+
   it('should return dark-tome variables', () => {
     const vars = getTypstThemeVariables('dark-tome');
 
@@ -124,7 +138,12 @@ describe('Typst Theme Variables', () => {
     expect(vars).toContain('#let heading-font = "Mr Eaves Small Caps"');
     expect(vars).not.toContain('serif');
 
-    // dmguild uses same Solbera fonts
+    // gilded-folio uses same Solbera fonts
+    const gildedVars = getTypstThemeVariables('gilded-folio');
+    expect(gildedVars).toContain('#let heading-font = "Mr Eaves Small Caps"');
+    expect(gildedVars).not.toContain('serif');
+
+    // dmguild compatibility alias uses same Solbera fonts
     const dmVars = getTypstThemeVariables('dmguild');
     expect(dmVars).toContain('#let heading-font = "Mr Eaves Small Caps"');
     expect(dmVars).not.toContain('serif');

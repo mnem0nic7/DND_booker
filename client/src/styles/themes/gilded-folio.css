@@ -1,0 +1,124 @@
+[data-theme="gilded-folio"] {
+  --page-bg: #EEE5CE;
+  --text-color: #1a1a1a;
+  --heading-font: 'Cinzel', serif;
+  --body-font: 'Libre Baskerville', serif;
+  --accent-color: #58180D;
+  --accent-secondary: #C9AD6A;
+  --stat-block-bg: #F2E5B5;
+  --stat-block-border: #E69A28;
+  --callout-bg: #E0E5C1;
+  --read-aloud-bg: #FAF7EA;
+  --read-aloud-border: #58180D;
+  --sidebar-bg: #E0E5C1;
+  --table-header-bg: #58180D;
+  --table-stripe-bg: #E0E5C1;
+  --border-decoration: #9C2B1B;
+  --spell-card-accent: #58180D;
+  --magic-item-accent: #58180D;
+  --class-feature-accent: #58180D;
+  --encounter-accent: #58180D;
+  --page-texture: url('/textures/parchment-dmguild.jpg');
+  --column-rule-color: rgba(0, 0, 0, 0.06);
+  --footer-color: #C9AD6A;
+  --drop-cap-font: 'Cinzel Decorative', 'Cinzel', serif;
+  --paragraph-indent: 0;
+  --divider-ornament: '';
+  --divider-gradient: linear-gradient(to right, transparent, #9C2B1B 15%, #9C2B1B 85%, transparent);
+  --divider-height: 4px;
+  --blockquote-border: 3px solid #C9AD6A;
+  --blockquote-bg: rgba(201, 173, 106, 0.08);
+  --h1-border-bottom: none;
+  --h1-padding-bottom: 0;
+  --h3-border-bottom: 2px solid #C0AD6A;
+}
+
+[data-theme="gilded-folio"] .editor-themed-content h1 + p::first-letter,
+[data-theme="gilded-folio"] .editor-themed-content h2 + p::first-letter,
+[data-theme="gilded-folio"] .editor-themed-content h3 + p::first-letter,
+[data-theme="gilded-folio"] .page-canvas .ProseMirror h1 + p::first-letter,
+[data-theme="gilded-folio"] .page-canvas .ProseMirror h2 + p::first-letter,
+[data-theme="gilded-folio"] .page-canvas .ProseMirror h3 + p::first-letter {
+  font-family: 'Cinzel Decorative', 'Cinzel', serif;
+  font-size: 3.5em;
+  float: left;
+  line-height: 0.8;
+  margin-right: 0.08em;
+  margin-top: 0.05em;
+  color: #58180D;
+}
+
+[data-theme="gilded-folio"] .editor-themed-content hr {
+  border: none;
+  height: 4px;
+  background: linear-gradient(
+    to right,
+    transparent,
+    #9C2B1B 15%,
+    #9C2B1B 85%,
+    transparent
+  );
+  margin: 1.5rem 0;
+  position: relative;
+}
+
+[data-theme="gilded-folio"] .editor-themed-content hr::after {
+  content: '';
+  position: absolute;
+  top: 6px;
+  left: 15%;
+  right: 15%;
+  height: 1px;
+  background: #9C2B1B;
+  opacity: 0.5;
+}
+
+[data-theme="gilded-folio"] .page-canvas .ProseMirror hr {
+  height: 4px;
+  background: linear-gradient(to right, transparent, #9C2B1B 15%, #9C2B1B 85%, transparent);
+}
+
+[data-theme="gilded-folio"] .page-canvas .ProseMirror hr::after {
+  content: '';
+  position: absolute;
+  top: 6px;
+  left: 15%;
+  right: 15%;
+  height: 1px;
+  background: #9C2B1B;
+  opacity: 0.5;
+}
+
+[data-theme="gilded-folio"] .editor-themed-content h1 {
+  margin-top: 2rem;
+  margin-bottom: 0.75rem;
+}
+
+[data-theme="gilded-folio"] .editor-themed-content h2 {
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+}
+
+[data-theme="gilded-folio"] .editor-themed-content h3 {
+  margin-top: 1.25rem;
+  margin-bottom: 0.4rem;
+  border-bottom: 2px solid #C0AD6A;
+  padding-bottom: 0.2rem;
+}
+
+[data-theme="gilded-folio"] .page-canvas .ProseMirror h1 {
+  margin-top: 2rem;
+  margin-bottom: 0.75rem;
+}
+
+[data-theme="gilded-folio"] .page-canvas .ProseMirror h2 {
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+}
+
+[data-theme="gilded-folio"] .page-canvas .ProseMirror h3 {
+  margin-top: 1.25rem;
+  margin-bottom: 0.4rem;
+  border-bottom: 2px solid #C0AD6A;
+  padding-bottom: 0.2rem;
+}

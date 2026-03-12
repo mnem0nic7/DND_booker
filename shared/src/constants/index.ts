@@ -7,6 +7,6 @@ export const DEFAULT_PROJECT_SETTINGS = {
   pageSize: 'letter' as const,
   margins: { top: 1, right: 1, bottom: 1, left: 1 },
   columns: 1 as const,
-  theme: 'classic-parchment',
+  theme: 'gilded-folio',
   fonts: { heading: 'Cinzel', body: 'Crimson Text' },
 };

@@ -161,12 +161,83 @@ Page size: 612 x 792 pts (letter)
     expect(review.findings.map((finding) => finding.code)).not.toContain('EXPORT_SECTION_TITLE_WRAP');
   });
 
+  it('flags broken utility blocks directly from exported document content', () => {
+    const review = analyzePdfExportLayout({
+      documents: [
+        {
+          title: 'Chapter 1: Broken Tools',
+          kind: 'chapter',
+          content: {
+            type: 'doc',
+            content: [
+              {
+                type: 'encounterTable',
+                attrs: {
+                  environment: 'Underdark trail',
+                  crRange: '1-4',
+                  entries: '[]',
+                },
+              },
+              {
+                type: 'statBlock',
+                attrs: {
+                  name: 'Enchanted Guardian',
+                  ac: 0,
+                  hp: 0,
+                },
+              },
+            ],
+          },
+        },
+      ],
+      pages: [],
+      pageCount: 1,
+      pageWidthPts: 612,
+      pageHeightPts: 792,
+    });
+
+    expect(review.findings.map((finding) => finding.code)).toContain('EXPORT_EMPTY_ENCOUNTER_TABLE');
+    expect(review.findings.map((finding) => finding.code)).toContain('EXPORT_PLACEHOLDER_STAT_BLOCK');
+    expect(review.metrics.utilityCoverage[0].referenceBlockCount).toBe(2);
+  });
+
+  it('flags prose-heavy chapters with weak utility density', () => {
+    const review = analyzePdfExportLayout({
+      documents: [
+        {
+          title: 'Chapter 2: Too Much Lore',
+          kind: 'chapter',
+          content: {
+            type: 'doc',
+            content: Array.from({ length: 6 }, (_, index) => ({
+              type: 'paragraph',
+              content: [
+                {
+                  type: 'text',
+                  text: `Paragraph ${index + 1} expands on mood and backstory without adding a usable reference block.`,
+                },
+              ],
+            })),
+          },
+        },
+      ],
+      pages: [],
+      pageCount: 1,
+      pageWidthPts: 612,
+      pageHeightPts: 792,
+    });
+
+    expect(review.findings.map((finding) => finding.code)).toContain('EXPORT_LOW_UTILITY_DENSITY');
+    expect(review.metrics.utilityCoverage[0].utilityDensity).toBe(0);
+  });
+
   it('builds an unavailable review payload when review tooling fails', () => {
     const review = buildUnavailableExportReview('missing pdftotext');
     expect(review.status).toBe('unavailable');
     expect(review.findings[0].code).toBe('EXPORT_REVIEW_UNAVAILABLE');
     expect(review.passCount).toBe(1);
     expect(review.appliedFixes).toEqual([]);
+    expect(review.metrics.utilityCoverage).toEqual([]);
   });
 
   it('plans deterministic export auto-fixes from review findings', () => {

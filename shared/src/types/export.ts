@@ -9,6 +9,9 @@ export type ExportReviewCode =
   | 'EXPORT_CHAPTER_OPENER_LOW'
   | 'EXPORT_SECTION_TITLE_WRAP'
   | 'EXPORT_LAST_PAGE_UNDERFILLED'
+  | 'EXPORT_EMPTY_ENCOUNTER_TABLE'
+  | 'EXPORT_PLACEHOLDER_STAT_BLOCK'
+  | 'EXPORT_LOW_UTILITY_DENSITY'
   | 'EXPORT_REVIEW_UNAVAILABLE';
 export type ExportReviewAutoFix =
   | 'shrink_h1_headings'
@@ -32,12 +35,22 @@ export interface ExportSectionReviewMetric {
   hyphenated: boolean;
 }
 
+export interface ExportUtilityReviewMetric {
+  title: string;
+  kind: DocumentKind | null;
+  utilityBlockCount: number;
+  referenceBlockCount: number;
+  proseParagraphCount: number;
+  utilityDensity: number;
+}
+
 export interface ExportReviewMetrics {
   pageCount: number;
   pageWidthPts: number | null;
   pageHeightPts: number | null;
   lastPageFillRatio: number | null;
   sectionStarts: ExportSectionReviewMetric[];
+  utilityCoverage: ExportUtilityReviewMetric[];
 }
 
 export interface ExportReview {

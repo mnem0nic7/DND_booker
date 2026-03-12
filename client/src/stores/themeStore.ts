@@ -4,6 +4,7 @@ import api from '../lib/api';
 
 export type ThemeName =
   | 'classic-parchment'
+  | 'gilded-folio'
   | 'dark-tome'
   | 'clean-modern'
   | 'fey-wild'
@@ -20,20 +21,22 @@ interface ThemeState {
 export const useThemeStore = create<ThemeState>()(
   persist(
     (set, get) => ({
-      currentTheme: 'classic-parchment',
+      currentTheme: 'gilded-folio',
       _projectId: null,
 
       loadProjectTheme: (projectId, settings) => {
-        const theme = (settings?.theme as ThemeName) || 'classic-parchment';
+        const rawTheme = (settings?.theme as ThemeName | undefined) ?? 'gilded-folio';
+        const theme = rawTheme === 'dmguild' ? 'gilded-folio' : rawTheme;
         set({ currentTheme: theme, _projectId: projectId });
       },
 
       setTheme: (theme) => {
         // Capture projectId before state update to avoid race with navigation
         const projectId = get()._projectId;
-        set({ currentTheme: theme });
+        const normalizedTheme = theme === 'dmguild' ? 'gilded-folio' : theme;
+        set({ currentTheme: normalizedTheme });
         if (projectId) {
-          api.put(`/projects/${projectId}`, { settings: { theme } }).catch((err) => {
+          api.put(`/projects/${projectId}`, { settings: { theme: normalizedTheme } }).catch((err) => {
             console.error('[Theme] Failed to persist theme to server:', err);
           });
         }

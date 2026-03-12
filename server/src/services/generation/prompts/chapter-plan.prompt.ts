@@ -15,9 +15,13 @@ You MUST respond with ONLY a JSON object (no markdown fences, no commentary). Th
       "contentType": "narrative | encounter | exploration | social | transition",
       "targetWords": 800,
       "outline": "2-3 sentences describing exactly what this section covers",
+      "scenePurpose": "Why this section exists in play and what job it does for the DM",
+      "playerObjective": "What the players are trying to accomplish or learn here",
+      "decisionPoint": "The most important choice or pressure point in this section",
+      "consequenceSummary": "What changes if the party succeeds, fails, bargains, retreats, or escalates",
       "keyBeats": ["PCs arrive via the forest road", "First signs of goblin damage"],
       "entityReferences": ["millbrook-village", "elder-mara"],
-      "blocksNeeded": ["readAloud", "dmTips"]
+      "blocksNeeded": ["readAloud", "dmTips", "handout"]
     }
   ],
   "encounters": [
@@ -45,14 +49,23 @@ blocksNeeded options (D&D editor block types):
 - magicItem: magic item card
 - spellCard: spell reference
 - randomTable: random encounter/loot table
+- handout: player-facing letter, clue sheet, inscription, or prop text
 
 Rules:
 - targetWords per section: narrative 600-1200, encounter 800-1500, exploration 600-1000, social 400-800, transition 200-400
 - Every encounter section MUST have a matching encounter spec
+- Every non-transition section MUST include scenePurpose, playerObjective, decisionPoint, and consequenceSummary
+- Every non-transition section MUST include at least one reusable DM utility block in blocksNeeded
+- Narrative sections should usually include readAloud plus dmTips or handout
+- Encounter sections MUST include encounterTable and usually statBlock
+- Exploration sections MUST include randomTable or handout
+- Social sections MUST include npcProfile or dmTips
+- Across the chapter, aim for at least one reference-heavy block (statBlock, encounterTable, npcProfile, magicItem, spellCard, randomTable, handout) for every 2 non-transition sections
 - entityReferences must use slugs from the campaign bible
 - readAloudCount: 1-2 per narrative section, 1 per encounter
 - dmTipCount: 1-2 per chapter
-- Difficulty should escalate within the chapter and across the adventure`;
+- Difficulty should escalate within the chapter and across the adventure
+- Optimize for table usability, not fiction recital. The plan should give a DM actionable scenes, not just plot summary.`;
 }
 
 export function buildChapterPlanUserPrompt(
@@ -66,6 +79,8 @@ export function buildChapterPlanUserPrompt(
     `Level range: ${chapter.levelRange.min}-${chapter.levelRange.max}`,
     `Target pages: ${chapter.targetPages}`,
     `Summary: ${chapter.summary}`,
+    '',
+    'Planning priority: make this chapter table-ready for a DM. Prefer scene goals, choices, consequences, and reusable utility blocks over long prose summary.',
     '',
     'Sections from outline:',
     ...chapter.sections.map(s =>

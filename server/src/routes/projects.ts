@@ -28,7 +28,15 @@ const tiptapContentSchema = z.object({
 );
 
 const settingsSchema = z.object({
-  theme: z.enum(['classic-parchment', 'dark-tome', 'clean-modern', 'fey-wild', 'infernal']).optional(),
+  theme: z.enum([
+    'classic-parchment',
+    'gilded-folio',
+    'dark-tome',
+    'clean-modern',
+    'fey-wild',
+    'infernal',
+    'dmguild',
+  ]).optional(),
   pageSize: z.enum(['letter', 'a4']).optional(),
   columns: z.number().int().min(1).max(3).optional(),
 }).strip(); // strip unknown fields to prevent arbitrary key injection into settings JSON

@@ -203,6 +203,7 @@ describe('Export Routes', () => {
               pageHeightPts: 792,
               lastPageFillRatio: 0.28,
               sectionStarts: [],
+              utilityCoverage: [],
             },
           },
           completedAt: new Date(),

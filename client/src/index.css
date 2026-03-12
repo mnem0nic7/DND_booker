@@ -2,6 +2,7 @@
 
 /* Theme CSS */
 @import './styles/themes/classic-parchment.css';
+@import './styles/themes/gilded-folio.css';
 @import './styles/themes/dark-tome.css';
 @import './styles/themes/clean-modern.css';
 @import './styles/themes/fey-wild.css';

@@ -1,23 +1,51 @@
 import { execFile as execFileCallback } from 'node:child_process';
 import { promisify } from 'node:util';
 import type {
+  DocumentContent,
   DocumentKind,
   ExportReviewAutoFix,
   ExportReview,
   ExportReviewFinding,
   ExportSectionReviewMetric,
+  ExportUtilityReviewMetric,
 } from '@dnd-booker/shared';
-import { normalizeChapterHeaderTitle } from '@dnd-booker/shared';
+import { normalizeChapterHeaderTitle, normalizeEncounterEntries } from '@dnd-booker/shared';
 
 const execFile = promisify(execFileCallback);
 
 const CHAPTER_OPENER_TOP_RATIO_THRESHOLD = 0.25;
 const LAST_PAGE_FILL_RATIO_THRESHOLD = 0.45;
 const HEADING_LINE_HEIGHT_THRESHOLD = 14;
+const UTILITY_DENSITY_THRESHOLD = 0.14;
+
+const UTILITY_BLOCK_WEIGHTS: Record<string, number> = {
+  readAloudBox: 0.5,
+  sidebarCallout: 0.5,
+  statBlock: 1.25,
+  spellCard: 1,
+  magicItem: 1,
+  randomTable: 1,
+  npcProfile: 1,
+  encounterTable: 1.25,
+  handout: 1,
+  mapBlock: 1,
+};
+
+const REFERENCE_BLOCK_TYPES = new Set([
+  'statBlock',
+  'spellCard',
+  'magicItem',
+  'randomTable',
+  'npcProfile',
+  'encounterTable',
+  'handout',
+  'mapBlock',
+]);
 
 interface ReviewableDocument {
   title: string;
   kind?: DocumentKind | null;
+  content?: DocumentContent | null;
 }
 
 interface PdfWord {
@@ -100,6 +128,7 @@ export function buildUnavailableExportReview(message: string): ExportReview {
       pageHeightPts: null,
       lastPageFillRatio: null,
       sectionStarts: [],
+      utilityCoverage: [],
     },
   };
 }
@@ -175,9 +204,14 @@ export function analyzePdfExportLayout(input: {
   const { documents, pages, pageCount, pageWidthPts, pageHeightPts } = input;
   const findings: ExportReviewFinding[] = [];
   const sectionStarts: ExportSectionReviewMetric[] = [];
+  const utilityCoverage: ExportUtilityReviewMetric[] = [];
   let previousSectionPage = 1;
 
   for (const document of documents.filter((doc) => doc.kind === 'chapter' || doc.kind === 'appendix')) {
+    const contentReview = analyzeDocumentUtility(document);
+    utilityCoverage.push(contentReview.metric);
+    findings.push(...contentReview.findings);
+
     const match = findSectionMatch(document, pages, previousSectionPage);
     sectionStarts.push({
       title: document.title,
@@ -222,6 +256,7 @@ export function analyzePdfExportLayout(input: {
         },
       });
     }
+
   }
 
   const lastPageFillRatio = computeLastPageFillRatio(pages.at(-1) ?? null);
@@ -253,7 +288,7 @@ export function analyzePdfExportLayout(input: {
     score,
     generatedAt: new Date().toISOString(),
     summary: findings.length > 0
-      ? `Export review found ${findings.length} layout issue${findings.length === 1 ? '' : 's'} across ${pageCount} page${pageCount === 1 ? '' : 's'}.`
+      ? `Export review found ${findings.length} issue${findings.length === 1 ? '' : 's'} across ${pageCount} page${pageCount === 1 ? '' : 's'}.`
       : `Export review passed across ${pageCount} page${pageCount === 1 ? '' : 's'}.`,
     passCount: 1,
     appliedFixes: [],
@@ -264,6 +299,7 @@ export function analyzePdfExportLayout(input: {
       pageHeightPts,
       lastPageFillRatio: lastPageFillRatio === null ? null : roundRatio(lastPageFillRatio),
       sectionStarts,
+      utilityCoverage,
     },
   };
 }
@@ -505,6 +541,12 @@ function findingPenalty(code: ExportReviewFinding['code']): number {
       return 10;
     case 'EXPORT_LAST_PAGE_UNDERFILLED':
       return 12;
+    case 'EXPORT_EMPTY_ENCOUNTER_TABLE':
+      return 22;
+    case 'EXPORT_PLACEHOLDER_STAT_BLOCK':
+      return 24;
+    case 'EXPORT_LOW_UTILITY_DENSITY':
+      return 16;
     case 'EXPORT_REVIEW_UNAVAILABLE':
       return 0;
     default:
@@ -514,4 +556,161 @@ function findingPenalty(code: ExportReviewFinding['code']): number {
 
 function roundRatio(value: number): number {
   return Math.round(value * 1000) / 1000;
+}
+
+function analyzeDocumentUtility(document: ReviewableDocument): {
+  metric: ExportUtilityReviewMetric;
+  findings: ExportReviewFinding[];
+} {
+  const inspection = inspectDocumentContent(document.content ?? null, document.title);
+  const utilityDensity = inspection.utilityWeight <= 0
+    ? 0
+    : inspection.utilityWeight / (inspection.utilityWeight + inspection.proseParagraphCount);
+
+  const findings = [...inspection.findings];
+  if (
+    (document.kind === 'chapter' || document.kind === 'appendix')
+    && inspection.proseParagraphCount >= 4
+    && utilityDensity < UTILITY_DENSITY_THRESHOLD
+  ) {
+    findings.push({
+      code: 'EXPORT_LOW_UTILITY_DENSITY',
+      severity: 'warning',
+      page: null,
+      message: `"${document.title}" is prose-heavy and under-indexed for table use.`,
+      details: {
+        title: document.title,
+        kind: document.kind ?? null,
+        proseParagraphCount: inspection.proseParagraphCount,
+        utilityBlockCount: inspection.utilityBlockCount,
+        referenceBlockCount: inspection.referenceBlockCount,
+        utilityDensity: roundRatio(utilityDensity),
+        threshold: UTILITY_DENSITY_THRESHOLD,
+      },
+    });
+  }
+
+  return {
+    metric: {
+      title: document.title,
+      kind: document.kind ?? null,
+      utilityBlockCount: inspection.utilityBlockCount,
+      referenceBlockCount: inspection.referenceBlockCount,
+      proseParagraphCount: inspection.proseParagraphCount,
+      utilityDensity: roundRatio(utilityDensity),
+    },
+    findings,
+  };
+}
+
+function inspectDocumentContent(content: DocumentContent | null, documentTitle: string): {
+  proseParagraphCount: number;
+  utilityBlockCount: number;
+  referenceBlockCount: number;
+  utilityWeight: number;
+  findings: ExportReviewFinding[];
+} {
+  if (!content) {
+    return {
+      proseParagraphCount: 0,
+      utilityBlockCount: 0,
+      referenceBlockCount: 0,
+      utilityWeight: 0,
+      findings: [],
+    };
+  }
+
+  const findings: ExportReviewFinding[] = [];
+  let proseParagraphCount = 0;
+  let utilityBlockCount = 0;
+  let referenceBlockCount = 0;
+  let utilityWeight = 0;
+
+  const visit = (node: DocumentContent, documentTitle: string, insideUtilityContainer = false) => {
+    const nodeType = node.type;
+    const nodeWeight = UTILITY_BLOCK_WEIGHTS[nodeType] ?? 0;
+    const isUtilityBlock = nodeWeight > 0;
+
+    if (isUtilityBlock) {
+      utilityBlockCount += 1;
+      utilityWeight += nodeWeight;
+      if (REFERENCE_BLOCK_TYPES.has(nodeType)) referenceBlockCount += 1;
+
+      if (nodeType === 'encounterTable' && normalizeEncounterEntries(node.attrs?.entries).length === 0) {
+        findings.push({
+          code: 'EXPORT_EMPTY_ENCOUNTER_TABLE',
+          severity: 'error',
+          page: null,
+          message: `"${documentTitle}" includes an empty encounter table.`,
+          details: {
+            title: documentTitle,
+            blockType: nodeType,
+          },
+        });
+      }
+
+      if (nodeType === 'statBlock' && isPlaceholderStatBlock(node)) {
+        findings.push({
+          code: 'EXPORT_PLACEHOLDER_STAT_BLOCK',
+          severity: 'error',
+          page: null,
+          message: `"${documentTitle}" includes a broken or placeholder stat block.`,
+          details: {
+            title: documentTitle,
+            blockType: nodeType,
+            name: readStringAttr(node, 'name'),
+            ac: readNumberAttr(node, 'ac'),
+            hp: readNumberAttr(node, 'hp'),
+          },
+        });
+      }
+    }
+
+    if (!insideUtilityContainer && !isUtilityBlock && nodeType === 'paragraph' && hasParagraphText(node)) {
+      proseParagraphCount += 1;
+    }
+
+    for (const child of node.content ?? []) {
+      visit(child, documentTitle, insideUtilityContainer || isUtilityBlock);
+    }
+  };
+
+  visit(content, documentTitle);
+
+  return {
+    proseParagraphCount,
+    utilityBlockCount,
+    referenceBlockCount,
+    utilityWeight,
+    findings,
+  };
+}
+
+function hasParagraphText(node: DocumentContent): boolean {
+  return readNodeText(node).trim().length > 0;
+}
+
+function readNodeText(node: DocumentContent): string {
+  if (typeof node.text === 'string') return node.text;
+  return (node.content ?? []).map((child) => readNodeText(child)).join(' ');
+}
+
+function isPlaceholderStatBlock(node: DocumentContent): boolean {
+  const name = readStringAttr(node, 'name');
+  const ac = readNumberAttr(node, 'ac');
+  const hp = readNumberAttr(node, 'hp');
+
+  if (!name.trim()) return true;
+  if (!Number.isFinite(ac) || !Number.isFinite(hp)) return true;
+  return ac <= 0 || hp <= 0;
+}
+
+function readStringAttr(node: DocumentContent, key: string): string {
+  const value = node.attrs?.[key];
+  return typeof value === 'string' ? value : value == null ? '' : String(value);
+}
+
+function readNumberAttr(node: DocumentContent, key: string): number {
+  const value = Number(node.attrs?.[key]);
+  return Number.isFinite(value) ? value : Number.NaN;
 }

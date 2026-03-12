@@ -528,9 +528,10 @@ describe('Typst E2E Pipeline', () => {
     expect(pdf.subarray(0, 5).toString('ascii')).toBe('%PDF-');
   }, 30_000);
 
-  it('should generate a PDF with all 6 themes', async () => {
+  it('should generate a PDF with all supported themes', async () => {
     const themes = [
       'classic-parchment',
+      'gilded-folio',
       'dark-tome',
       'clean-modern',
       'fey-wild',

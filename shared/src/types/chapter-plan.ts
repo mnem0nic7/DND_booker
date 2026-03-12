@@ -8,6 +8,17 @@ export interface EncounterSpec {
   rewards: string[];
 }
 
+export type ChapterPlanBlockType =
+  | 'readAloud'
+  | 'dmTips'
+  | 'statBlock'
+  | 'encounterTable'
+  | 'npcProfile'
+  | 'magicItem'
+  | 'spellCard'
+  | 'randomTable'
+  | 'handout';
+
 /** Specification for one section within a chapter plan. */
 export interface SectionSpec {
   slug: string;
@@ -17,7 +28,11 @@ export interface SectionSpec {
   outline: string;
   keyBeats: string[];
   entityReferences: string[];
-  blocksNeeded: string[];
+  blocksNeeded: ChapterPlanBlockType[];
+  scenePurpose?: string;
+  playerObjective?: string;
+  decisionPoint?: string;
+  consequenceSummary?: string;
 }
 
 /** Detailed plan for one chapter — produced by the chapter plan service. */

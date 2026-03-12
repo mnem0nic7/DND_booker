@@ -317,7 +317,11 @@ async function renderPdfVariant(input: {
     try {
       const review = await reviewPdfExport(
         filepath,
-        docs.map((doc) => ({ title: doc.title, kind: doc.kind ?? null }))
+        docs.map((doc) => ({
+          title: doc.title,
+          kind: doc.kind ?? null,
+          content: doc.content,
+        }))
       );
       return { buffer, review };
     } catch (reviewError) {

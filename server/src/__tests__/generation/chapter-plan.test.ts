@@ -48,6 +48,10 @@ const VALID_PLAN: ChapterPlan = {
     {
       slug: 'arrival', title: 'Arrival', contentType: 'narrative', targetWords: 800,
       outline: 'The party arrives at the village and sees signs of recent goblin attacks.',
+      scenePurpose: 'Introduce the village in a playable, table-facing way.',
+      playerObjective: 'Learn what happened and decide whom to trust.',
+      decisionPoint: 'Choose whether to investigate the damage, talk to witnesses, or fortify the village.',
+      consequenceSummary: 'The first lead and first ally shape how prepared the party is for the ambush.',
       keyBeats: ['PCs arrive', 'See damaged buildings', 'Meet villagers'],
       entityReferences: ['chief-gnarltooth'],
       blocksNeeded: ['readAloud', 'dmTips'],
@@ -55,6 +59,10 @@ const VALID_PLAN: ChapterPlan = {
     {
       slug: 'ambush', title: 'Goblin Ambush', contentType: 'encounter', targetWords: 1200,
       outline: 'Goblins ambush the party at the village outskirts.',
+      scenePurpose: 'Deliver the chapter combat set piece and reveal goblin tactics.',
+      playerObjective: 'Survive the ambush and secure the goblins’ trail or clues.',
+      decisionPoint: 'Choose whether to hold ground, protect villagers, or chase the retreating goblins.',
+      consequenceSummary: 'The outcome affects available clues, allied morale, and the next route forward.',
       keyBeats: ['Goblins attack from cover', 'Villagers flee', 'Chief watches from afar'],
       entityReferences: ['chief-gnarltooth'],
       blocksNeeded: ['readAloud', 'encounterTable', 'statBlock'],
@@ -166,6 +174,67 @@ describe('Chapter Plan Service — executeChapterPlanGeneration', () => {
 
     const updated = await prisma.generationRun.findUnique({ where: { id: run!.id } });
     expect(updated!.actualTokens).toBe(2500);
+  });
+
+  it('should normalize weak plans into table-usable chapter structure', async () => {
+    mockGenerateText.mockResolvedValueOnce({
+      text: JSON.stringify({
+        chapterSlug: 'ch-1',
+        chapterTitle: 'Chapter 1: The Village',
+        sections: [
+          {
+            slug: 'arrival',
+            title: 'Arrival',
+            contentType: 'narrative',
+            targetWords: 1400,
+            outline: 'The party reaches the village.',
+            keyBeats: ['PCs arrive'],
+            entityReferences: ['chief-gnarltooth'],
+            blocksNeeded: [],
+          },
+          {
+            slug: 'ambush',
+            title: 'Goblin Ambush',
+            contentType: 'encounter',
+            targetWords: 200,
+            outline: 'Goblins strike from cover.',
+            keyBeats: ['combat starts'],
+            entityReferences: ['chief-gnarltooth'],
+            blocksNeeded: ['readAloud'],
+          },
+        ],
+        encounters: VALID_PLAN.encounters,
+        entityReferences: ['chief-gnarltooth'],
+        readAloudCount: 0,
+        dmTipCount: 0,
+        difficultyProgression: '',
+      }),
+      usage: { inputTokens: 1000, outputTokens: 1500 },
+    } as any);
+
+    const run = await createRun({
+      projectId: testProject.id, userId: testUser.id, prompt: 'test',
+    });
+
+    const result = await executeChapterPlanGeneration(
+      run!, SAMPLE_CHAPTER, SAMPLE_BIBLE,
+      SAMPLE_BIBLE.entities.map(e => ({ slug: e.slug, entityType: e.entityType, name: e.name, summary: e.summary })),
+      {} as any, 8192,
+    );
+
+    expect(result.plan.sections[0].targetWords).toBeLessThanOrEqual(1200);
+    expect(result.plan.sections[0].blocksNeeded).toContain('readAloud');
+    expect(result.plan.sections[0].blocksNeeded).toContain('dmTips');
+    expect(result.plan.sections[0].scenePurpose).toBeTruthy();
+    expect(result.plan.sections[0].playerObjective).toBeTruthy();
+    expect(result.plan.sections[0].decisionPoint).toBeTruthy();
+    expect(result.plan.sections[0].consequenceSummary).toBeTruthy();
+    expect(result.plan.sections[1].targetWords).toBeGreaterThanOrEqual(800);
+    expect(result.plan.sections[1].blocksNeeded).toContain('encounterTable');
+    expect(result.plan.sections[1].blocksNeeded).toContain('statBlock');
+    expect(result.plan.readAloudCount).toBeGreaterThanOrEqual(2);
+    expect(result.plan.dmTipCount).toBeGreaterThanOrEqual(1);
+    expect(result.plan.difficultyProgression).toBeTruthy();
   });
 
   it('should throw on malformed AI response', async () => {
