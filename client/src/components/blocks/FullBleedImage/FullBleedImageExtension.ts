@@ -6,6 +6,7 @@ export interface FullBleedImageAttrs {
   src: string;
   caption: string;
   position: 'full' | 'half' | 'quarter';
+  imagePrompt: string;
 }
 
 export const FullBleedImage = Node.create({
@@ -19,6 +20,7 @@ export const FullBleedImage = Node.create({
       src: { default: '' },
       caption: { default: '' },
       position: { default: 'full' },
+      imagePrompt: { default: '' },
     };
   },
 

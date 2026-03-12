@@ -177,6 +177,64 @@ describe('Assembler — assembleDocuments', () => {
     expect(docs[1].slug).toBe('dark-forest');
   });
 
+  it('replaces any existing project documents before assembling new ones', async () => {
+    const run = await createRun({
+      projectId: testProject.id,
+      userId: testUser.id,
+      prompt: 'replace docs test',
+    });
+
+    await prisma.projectDocument.create({
+      data: {
+        projectId: run!.projectId,
+        runId: null,
+        kind: 'chapter',
+        title: 'Old Draft',
+        slug: 'old-draft',
+        sortOrder: 0,
+        content: { type: 'doc', content: [{ type: 'paragraph' }] } as any,
+        status: 'draft',
+      },
+    });
+
+    await prisma.generatedArtifact.create({
+      data: {
+        runId: run!.id,
+        projectId: run!.projectId,
+        artifactType: 'chapter_outline',
+        artifactKey: 'chapter-outline',
+        status: 'accepted',
+        version: 1,
+        title: 'Outline',
+        jsonContent: SAMPLE_OUTLINE as any,
+      },
+    });
+
+    await prisma.generatedArtifact.create({
+      data: {
+        runId: run!.id,
+        projectId: run!.projectId,
+        artifactType: 'chapter_draft',
+        artifactKey: 'chapter-draft-goblin-ambush',
+        status: 'accepted',
+        version: 1,
+        title: 'The Goblin Ambush',
+        tiptapContent: { type: 'doc', content: [{ type: 'paragraph' }] } as any,
+        jsonContent: { wordCount: 2500 } as any,
+      },
+    });
+
+    await assembleDocuments(run!);
+
+    const docs = await prisma.projectDocument.findMany({
+      where: { projectId: run!.projectId },
+      orderBy: { sortOrder: 'asc' },
+    });
+
+    expect(docs.some((doc) => doc.slug === 'old-draft')).toBe(false);
+    expect(docs).toHaveLength(3);
+  });
+
   it('throws when no accepted outline exists', async () => {
     const run = await createRun({
       projectId: testProject.id,

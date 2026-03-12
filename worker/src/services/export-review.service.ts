@@ -7,6 +7,7 @@ import type {
   ExportReviewFinding,
   ExportSectionReviewMetric,
 } from '@dnd-booker/shared';
+import { normalizeChapterHeaderTitle } from '@dnd-booker/shared';
 
 const execFile = promisify(execFileCallback);
 
@@ -205,7 +206,7 @@ export function analyzePdfExportLayout(input: {
       });
     }
 
-    if (match.lineCount > 1 || match.hyphenated) {
+    if (shouldFlagSectionTitleWrap(document, match)) {
       findings.push({
         code: 'EXPORT_SECTION_TITLE_WRAP',
         severity: 'warning',
@@ -354,12 +355,16 @@ function normalizeText(text: string): string {
     .toLowerCase();
 }
 
+function normalizeSectionReviewTitle(title: string): string {
+  return normalizeText(normalizeChapterHeaderTitle(title, title));
+}
+
 function findSectionMatch(
   document: ReviewableDocument,
   pages: PdfPage[],
   minimumPage: number
 ): SectionMatch | null {
-  const titleNeedle = normalizeText(document.title);
+  const titleNeedle = normalizeSectionReviewTitle(document.title);
   if (!titleNeedle) return null;
 
   const candidates: Array<SectionMatch & { score: number }> = [];
@@ -413,6 +418,14 @@ function getHeadingScore(lines: PdfLine[], normalizedTitle: string): number {
   if (startsNearTop) score += 2;
   if (isExactTitleLine) score += 1;
   return score;
+}
+
+function shouldFlagSectionTitleWrap(document: ReviewableDocument, match: SectionMatch): boolean {
+  if (match.hyphenated) return true;
+  if (document.kind === 'chapter' || document.kind === 'appendix') {
+    return match.lineCount > 2;
+  }
+  return match.lineCount > 1;
 }
 
 function lineEndsWithHyphen(line: PdfLine): boolean {

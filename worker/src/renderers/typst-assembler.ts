@@ -96,16 +96,14 @@ export function assembleTypst(options: AssembleTypstOptions): string {
   // 4. Heading show rules — PHB style
 
   // H1: Large, no divider line
-  t += `#show heading.where(level: 1): it => {\n`;
-  t += `  set text(font: heading-font, size: ${h1SizePt}pt, fill: theme-primary, weight: "bold")\n`;
-  t += `  v(12pt)\n`;
-  t += `  block(width: 100%)[\n`;
-  t += `    set par(justify: false)\n`;
-  t += `    set text(hyphenate: false)\n`;
-  t += `    it.body\n`;
-  t += `  ]\n`;
-  t += `  v(4pt)\n`;
-  t += `}\n\n`;
+  t += `#show heading.where(level: 1): it => [\n`;
+  t += `  #set text(font: heading-font, size: ${h1SizePt}pt, fill: theme-primary, weight: "bold")\n`;
+  t += `  #set text(hyphenate: false)\n`;
+  t += `  #set par(justify: false)\n`;
+  t += `  #v(12pt)\n`;
+  t += `  #it.body\n`;
+  t += `  #v(4pt)\n`;
+  t += `]\n\n`;
 
   // H2: Medium
   t += `#show heading.where(level: 2): it => {\n`;
@@ -174,6 +172,7 @@ function buildRenderQueue(
   chapterOpenerMode: ChapterOpenerMode
 ): AssembleTypstDocument[] {
   const longForm = isLongFormBook(documents);
+  const syntheticToc = shouldInjectSyntheticTableOfContents(documents);
   const hasTitlePage = documents.some((doc) => documentContainsType(doc.content, 'titlePage'));
   const hasTableOfContents = documents.some((doc) => documentContainsType(doc.content, 'tableOfContents'));
   const chapterDocs = documents.filter((doc) => doc.kind === 'chapter' && doc.content != null);
@@ -192,14 +191,14 @@ function buildRenderQueue(
       return withChapterMeta;
     }
 
-    return ensureDocumentSectionOpener(withChapterMeta, chapterNumber);
+    return longForm ? ensureDocumentSectionOpener(withChapterMeta, chapterNumber) : withChapterMeta;
   });
 
   if (longForm && !hasTitlePage) {
     queue.unshift(createSyntheticTitlePage(projectTitle));
   }
 
-  if (longForm && !hasTableOfContents) {
+  if (syntheticToc && !hasTableOfContents) {
     const insertAt = queue.findIndex((doc) => doc.kind === 'chapter' || doc.kind === 'appendix' || doc.kind === 'back_matter');
     queue.splice(insertAt === -1 ? queue.length : insertAt, 0, createSyntheticTableOfContents());
   }
@@ -212,6 +211,13 @@ function isLongFormBook(documents: AssembleTypstDocument[]): boolean {
     (doc) => doc.content != null && (doc.kind === 'chapter' || doc.kind === 'appendix')
   );
   return chapterLikeDocs.length >= 2;
+}
+
+function shouldInjectSyntheticTableOfContents(documents: AssembleTypstDocument[]): boolean {
+  const chapterLikeDocs = documents.filter(
+    (doc) => doc.content != null && (doc.kind === 'chapter' || doc.kind === 'appendix')
+  );
+  return chapterLikeDocs.length >= 3;
 }
 
 function ensureDocumentSectionOpener(
@@ -233,10 +239,28 @@ function ensureDocumentSectionOpener(
       type: 'doc',
       content: [
         { type: 'chapterHeader', attrs: openerAttrs },
-        ...getTopLevelNodes(document.content),
+        ...stripLeadingDuplicateTitleHeading(getTopLevelNodes(document.content), document.title),
       ],
     },
   };
+}
+
+function stripLeadingDuplicateTitleHeading(nodes: DocumentContent[], documentTitle: string): DocumentContent[] {
+  const firstMeaningfulIndex = nodes.findIndex((node) => node.type !== 'pageBreak' && node.type !== 'columnBreak');
+  if (firstMeaningfulIndex === -1) return nodes;
+
+  const firstNode = nodes[firstMeaningfulIndex];
+  if (firstNode.type !== 'heading') return nodes;
+
+  const level = Number(firstNode.attrs?.level ?? 0);
+  if (level < 1 || level > 3) return nodes;
+
+  const headingText = renderInlineText(firstNode.content);
+  if (!headingText || normalizeSectionTitle(headingText) !== normalizeSectionTitle(documentTitle)) {
+    return nodes;
+  }
+
+  return nodes.filter((_node, index) => index !== firstMeaningfulIndex);
 }
 
 function stripLeadingSectionOpener(content: DocumentContent, documentTitle: string): DocumentContent {

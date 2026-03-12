@@ -349,6 +349,17 @@ describe('TipTap-to-Typst Renderer', () => {
       expect(result).toContain('theme-divider');
       expect(result).toContain('An Introduction');
     });
+
+    it('should strip a duplicated chapter prefix from the title when a chapter number is provided', () => {
+      const result = renderTypstNode(node({
+        type: 'chapterHeader',
+        attrs: { title: 'Chapter 2: Approaching the Mine', chapterNumber: 'Chapter 2' },
+      }));
+
+      expect(result).toContain('Chapter 2');
+      expect(result).toContain('= Approaching the Mine');
+      expect(result).not.toContain('= Chapter 2: Approaching the Mine');
+    });
   });
 
   describe('spellCard', () => {

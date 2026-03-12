@@ -5,8 +5,7 @@ import type { ReactNodeViewProps } from '@tiptap/react';
 import type { TitlePageAttrs } from './TitlePageExtension';
 import { AiGenerateButton } from '../../ai/AiGenerateButton';
 import { AiAutoFillButton } from '../../ai/AiAutoFillButton';
-import { AiImageGenerateButton } from '../../ai/AiImageGenerateButton';
-import { ImageUploader } from '../../editor/ImageUploader';
+import { ProjectImageControls } from '../../editor/ProjectImageControls';
 
 export function TitlePageView({
   node,
@@ -114,24 +113,17 @@ export function TitlePageView({
             <div className="title-page__edit-row">
               <label>Cover Image</label>
               {projectId && (
-                <>
-                  <ImageUploader
-                    projectId={projectId}
-                    onUpload={(url) => updateAttr('coverImageUrl', url)}
-                    className="mb-2"
-                  />
-                  <AiImageGenerateButton
-                    projectId={projectId}
-                    blockType="titlePage"
-                    onGenerated={(url) => updateAttr('coverImageUrl', url)}
-                  />
-                </>
+                <ProjectImageControls
+                  projectId={projectId}
+                  blockType="titlePage"
+                  imageUrl={attrs.coverImageUrl}
+                  imagePrompt={attrs.imagePrompt}
+                  onUrlChange={(url) => updateAttr('coverImageUrl', url)}
+                  onPromptChange={(prompt) => updateAttr('imagePrompt', prompt)}
+                  urlPlaceholder="Or enter image URL"
+                  promptPlaceholder="Suggested cover art prompt"
+                />
               )}
-              <input
-                value={attrs.coverImageUrl}
-                onChange={(e) => updateAttr('coverImageUrl', e.target.value)}
-                placeholder="Or enter image URL"
-              />
             </div>
           </div>
         )}

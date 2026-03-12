@@ -1,8 +1,6 @@
 #!/bin/sh
 set -eu
 
-mkdir -p /app/worker/output
-chown -R nodeapp:nodejs /app/worker/output
 mkdir -p /app/uploads
 chown -R nodeapp:nodejs /app/uploads
 

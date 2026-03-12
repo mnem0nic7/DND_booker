@@ -192,6 +192,19 @@ describe('Typst Assembler', () => {
       expect(source).toContain('fill: theme-primary');
     });
 
+    it('should render the H1 show rule without a nested content block wrapper', () => {
+      const source = assembleTypst({
+        documents: [],
+        theme: 'classic-parchment',
+        projectTitle: 'Test',
+      });
+
+      const h1Rule = source.match(/#show heading\.where\(level: 1\):[\s\S]*?#show heading\.where\(level: 2\)/)?.[0] ?? '';
+      expect(h1Rule).toContain('#set par(justify: false)');
+      expect(h1Rule).toContain('#set text(hyphenate: false)');
+      expect(h1Rule).not.toContain('block(width: 100%)');
+    });
+
     it('should set text font and size', () => {
       const source = assembleTypst({
         documents: [],
@@ -249,7 +262,37 @@ describe('Typst Assembler', () => {
       expect(source).toContain('fill: theme-secondary');
     });
 
-    it('should inject title page and table of contents for long-form exports', () => {
+    it('should inject title page and table of contents for multi-chapter book exports', () => {
+      const source = assembleTypst({
+        documents: [
+          {
+            title: 'Arrival at Dawn',
+            kind: 'chapter',
+            content: docWithParagraph('Chapter one body'),
+            sortOrder: 1,
+          },
+          {
+            title: 'Into the Wilds',
+            kind: 'chapter',
+            content: docWithParagraph('Chapter two body'),
+            sortOrder: 2,
+          },
+          {
+            title: 'The Final Ascent',
+            kind: 'chapter',
+            content: docWithParagraph('Chapter three body'),
+            sortOrder: 3,
+          },
+        ],
+        theme: 'classic-parchment',
+        projectTitle: 'The Ember Road',
+      });
+
+      expect(source).toContain('#text(font: title-font, size: 28pt, weight: "bold")[The Ember Road]');
+      expect(source).toContain('#outline(title: none, depth: 3)');
+    });
+
+    it('should not inject a synthetic table of contents for a short two-chapter one-shot', () => {
       const source = assembleTypst({
         documents: [
           {
@@ -270,7 +313,7 @@ describe('Typst Assembler', () => {
       });
 
       expect(source).toContain('#text(font: title-font, size: 28pt, weight: "bold")[The Ember Road]');
-      expect(source).toContain('#outline(title: none, depth: 3)');
+      expect(source).not.toContain('#outline(title: none, depth: 3)');
     });
 
     it('should place table of contents on its own page without adding an extra blank page before the first chapter', () => {
@@ -294,18 +337,30 @@ describe('Typst Assembler', () => {
             content: docWithParagraph('Chapter two body'),
             sortOrder: 3,
           },
+          {
+            title: 'The Final Ascent',
+            kind: 'chapter',
+            content: docWithParagraph('Chapter three body'),
+            sortOrder: 4,
+          },
         ],
         theme: 'classic-parchment',
         projectTitle: 'The Ember Road',
       });
 
-      const pageBreakCount = (source.match(/#pagebreak\(\)/g) ?? []).length;
-      expect(pageBreakCount).toBe(4);
+      expect(source).toContain('#outline(title: none, depth: 3)');
+      expect(source).not.toContain('#pagebreak()\n\n#pagebreak()');
     });
 
-    it('should inject a chapter header when a chapter document lacks an opener', () => {
+    it('should inject a chapter header when a long-form chapter document lacks an opener', () => {
       const source = assembleTypst({
         documents: [
+          {
+            title: 'Foreword',
+            kind: 'front_matter',
+            content: docWithParagraph('A welcome for the reader.'),
+            sortOrder: 0,
+          },
           {
             title: 'Arrival at Dawn',
             kind: 'chapter',
@@ -325,6 +380,65 @@ describe('Typst Assembler', () => {
 
       expect(source).toContain('[Chapter 1]');
       expect(source).toContain('= Arrival at Dawn');
+    });
+
+    it('should strip a duplicate leading heading when injecting a chapter header', () => {
+      const source = assembleTypst({
+        documents: [
+          {
+            title: 'Foreword',
+            kind: 'front_matter',
+            content: docWithParagraph('A welcome for the reader.'),
+            sortOrder: 0,
+          },
+          {
+            title: 'Arrival at Dawn',
+            kind: 'chapter',
+            content: {
+              type: 'doc',
+              content: [
+                {
+                  type: 'heading',
+                  attrs: { level: 2 },
+                  content: [{ type: 'text', text: 'Arrival at Dawn' }],
+                },
+                paragraph('The adventure begins at first light.'),
+              ],
+            },
+            sortOrder: 1,
+          },
+          {
+            title: 'Into the Wilds',
+            kind: 'chapter',
+            content: docWithParagraph('The road twists into the forest.'),
+            sortOrder: 2,
+          },
+        ],
+        theme: 'classic-parchment',
+        projectTitle: 'The Ember Road',
+      });
+
+      expect(source).toContain('[Chapter 1]');
+      expect(source.match(/Arrival at Dawn/g)?.length).toBe(1);
+    });
+
+    it('should not inject a synthetic chapter header for a single-chapter export', () => {
+      const source = assembleTypst({
+        documents: [
+          {
+            title: 'Gravel Guardian Review',
+            kind: 'chapter',
+            content: docWithParagraph('Single-page reference copy'),
+            sortOrder: 1,
+          },
+        ],
+        theme: 'classic-parchment',
+        projectTitle: 'Gravel Guardian Review',
+      });
+
+      expect(source).not.toContain('[Chapter 1]');
+      expect(source).not.toContain('= Gravel Guardian Review');
+      expect(source).toContain('Single-page reference copy');
     });
 
     it('should not inject a duplicate chapter header when one already exists', () => {
@@ -376,6 +490,12 @@ describe('Typst Assembler', () => {
             kind: 'chapter',
             content: docWithParagraph('The adventure begins at first light.'),
             sortOrder: 2,
+          },
+          {
+            title: 'Into the Wilds',
+            kind: 'chapter',
+            content: docWithParagraph('The road twists into the forest.'),
+            sortOrder: 3,
           },
         ],
         theme: 'classic-parchment',

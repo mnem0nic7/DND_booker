@@ -23,6 +23,7 @@ export async function processGenerationJob(job: Job<GenerationJobData>): Promise
   const fullRun = await prisma.generationRun.findUniqueOrThrow({ where: { id: runId } });
   const run = { id: runId, projectId, userId, inputPrompt: fullRun.inputPrompt, inputParameters: fullRun.inputParameters };
   const isPolished = fullRun.quality === 'polished';
+  const isOneShot = fullRun.mode === 'one_shot';
 
   // Dynamic imports to avoid cross-package resolution issues at module load time
   const { transitionRunStatus, updateRunProgress } = await import('../../../server/src/services/generation/run.service.js');
@@ -37,6 +38,7 @@ export async function processGenerationJob(job: Job<GenerationJobData>): Promise
   const { assembleDocuments } = await import('../../../server/src/services/generation/assembler.service.js');
   const { runPreflight } = await import('../../../server/src/services/generation/preflight.service.js');
   const { executePublicationPolish } = await import('../../../server/src/services/generation/publication-polish.service.js');
+  const { executeArtDirectionPass } = await import('../../../server/src/services/generation/art-direction.service.js');
   const { executeIntake } = await import('../../../server/src/services/generation/intake.service.js');
 
   async function publishProgress(status: string, stage: string, percent: number) {
@@ -193,6 +195,29 @@ export async function processGenerationJob(job: Job<GenerationJobData>): Promise
     if (!preflight.passed) {
       const errorMsgs = preflight.issues.filter((i: any) => i.severity === 'error').map((i: any) => i.message).join('; ');
       throw new Error(`Preflight failed: ${errorMsgs || 'compiled document validation reported blocking issues'}`);
+    }
+
+    if (isOneShot) {
+      await publishProgress('assembling', 'art_direction', 99);
+      try {
+        const artDirection = await executeArtDirectionPass(run, model, maxOutputTokens);
+        if (artDirection.placementCount > 0) {
+          await publishGenerationEvent(runId, {
+            type: 'run_warning',
+            runId,
+            message: `Art direction prepared ${artDirection.placementCount} image prompt suggestion(s) for the generated one-shot.`,
+            severity: 'info',
+          });
+        }
+      } catch (artErr) {
+        const message = artErr instanceof Error ? artErr.message : String(artErr);
+        await publishGenerationEvent(runId, {
+          type: 'run_warning',
+          runId,
+          message: `Art direction pass failed: ${message}`,
+          severity: 'warning',
+        });
+      }
     }
 
     // Complete

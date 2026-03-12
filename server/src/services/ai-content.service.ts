@@ -47,7 +47,7 @@ spellCard: {"name","level"(num 0-9),"school","castingTime","range","components",
 
 magicItem: {"name","type","rarity","requiresAttunement"(bool),"attunementRequirement","description","properties"}
 
-npcProfile (ALL fields are plain strings): {"name","race","class","description","personalityTraits","ideals","bonds","flaws"}
+npcProfile (ALL fields are plain strings): {"name","race","class","description","personalityTraits","ideals","bonds","flaws","portraitUrl"}
 
 randomTable: {"title","dieType","entries":"[{roll,result}]"}
 
@@ -79,7 +79,7 @@ Block rules:
 - For general questions or brainstorming, respond conversationally — only use JSON blocks when generating insertable content
 
 === AI IMAGE GENERATION ===
-The editor supports AI image generation for 5 image-capable block types: Title Page (cover art), Full Bleed Image (illustrations), Map Block (battle maps), Back Cover (author photo/art), and Chapter Header (background banner). Users with an OpenAI API key can generate images directly in each block's edit panel using DALL-E 3 or GPT Image 1.
+The editor supports AI image generation for 6 image-capable block types: Title Page (cover art), Full Bleed Image (illustrations), Map Block (battle maps), Back Cover (author photo/art), Chapter Header (background banner), and NPC Profile (character portrait). Users with an OpenAI API key can generate images directly in each block's edit panel using DALL-E 3 or GPT Image 1. Existing uploaded/generated project assets can also be reused from the asset browser.
 
 **When to recommend DALL-E 3:**
 - Artistic illustrations, cover art, character portraits, scenic landscapes
@@ -102,6 +102,7 @@ The editor supports AI image generation for 5 image-capable block types: Title P
 - Map Block → Square (battle maps are typically square grids)
 - Back Cover → Square (small author photo or spot illustration)
 - Chapter Header → Landscape (wide banner across the page top)
+- NPC Profile → Square (portrait crops cleanly in the profile card)
 
 **Prompt tips you can share with users:**
 - Be specific about style: "oil painting style", "ink and watercolor", "old parchment map"
@@ -148,6 +149,7 @@ Image attribute mapping by block type:
 - mapBlock → "src" (battle map)
 - backCover → "authorImageUrl" (author photo or back art)
 - chapterHeader → "backgroundImage" (banner image)
+- npcProfile → "portraitUrl" (NPC portrait)
 
 RULES:
 - Maximum 4 images per \`_generateImage\` block
@@ -172,11 +174,11 @@ You have access to tools that execute server-side. Use them instead of embedding
 **Project CRUD tools:**
 - \`listProjects\` — list all user projects
 - \`getProject\` — get project metadata
-- \`getProjectContent\` — read the document's TipTap JSON content
+- \`getProjectContent\` — read the composed TipTap JSON for the whole project across its documents
 - \`createProject\` — create a new project (optionally from a template)
 - \`updateProject\` — update project metadata (requires expectedUpdatedAt)
 - \`deleteProject\` — delete a project (requires expectedUpdatedAt)
-- \`updateProjectContent\` — replace document content (requires expectedUpdatedAt)
+- \`updateProjectContent\` — replace the whole project content; the server will split it back into separate documents (requires expectedUpdatedAt)
 
 Write tools require an \`expectedUpdatedAt\` timestamp from a prior read to prevent overwriting concurrent changes. If you get a CONFLICT error, re-read and retry.
 
@@ -593,7 +595,7 @@ Atom blocks and their attrs:
 - statBlock: name, type, alignment, ac, hp, speed, str, dex, con, int, wis, cha, skills, senses, languages, cr, traits (JSON string), actions (JSON string)
 - encounterTable: environment (string), crRange (string), entries (JSON string array: [{"weight":1,"description":"1d4 shadows","cr":"1/2"},{"weight":2,"description":"1 specter","cr":"1"},...])
 - magicItem: name, rarity, type, description, attunement
-- npcProfile: name, race, occupation, description, portrait
+- npcProfile: name, race, class, description, personalityTraits, ideals, bonds, flaws, portraitUrl, imagePrompt
 - spellCard: name, level (number), school, castingTime, range, components, duration, description, higherLevels
 - randomTable: title (string), dieType (string), entries (JSON string: [{"roll":"1","result":"..."},{"roll":"2","result":"..."},...])
 - fullBleedImage: src (string), caption (string), position ("full"|"half"|"quarter")
@@ -918,7 +920,9 @@ export function buildAutoFillPrompt(blockType: string, currentAttrs: Record<stri
   const emptyFields: string[] = [];
 
   for (const [key, value] of Object.entries(currentAttrs)) {
-    if (key === 'portraitUrl') continue;
+    if (key === 'portraitUrl' || key === 'coverImageUrl' || key === 'authorImageUrl' || key === 'backgroundImage' || key === 'imagePrompt') {
+      continue;
+    }
     let strValue = typeof value === 'string' ? value : JSON.stringify(value);
     // Limit individual field lengths in the prompt
     if (strValue.length > 500) strValue = strValue.slice(0, 500) + '...';

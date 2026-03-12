@@ -57,6 +57,14 @@ describe('Projects API', () => {
       expect(res.body.id).toBeDefined();
 
       createdProjectId = res.body.id;
+
+      const docs = await prisma.projectDocument.findMany({
+        where: { projectId: createdProjectId },
+        orderBy: { sortOrder: 'asc' },
+      });
+      expect(docs).toHaveLength(1);
+      expect(docs[0].kind).toBe('chapter');
+      expect(docs[0].title).toBe('My Campaign');
     });
 
     it('should create a project with only a title', async () => {
@@ -240,7 +248,17 @@ describe('Projects API', () => {
 
   describe('PUT /api/projects/:id/content', () => {
     it('should update project content', async () => {
-      const content = { type: 'doc', content: [{ type: 'paragraph' }] };
+      const content = {
+        type: 'doc',
+        content: [
+          { type: 'titlePage', attrs: { title: 'Updated Campaign', subtitle: 'One-Shot' } },
+          { type: 'pageBreak' },
+          { type: 'heading', attrs: { level: 1 }, content: [{ type: 'text', text: 'Act One' }] },
+          { type: 'paragraph', content: [{ type: 'text', text: 'The road to the dungeon begins here.' }] },
+          { type: 'pageBreak' },
+          { type: 'creditsPage', attrs: { credits: 'Written by Test Author' } },
+        ],
+      };
       const res = await request(app)
         .put(`/api/projects/${createdProjectId}/content`)
         .set('Authorization', `Bearer ${accessToken}`)
@@ -248,6 +266,17 @@ describe('Projects API', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.content.type).toBe('doc');
+
+      const docs = await prisma.projectDocument.findMany({
+        where: { projectId: createdProjectId },
+        orderBy: { sortOrder: 'asc' },
+        select: { title: true, kind: true, slug: true },
+      });
+      expect(docs).toEqual([
+        { title: 'Title Page', kind: 'front_matter', slug: 'title-page' },
+        { title: 'Act One', kind: 'chapter', slug: 'act-one' },
+        { title: 'Credits', kind: 'back_matter', slug: 'credits' },
+      ]);
     });
 
     it('should return 404 for non-existent project', async () => {

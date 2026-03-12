@@ -16,6 +16,7 @@ import * as aiMemoryService from '../services/ai-memory.service.js';
 import * as aiImage from '../services/ai-image.service.js';
 import * as assetService from '../services/asset.service.js';
 import { createModel, validateApiKey, validateConnection, SUPPORTED_MODELS, fetchOpenAiModels, resolveOllamaModelId, streamOllamaChatText, type AiProvider } from '../services/ai-provider.service.js';
+import { getCanonicalProjectContent } from '../services/project-document-content.service.js';
 import { prisma } from '../config/database.js';
 import type { WizardEvent, WizardGeneratedSection } from '@dnd-booker/shared';
 
@@ -515,14 +516,12 @@ aiChatRoutes.post('/ai/chat', validateUuid('projectId'), chatRateLimit, asyncHan
   let savedUserMsgId: string | null = null;
 
   try {
-    // Verify project ownership
-    const project = await prisma.project.findFirst({
-      where: { id: projectId, userId: req.userId! },
-    });
-    if (!project) {
+    const canonicalProject = await getCanonicalProjectContent(projectId, req.userId!);
+    if (!canonicalProject) {
       res.status(404).json({ error: 'Project not found' });
       return;
     }
+    const { project, content: projectContent } = canonicalProject;
 
     const userModel = await getModelForUser(req.userId!);
     if (!userModel) {
@@ -556,10 +555,10 @@ aiChatRoutes.post('/ai/chat', validateUuid('projectId'), chatRateLimit, asyncHan
       : await aiPlanner.buildPlanningContext(projectId, req.userId!);
     const documentOutline = useCompactOllamaPrompt
       ? null
-      : aiContent.buildDocumentOutline(project.content);
+      : aiContent.buildDocumentOutline(projectContent);
     const documentTextSample = useCompactOllamaPrompt
       ? null
-      : aiContent.buildDocumentTextSample(project.content);
+      : aiContent.buildDocumentTextSample(projectContent);
     const systemPrompt = aiContent.buildSystemPrompt(
       project.title,
       documentOutline,

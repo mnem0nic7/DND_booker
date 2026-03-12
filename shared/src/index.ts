@@ -1,6 +1,7 @@
 export * from './types/user.js';
 export * from './types/project.js';
 export * from './types/document.js';
+export * from './types/asset.js';
 export * from './types/export.js';
 export * from './types/template.js';
 export * from './types/wizard.js';

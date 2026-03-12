@@ -10,7 +10,12 @@
  */
 
 import type { DocumentContent } from '../types/document';
-import { escapeTypst, escapeTypstUrl } from './utils.js';
+import {
+  escapeTypst,
+  escapeTypstUrl,
+  normalizeChapterHeaderTitle,
+  normalizeEncounterEntries,
+} from './utils.js';
 
 type TipTapNode = DocumentContent;
 
@@ -421,9 +426,9 @@ function renderSidebarCallout(attrs: Record<string, unknown>, content?: TipTapNo
 }
 
 function renderChapterHeader(attrs: Record<string, unknown>): string {
-  const title = escapeTypst(String(attrs.title || ''));
   const subtitle = String(attrs.subtitle || '');
   const chapterNumber = String(attrs.chapterNumber || '');
+  const title = escapeTypst(normalizeChapterHeaderTitle(attrs.title, chapterNumber));
 
   let t = '';
   if (chapterNumber) {
@@ -573,7 +578,7 @@ function renderNpcProfile(attrs: Record<string, unknown>): string {
 function renderEncounterTable(attrs: Record<string, unknown>): string {
   const environment = escapeTypst(String(attrs.environment || ''));
   const crRange = escapeTypst(String(attrs.crRange || ''));
-  const entries = parseJsonArray<{ weight: number; description: string; cr: string }>(String(attrs.entries || '[]'));
+  const entries = normalizeEncounterEntries(attrs.entries);
 
   const totalWeight = entries.reduce((s, e) => s + e.weight, 0);
 
@@ -766,6 +771,7 @@ function renderCreditsPage(attrs: Record<string, unknown>): string {
 
   const lines = credits.split('\n');
   for (const line of lines) {
+    if (!line.trim()) continue;
     t += `  ${escapeTypst(line)}\n\n`;
   }
 

@@ -17,6 +17,18 @@ const STAGE_LABELS: Record<RunStatus, string> = {
   cancelled: 'Cancelled',
 };
 
+const SUBSTAGE_LABELS: Record<string, string> = {
+  planning: 'Planning Campaign',
+  generating_assets: 'Creating Assets',
+  generating_prose: 'Writing Chapters',
+  evaluating: 'Quality Review',
+  revising: 'Revising Content',
+  assembly: 'Assembling Documents',
+  publication_polish: 'Polishing Layout',
+  preflight_recheck: 'Rechecking Layout',
+  art_direction: 'Planning Artwork',
+};
+
 const ACTIVE_STATUSES: RunStatus[] = [
   'queued',
   'planning',
@@ -40,7 +52,7 @@ function formatEvent(e: GenerationEvent): string | null {
     case 'run_warning':
       return `${e.severity === 'error' ? 'Error' : e.severity === 'warning' ? 'Warning' : 'Info'}: ${e.message}`;
     case 'run_status':
-      return STAGE_LABELS[e.status as RunStatus] ?? e.stage;
+      return (e.stage ? SUBSTAGE_LABELS[e.stage] : null) ?? STAGE_LABELS[e.status as RunStatus] ?? e.stage;
     case 'task_started':
       return `Task started: ${e.taskType}`;
     case 'task_completed':
@@ -106,7 +118,10 @@ export function GenerationRunPanel({ projectId }: Props) {
     && (RUN_STATUS_TRANSITIONS.paused?.includes(currentRun.currentStage as RunStatus) ?? false);
 
   const stageLabel =
-    STAGE_LABELS[(currentStage as RunStatus) ?? status] ?? STAGE_LABELS[status] ?? status;
+    (currentStage ? SUBSTAGE_LABELS[currentStage] : null) ??
+    STAGE_LABELS[(currentStage as RunStatus) ?? status] ??
+    STAGE_LABELS[status] ??
+    status;
   const recentEvents = events.slice(-5);
 
   return (

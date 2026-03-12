@@ -1,4 +1,5 @@
 FROM node:20-alpine
+RUN apk add --no-cache su-exec
 WORKDIR /app
 COPY package*.json ./
 COPY server/package.json server/
@@ -19,7 +20,9 @@ RUN npm run build
 
 # Run as non-root user for security
 RUN addgroup -g 1001 -S nodejs && adduser -S nodeapp -u 1001 -G nodejs
-USER nodeapp
+COPY server/docker-entrypoint.sh /usr/local/bin/server-entrypoint.sh
+RUN chmod +x /usr/local/bin/server-entrypoint.sh
 
 EXPOSE 4000
+ENTRYPOINT ["/usr/local/bin/server-entrypoint.sh"]
 CMD ["sh", "-c", "npx prisma migrate deploy && node dist/index.js"]

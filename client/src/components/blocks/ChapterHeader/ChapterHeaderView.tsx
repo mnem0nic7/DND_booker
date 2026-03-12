@@ -5,8 +5,7 @@ import type { ReactNodeViewProps } from '@tiptap/react';
 import type { ChapterHeaderAttrs } from './ChapterHeaderExtension';
 import { AiGenerateButton } from '../../ai/AiGenerateButton';
 import { AiAutoFillButton } from '../../ai/AiAutoFillButton';
-import { AiImageGenerateButton } from '../../ai/AiImageGenerateButton';
-import { ImageUploader } from '../../editor/ImageUploader';
+import { ProjectImageControls } from '../../editor/ProjectImageControls';
 
 export function ChapterHeaderView({
   node,
@@ -102,24 +101,17 @@ export function ChapterHeaderView({
             <div className="chapter-header__edit-row">
               <label>Background</label>
               {projectId && (
-                <>
-                  <ImageUploader
-                    projectId={projectId}
-                    onUpload={(url) => updateAttr('backgroundImage', url)}
-                    className="mb-2"
-                  />
-                  <AiImageGenerateButton
-                    projectId={projectId}
-                    blockType="chapterHeader"
-                    onGenerated={(url) => updateAttr('backgroundImage', url)}
-                  />
-                </>
+                <ProjectImageControls
+                  projectId={projectId}
+                  blockType="chapterHeader"
+                  imageUrl={attrs.backgroundImage}
+                  imagePrompt={attrs.imagePrompt}
+                  onUrlChange={(url) => updateAttr('backgroundImage', url)}
+                  onPromptChange={(prompt) => updateAttr('imagePrompt', prompt)}
+                  urlPlaceholder="Or enter image URL"
+                  promptPlaceholder="Suggested chapter banner prompt"
+                />
               )}
-              <input
-                value={attrs.backgroundImage}
-                onChange={(e) => updateAttr('backgroundImage', e.target.value)}
-                placeholder="Or enter image URL"
-              />
             </div>
           </div>
         )}

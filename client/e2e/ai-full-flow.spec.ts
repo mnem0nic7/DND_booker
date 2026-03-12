@@ -1,21 +1,32 @@
+import { resolve } from 'node:path';
 import { test, expect } from '@playwright/test';
 import {
   clearAiChatHistory,
+  configureAiSettings,
   getEditorText,
   insertFirstGeneratedBlock,
+  login,
   openProjectByTitleOrCreate,
   sendAiMessage,
   startExportAndWaitForCompletion,
 } from './helpers';
 
-const REVIEW_PROJECT_TITLE = 'AI Local Model Review Workspace One Shot';
-const REVIEW_PROJECT_TEMPLATE = 'one-shot' as const;
+const REVIEW_PROJECT_TITLE = 'AI Export Review Workspace';
+const REVIEW_PROJECT_TEMPLATE = 'blank' as const;
+const EXPORT_PDF_PATH = resolve(process.cwd(), '..', 'test-results', 'export.pdf');
 
 test.describe('AI Full Campaign Flow', () => {
   test('should generate a single shared review artifact and export it', async ({ page }) => {
     test.setTimeout(30 * 60 * 1000);
 
-    await openProjectByTitleOrCreate(page, REVIEW_PROJECT_TITLE, REVIEW_PROJECT_TEMPLATE);
+    await login(page);
+    await configureAiSettings(page, {
+      provider: 'openai',
+      model: 'gpt-4o',
+    });
+    await openProjectByTitleOrCreate(page, REVIEW_PROJECT_TITLE, REVIEW_PROJECT_TEMPLATE, {
+      resetIfExists: true,
+    });
     await clearAiChatHistory(page);
     const initialText = await getEditorText(page);
     const initialGuardianMentions = initialText.match(/Gravel Guardian/g)?.length ?? 0;
@@ -35,6 +46,6 @@ test.describe('AI Full Campaign Flow', () => {
     const editorText = await getEditorText(page);
     expect(editorText.length).toBeGreaterThan(initialTextLength);
 
-    await startExportAndWaitForCompletion(page, 'pdf', 10 * 60 * 1000);
+    await startExportAndWaitForCompletion(page, 'pdf', 10 * 60 * 1000, EXPORT_PDF_PATH);
   });
 });

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAiStore } from '../../stores/aiStore';
 
 type ImageModel = 'dall-e-3' | 'gpt-image-1';
@@ -37,25 +37,41 @@ const BLOCK_DEFAULTS: Record<string, { size: string; hint: string }> = {
     size: '1792x1024',
     hint: 'Wide fantasy landscape banner...',
   },
+  npcProfile: {
+    size: '1024x1024',
+    hint: 'Fantasy portrait of a memorable D&D NPC...',
+  },
 };
 
 interface AiImageGenerateButtonProps {
   projectId: string;
   blockType: string;
+  initialPrompt?: string;
   onGenerated: (url: string) => void;
 }
 
-export function AiImageGenerateButton({ projectId, blockType, onGenerated }: AiImageGenerateButtonProps) {
+export function AiImageGenerateButton({
+  projectId,
+  blockType,
+  initialPrompt,
+  onGenerated,
+}: AiImageGenerateButtonProps) {
   const { generateImage, isGeneratingImage, settings } = useAiStore();
 
   const defaults = BLOCK_DEFAULTS[blockType] || { size: '1024x1024', hint: '' };
 
   const [isOpen, setIsOpen] = useState(false);
-  const [prompt, setPrompt] = useState('');
+  const [prompt, setPrompt] = useState(initialPrompt || '');
   const [model, setModel] = useState<ImageModel>('dall-e-3');
   const [size, setSize] = useState(defaults.size);
   const [quality, setQuality] = useState('standard');
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (!isOpen) {
+      setPrompt(initialPrompt || '');
+    }
+  }, [initialPrompt, isOpen]);
 
   // Only show when provider is OpenAI with an API key
   const isAvailable = settings?.provider === 'openai' && settings?.hasApiKey;

@@ -6,7 +6,13 @@
  */
 
 import type { DocumentContent } from '../types/document';
-import { escapeHtml, safeUrl, safeCssUrl } from './utils.js';
+import {
+  escapeHtml,
+  normalizeChapterHeaderTitle,
+  normalizeEncounterEntries,
+  safeCssUrl,
+  safeUrl,
+} from './utils.js';
 
 type TipTapNode = DocumentContent;
 
@@ -372,9 +378,9 @@ function renderSidebarCallout(attrs: Record<string, unknown>, content?: TipTapNo
 }
 
 function renderChapterHeader(attrs: Record<string, unknown>): string {
-  const title = escapeHtml(String(attrs.title || ''));
   const subtitle = String(attrs.subtitle || '');
   const chapterNumber = String(attrs.chapterNumber || '');
+  const title = escapeHtml(normalizeChapterHeaderTitle(attrs.title, chapterNumber));
   const backgroundImage = String(attrs.backgroundImage || '');
 
   const safeBg = backgroundImage ? safeCssUrl(backgroundImage) : null;
@@ -528,7 +534,7 @@ function renderNpcProfile(attrs: Record<string, unknown>): string {
 function renderEncounterTable(attrs: Record<string, unknown>): string {
   const environment = escapeHtml(String(attrs.environment || ''));
   const crRange = escapeHtml(String(attrs.crRange || ''));
-  const entries = parseJsonArray<{ weight: number; description: string; cr: string }>(String(attrs.entries || '[]'));
+  const entries = normalizeEncounterEntries(attrs.entries);
 
   let html = `<div class="encounter-table">`;
   html += `<div class="encounter-table__header">`;

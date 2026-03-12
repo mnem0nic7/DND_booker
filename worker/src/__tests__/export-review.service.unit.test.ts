@@ -119,6 +119,48 @@ Page size: 612 x 792 pts (letter)
     expect(review.metrics.sectionStarts[0].hyphenated).toBe(true);
   });
 
+  it('matches chapter titles without penalizing a clean two-line chapter opener', () => {
+    const pages = parseBboxLayoutXhtml(`
+<doc>
+  <page width="612.000000" height="792.000000">
+    <flow>
+      <block xMin="54.000000" yMin="52.000000" xMax="280.000000" yMax="118.000000">
+        <line xMin="54.000000" yMin="52.000000" xMax="132.000000" yMax="68.000000">
+          <word xMin="54.000000" yMin="52.000000" xMax="102.000000" yMax="68.000000">Chapter</word>
+          <word xMin="108.000000" yMin="52.000000" xMax="132.000000" yMax="68.000000">2</word>
+        </line>
+        <line xMin="54.000000" yMin="76.000000" xMax="240.000000" yMax="102.000000">
+          <word xMin="54.000000" yMin="76.000000" xMax="184.000000" yMax="102.000000">Approaching</word>
+          <word xMin="192.000000" yMin="76.000000" xMax="240.000000" yMax="102.000000">the</word>
+        </line>
+        <line xMin="54.000000" yMin="104.000000" xMax="152.000000" yMax="130.000000">
+          <word xMin="54.000000" yMin="104.000000" xMax="152.000000" yMax="130.000000">Mine</word>
+        </line>
+      </block>
+      <block xMin="54.000000" yMin="160.000000" xMax="280.000000" yMax="178.000000">
+        <line xMin="54.000000" yMin="160.000000" xMax="280.000000" yMax="178.000000">
+          <word xMin="54.000000" yMin="160.000000" xMax="280.000000" yMax="178.000000">Body text continues here.</word>
+        </line>
+      </block>
+    </flow>
+  </page>
+</doc>
+`);
+
+    const review = analyzePdfExportLayout({
+      documents: [
+        { title: 'Chapter 2: Approaching the Mine', kind: 'chapter' },
+      ],
+      pages,
+      pageCount: 1,
+      pageWidthPts: 612,
+      pageHeightPts: 792,
+    });
+
+    expect(review.metrics.sectionStarts[0].page).toBe(1);
+    expect(review.findings.map((finding) => finding.code)).not.toContain('EXPORT_SECTION_TITLE_WRAP');
+  });
+
   it('builds an unavailable review payload when review tooling fails', () => {
     const review = buildUnavailableExportReview('missing pdftotext');
     expect(review.status).toBe('unavailable');

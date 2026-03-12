@@ -7,6 +7,7 @@ export interface ChapterHeaderAttrs {
   subtitle: string;
   chapterNumber: string;
   backgroundImage: string;
+  imagePrompt: string;
 }
 
 export const ChapterHeader = Node.create({
@@ -21,6 +22,7 @@ export const ChapterHeader = Node.create({
       subtitle: { default: '' },
       chapterNumber: { default: '' },
       backgroundImage: { default: '' },
+      imagePrompt: { default: '' },
     };
   },
 

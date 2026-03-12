@@ -12,6 +12,7 @@ export interface NpcProfileAttrs {
   bonds: string;
   flaws: string;
   portraitUrl: string;
+  imagePrompt: string;
 }
 
 export const NpcProfile = Node.create({
@@ -31,6 +32,7 @@ export const NpcProfile = Node.create({
       bonds: { default: '' },
       flaws: { default: '' },
       portraitUrl: { default: '' },
+      imagePrompt: { default: '' },
     };
   },
 

@@ -21,13 +21,14 @@ export function DocumentNavigator({ projectId }: Props) {
     documents,
     activeDocument,
     isLoadingDocuments,
-    fetchDocuments,
     loadDocument,
   } = useProjectStore();
 
   useEffect(() => {
-    fetchDocuments(projectId);
-  }, [projectId, fetchDocuments]);
+    if (documents.length === 0) return;
+    if (activeDocument && documents.some((doc) => doc.id === activeDocument.id)) return;
+    void loadDocument(projectId, documents[0].id);
+  }, [projectId, documents, activeDocument, loadDocument]);
 
   if (isLoadingDocuments && documents.length === 0) {
     return (

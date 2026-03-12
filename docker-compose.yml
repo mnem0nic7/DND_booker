@@ -47,8 +47,10 @@ services:
       - PORT=4000
       - OLLAMA_MAX_RESPONSE_TOKENS=${OLLAMA_MAX_RESPONSE_TOKENS:-256}
       - EXPORT_OUTPUT_DIR=/app/worker/output
+      - ASSET_STORAGE_DIR=/app/uploads
     volumes:
       - export-output:/app/worker/output
+      - project-assets:/app/uploads
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:4000/api/health"]
       interval: 10s
@@ -74,8 +76,10 @@ services:
       - SERVER_BASE_URL=http://server:4000
       - AI_KEY_ENCRYPTION_SECRET=${AI_KEY_ENCRYPTION_SECRET:?AI_KEY_ENCRYPTION_SECRET must be set in .env}
       - NODE_ENV=production
+      - ASSET_STORAGE_DIR=/app/uploads
     volumes:
       - export-output:/app/worker/output
+      - project-assets:/app/uploads
     depends_on:
       postgres:
         condition: service_healthy
@@ -95,3 +99,4 @@ services:
 volumes:
   pgdata:
   export-output:
+  project-assets:

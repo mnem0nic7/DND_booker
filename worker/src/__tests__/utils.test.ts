@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { escapeHtml, safeUrl, safeCssUrl } from '../renderers/utils.js';
+import { escapeHtml, normalizeChapterHeaderTitle, safeCssUrl, safeUrl } from '../renderers/utils.js';
 import { renderNode } from '../renderers/tiptap-to-html.js';
 
 describe('Worker Renderer Utils', () => {
@@ -114,6 +114,16 @@ describe('Worker Renderer Utils', () => {
 
     it('should escape HTML entities in output', () => {
       expect(safeCssUrl('https://example.com/a&b')).toBe('https://example.com/a&amp;b');
+    });
+  });
+
+  describe('normalizeChapterHeaderTitle', () => {
+    it('should strip a matching chapter prefix from the title', () => {
+      expect(normalizeChapterHeaderTitle('Chapter 2: Approaching the Mine', 'Chapter 2')).toBe('Approaching the Mine');
+    });
+
+    it('should preserve titles that do not duplicate the chapter number', () => {
+      expect(normalizeChapterHeaderTitle('The Village', 'Chapter 1')).toBe('The Village');
     });
   });
 });

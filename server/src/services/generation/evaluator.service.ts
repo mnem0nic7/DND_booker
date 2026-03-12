@@ -20,7 +20,7 @@ const FindingSchema = z.object({
   code: z.string(),
   message: z.string(),
   affectedScope: z.string(),
-  suggestedFix: z.string().optional(),
+  suggestedFix: z.string().nullish().transform((value) => value ?? undefined),
 });
 
 const EvaluationResponseSchema = z.object({
@@ -43,6 +43,7 @@ const ARTIFACT_CATEGORY: Record<string, string> = {
   faction_profile: 'reference',
   encounter_bundle: 'reference',
   item_bundle: 'reference',
+  art_direction_plan: 'reference',
   chapter_draft: 'written',
   appendix_draft: 'written',
   front_matter_draft: 'written',

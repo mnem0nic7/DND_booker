@@ -118,7 +118,12 @@ export async function assembleDocuments(
     },
   });
 
-  // 4. Create ProjectDocument records
+  // 4. Replace any pre-existing project documents for this project.
+  await prisma.projectDocument.deleteMany({
+    where: { projectId: run.projectId },
+  });
+
+  // 5. Create ProjectDocument records
   const documentIds: string[] = [];
 
   for (const spec of manifestDocs) {
@@ -147,13 +152,13 @@ export async function assembleDocuments(
     documentIds.push(doc.id);
   }
 
-  // 5. Update manifest status
+  // 6. Update manifest status
   await prisma.assemblyManifest.update({
     where: { id: manifest.id },
     data: { status: 'assembled' },
   });
 
-  // 6. Publish event
+  // 7. Publish event
   await publishGenerationEvent(run.id, {
     type: 'run_status',
     runId: run.id,

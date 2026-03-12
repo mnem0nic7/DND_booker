@@ -3,8 +3,7 @@ import { useParams } from 'react-router-dom';
 import { NodeViewWrapper } from '@tiptap/react';
 import type { ReactNodeViewProps } from '@tiptap/react';
 import type { FullBleedImageAttrs } from './FullBleedImageExtension';
-import { AiImageGenerateButton } from '../../ai/AiImageGenerateButton';
-import { ImageUploader } from '../../editor/ImageUploader';
+import { ProjectImageControls } from '../../editor/ProjectImageControls';
 
 const POSITION_OPTIONS: { value: FullBleedImageAttrs['position']; label: string }[] = [
   { value: 'full', label: 'Full Width' },
@@ -71,24 +70,17 @@ export function FullBleedImageView({
             <div className="full-bleed-image__edit-row">
               <label>Image</label>
               {projectId && (
-                <>
-                  <ImageUploader
-                    projectId={projectId}
-                    onUpload={(url) => updateAttr('src', url)}
-                    className="mb-2"
-                  />
-                  <AiImageGenerateButton
-                    projectId={projectId}
-                    blockType="fullBleedImage"
-                    onGenerated={(url) => updateAttr('src', url)}
-                  />
-                </>
+                <ProjectImageControls
+                  projectId={projectId}
+                  blockType="fullBleedImage"
+                  imageUrl={attrs.src}
+                  imagePrompt={attrs.imagePrompt}
+                  onUrlChange={(url) => updateAttr('src', url)}
+                  onPromptChange={(prompt) => updateAttr('imagePrompt', prompt)}
+                  urlPlaceholder="Or enter image URL"
+                  promptPlaceholder="Suggested illustration prompt"
+                />
               )}
-              <input
-                value={attrs.src}
-                onChange={(e) => updateAttr('src', e.target.value)}
-                placeholder="Or enter image URL"
-              />
             </div>
             <div className="full-bleed-image__edit-row">
               <label>Caption</label>

@@ -1,8 +1,14 @@
 import path from 'path';
 import fs from 'fs/promises';
 import { prisma } from '../config/database.js';
+import {
+  buildProjectAssetUrl,
+  getAssetStorageDir,
+  getProjectAssetDir,
+  resolveProjectAssetPathFromUrl,
+} from './asset-paths.service.js';
 
-const UPLOADS_DIR = path.resolve(process.cwd(), 'uploads');
+const UPLOADS_DIR = getAssetStorageDir();
 
 /** Ensure the uploads directory exists. */
 async function ensureUploadsDir(): Promise<void> {
@@ -11,7 +17,7 @@ async function ensureUploadsDir(): Promise<void> {
 
 /** Build a project-scoped directory path inside uploads/. */
 function projectDir(projectId: string): string {
-  return path.join(UPLOADS_DIR, projectId);
+  return getProjectAssetDir(projectId);
 }
 
 /**
@@ -40,7 +46,7 @@ export async function createAsset(
   await fs.writeFile(filePath, file.buffer);
 
   // Build a URL that can be served statically
-  const url = `/uploads/${projectId}/${uniqueName}`;
+  const url = buildProjectAssetUrl(projectId, uniqueName);
 
   const asset = await prisma.asset.create({
     data: {
@@ -83,10 +89,8 @@ export async function deleteAsset(assetId: string, userId: string) {
 
   // Remove file from disk (best-effort)
   try {
-    const resolvedDir = path.resolve(UPLOADS_DIR);
-    const filePath = path.resolve(UPLOADS_DIR, asset.url.replace('/uploads/', ''));
-    // Verify resolved path stays within uploads directory (defense-in-depth)
-    if (filePath.startsWith(resolvedDir + path.sep)) {
+    const filePath = resolveProjectAssetPathFromUrl(asset.url);
+    if (filePath) {
       await fs.unlink(filePath);
     }
   } catch (err: unknown) {

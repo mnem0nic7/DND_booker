@@ -1,5 +1,6 @@
 import express, { type Request, type Response, type NextFunction } from 'express';
 import path from 'path';
+import { getAssetStorageDir } from './services/asset-paths.service.js';
 import cors from 'cors';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
@@ -106,7 +107,7 @@ app.use('/uploads/:projectId/:filename', requireAuth, async (req: express.Reques
   }
 
   // Serve the file with security headers
-  const filePath = path.resolve(process.cwd(), 'uploads', projectId, filename);
+  const filePath = path.resolve(getAssetStorageDir(), projectId, filename);
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('Content-Security-Policy', "default-src 'none'; img-src 'self'; style-src 'none'; script-src 'none'");
   res.sendFile(filePath, (err) => {

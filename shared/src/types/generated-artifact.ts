@@ -34,6 +34,7 @@ export type ArtifactType =
   | 'sidebar_bundle'
   | 'read_aloud_bundle'
   | 'handout_bundle'
+  | 'art_direction_plan'
   | 'artifact_evaluation'
   | 'continuity_report'
   | 'preflight_report'
@@ -63,6 +64,7 @@ export const ARTIFACT_CATEGORY_MAP: Record<ArtifactType, ArtifactCategory> = {
   sidebar_bundle: 'written',
   read_aloud_bundle: 'written',
   handout_bundle: 'written',
+  art_direction_plan: 'reference',
   artifact_evaluation: 'evaluation',
   continuity_report: 'evaluation',
   preflight_report: 'evaluation',

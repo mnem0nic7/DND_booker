@@ -17,6 +17,7 @@ let userId: string;
 let projectId: string;
 let docId1: string;
 let docId2: string;
+let legacyProjectId: string;
 
 describe('Document Routes', () => {
   beforeAll(async () => {
@@ -74,11 +75,31 @@ describe('Document Routes', () => {
       },
     });
     docId2 = doc2.id;
+
+    const legacyProject = await prisma.project.create({
+      data: {
+        title: 'Legacy One Shot',
+        type: 'one_shot',
+        userId: user.id,
+        content: {
+          type: 'doc',
+          content: [
+            { type: 'titlePage', attrs: { title: 'Legacy One Shot', subtitle: 'A D&D 5e One-Shot', author: 'Author Name' } },
+            { type: 'pageBreak' },
+            { type: 'heading', attrs: { level: 1 }, content: [{ type: 'text', text: 'Act One' }] },
+            { type: 'paragraph', content: [{ type: 'text', text: 'The heroes meet in a tavern.' }] },
+            { type: 'pageBreak' },
+            { type: 'creditsPage', attrs: { credits: 'Written by Author Name' } },
+          ],
+        },
+      },
+    });
+    legacyProjectId = legacyProject.id;
   });
 
   afterAll(async () => {
     // Clean up in cascade-safe order
-    await prisma.projectDocument.deleteMany({ where: { projectId } });
+    await prisma.projectDocument.deleteMany({ where: { projectId: { in: [projectId, legacyProjectId] } } });
     await prisma.project.deleteMany({ where: { userId } });
     await prisma.user.delete({ where: { id: userId } });
     await prisma.$disconnect();
@@ -103,6 +124,23 @@ describe('Document Routes', () => {
       // Content should NOT be included in list response
       expect(res.body[0].content).toBeUndefined();
       expect(res.body[1].content).toBeUndefined();
+    });
+
+    it('should bootstrap legacy monolithic content into separate documents', async () => {
+      const res = await request(app)
+        .get(`/api/projects/${legacyProjectId}/documents`)
+        .set('Authorization', `Bearer ${accessToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.map((doc: { title: string; kind: string; slug: string }) => ({
+        title: doc.title,
+        kind: doc.kind,
+        slug: doc.slug,
+      }))).toEqual([
+        { title: 'Title Page', kind: 'front_matter', slug: 'title-page' },
+        { title: 'Act One', kind: 'chapter', slug: 'act-one' },
+        { title: 'Credits', kind: 'back_matter', slug: 'credits' },
+      ]);
     });
   });
 

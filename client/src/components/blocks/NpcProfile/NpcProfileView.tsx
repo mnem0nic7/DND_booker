@@ -5,7 +5,7 @@ import type { ReactNodeViewProps } from '@tiptap/react';
 import type { NpcProfileAttrs } from './NpcProfileExtension';
 import { AiGenerateButton } from '../../ai/AiGenerateButton';
 import { AiAutoFillButton } from '../../ai/AiAutoFillButton';
-import { ImageUploader } from '../../editor/ImageUploader';
+import { ProjectImageControls } from '../../editor/ProjectImageControls';
 
 export function NpcProfileView({
   node,
@@ -152,17 +152,17 @@ export function NpcProfileView({
             <div className="npc-profile__edit-row">
               <label>Portrait</label>
               {projectId && (
-                <ImageUploader
+                <ProjectImageControls
                   projectId={projectId}
-                  onUpload={(url) => updateAttr('portraitUrl', url)}
-                  className="mb-2"
+                  blockType="npcProfile"
+                  imageUrl={attrs.portraitUrl}
+                  imagePrompt={attrs.imagePrompt}
+                  onUrlChange={(url) => updateAttr('portraitUrl', url)}
+                  onPromptChange={(prompt) => updateAttr('imagePrompt', prompt)}
+                  urlPlaceholder="Or enter image URL"
+                  promptPlaceholder="Suggested NPC portrait prompt"
                 />
               )}
-              <input
-                value={attrs.portraitUrl}
-                onChange={(e) => updateAttr('portraitUrl', e.target.value)}
-                placeholder="Or enter image URL"
-              />
             </div>
 
             <h4>Description</h4>

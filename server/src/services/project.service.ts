@@ -1,5 +1,10 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '../config/database.js';
+import { createProjectWithDocuments } from './project-document-bootstrap.service.js';
+import {
+  composeProjectContentFromDocuments,
+  saveCanonicalProjectContent,
+} from './project-document-content.service.js';
 
 const DEFAULT_PROJECT_SETTINGS = {
   pageSize: 'letter',
@@ -29,15 +34,12 @@ export async function createProject(userId: string, data: {
     }
   }
 
-  return prisma.project.create({
-    data: {
-      userId,
-      title: data.title,
-      description: data.description || '',
-      type: data.type || 'campaign',
-      settings: DEFAULT_PROJECT_SETTINGS,
-      content: (templateContent as Prisma.InputJsonValue) ?? BLANK_CONTENT,
-    },
+  return createProjectWithDocuments(userId, {
+    title: data.title,
+    description: data.description,
+    type: data.type || 'campaign',
+    templateContent: (templateContent as Prisma.InputJsonValue) ?? BLANK_CONTENT,
+    settings: DEFAULT_PROJECT_SETTINGS as Prisma.InputJsonValue,
   });
 }
 
@@ -61,9 +63,31 @@ export async function getUserProjects(userId: string) {
 }
 
 export async function getProject(id: string, userId: string) {
-  return prisma.project.findFirst({
+  const project = await prisma.project.findFirst({
     where: { id, userId },
   });
+  if (!project) return null;
+
+  const documents = await prisma.projectDocument.findMany({
+    where: { projectId: id },
+    orderBy: { sortOrder: 'asc' },
+    select: { content: true, updatedAt: true },
+  });
+
+  if (documents.length === 0) {
+    return project;
+  }
+
+  const updatedAt = documents.reduce(
+    (latest, document) => (document.updatedAt > latest ? document.updatedAt : latest),
+    project.updatedAt,
+  );
+
+  return {
+    ...project,
+    content: composeProjectContentFromDocuments(documents),
+    updatedAt,
+  };
 }
 
 export async function updateProject(id: string, userId: string, data: {
@@ -85,13 +109,14 @@ export async function updateProject(id: string, userId: string, data: {
 }
 
 export async function updateProjectContent(id: string, userId: string, content: Prisma.InputJsonValue) {
-  const project = await prisma.project.findFirst({ where: { id, userId } });
-  if (!project) return null;
+  const result = await saveCanonicalProjectContent(id, userId, content);
+  if (result.status !== 'success') return null;
 
-  return prisma.project.update({
-    where: { id },
-    data: { content },
-  });
+  return {
+    ...result.project,
+    content: result.content,
+    updatedAt: result.updatedAt,
+  };
 }
 
 export async function deleteProject(id: string, userId: string) {

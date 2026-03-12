@@ -5,8 +5,7 @@ import type { ReactNodeViewProps } from '@tiptap/react';
 import type { BackCoverAttrs } from './BackCoverExtension';
 import { AiGenerateButton } from '../../ai/AiGenerateButton';
 import { AiAutoFillButton } from '../../ai/AiAutoFillButton';
-import { AiImageGenerateButton } from '../../ai/AiImageGenerateButton';
-import { ImageUploader } from '../../editor/ImageUploader';
+import { ProjectImageControls } from '../../editor/ProjectImageControls';
 
 export function BackCoverView({
   node,
@@ -126,24 +125,17 @@ export function BackCoverView({
             <div className="back-cover__edit-row">
               <label>Author Image</label>
               {projectId && (
-                <>
-                  <ImageUploader
-                    projectId={projectId}
-                    onUpload={(url) => updateAttr('authorImageUrl', url)}
-                    className="mb-2"
-                  />
-                  <AiImageGenerateButton
-                    projectId={projectId}
-                    blockType="backCover"
-                    onGenerated={(url) => updateAttr('authorImageUrl', url)}
-                  />
-                </>
+                <ProjectImageControls
+                  projectId={projectId}
+                  blockType="backCover"
+                  imageUrl={attrs.authorImageUrl}
+                  imagePrompt={attrs.imagePrompt}
+                  onUrlChange={(url) => updateAttr('authorImageUrl', url)}
+                  onPromptChange={(prompt) => updateAttr('imagePrompt', prompt)}
+                  urlPlaceholder="Or enter image URL"
+                  promptPlaceholder="Suggested back cover portrait or spot-art prompt"
+                />
               )}
-              <input
-                value={attrs.authorImageUrl}
-                onChange={(e) => updateAttr('authorImageUrl', e.target.value)}
-                placeholder="Or enter image URL"
-              />
             </div>
           </div>
         )}

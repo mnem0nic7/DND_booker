@@ -6,6 +6,7 @@ export interface MapBlockAttrs {
   src: string;
   scale: string;
   keyEntries: string;
+  imagePrompt: string;
 }
 
 export const MapBlock = Node.create({
@@ -19,6 +20,7 @@ export const MapBlock = Node.create({
       src: { default: '' },
       scale: { default: '1 inch = 5 feet' },
       keyEntries: { default: '[]' },
+      imagePrompt: { default: '' },
     };
   },
 

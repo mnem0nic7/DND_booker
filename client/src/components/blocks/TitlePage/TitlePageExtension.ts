@@ -7,6 +7,7 @@ export interface TitlePageAttrs {
   subtitle: string;
   author: string;
   coverImageUrl: string;
+  imagePrompt: string;
 }
 
 export const TitlePage = Node.create({
@@ -21,6 +22,7 @@ export const TitlePage = Node.create({
       subtitle: { default: 'A D&D 5e Adventure' },
       author: { default: 'Author Name' },
       coverImageUrl: { default: '' },
+      imagePrompt: { default: '' },
     };
   },
 

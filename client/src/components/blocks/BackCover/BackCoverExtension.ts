@@ -6,6 +6,7 @@ export interface BackCoverAttrs {
   blurb: string;
   authorBio: string;
   authorImageUrl: string;
+  imagePrompt: string;
 }
 
 export const BackCover = Node.create({
@@ -19,6 +20,7 @@ export const BackCover = Node.create({
       blurb: { default: 'A thrilling adventure awaits! Deep in the forgotten ruins, an ancient evil stirs. Heroes must brave deadly traps, cunning monsters, and dark sorcery to save the realm from certain doom.' },
       authorBio: { default: 'Author Name is a tabletop RPG designer and storyteller.' },
       authorImageUrl: { default: '' },
+      imagePrompt: { default: '' },
     };
   },
 

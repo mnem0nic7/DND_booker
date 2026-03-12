@@ -1,22 +1,19 @@
 import { z } from 'zod';
-import { prisma } from '../../../config/database.js';
+import { getCanonicalProjectContent } from '../../project-document-content.service.js';
 import type { ToolDefinition } from '../types.js';
 
 export const getProjectContent: ToolDefinition = {
   name: 'getProjectContent',
   description:
-    'Get the TipTap JSON content of a project document. Use this to read what is currently in the editor.',
+    'Get the composed TipTap JSON content of the whole project across its documents. Use this to read the current editor state.',
   parameters: z.object({
     projectId: z.string().uuid().describe('The project ID whose content to retrieve'),
   }),
   contexts: ['project-chat'],
   execute: async (params, ctx) => {
     const { projectId } = params as { projectId: string };
-    const project = await prisma.project.findFirst({
-      where: { id: projectId, userId: ctx.userId },
-      select: { id: true, content: true, updatedAt: true },
-    });
-    if (!project) {
+    const snapshot = await getCanonicalProjectContent(projectId, ctx.userId);
+    if (!snapshot) {
       return {
         success: false,
         error: { code: 'NOT_FOUND' as const, message: 'Project not found' },
@@ -24,7 +21,7 @@ export const getProjectContent: ToolDefinition = {
     }
     return {
       success: true,
-      data: { content: project.content, updatedAt: project.updatedAt.toISOString() },
+      data: { content: snapshot.content, updatedAt: snapshot.updatedAt.toISOString() },
     };
   },
 };

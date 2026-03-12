@@ -24,6 +24,7 @@ export default function EditorPage() {
     retrySave,
     documents,
     activeDocument,
+    isLoadingDocuments,
     isLoadingDocument,
     fetchDocuments,
     updateDocumentContent,
@@ -141,6 +142,10 @@ export default function EditorPage() {
           {isLoadingProject ? (
             <div className="flex items-center justify-center h-full text-gray-400">
               Loading...
+            </div>
+          ) : isLoadingDocuments && documents.length === 0 ? (
+            <div className="flex items-center justify-center h-full text-gray-400">
+              Loading documents...
             </div>
           ) : documents.length > 0 && activeDocument ? (
             <EditorLayout

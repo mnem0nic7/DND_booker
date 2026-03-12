@@ -44,7 +44,7 @@ export function extractTocEntriesFromContent(content: DocumentContent | null | u
 
   const entries: TocEntry[] = [];
   walkTocEntries(content, entries);
-  return entries;
+  return dedupeAdjacentEntries(entries);
 }
 
 export function extractTocEntriesFromDocuments(
@@ -57,5 +57,17 @@ export function extractTocEntriesFromDocuments(
     walkTocEntries(doc.content, entries);
   }
 
-  return entries;
+  return dedupeAdjacentEntries(entries);
+}
+
+function dedupeAdjacentEntries(entries: TocEntry[]): TocEntry[] {
+  return entries.filter((entry, index) => {
+    if (index === 0) return true;
+    const previous = entries[index - 1];
+    return !(
+      previous.level === entry.level
+      && previous.prefix === entry.prefix
+      && previous.title.trim() === entry.title.trim()
+    );
+  });
 }

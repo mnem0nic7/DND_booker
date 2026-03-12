@@ -1,5 +1,7 @@
 import { Page, expect } from '@playwright/test';
 import { execFile } from 'node:child_process';
+import { mkdir } from 'node:fs/promises';
+import { dirname, resolve } from 'node:path';
 import { promisify } from 'node:util';
 
 // Test credentials (Docker DB test account)
@@ -15,6 +17,13 @@ const execFileAsync = promisify(execFile);
 type ProjectLookup = {
   id: string;
   documentCount: number;
+};
+
+type AiSettingsInput = {
+  provider: 'anthropic' | 'openai' | 'ollama';
+  model: string;
+  apiKey?: string;
+  baseUrl?: string;
 };
 
 async function isOllamaGenerationActive(model = TEST_OLLAMA_MODEL): Promise<boolean> {
@@ -151,6 +160,31 @@ async function deleteProjectById(page: Page, projectId: string) {
   }
 }
 
+export async function configureAiSettings(page: Page, settings: AiSettingsInput) {
+  const accessToken = await getAccessToken(page);
+  const result = await page.evaluate(async ({ token, nextSettings }) => {
+    const response = await fetch('/api/ai/settings', {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(nextSettings),
+    });
+
+    return {
+      ok: response.ok,
+      status: response.status,
+      body: response.ok ? '' : await response.text(),
+    };
+  }, { token: accessToken, nextSettings: settings });
+
+  if (!result.ok) {
+    throw new Error(`Failed to configure AI settings: ${result.status} ${result.body}`);
+  }
+}
+
 /**
  * Navigate to the dashboard and retry once if the first load stalls.
  */
@@ -171,7 +205,21 @@ export async function login(page: Page) {
   await page.goto('/');
 
   const newProjectBtn = page.getByRole('button', { name: 'New Project' });
-  if (await newProjectBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+  const loginField = page.locator('input[type="email"]');
+
+  const readyState = await expect
+    .poll(async () => {
+      if (await newProjectBtn.isVisible().catch(() => false)) return 'dashboard';
+      if (await loginField.isVisible().catch(() => false)) return 'login';
+      return 'pending';
+    }, { timeout: 15_000 })
+    .not.toBe('pending')
+    .then(async () => {
+      if (await newProjectBtn.isVisible().catch(() => false)) return 'dashboard';
+      return 'login';
+    });
+
+  if (readyState === 'dashboard') {
     return;
   }
 
@@ -218,11 +266,17 @@ export async function openProjectByTitleOrCreate(
   page: Page,
   name: string,
   template: 'one-shot' | 'campaign' | 'supplement' | 'sourcebook' | 'blank' = 'one-shot',
+  options?: {
+    resetIfExists?: boolean;
+  },
 ) {
   await goToDashboard(page);
 
   const existingProjectMeta = await findProjectByTitle(page, name);
-  if (existingProjectMeta && existingProjectMeta.documentCount === 0) {
+  if (
+    existingProjectMeta
+    && (options?.resetIfExists || existingProjectMeta.documentCount === 0)
+  ) {
     await deleteProjectById(page, existingProjectMeta.id);
     await goToDashboard(page);
   }
@@ -565,6 +619,7 @@ export async function startExportAndWaitForCompletion(
   page: Page,
   format: 'pdf' | 'print_pdf' | 'epub' = 'pdf',
   timeoutMs = 120_000,
+  downloadPath?: string,
 ) {
   await page.getByRole('button', { name: 'Export project' }).click();
   await expect(page.getByText('Export Project').first()).toBeVisible({ timeout: 5_000 });
@@ -588,7 +643,20 @@ export async function startExportAndWaitForCompletion(
     }, { timeout: timeoutMs })
     .toBe('completed');
 
-  await expect(page.getByRole('link', { name: 'Download' }).first()).toBeVisible({ timeout: 10_000 });
+  const downloadLink = page.getByRole('link', { name: 'Download' }).first();
+  await expect(downloadLink).toBeVisible({ timeout: 10_000 });
+
+  if (downloadPath) {
+    const absolutePath = resolve(downloadPath);
+    await mkdir(dirname(absolutePath), { recursive: true });
+
+    const [download] = await Promise.all([
+      page.waitForEvent('download'),
+      downloadLink.click(),
+    ]);
+
+    await download.saveAs(absolutePath);
+  }
 }
 
 /**

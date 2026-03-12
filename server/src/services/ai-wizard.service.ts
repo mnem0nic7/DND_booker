@@ -209,13 +209,22 @@ export function markdownToTipTap(markdown: string): TipTapNode {
   let i = 0;
 
   while (i < lines.length) {
-    const line = lines[i];
+    const rawLine = lines[i];
+    const line = rawLine.trimStart();
 
     // ── Fenced D&D block: :::blockType ... ::: (with optional attrs like title="...")
     const blockMatch = line.match(/^:::(\w+)(.*)$/);
     if (blockMatch) {
-      const blockType = blockMatch[1];
+      const rawBlockType = blockMatch[1];
+      const blockType = normalizeWizardBlockType(rawBlockType);
       const inlineAttrs = blockMatch[2]?.trim() || '';
+
+      if (isInlineProseBlock(rawBlockType, inlineAttrs)) {
+        content.push(createInlineProseBlock(rawBlockType, inlineAttrs));
+        i++;
+        continue;
+      }
+
       const blockLines: string[] = [];
       i++;
       while (i < lines.length && lines[i].trim() !== ':::') {
@@ -237,7 +246,7 @@ export function markdownToTipTap(markdown: string): TipTapNode {
         }
 
         const attrs = blockType === 'sidebarCallout'
-          ? { title: parsedAttrs.title || 'Note', calloutType: parsedAttrs.calloutType || 'info' }
+          ? { title: parsedAttrs.title || defaultSidebarTitleForBlock(rawBlockType), calloutType: parsedAttrs.calloutType || 'info' }
           : undefined;
 
         content.push({
@@ -283,8 +292,8 @@ export function markdownToTipTap(markdown: string): TipTapNode {
     // ── Unordered list
     if (line.match(/^[-*]\s+/)) {
       const items: TipTapNode[] = [];
-      while (i < lines.length && lines[i].match(/^[-*]\s+/)) {
-        const itemText = lines[i].replace(/^[-*]\s+/, '');
+      while (i < lines.length && lines[i].trimStart().match(/^[-*]\s+/)) {
+        const itemText = lines[i].trimStart().replace(/^[-*]\s+/, '');
         items.push({
           type: 'listItem',
           content: [{ type: 'paragraph', content: parseInlineMarks(itemText) }],
@@ -298,8 +307,8 @@ export function markdownToTipTap(markdown: string): TipTapNode {
     // ── Ordered list
     if (line.match(/^\d+\.\s+/)) {
       const items: TipTapNode[] = [];
-      while (i < lines.length && lines[i].match(/^\d+\.\s+/)) {
-        const itemText = lines[i].replace(/^\d+\.\s+/, '');
+      while (i < lines.length && lines[i].trimStart().match(/^\d+\.\s+/)) {
+        const itemText = lines[i].trimStart().replace(/^\d+\.\s+/, '');
         items.push({
           type: 'listItem',
           content: [{ type: 'paragraph', content: parseInlineMarks(itemText) }],
@@ -334,8 +343,8 @@ export function markdownToTipTap(markdown: string): TipTapNode {
     // ── Blockquote
     if (line.match(/^>\s?/)) {
       const quoteLines: string[] = [];
-      while (i < lines.length && lines[i].match(/^>\s?/)) {
-        quoteLines.push(lines[i].replace(/^>\s?/, ''));
+      while (i < lines.length && lines[i].trimStart().match(/^>\s?/)) {
+        quoteLines.push(lines[i].trimStart().replace(/^>\s?/, ''));
         i++;
       }
       content.push({
@@ -406,17 +415,17 @@ export function markdownToTipTap(markdown: string): TipTapNode {
     while (
       i < lines.length &&
       lines[i].trim() !== '' &&
-      !lines[i].match(/^#{1,6}\s+/) &&
-      !lines[i].match(/^:::/) &&
-      !lines[i].match(/^[-*]\s+/) &&
-      !lines[i].match(/^\d+\.\s+/) &&
-      !lines[i].match(/^---+\s*$/) &&
-      !lines[i].match(/^\*\*\*+\s*$/) &&
-      !lines[i].match(/^```/) &&
-      !lines[i].match(/^>\s?/) &&
-      !lines[i].match(/^\|.+\|/)
+      !lines[i].trimStart().match(/^#{1,6}\s+/) &&
+      !lines[i].trimStart().match(/^:::/) &&
+      !lines[i].trimStart().match(/^[-*]\s+/) &&
+      !lines[i].trimStart().match(/^\d+\.\s+/) &&
+      !lines[i].trimStart().match(/^---+\s*$/) &&
+      !lines[i].trimStart().match(/^\*\*\*+\s*$/) &&
+      !lines[i].trimStart().match(/^```/) &&
+      !lines[i].trimStart().match(/^>\s?/) &&
+      !lines[i].trimStart().match(/^\|.+\|/)
     ) {
-      paraLines.push(lines[i]);
+      paraLines.push(lines[i].trim());
       i++;
     }
     if (paraLines.length > 0) {
@@ -428,6 +437,52 @@ export function markdownToTipTap(markdown: string): TipTapNode {
   }
 
   return { type: 'doc', content };
+}
+
+function normalizeWizardBlockType(blockType: string): string {
+  switch (blockType) {
+    case 'readAloud':
+      return 'readAloudBox';
+    case 'dmTips':
+      return 'sidebarCallout';
+    default:
+      return blockType;
+  }
+}
+
+function defaultSidebarTitleForBlock(rawBlockType: string): string {
+  return rawBlockType === 'dmTips' ? 'DM Tips' : 'Note';
+}
+
+function isInlineProseBlock(rawBlockType: string, inlinePayload: string): boolean {
+  if (!inlinePayload) return false;
+  if (rawBlockType === 'readAloud' || rawBlockType === 'readAloudBox') return true;
+  if (rawBlockType === 'dmTips') return true;
+  if (rawBlockType === 'sidebarCallout') {
+    return !/^\w+="[^"]*"/.test(inlinePayload);
+  }
+  return false;
+}
+
+function createInlineProseBlock(rawBlockType: string, inlinePayload: string): TipTapNode {
+  const blockType = normalizeWizardBlockType(rawBlockType);
+  const content = parseInlineContent(inlinePayload);
+
+  if (blockType === 'sidebarCallout') {
+    return {
+      type: 'sidebarCallout',
+      attrs: {
+        title: defaultSidebarTitleForBlock(rawBlockType),
+        calloutType: 'info',
+      },
+      content,
+    };
+  }
+
+  return {
+    type: 'readAloudBox',
+    content,
+  };
 }
 
 /** Parse a block of text into paragraphs */

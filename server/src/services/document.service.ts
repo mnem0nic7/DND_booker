@@ -1,32 +1,13 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '../config/database.js';
+import { ensureProjectDocuments } from './project-document-bootstrap.service.js';
 
 /**
  * List all documents for a project (excluding large content/outline fields).
  * Returns null if the project doesn't exist or the user doesn't own it.
  */
 export async function listDocuments(projectId: string, userId: string) {
-  const project = await prisma.project.findFirst({ where: { id: projectId, userId } });
-  if (!project) return null;
-
-  return prisma.projectDocument.findMany({
-    where: { projectId },
-    orderBy: { sortOrder: 'asc' },
-    select: {
-      id: true,
-      projectId: true,
-      runId: true,
-      kind: true,
-      title: true,
-      slug: true,
-      sortOrder: true,
-      targetPageCount: true,
-      status: true,
-      sourceArtifactId: true,
-      createdAt: true,
-      updatedAt: true,
-    },
-  });
+  return ensureProjectDocuments(projectId, userId);
 }
 
 /**

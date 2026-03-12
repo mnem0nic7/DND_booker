@@ -3,8 +3,7 @@ import { useParams } from 'react-router-dom';
 import { NodeViewWrapper } from '@tiptap/react';
 import type { ReactNodeViewProps } from '@tiptap/react';
 import type { MapBlockAttrs } from './MapBlockExtension';
-import { AiImageGenerateButton } from '../../ai/AiImageGenerateButton';
-import { ImageUploader } from '../../editor/ImageUploader';
+import { ProjectImageControls } from '../../editor/ProjectImageControls';
 
 interface KeyEntry {
   label: string;
@@ -112,24 +111,17 @@ export function MapBlockView({
             <div className="map-block__edit-row">
               <label>Map Image</label>
               {projectId && (
-                <>
-                  <ImageUploader
-                    projectId={projectId}
-                    onUpload={(url) => updateAttr('src', url)}
-                    className="mb-2"
-                  />
-                  <AiImageGenerateButton
-                    projectId={projectId}
-                    blockType="mapBlock"
-                    onGenerated={(url) => updateAttr('src', url)}
-                  />
-                </>
+                <ProjectImageControls
+                  projectId={projectId}
+                  blockType="mapBlock"
+                  imageUrl={attrs.src}
+                  imagePrompt={attrs.imagePrompt}
+                  onUrlChange={(url) => updateAttr('src', url)}
+                  onPromptChange={(prompt) => updateAttr('imagePrompt', prompt)}
+                  urlPlaceholder="Or enter image URL"
+                  promptPlaceholder="Suggested battle map prompt"
+                />
               )}
-              <input
-                value={attrs.src}
-                onChange={(e) => updateAttr('src', e.target.value)}
-                placeholder="Or enter image URL"
-              />
             </div>
             <div className="map-block__edit-row">
               <label>Scale</label>

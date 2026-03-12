@@ -14,9 +14,16 @@ const mockPrisma = vi.hoisted(() => ({
   },
 }));
 
+const mockProjectContentService = vi.hoisted(() => ({
+  getCanonicalProjectContent: vi.fn(),
+  saveCanonicalProjectContent: vi.fn(),
+}));
+
 vi.mock('../../config/database.js', () => ({
   prisma: mockPrisma,
 }));
+
+vi.mock('../../services/project-document-content.service.js', () => mockProjectContentService);
 
 import { listProjects } from '../../services/ai-tools/crud/list-projects.js';
 import { getProject } from '../../services/ai-tools/crud/get-project.js';
@@ -64,16 +71,17 @@ describe('CRUD Read Tools', () => {
   });
 
   it('getProjectContent returns content and updatedAt', async () => {
-    const project = {
-      id: 'p1',
+    mockProjectContentService.getCanonicalProjectContent.mockResolvedValue({
+      project: { id: 'p1', title: 'My Campaign', type: 'campaign', updatedAt: NOW },
       content: { type: 'doc', content: [] },
       updatedAt: NOW,
-    };
-    mockPrisma.project.findFirst.mockResolvedValue(project);
+      hasDocuments: true,
+    });
 
     const result = await getProjectContent.execute({ projectId: 'p1' }, ctx);
     expect(result.success).toBe(true);
     expect((result.data as any).updatedAt).toBe('2026-03-04T12:00:00.000Z');
+    expect(mockProjectContentService.getCanonicalProjectContent).toHaveBeenCalledWith('p1', 'user-1');
   });
 });
 
@@ -162,8 +170,9 @@ describe('CRUD Write Tools', () => {
   });
 
   it('updateProjectContent enforces concurrency', async () => {
-    mockPrisma.project.findFirst.mockResolvedValue({
-      id: 'p1', updatedAt: new Date('2026-03-04T12:10:00.000Z'),
+    mockProjectContentService.saveCanonicalProjectContent.mockResolvedValue({
+      status: 'conflict',
+      updatedAt: new Date('2026-03-04T12:10:00.000Z'),
     });
 
     const result = await updateProjectContent.execute({
@@ -176,9 +185,13 @@ describe('CRUD Write Tools', () => {
   });
 
   it('updateProjectContent succeeds with fresh timestamp', async () => {
-    mockPrisma.project.findFirst.mockResolvedValue({ id: 'p1', updatedAt: NOW });
     const newTime = new Date('2026-03-04T12:01:00.000Z');
-    mockPrisma.project.update.mockResolvedValue({ id: 'p1', updatedAt: newTime });
+    mockProjectContentService.saveCanonicalProjectContent.mockResolvedValue({
+      status: 'success',
+      project: { id: 'p1', title: 'Campaign A', type: 'campaign', content: { type: 'doc', content: [] }, updatedAt: newTime },
+      content: { type: 'doc', content: [{ type: 'paragraph' }] },
+      updatedAt: newTime,
+    });
 
     const result = await updateProjectContent.execute({
       projectId: 'p1',
@@ -186,5 +199,11 @@ describe('CRUD Write Tools', () => {
       content: { type: 'doc', content: [{ type: 'paragraph' }] },
     }, ctx);
     expect(result.success).toBe(true);
+    expect(mockProjectContentService.saveCanonicalProjectContent).toHaveBeenCalledWith(
+      'p1',
+      'user-1',
+      { type: 'doc', content: [{ type: 'paragraph' }] },
+      '2026-03-04T12:00:00.000Z',
+    );
   });
 });

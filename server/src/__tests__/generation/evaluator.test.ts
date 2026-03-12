@@ -73,6 +73,24 @@ const FAILING_EVAL_RESPONSE = {
   recommendedActions: ['Add missing section', 'Fix NPC names'],
 };
 
+const NULL_SUGGESTED_FIX_RESPONSE = {
+  structuralCompleteness: 84,
+  continuityScore: 82,
+  dndSanity: 80,
+  editorialQuality: 79,
+  publicationFit: 77,
+  findings: [
+    {
+      severity: 'major',
+      code: 'WEAK_TRANSITION',
+      message: 'Transition into the mine could be sharper.',
+      affectedScope: 'chapter-1',
+      suggestedFix: null,
+    },
+  ],
+  recommendedActions: ['Tighten the transition into the mine.'],
+};
+
 beforeAll(async () => {
   testUser = await prisma.user.create({
     data: {
@@ -256,5 +274,36 @@ describe('Evaluator — evaluateArtifact', () => {
 
     const updatedRun = await prisma.generationRun.findUnique({ where: { id: run!.id } });
     expect(updatedRun!.actualTokens).toBe(1500);
+  });
+
+  it('should tolerate null suggestedFix values from the evaluator response', async () => {
+    mockGenerateText.mockResolvedValueOnce({
+      text: JSON.stringify(NULL_SUGGESTED_FIX_RESPONSE),
+      usage: { inputTokens: 900, outputTokens: 300 },
+    } as any);
+
+    const run = await createRun({
+      projectId: testProject.id,
+      userId: testUser.id,
+      prompt: 'test',
+    });
+
+    const artifact = await prisma.generatedArtifact.create({
+      data: {
+        runId: run!.id,
+        projectId: run!.projectId,
+        artifactType: 'chapter_draft',
+        artifactKey: 'test-null-fix',
+        status: 'generated',
+        version: 1,
+        title: 'Null Fix Chapter',
+        jsonContent: { test: true } as any,
+      },
+    });
+
+    const result = await evaluateArtifact(run!, artifact.id, SAMPLE_BIBLE, {} as any, 4096);
+
+    expect(result.findings).toHaveLength(1);
+    expect(result.findings[0].suggestedFix).toBeUndefined();
   });
 });

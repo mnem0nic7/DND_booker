@@ -4,6 +4,12 @@ function normalizeString(value: unknown): string {
   return String(value);
 }
 
+export interface NormalizedEncounterEntry {
+  weight: number;
+  description: string;
+  cr: string;
+}
+
 export function escapeHtml(text: unknown): string {
   return normalizeString(text)
     .replace(/&/g, '&amp;')
@@ -64,4 +70,49 @@ export function escapeTypst(text: unknown): string {
  */
 export function escapeTypstUrl(url: unknown): string {
   return normalizeString(url).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+}
+
+export function normalizeEncounterEntries(value: unknown): NormalizedEncounterEntry[] {
+  let parsed: unknown;
+  if (typeof value === 'string') {
+    try {
+      parsed = JSON.parse(value);
+    } catch {
+      return [];
+    }
+  } else {
+    parsed = value;
+  }
+
+  if (!Array.isArray(parsed)) return [];
+
+  return parsed.flatMap((entry) => {
+    if (entry == null || typeof entry !== 'object') return [];
+
+    const raw = entry as Record<string, unknown>;
+    const weight = Number(raw.weight);
+    const description = normalizeString(raw.description).trim();
+    const cr = normalizeString(raw.cr).trim();
+
+    if (!Number.isFinite(weight) || weight <= 0 || !description) return [];
+
+    return [{
+      weight: Math.max(1, Math.floor(weight)),
+      description,
+      cr,
+    }];
+  });
+}
+
+export function normalizeChapterHeaderTitle(title: unknown, chapterNumber: unknown): string {
+  const normalizedTitle = normalizeString(title).trim();
+  const normalizedChapterNumber = normalizeString(chapterNumber).trim();
+
+  if (!normalizedTitle || !normalizedChapterNumber) return normalizedTitle;
+
+  const chapterMatch = normalizedChapterNumber.match(/chapter\s+(\d+)/i);
+  if (!chapterMatch) return normalizedTitle;
+
+  const chapterPrefix = new RegExp(`^chapter\\s+${chapterMatch[1]}\\s*[:.-]\\s*`, 'i');
+  return normalizedTitle.replace(chapterPrefix, '').trim();
 }

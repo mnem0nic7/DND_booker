@@ -354,11 +354,11 @@ export function Toolbar({ editor, columnCount, setColumnCount, pageSize, setPage
             <Btn onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()} title="Insert table">
               <Icon d="M3 10h18M3 14h18M10 3v18M14 3v18M3 6a3 3 0 013-3h12a3 3 0 013 3v12a3 3 0 01-3 3H6a3 3 0 01-3-3V6z" />
             </Btn>
-            <Btn onClick={() => onOpenBlockPicker()} title="Insert block">
-              <span className="text-[10px] font-bold">Block</span>
+            <Btn onClick={() => onOpenBlockPicker()} title="Create component">
+              <span className="text-[10px] font-bold">Create</span>
             </Btn>
           </div>
-          <GroupLabel>Insert</GroupLabel>
+          <GroupLabel>Create</GroupLabel>
         </div>
 
         <GroupDivider />

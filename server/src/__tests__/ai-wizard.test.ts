@@ -82,6 +82,34 @@ describe('markdownToTipTap', () => {
     expect(result.content![0].content![0].type).toBe('paragraph');
   });
 
+  it('should convert indented headings and readAloud aliases', () => {
+    const md = `  ### The Tale of the Mine
+
+  :::readAloud The cave entrance looms before you.`;
+    const result = markdownToTipTap(md);
+
+    expect(result.content).toHaveLength(2);
+    expect(result.content![0]).toMatchObject({
+      type: 'heading',
+      attrs: { level: 3 },
+      content: [{ text: 'The Tale of the Mine' }],
+    });
+    expect(result.content![1]).toMatchObject({
+      type: 'readAloudBox',
+    });
+  });
+
+  it('should convert dmTips aliases into sidebar callouts', () => {
+    const md = ':::dmTips Telegraph the danger before initiative is rolled.';
+    const result = markdownToTipTap(md);
+
+    expect(result.content).toHaveLength(1);
+    expect(result.content![0]).toMatchObject({
+      type: 'sidebarCallout',
+      attrs: { title: 'DM Tips', calloutType: 'info' },
+    });
+  });
+
   it('should convert :::statBlock blocks with JSON attrs', () => {
     const md = ':::statBlock\n{"name":"Goblin","size":"Small","type":"humanoid"}\n:::';
     const result = markdownToTipTap(md);

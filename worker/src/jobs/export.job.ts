@@ -8,6 +8,7 @@ import type {
 import { prisma } from '../config/database.js';
 import { assembleHtml } from '../renderers/html-assembler.js';
 import { assembleTypst } from '../renderers/typst-assembler.js';
+import { normalizeExportDocuments } from '../renderers/export-document-normalizer.js';
 import { generateTypstPdf } from '../generators/typst.generator.js';
 import { generateEpub } from '../generators/epub.generator.js';
 import {
@@ -19,6 +20,11 @@ import {
 } from '../services/export-review.service.js';
 import fs from 'fs/promises';
 import path from 'path';
+import {
+  getAssetStorageDir,
+  getProjectAssetRelativePath,
+  parseProjectAssetUrl,
+} from '../../../server/src/services/asset-paths.service.js';
 
 interface ExportJobData {
   exportJobId: string;
@@ -28,6 +34,55 @@ interface ExportJobData {
 interface PdfRenderResult {
   buffer: Buffer;
   review: ExportReview;
+}
+
+export function rewriteUploadUrlsInValue(value: unknown): unknown {
+  if (typeof value === 'string') {
+    const parsed = parseProjectAssetUrl(value);
+    if (!parsed) return value;
+    return getProjectAssetRelativePath(parsed.projectId, parsed.filename);
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((item) => rewriteUploadUrlsInValue(item));
+  }
+
+  if (!value || typeof value !== 'object') return value;
+
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>).map(([key, entryValue]) => [
+      key,
+      rewriteUploadUrlsInValue(entryValue),
+    ]),
+  );
+}
+
+export function rewriteUploadUrlsInDocs(
+  docs: Array<{ title: string; content: DocumentContent | null; sortOrder: number; kind?: DocumentKind | null }>,
+) {
+  return docs.map((doc) => ({
+    ...doc,
+    content: doc.content ? rewriteUploadUrlsInValue(doc.content) as DocumentContent : doc.content,
+  }));
+}
+
+export async function createTypstWorkspace(baseDir: string): Promise<string> {
+  const workspace = await fs.mkdtemp(path.join(baseDir, 'typst-workspace-'));
+  const texturesSource = path.resolve(process.cwd(), 'assets', 'textures');
+  const texturesDest = path.join(workspace, 'textures');
+  const uploadsSource = getAssetStorageDir();
+  const uploadsDest = path.join(workspace, 'uploads');
+
+  await fs.symlink(texturesSource, texturesDest);
+
+  try {
+    await fs.access(uploadsSource);
+    await fs.symlink(uploadsSource, uploadsDest);
+  } catch {
+    await fs.mkdir(uploadsDest, { recursive: true });
+  }
+
+  return workspace;
 }
 
 /**
@@ -74,7 +129,7 @@ export async function processExportJob(job: Job<ExportJobData>): Promise<void> {
       select: { title: true, content: true, sortOrder: true, kind: true },
     });
 
-    const docs = projectDocuments.length > 0
+    const rawDocs = projectDocuments.length > 0
       ? projectDocuments.map(doc => ({
           title: doc.title,
           content: doc.content as DocumentContent | null,
@@ -86,6 +141,8 @@ export async function processExportJob(job: Job<ExportJobData>): Promise<void> {
           content: exportJob.project.content as DocumentContent | null,
           sortOrder: 0,
         }];
+
+    const docs = normalizeExportDocuments(rawDocs, exportJob.project.title);
 
     await job.updateProgress(50);
 
@@ -237,34 +294,41 @@ async function renderPdfVariant(input: {
   const { filepath, docs, theme, projectTitle, printReady, autoFixes = [] } = input;
   const assetsDir = path.resolve(process.cwd(), 'assets');
   const fontsDir = path.join(assetsDir, 'fonts');
-
-  const typstSource = assembleTypst({
-    documents: docs,
-    theme,
-    projectTitle,
-    printReady,
-    exportPolish: {
-      h1SizePt: autoFixes.includes('shrink_h1_headings') ? 21 : undefined,
-      endCapMode: autoFixes.includes('dedicated_end_page') ? 'full_page' : 'inline',
-      chapterOpenerMode: autoFixes.includes('dedicated_chapter_openers') ? 'dedicated_page' : 'inline',
-    },
-  });
-
-  const buffer = await generateTypstPdf(typstSource, [fontsDir], assetsDir);
-  await fs.writeFile(filepath, buffer);
+  const outputDir = path.dirname(filepath);
+  const typstWorkspace = await createTypstWorkspace(outputDir);
+  const rewrittenDocs = rewriteUploadUrlsInDocs(docs);
 
   try {
-    const review = await reviewPdfExport(
-      filepath,
-      docs.map((doc) => ({ title: doc.title, kind: doc.kind ?? null }))
-    );
-    return { buffer, review };
-  } catch (reviewError) {
-    const message = reviewError instanceof Error ? reviewError.message : String(reviewError);
-    console.error(`[export.job] Export review failed for ${path.basename(filepath)}:`, message);
-    return {
-      buffer,
-      review: buildUnavailableExportReview(`Export review failed: ${message}`),
-    };
+    const typstSource = assembleTypst({
+      documents: rewrittenDocs,
+      theme,
+      projectTitle,
+      printReady,
+      exportPolish: {
+        h1SizePt: autoFixes.includes('shrink_h1_headings') ? 21 : undefined,
+        endCapMode: autoFixes.includes('dedicated_end_page') ? 'full_page' : 'inline',
+        chapterOpenerMode: autoFixes.includes('dedicated_chapter_openers') ? 'dedicated_page' : 'inline',
+      },
+    });
+
+    const buffer = await generateTypstPdf(typstSource, [fontsDir], typstWorkspace);
+    await fs.writeFile(filepath, buffer);
+
+    try {
+      const review = await reviewPdfExport(
+        filepath,
+        docs.map((doc) => ({ title: doc.title, kind: doc.kind ?? null }))
+      );
+      return { buffer, review };
+    } catch (reviewError) {
+      const message = reviewError instanceof Error ? reviewError.message : String(reviewError);
+      console.error(`[export.job] Export review failed for ${path.basename(filepath)}:`, message);
+      return {
+        buffer,
+        review: buildUnavailableExportReview(`Export review failed: ${message}`),
+      };
+    }
+  } finally {
+    await fs.rm(typstWorkspace, { recursive: true, force: true });
   }
 }
