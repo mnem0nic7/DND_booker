@@ -10,6 +10,11 @@ export interface NormalizedEncounterEntry {
   cr: string;
 }
 
+export interface NormalizedRandomTableEntry {
+  roll: string;
+  result: string;
+}
+
 export function escapeHtml(text: unknown): string {
   return normalizeString(text)
     .replace(/&/g, '&amp;')
@@ -101,6 +106,33 @@ export function normalizeEncounterEntries(value: unknown): NormalizedEncounterEn
       description,
       cr,
     }];
+  });
+}
+
+export function normalizeRandomTableEntries(value: unknown): NormalizedRandomTableEntry[] {
+  let parsed: unknown;
+  if (typeof value === 'string') {
+    try {
+      parsed = JSON.parse(value);
+    } catch {
+      return [];
+    }
+  } else {
+    parsed = value;
+  }
+
+  if (!Array.isArray(parsed)) return [];
+
+  return parsed.flatMap((entry) => {
+    if (entry == null || typeof entry !== 'object') return [];
+
+    const raw = entry as Record<string, unknown>;
+    const roll = normalizeString(raw.roll).trim();
+    const result = normalizeString(raw.result).trim();
+
+    if (!roll || !result) return [];
+
+    return [{ roll, result }];
   });
 }
 

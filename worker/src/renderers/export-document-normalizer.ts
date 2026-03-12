@@ -1,5 +1,5 @@
 import type { DocumentContent, DocumentKind } from '@dnd-booker/shared';
-import { normalizeEncounterEntries } from '@dnd-booker/shared';
+import { normalizeEncounterEntries, normalizeRandomTableEntries } from '@dnd-booker/shared';
 
 interface ExportDocument {
   title: string;
@@ -74,7 +74,8 @@ function normalizeExportContent(content: DocumentContent, projectTitle: string):
 
   const repairedMarkdownBleedThrough = repairMarkdownBleedThrough(nodes);
   const withoutPlaceholderScaffold = stripPlaceholderAdventureScaffold(repairedMarkdownBleedThrough);
-  const withoutRedundantBreaks = stripRedundantStructuralPageBreaks(withoutPlaceholderScaffold);
+  const withoutOrphanedUtilityScaffold = stripOrphanedUtilityScaffold(withoutPlaceholderScaffold);
+  const withoutRedundantBreaks = stripRedundantStructuralPageBreaks(withoutOrphanedUtilityScaffold);
 
   if (withoutRedundantBreaks.length === 0) return null;
 
@@ -102,6 +103,10 @@ function normalizeNode(node: DocumentContent, projectTitle: string): DocumentCon
       return normalizeCreditsPageNode(baseNode);
     case 'encounterTable':
       return normalizeEncounterTableNode(baseNode);
+    case 'randomTable':
+      return normalizeRandomTableNode(baseNode);
+    case 'heading':
+      return normalizeHeadingNode(baseNode);
     default:
       return baseNode;
   }
@@ -154,13 +159,33 @@ function normalizeCreditsPageNode(node: DocumentContent): DocumentContent | null
   };
 }
 
-function normalizeEncounterTableNode(node: DocumentContent): DocumentContent {
+function normalizeEncounterTableNode(node: DocumentContent): DocumentContent | null {
   const attrs = { ...(node.attrs ?? {}) };
   const entries = normalizeEncounterEntries(attrs.entries);
+  if (entries.length === 0) return null;
   attrs.entries = JSON.stringify(entries);
   return {
     ...node,
     attrs,
+  };
+}
+
+function normalizeRandomTableNode(node: DocumentContent): DocumentContent | null {
+  const attrs = { ...(node.attrs ?? {}) };
+  const entries = normalizeRandomTableEntries(attrs.entries);
+  if (entries.length === 0) return null;
+  attrs.entries = JSON.stringify(entries);
+  return {
+    ...node,
+    attrs,
+  };
+}
+
+function normalizeHeadingNode(node: DocumentContent): DocumentContent {
+  if (!isSuspiciousDisplayHeading(node)) return node;
+  return {
+    type: 'paragraph',
+    content: node.content ?? [],
   };
 }
 
@@ -177,6 +202,40 @@ function stripPlaceholderAdventureScaffold(nodes: DocumentContent[]): DocumentCo
 
     if (isPlaceholderAdventureParagraph(node)) {
       continue;
+    }
+
+    result.push(node);
+  }
+
+  return result;
+}
+
+function stripOrphanedUtilityScaffold(nodes: DocumentContent[]): DocumentContent[] {
+  const result: DocumentContent[] = [];
+
+  for (let index = 0; index < nodes.length; index += 1) {
+    const node = nodes[index];
+
+    if (isUtilityIntroParagraph(node)) {
+      const nextMeaningfulIndex = findNextMeaningfulIndex(nodes, index + 1);
+      const nextMeaningful = nextMeaningfulIndex === -1 ? null : nodes[nextMeaningfulIndex];
+      const nextUtilityCandidate = nextMeaningful?.type === 'heading'
+        ? findNextMeaningfulNode(nodes, nextMeaningfulIndex + 1)
+        : nextMeaningful;
+
+      if (!isReferencedUtilityNode(nextUtilityCandidate, node)) {
+        if (nextMeaningful?.type === 'heading') {
+          index = nextMeaningfulIndex;
+        }
+        continue;
+      }
+    }
+
+    if (isOrphanedUtilityHeading(node)) {
+      const nextMeaningful = findNextMeaningfulNode(nodes, index + 1);
+      if (!isReferencedUtilityNode(nextMeaningful, node)) {
+        continue;
+      }
     }
 
     result.push(node);
@@ -281,6 +340,22 @@ function findNextNonBreakNode(nodes: DocumentContent[], startIndex: number): Doc
   return null;
 }
 
+function findNextMeaningfulIndex(nodes: DocumentContent[], startIndex: number): number {
+  for (let index = startIndex; index < nodes.length; index += 1) {
+    if (!isStructuralBreak(nodes[index])) return index;
+  }
+  return -1;
+}
+
+function findNextMeaningfulNode(nodes: DocumentContent[], startIndex: number): DocumentContent | null {
+  const index = findNextMeaningfulIndex(nodes, startIndex);
+  return index === -1 ? null : nodes[index];
+}
+
+function isStructuralBreak(node: DocumentContent | null | undefined): boolean {
+  return node?.type === 'pageBreak' || node?.type === 'columnBreak';
+}
+
 function isPlaceholderAdventureHeading(node: DocumentContent | undefined): boolean {
   if (node?.type !== 'heading') return false;
   if (Number(node.attrs?.level) !== 1) return false;
@@ -307,6 +382,48 @@ function isEffectivelyEmpty(content: DocumentContent): boolean {
 function readInlineText(node: DocumentContent): string {
   if (node.type === 'text') return String(node.text ?? '');
   return normalizeText((node.content ?? []).map(readInlineText).join(''));
+}
+
+function isSuspiciousDisplayHeading(node: DocumentContent): boolean {
+  if (node.type !== 'heading') return false;
+
+  const level = Number(node.attrs?.level ?? 0);
+  if (level < 1 || level > 2) return false;
+
+  const text = readInlineText(node);
+  const wordCount = text.split(/\s+/).filter(Boolean).length;
+  return text.length >= 70 || wordCount >= 10;
+}
+
+function isUtilityIntroParagraph(node: DocumentContent): boolean {
+  if (node.type !== 'paragraph') return false;
+  const text = readInlineText(node).toLowerCase();
+  return /(?:use|utilize)\s+the\s+following\s+(?:random\s+table|encounter\s+table|table|handout)/.test(text);
+}
+
+function isOrphanedUtilityHeading(node: DocumentContent): boolean {
+  if (node.type !== 'heading') return false;
+  const text = readInlineText(node).toLowerCase();
+  return /\b(encounter table|random table|discoveries|treasure table|loot table)\b/.test(text);
+}
+
+function isReferencedUtilityNode(node: DocumentContent | null, referenceNode: DocumentContent): boolean {
+  if (!node) return false;
+
+  const referenceText = readInlineText(referenceNode).toLowerCase();
+
+  if (referenceNode.type === 'paragraph' && /\bhandout\b/.test(referenceText)) {
+    return node.type === 'handout';
+  }
+
+  if (
+    (referenceNode.type === 'paragraph' && /\b(encounter table|random table|table)\b/.test(referenceText))
+    || referenceNode.type === 'heading'
+  ) {
+    return node.type === 'encounterTable' || node.type === 'randomTable';
+  }
+
+  return false;
 }
 
 function normalizeText(value: unknown): string {

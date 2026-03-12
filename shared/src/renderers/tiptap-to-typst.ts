@@ -15,6 +15,7 @@ import {
   escapeTypstUrl,
   normalizeChapterHeaderTitle,
   normalizeEncounterEntries,
+  normalizeRandomTableEntries,
 } from './utils.js';
 
 type TipTapNode = DocumentContent;
@@ -429,8 +430,14 @@ function renderChapterHeader(attrs: Record<string, unknown>): string {
   const subtitle = String(attrs.subtitle || '');
   const chapterNumber = String(attrs.chapterNumber || '');
   const title = escapeTypst(normalizeChapterHeaderTitle(attrs.title, chapterNumber));
+  const backgroundImage = String(attrs.backgroundImage || '');
 
   let t = '';
+  if (backgroundImage) {
+    t += `#block(width: 100%, inset: 0pt, above: 4pt, below: 10pt)[\n`;
+    t += `  #image("${escapeTypstUrl(backgroundImage)}", width: 100%)\n`;
+    t += `]\n\n`;
+  }
   if (chapterNumber) {
     t += `#text(font: title-font, size: 14pt, fill: theme-secondary)[${escapeTypst(chapterNumber)}]\n\n`;
   }
@@ -505,10 +512,12 @@ function renderMagicItem(attrs: Record<string, unknown>): string {
 function renderRandomTable(attrs: Record<string, unknown>): string {
   const title = escapeTypst(String(attrs.title || ''));
   const dieType = escapeTypst(String(attrs.dieType || 'd6'));
-  const entries = parseJsonArray<{ roll: string; result: string }>(String(attrs.entries || '[]'));
+  const entries = normalizeRandomTableEntries(attrs.entries);
+
+  if (entries.length === 0) return '';
 
   let t = '';
-  t += `#block(width: 100%, inset: 0pt)[\n`;
+  t += `#block(width: 100%, inset: 0pt, breakable: false)[\n`;
   t += `  #set text(font: stat-font)\n`;
   t += `  #text(font: heading-font, size: 14pt, weight: "bold")[${title}] #h(1fr) #text(size: 10pt)[${dieType}]\n\n`;
   t += `  #table(\n`;
@@ -579,11 +588,12 @@ function renderEncounterTable(attrs: Record<string, unknown>): string {
   const environment = escapeTypst(String(attrs.environment || ''));
   const crRange = escapeTypst(String(attrs.crRange || ''));
   const entries = normalizeEncounterEntries(attrs.entries);
+  if (entries.length === 0) return '';
 
   const totalWeight = entries.reduce((s, e) => s + e.weight, 0);
 
   let t = '';
-  t += `#block(width: 100%, inset: 0pt)[\n`;
+  t += `#block(width: 100%, inset: 0pt, breakable: false)[\n`;
   t += `  #set text(font: stat-font)\n`;
   t += `  #text(font: heading-font, size: 14pt, weight: "bold")[${environment} Encounters]\n`;
   t += `  #text(size: 10pt)[CR Range: ${crRange}]\n\n`;
@@ -749,11 +759,12 @@ function renderTitlePage(attrs: Record<string, unknown>): string {
 
 function renderTableOfContents(attrs: Record<string, unknown>): string {
   const title = escapeTypst(String(attrs.title || 'Table of Contents'));
+  const depth = Math.min(3, Math.max(1, Number(attrs.depth) || 3));
 
   let t = '';
   t += `#set page(columns: 1)\n`;
   t += `#text(font: title-font, size: 20pt, weight: "bold")[${title}]\n\n`;
-  t += `#outline(title: none, depth: 3)\n\n`;
+  t += `#outline(title: none, depth: ${depth})\n\n`;
   t += `#pagebreak()\n`;
   t += `#set page(columns: 2)\n\n`;
   return t;

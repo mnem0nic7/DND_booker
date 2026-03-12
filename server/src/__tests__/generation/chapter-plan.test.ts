@@ -273,4 +273,63 @@ describe('Chapter Plan Service — executeChapterPlanGeneration', () => {
     });
     expect(artifact!.artifactKey).toBe('chapter-plan-ch-2');
   });
+
+  it('should coerce sloppy pipe-delimited section contentType values from the model', async () => {
+    mockGenerateText.mockResolvedValueOnce({
+      text: JSON.stringify({
+        ...VALID_PLAN,
+        sections: [
+          {
+            ...VALID_PLAN.sections[0],
+            contentType: 'narrative | social | transition',
+          },
+          {
+            ...VALID_PLAN.sections[1],
+            contentType: 'encounter / exploration',
+          },
+        ],
+      }),
+      usage: { inputTokens: 1000, outputTokens: 1500 },
+    } as any);
+
+    const run = await createRun({
+      projectId: testProject.id, userId: testUser.id, prompt: 'test',
+    });
+
+    const result = await executeChapterPlanGeneration(
+      run!, SAMPLE_CHAPTER, SAMPLE_BIBLE,
+      SAMPLE_BIBLE.entities.map(e => ({ slug: e.slug, entityType: e.entityType, name: e.name, summary: e.summary })),
+      {} as any, 8192,
+    );
+
+    expect(result.plan.sections[0].contentType).toBe('narrative');
+    expect(result.plan.sections[1].contentType).toBe('encounter');
+  });
+
+  it('coerces numeric encounter CR values into strings', async () => {
+    mockGenerateText.mockResolvedValueOnce({
+      text: JSON.stringify({
+        ...VALID_PLAN,
+        encounters: [
+          {
+            ...VALID_PLAN.encounters[0],
+            enemies: [{ name: 'Goblin', count: 6, cr: 0.25 }],
+          },
+        ],
+      }),
+      usage: { inputTokens: 1000, outputTokens: 1500 },
+    } as any);
+
+    const run = await createRun({
+      projectId: testProject.id, userId: testUser.id, prompt: 'test',
+    });
+
+    const result = await executeChapterPlanGeneration(
+      run!, SAMPLE_CHAPTER, SAMPLE_BIBLE,
+      SAMPLE_BIBLE.entities.map(e => ({ slug: e.slug, entityType: e.entityType, name: e.name, summary: e.summary })),
+      {} as any, 8192,
+    );
+
+    expect(result.plan.encounters[0].enemies[0].cr).toBe('0.25');
+  });
 });

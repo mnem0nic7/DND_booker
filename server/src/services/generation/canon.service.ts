@@ -83,7 +83,12 @@ const EncounterBundleSchema = z.object({
   difficulty: z.string(),
   suggestedLevel: z.object({ min: z.number(), max: z.number() }),
   setup: z.string(),
-  enemies: z.array(z.object({ name: z.string(), count: z.number(), cr: z.string(), tactics: z.string() })),
+  enemies: z.array(z.object({
+    name: z.string(),
+    count: z.number(),
+    cr: z.preprocess((value) => String(value ?? '').trim(), z.string().min(1)),
+    tactics: z.string(),
+  })),
   environment: z.object({ terrain: z.string(), lighting: z.string(), features: z.array(z.string()) }),
   complications: z.array(z.string()),
   rewards: z.array(z.object({ name: z.string(), description: z.string() })),

@@ -22,7 +22,7 @@ You MUST respond with ONLY a JSON object (no markdown fences, no commentary). Th
           "title": "Arrival at the Village",
           "sortOrder": 1,
           "targetPages": 3,
-          "contentType": "narrative | encounter | exploration | social | transition",
+          "contentType": "narrative",
           "summary": "1-2 sentences about this section"
         }
       ]
@@ -46,6 +46,7 @@ Rules:
 - Total page estimate must be within 10% of the bible's target
 - Every entity referenced in keyEntities must exist in the bible's entities
 - Content types: narrative (story/description), encounter (combat), exploration (dungeon/hex), social (roleplay/dialogue), transition (travel/summary)
+- contentType must be ONE value only: narrative, encounter, exploration, social, or transition. Never return a pipe-delimited list.
 - Each chapter needs 2-6 sections
 - Appendices: include NPC appendix if 4+ NPCs, item appendix if 3+ items, monster appendix if encounters exist
 - Sort order must be sequential starting from 1

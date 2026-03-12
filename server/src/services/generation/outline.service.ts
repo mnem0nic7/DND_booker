@@ -4,6 +4,7 @@ import type { BibleContent, ChapterOutline } from '@dnd-booker/shared';
 import { prisma } from '../../config/database.js';
 import { publishGenerationEvent } from './pubsub.service.js';
 import { parseJsonResponse } from './parse-json.js';
+import { normalizeGenerationContentType } from './content-type-normalizer.js';
 import {
   buildChapterOutlineSystemPrompt,
   buildChapterOutlineUserPrompt,
@@ -14,7 +15,10 @@ const SectionOutlineSchema = z.object({
   title: z.string(),
   sortOrder: z.number(),
   targetPages: z.number(),
-  contentType: z.enum(['narrative', 'encounter', 'exploration', 'social', 'transition']),
+  contentType: z.preprocess(
+    normalizeGenerationContentType,
+    z.enum(['narrative', 'encounter', 'exploration', 'social', 'transition']),
+  ),
   summary: z.string(),
 });
 

@@ -12,7 +12,7 @@ You MUST respond with ONLY a JSON object (no markdown fences, no commentary). Th
     {
       "slug": "arrival",
       "title": "Arrival at the Village",
-      "contentType": "narrative | encounter | exploration | social | transition",
+      "contentType": "narrative",
       "targetWords": 800,
       "outline": "2-3 sentences describing exactly what this section covers",
       "scenePurpose": "Why this section exists in play and what job it does for the DM",
@@ -54,6 +54,7 @@ blocksNeeded options (D&D editor block types):
 Rules:
 - targetWords per section: narrative 600-1200, encounter 800-1500, exploration 600-1000, social 400-800, transition 200-400
 - Every encounter section MUST have a matching encounter spec
+- contentType must be ONE value only: narrative, encounter, exploration, social, or transition. Never return a pipe-delimited list.
 - Every non-transition section MUST include scenePurpose, playerObjective, decisionPoint, and consequenceSummary
 - Every non-transition section MUST include at least one reusable DM utility block in blocksNeeded
 - Narrative sections should usually include readAloud plus dmTips or handout

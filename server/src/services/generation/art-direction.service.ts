@@ -1,9 +1,12 @@
 import { generateText, type LanguageModel } from 'ai';
 import { z } from 'zod';
-import type { DocumentContent } from '@dnd-booker/shared';
+import { normalizeChapterHeaderTitle, type DocumentContent, type DocumentKind } from '@dnd-booker/shared';
 import { prisma } from '../../config/database.js';
 import { publishGenerationEvent } from './pubsub.service.js';
 import { parseJsonResponse } from './parse-json.js';
+import { getAiSettings, getDecryptedApiKey } from '../ai-settings.service.js';
+import { generateAiImage } from '../ai-image.service.js';
+import { createAsset } from '../asset.service.js';
 
 type ImageCapableBlockType =
   | 'titlePage'
@@ -17,9 +20,40 @@ interface ImageSlot {
   documentId: string;
   documentSlug: string;
   documentTitle: string;
+  kind?: DocumentKind | null;
   blockType: ImageCapableBlockType;
   nodeIndex: number;
   context: string;
+}
+
+interface AutomaticPlacementSeed {
+  documentSlug: string;
+  documentTitle: string;
+  kind?: DocumentKind | null;
+  nodeIndex: number;
+  blockType: ImageCapableBlockType;
+  context: string;
+  model: 'dall-e-3' | 'gpt-image-1';
+  size: string;
+}
+
+interface RealizedImagePlacement {
+  documentSlug: string;
+  nodeIndex: number;
+  blockType: ImageCapableBlockType;
+  prompt: string;
+  model: 'dall-e-3' | 'gpt-image-1';
+  size: string;
+  assetId: string;
+  assetUrl: string;
+}
+
+interface FailedImagePlacement {
+  documentSlug: string;
+  nodeIndex: number;
+  blockType: ImageCapableBlockType;
+  prompt: string;
+  error: string;
 }
 
 const IMAGE_ATTR_BY_BLOCK: Record<ImageCapableBlockType, string> = {
@@ -49,6 +83,24 @@ const RECOMMENDED_SIZE_BY_BLOCK: Record<ImageCapableBlockType, string> = {
   npcProfile: '1024x1024',
 };
 
+const AUTO_ART_LIMIT_BY_BLOCK: Record<ImageCapableBlockType, number> = {
+  titlePage: 1,
+  chapterHeader: 8,
+  fullBleedImage: 4,
+  mapBlock: 2,
+  backCover: 1,
+  npcProfile: 4,
+};
+
+const AUTO_ART_PRIORITY: ImageCapableBlockType[] = [
+  'titlePage',
+  'chapterHeader',
+  'fullBleedImage',
+  'mapBlock',
+  'npcProfile',
+  'backCover',
+];
+
 const PlacementSchema = z.object({
   documentSlug: z.string(),
   nodeIndex: z.number().int().min(0),
@@ -61,7 +113,7 @@ const PlacementSchema = z.object({
 
 const ArtDirectionPlanSchema = z.object({
   summary: z.string().min(10).max(1000),
-  placements: z.array(PlacementSchema).max(6),
+  placements: z.array(PlacementSchema).max(20),
 });
 
 type ArtDirectionPlan = z.infer<typeof ArtDirectionPlanSchema>;
@@ -69,10 +121,32 @@ type ArtDirectionPlan = z.infer<typeof ArtDirectionPlanSchema>;
 export interface ArtDirectionResult {
   artifactId: string | null;
   placementCount: number;
+  generatedImageCount: number;
+  failedImageCount: number;
+  skippedImageGenerationReason: string | null;
 }
 
 function getTopLevelNodes(content: DocumentContent | null | undefined): DocumentContent[] {
   return Array.isArray(content?.content) ? content.content : [];
+}
+
+function documentContainsType(content: DocumentContent | null | undefined, targetType: string): boolean {
+  if (!content) return false;
+  if (content.type === targetType) return true;
+  return (content.content ?? []).some((child) => documentContainsType(child, targetType));
+}
+
+function findFirstMeaningfulNodeIndex(nodes: DocumentContent[]): number {
+  return nodes.findIndex((node) => node.type !== 'pageBreak' && node.type !== 'columnBreak');
+}
+
+function normalizeTitleForComparison(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+}
+
+function deriveChapterNumberLabel(title: string): string | null {
+  const match = title.match(/chapter\s+\d+/i);
+  return match ? match[0].replace(/\s+/g, ' ').trim() : null;
 }
 
 function stringifyNode(node: DocumentContent | null | undefined): string {
@@ -102,11 +176,116 @@ function buildSlotContext(nodes: DocumentContent[], nodeIndex: number): string {
     .slice(0, 320);
 }
 
+function buildSlotKey(slot: {
+  documentSlug: string;
+  nodeIndex: number;
+  blockType: ImageCapableBlockType;
+}): string {
+  return `${slot.documentSlug}:${slot.nodeIndex}:${slot.blockType}`;
+}
+
+function buildFallbackRationale(blockType: ImageCapableBlockType): string {
+  switch (blockType) {
+    case 'titlePage':
+      return 'Creates an immediate professional first impression and gives the adventure a clear identity.';
+    case 'chapterHeader':
+      return 'Separates sections cleanly and gives each major beat a visual anchor.';
+    case 'fullBleedImage':
+      return 'Adds a strong scene illustration that breaks up dense text and improves page rhythm.';
+    case 'mapBlock':
+      return 'Gives the table a practical reference image for play instead of relying on prose alone.';
+    case 'npcProfile':
+      return 'Makes a named character easier to remember and faster to reference during play.';
+    case 'backCover':
+      return 'Provides a finished closing page instead of ending on plain texture and text alone.';
+  }
+}
+
+function buildFallbackPrompt(input: {
+  projectTitle: string;
+  inputPrompt: string;
+  includeMaps: boolean;
+  slot: AutomaticPlacementSeed;
+}): string {
+  const projectTitle = input.projectTitle.trim();
+  const context = (input.slot.context || input.slot.documentTitle || input.inputPrompt || projectTitle)
+    .replace(/\s+/g, ' ')
+    .trim();
+  const sceneContext = context || input.inputPrompt || projectTitle;
+
+  switch (input.slot.blockType) {
+    case 'titlePage':
+      return `Illustrated fantasy cover art for the Dungeons & Dragons adventure "${projectTitle}". Show ${sceneContext}. Painterly, dramatic lighting, rich atmosphere, publication-quality composition, no text, no watermark.`;
+    case 'chapterHeader':
+      return `Wide fantasy chapter banner illustration for the Dungeons & Dragons adventure "${projectTitle}", chapter "${input.slot.documentTitle}". Depict ${sceneContext}. Cinematic panoramic composition, readable negative space for title overlay, no text, no watermark.`;
+    case 'fullBleedImage':
+      return `Full-width fantasy illustration for the Dungeons & Dragons adventure "${projectTitle}". Depict ${sceneContext}. High-detail painterly scene art, dramatic lighting, no text, no watermark.`;
+    case 'mapBlock':
+      return `Top-down fantasy RPG map for the Dungeons & Dragons adventure "${projectTitle}". Show ${sceneContext}. Clear encounter layout, readable rooms and paths, parchment-ready styling, no labels outside the map artwork, no watermark.`;
+    case 'npcProfile':
+      return `Fantasy character portrait for the Dungeons & Dragons adventure "${projectTitle}". Character context: ${sceneContext}. Waist-up or bust portrait, expressive face, detailed costume, painterly style, neutral background or subtle environmental hint, no text, no watermark.`;
+    case 'backCover':
+      return `Atmospheric back-cover fantasy illustration for the Dungeons & Dragons adventure "${projectTitle}". Evoke ${sceneContext}. Elegant, moody, uncluttered composition suitable for a book back cover, no text, no watermark.`;
+  }
+}
+
+function buildFallbackSummary(projectTitle: string, placements: AutomaticPlacementSeed[]): string {
+  return `Automatic art package for "${projectTitle}" covering ${placements.length} visual slot(s) across the generated adventure.`;
+}
+
+function buildGlobalArtDirectionSuffix(): string {
+  return 'Cohesive premium fantasy book illustration style, grounded D&D adventure tone, painterly finish, strong focal composition, no text, no lettering, no typography, no logo, no watermark.';
+}
+
+function buildBlockSpecificSuffix(blockType: ImageCapableBlockType): string {
+  switch (blockType) {
+    case 'titlePage':
+      return 'Cover composition only; do not depict a printed title or any written words in the artwork.';
+    case 'chapterHeader':
+      return 'Wide chapter-banner composition with restrained detail through the central title zone and clear negative space for overlaid chapter text.';
+    case 'fullBleedImage':
+      return 'Full-width scene art with readable silhouettes and controlled detail, suitable for book layout.';
+    case 'mapBlock':
+      return 'Functional top-down encounter map with readable spaces and paths, but no decorative title text.';
+    case 'npcProfile':
+      return 'Portrait-focused composition with the face clearly readable and background kept secondary.';
+    case 'backCover':
+      return 'Back-cover-safe composition with elegant atmosphere and no typography.';
+  }
+}
+
+function removePromptTextRenderingInstructions(value: string): string {
+  return value
+    .replace(/\b(the )?title (is|should be|appears|appearing|displayed|written)[^.]*\.?/gi, ' ')
+    .replace(/\b(display|show|include|render)\s+(the\s+)?title[^.]*\.?/gi, ' ')
+    .replace(/\b(mystical|ornate|decorative|stylized)\s+font[^.]*\.?/gi, ' ')
+    .replace(/\b(lettering|typography|caption|logo|watermark)[^.]*\.?/gi, ' ');
+}
+
+export function finalizeArtPrompt(prompt: string, blockType: ImageCapableBlockType): string {
+  const cleaned = removePromptTextRenderingInstructions(prompt)
+    .replace(/\s+/g, ' ')
+    .replace(/\s+\./g, '.')
+    .trim()
+    .replace(/[.;,\s]+$/g, '');
+
+  return [
+    cleaned,
+    buildBlockSpecificSuffix(blockType),
+    buildGlobalArtDirectionSuffix(),
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 export function collectImageSlots(
   documents: Array<{
     id: string;
     slug: string;
     title: string;
+    kind?: DocumentKind | null;
     content: DocumentContent | null;
   }>,
 ): ImageSlot[] {
@@ -121,14 +300,13 @@ export function collectImageSlots(
 
       const attrs = (node.attrs ?? {}) as Record<string, unknown>;
       const imageUrl = String(attrs[IMAGE_ATTR_BY_BLOCK[blockType]] || '').trim();
-      const imagePrompt = String(attrs.imagePrompt || '').trim();
-
-      if (imageUrl || imagePrompt) return;
+      if (imageUrl) return;
 
       slots.push({
         documentId: document.id,
         documentSlug: document.slug,
         documentTitle: document.title,
+        kind: document.kind ?? null,
         blockType,
         nodeIndex,
         context: buildSlotContext(nodes, nodeIndex),
@@ -137,6 +315,53 @@ export function collectImageSlots(
   }
 
   return slots;
+}
+
+export function selectAutomaticArtSlots(
+  slots: ImageSlot[],
+  options: { includeMaps: boolean },
+): AutomaticPlacementSeed[] {
+  const selected: AutomaticPlacementSeed[] = [];
+  const selectedKeys = new Set<string>();
+  const counts: Partial<Record<ImageCapableBlockType, number>> = {};
+
+  const maybeAddSlot = (slot: ImageSlot) => {
+    if (slot.blockType === 'mapBlock' && !options.includeMaps) {
+      return;
+    }
+
+    const key = buildSlotKey(slot);
+    if (selectedKeys.has(key)) {
+      return;
+    }
+
+    const currentCount = counts[slot.blockType] ?? 0;
+    const limit = AUTO_ART_LIMIT_BY_BLOCK[slot.blockType];
+    if (currentCount >= limit) {
+      return;
+    }
+
+    selected.push({
+      documentSlug: slot.documentSlug,
+      documentTitle: slot.documentTitle,
+      kind: slot.kind ?? null,
+      nodeIndex: slot.nodeIndex,
+      blockType: slot.blockType,
+      context: slot.context,
+      model: RECOMMENDED_MODEL_BY_BLOCK[slot.blockType],
+      size: RECOMMENDED_SIZE_BY_BLOCK[slot.blockType],
+    });
+    selectedKeys.add(key);
+    counts[slot.blockType] = currentCount + 1;
+  };
+
+  for (const blockType of AUTO_ART_PRIORITY) {
+    slots
+      .filter((slot) => slot.blockType === blockType)
+      .forEach(maybeAddSlot);
+  }
+
+  return selected;
 }
 
 function applyPromptToNode(node: DocumentContent, nodeIndex: number, prompt: string): DocumentContent {
@@ -191,14 +416,311 @@ export function applyArtDirectionPlanToDocuments(
   });
 }
 
-function buildSystemPrompt(): string {
+function ensureTitlePageSlot(content: DocumentContent | null, projectTitle: string): DocumentContent {
+  const nodes = getTopLevelNodes(content);
+  if (nodes.length === 0) {
+    return {
+      type: 'doc',
+      content: [{ type: 'titlePage', attrs: { title: projectTitle, coverImageUrl: '', imagePrompt: '' } }],
+    };
+  }
+
+  if (documentContainsType(content, 'titlePage')) return content as DocumentContent;
+
+  return {
+    type: 'doc',
+    content: [
+      { type: 'titlePage', attrs: { title: projectTitle, coverImageUrl: '', imagePrompt: '' } },
+      ...nodes,
+    ],
+  };
+}
+
+export function ensureChapterHeaderImageSlot(
+  content: DocumentContent | null,
+  documentTitle: string,
+): DocumentContent {
+  const nodes = getTopLevelNodes(content);
+  const chapterNumber = deriveChapterNumberLabel(documentTitle);
+
+  if (documentContainsType(content, 'chapterHeader')) {
+    return (content ?? { type: 'doc', content: [] }) as DocumentContent;
+  }
+
+  const chapterHeaderNode: DocumentContent = {
+    type: 'chapterHeader',
+    attrs: {
+      title: normalizeChapterHeaderTitle(documentTitle, chapterNumber ?? ''),
+      chapterNumber: chapterNumber ?? undefined,
+      backgroundImage: '',
+      imagePrompt: '',
+    },
+  };
+
+  if (nodes.length === 0) {
+    return { type: 'doc', content: [chapterHeaderNode] };
+  }
+
+  const firstMeaningfulIndex = findFirstMeaningfulNodeIndex(nodes);
+  if (firstMeaningfulIndex >= 0) {
+    const firstMeaningfulNode = nodes[firstMeaningfulIndex];
+    if (firstMeaningfulNode.type === 'heading' && Number(firstMeaningfulNode.attrs?.level ?? 0) === 1) {
+      const headingText = normalizeTitleForComparison(stringifyNode(firstMeaningfulNode));
+      const documentText = normalizeTitleForComparison(normalizeChapterHeaderTitle(documentTitle, chapterNumber ?? ''));
+      if (headingText === documentText || headingText.includes(documentText) || documentText.includes(headingText)) {
+        return {
+          type: 'doc',
+          content: nodes.map((node, index) => (index === firstMeaningfulIndex ? chapterHeaderNode : node)),
+        };
+      }
+    }
+  }
+
+  return {
+    type: 'doc',
+    content: [chapterHeaderNode, ...nodes],
+  };
+}
+
+async function ensureArtDirectionReadyDocuments(input: {
+  runId: string;
+  projectId: string;
+  projectTitle: string;
+  documents: Array<{
+    id: string;
+    slug: string;
+    title: string;
+    kind?: DocumentKind | null;
+    sortOrder: number;
+    content: DocumentContent | null;
+  }>;
+}): Promise<Array<{
+  id: string;
+  slug: string;
+  title: string;
+  kind?: DocumentKind | null;
+  sortOrder: number;
+  content: DocumentContent | null;
+}>> {
+  let documents = [...input.documents];
+  const chapterLikeCount = documents.filter((doc) => doc.kind === 'chapter' || doc.kind === 'appendix').length;
+
+  if (!documents.some((doc) => doc.kind === 'front_matter')) {
+    const frontMatterDoc = await prisma.projectDocument.create({
+      data: {
+        projectId: input.projectId,
+        runId: input.runId,
+        kind: 'front_matter',
+        title: 'Front Matter',
+        slug: 'front-matter',
+        sortOrder: Math.min(...documents.map((doc) => doc.sortOrder), 0) - 1,
+        targetPageCount: null,
+        status: 'draft',
+        sourceArtifactId: null,
+        content: {
+          type: 'doc',
+          content: [
+            { type: 'titlePage', attrs: { title: input.projectTitle, coverImageUrl: '', imagePrompt: '' } },
+            ...(chapterLikeCount >= 3
+              ? [{ type: 'tableOfContents', attrs: { title: 'Table of Contents', depth: 1 } }]
+              : []),
+          ],
+        } as any,
+      },
+      select: { id: true, slug: true, title: true, kind: true, sortOrder: true, content: true },
+    });
+
+    documents = [frontMatterDoc as typeof documents[number], ...documents];
+  }
+
+  const nextDocuments = await Promise.all(documents.map(async (document) => {
+    let nextContent = document.content as DocumentContent | null;
+
+    if (document.kind === 'front_matter') {
+      nextContent = ensureTitlePageSlot(nextContent, input.projectTitle);
+    } else if (document.kind === 'chapter' || document.kind === 'appendix') {
+      nextContent = ensureChapterHeaderImageSlot(nextContent, document.title);
+    }
+
+    const changed = JSON.stringify(nextContent) !== JSON.stringify(document.content);
+    if (changed) {
+      await prisma.projectDocument.update({
+        where: { id: document.id },
+        data: { content: nextContent as any },
+      });
+    }
+
+    return {
+      ...document,
+      content: nextContent,
+    };
+  }));
+
+  return nextDocuments;
+}
+
+function sanitizeAssetBaseName(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80) || 'art';
+}
+
+function applyImageToNode(
+  content: DocumentContent,
+  nodeIndex: number,
+  blockType: ImageCapableBlockType,
+  prompt: string,
+  assetId: string,
+  assetUrl: string,
+): DocumentContent {
+  const nodes = getTopLevelNodes(content);
+  if (!Array.isArray(content.content) || !nodes[nodeIndex]) return content;
+
+  const nextNodes = nodes.map((child, index) => {
+    if (index !== nodeIndex) return child;
+    return {
+      ...child,
+      attrs: {
+        ...(child.attrs ?? {}),
+        [IMAGE_ATTR_BY_BLOCK[blockType]]: assetUrl,
+        imagePrompt: prompt,
+        imageAssetId: assetId,
+      },
+    };
+  });
+
+  return {
+    ...content,
+    content: nextNodes,
+  };
+}
+
+export function applyRealizedArtToDocuments(
+  documents: Array<{
+    id: string;
+    slug: string;
+    content: DocumentContent | null;
+  }>,
+  placements: RealizedImagePlacement[],
+): Array<{ id: string; content: DocumentContent | null }> {
+  const placementsByDocument = new Map<string, RealizedImagePlacement[]>();
+
+  for (const placement of placements) {
+    const bucket = placementsByDocument.get(placement.documentSlug) ?? [];
+    bucket.push(placement);
+    placementsByDocument.set(placement.documentSlug, bucket);
+  }
+
+  return documents.map((document) => {
+    const placementsForDoc = placementsByDocument.get(document.slug);
+    if (!placementsForDoc || !document.content) {
+      return { id: document.id, content: document.content };
+    }
+
+    const nextContent = placementsForDoc.reduce(
+      (current, placement) => applyImageToNode(
+        current,
+        placement.nodeIndex,
+        placement.blockType,
+        placement.prompt,
+        placement.assetId,
+        placement.assetUrl,
+      ),
+      document.content,
+    );
+
+    return { id: document.id, content: nextContent };
+  });
+}
+
+async function realizeArtPlacements(input: {
+  userId: string;
+  projectId: string;
+  placements: ArtDirectionPlan['placements'];
+}): Promise<{
+  successfulPlacements: RealizedImagePlacement[];
+  failedPlacements: FailedImagePlacement[];
+  skippedReason: string | null;
+}> {
+  if (input.placements.length === 0) {
+    return { successfulPlacements: [], failedPlacements: [], skippedReason: null };
+  }
+
+  const settings = await getAiSettings(input.userId);
+  if (!settings?.provider || settings.provider !== 'openai' || !settings.hasApiKey) {
+    return {
+      successfulPlacements: [],
+      failedPlacements: [],
+      skippedReason: 'Automatic image generation requires OpenAI AI settings with a saved API key.',
+    };
+  }
+
+  const apiKey = await getDecryptedApiKey(input.userId);
+  if (!apiKey) {
+    return {
+      successfulPlacements: [],
+      failedPlacements: [],
+      skippedReason: 'OpenAI API key could not be decrypted for automatic image generation.',
+    };
+  }
+
+  const successfulPlacements: RealizedImagePlacement[] = [];
+  const failedPlacements: FailedImagePlacement[] = [];
+
+  for (const placement of input.placements) {
+    try {
+      const image = await generateAiImage(apiKey, {
+        prompt: placement.prompt,
+        model: placement.model,
+        size: placement.size,
+      });
+      const buffer = Buffer.from(image.base64, 'base64');
+      const filename = `${sanitizeAssetBaseName(placement.documentSlug)}-${placement.blockType}-${placement.nodeIndex + 1}.png`;
+      const asset = await createAsset(input.projectId, input.userId, {
+        originalname: filename,
+        mimetype: image.mimeType,
+        size: buffer.length,
+        buffer,
+      });
+
+      if (!asset) {
+        throw new Error('Asset storage rejected the generated image.');
+      }
+
+      successfulPlacements.push({
+        documentSlug: placement.documentSlug,
+        nodeIndex: placement.nodeIndex,
+        blockType: placement.blockType,
+        prompt: placement.prompt,
+        model: placement.model,
+        size: placement.size,
+        assetId: asset.id,
+        assetUrl: asset.url,
+      });
+    } catch (error) {
+      failedPlacements.push({
+        documentSlug: placement.documentSlug,
+        nodeIndex: placement.nodeIndex,
+        blockType: placement.blockType,
+        prompt: placement.prompt,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  return {
+    successfulPlacements,
+    failedPlacements,
+    skippedReason: null,
+  };
+}
+
+function buildSystemPrompt(selectedPlacementCount: number): string {
   return `You are an art director for a professional D&D one-shot.
 
-You receive a list of existing image slots already present in the document structure. Choose only the slots that most improve the final product. Favor:
-- one strong cover image
-- chapter banners for major sections
-- one standout NPC portrait when a named NPC feels central
-- a map only when the slot is already present and the content obviously benefits from it
+You receive a list of image slots already selected by the system. Your job is to write the best prompt package for those exact slots. Do not choose a subset. Do not invent extra slots. Return exactly ${selectedPlacementCount} placements, one for each provided slot.
 
 Return ONLY valid JSON with this shape:
 {
@@ -217,10 +739,13 @@ Return ONLY valid JSON with this shape:
 }
 
 Rules:
-- Choose at most 4 placements
-- Only use slots provided in the user message
+- Use every slot provided in the user message exactly once
+- Preserve the provided documentSlug, nodeIndex, blockType, model, and size
 - Do not invent document slugs or node indices
-- Prefer DALL-E 3 for art and GPT Image 1 for maps or text-heavy diagrams
+- Do not skip slots
+- Never ask for titles, labels, captions, logos, typography, or any visible words inside the image
+- For chapterHeader images, reserve clean negative space where chapter text will be overlaid
+- Keep the images visually cohesive, like one premium adventure product line
 - Match the visual language of official D&D 5e books without naming copyrighted characters`;
 }
 
@@ -228,18 +753,16 @@ function buildUserPrompt(input: {
   projectTitle: string;
   inputPrompt: string;
   includeMaps: boolean;
-  slots: ImageSlot[];
+  placements: AutomaticPlacementSeed[];
 }): string {
-  const slotLines = input.slots.map((slot) => {
-    const defaultModel = RECOMMENDED_MODEL_BY_BLOCK[slot.blockType];
-    const defaultSize = RECOMMENDED_SIZE_BY_BLOCK[slot.blockType];
+  const slotLines = input.placements.map((slot) => {
     return [
       `- documentSlug=${slot.documentSlug}`,
       `documentTitle="${slot.documentTitle}"`,
       `nodeIndex=${slot.nodeIndex}`,
       `blockType=${slot.blockType}`,
-      `recommendedModel=${defaultModel}`,
-      `recommendedSize=${defaultSize}`,
+      `recommendedModel=${slot.model}`,
+      `recommendedSize=${slot.size}`,
       `context="${slot.context || slot.documentTitle}"`,
     ].join(' | ');
   });
@@ -249,7 +772,7 @@ function buildUserPrompt(input: {
     `Original prompt: ${input.inputPrompt}`,
     `Maps requested: ${input.includeMaps}`,
     '',
-    'Available slots:',
+    'Selected slots requiring image prompts:',
     ...slotLines,
   ].join('\n');
 }
@@ -275,10 +798,50 @@ function buildMarkdown(plan: ArtDirectionPlan): string {
   ].join('\n');
 }
 
+function materializeAutomaticPlan(input: {
+  projectTitle: string;
+  inputPrompt: string;
+  includeMaps: boolean;
+  seeds: AutomaticPlacementSeed[];
+  candidatePlan: ArtDirectionPlan | null;
+}): ArtDirectionPlan {
+  const placementsByKey = new Map<string, ArtDirectionPlan['placements'][number]>();
+
+  for (const placement of input.candidatePlan?.placements ?? []) {
+    placementsByKey.set(buildSlotKey(placement), placement);
+  }
+
+  const placements = input.seeds.map((seed) => {
+    const candidate = placementsByKey.get(buildSlotKey(seed));
+    const basePrompt = candidate?.prompt?.trim() || buildFallbackPrompt({
+      projectTitle: input.projectTitle,
+      inputPrompt: input.inputPrompt,
+      includeMaps: input.includeMaps,
+      slot: seed,
+    });
+
+    return {
+      documentSlug: seed.documentSlug,
+      nodeIndex: seed.nodeIndex,
+      blockType: seed.blockType,
+      prompt: finalizeArtPrompt(basePrompt, seed.blockType),
+      rationale: candidate?.rationale?.trim() || buildFallbackRationale(seed.blockType),
+      model: seed.model,
+      size: seed.size,
+    };
+  });
+
+  return {
+    summary: input.candidatePlan?.summary?.trim() || buildFallbackSummary(input.projectTitle, input.seeds),
+    placements,
+  };
+}
+
 export async function executeArtDirectionPass(
   run: {
     id: string;
     projectId: string;
+    userId: string;
     inputPrompt: string;
     inputParameters?: Record<string, unknown> | null;
   },
@@ -293,68 +856,122 @@ export async function executeArtDirectionPass(
     prisma.projectDocument.findMany({
       where: { projectId: run.projectId, runId: run.id },
       orderBy: { sortOrder: 'asc' },
-      select: { id: true, slug: true, title: true, content: true },
+      select: { id: true, slug: true, title: true, kind: true, sortOrder: true, content: true },
     }),
   ]);
 
   if (!project || documents.length === 0) {
-    return { artifactId: null, placementCount: 0 };
+    return {
+      artifactId: null,
+      placementCount: 0,
+      generatedImageCount: 0,
+      failedImageCount: 0,
+      skippedImageGenerationReason: null,
+    };
   }
 
-  const slots = collectImageSlots(
-    documents.map((document) => ({
+  const artReadyDocuments = await ensureArtDirectionReadyDocuments({
+    runId: run.id,
+    projectId: run.projectId,
+    projectTitle: project.title,
+    documents: documents.map((document) => ({
       id: document.id,
       slug: document.slug,
       title: document.title,
+      kind: document.kind as DocumentKind | null,
+      sortOrder: document.sortOrder,
       content: document.content as DocumentContent | null,
+    })),
+  });
+
+  const slots = collectImageSlots(
+    artReadyDocuments.map((document) => ({
+      id: document.id,
+      slug: document.slug,
+      title: document.title,
+      kind: document.kind ?? null,
+      content: document.content,
     })),
   );
 
-  if (slots.length === 0) {
-    return { artifactId: null, placementCount: 0 };
-  }
-
-  const { text, usage } = await generateText({
-    model,
-    system: buildSystemPrompt(),
-    prompt: buildUserPrompt({
-      projectTitle: project.title,
-      inputPrompt: run.inputPrompt,
-      includeMaps: Boolean(run.inputParameters?.includeMaps),
-      slots,
-    }),
-    maxOutputTokens: Math.min(maxOutputTokens, 4096),
+  const selectedSlots = selectAutomaticArtSlots(slots, {
+    includeMaps: Boolean(run.inputParameters?.includeMaps),
   });
 
-  const parsed = parseJsonResponse(text);
-  const plan = ArtDirectionPlanSchema.parse(parsed);
-  const applicablePlacements = plan.placements.filter((placement) =>
-    slots.some((slot) =>
-      slot.documentSlug === placement.documentSlug &&
-      slot.nodeIndex === placement.nodeIndex &&
-      slot.blockType === placement.blockType,
-    ),
-  );
+  if (selectedSlots.length === 0) {
+    return {
+      artifactId: null,
+      placementCount: 0,
+      generatedImageCount: 0,
+      failedImageCount: 0,
+      skippedImageGenerationReason: null,
+    };
+  }
 
-  const updatedDocuments = applyArtDirectionPlanToDocuments(
-    documents.map((document) => ({
+  let candidatePlan: ArtDirectionPlan | null = null;
+  let totalTokens = 0;
+
+  try {
+    const { text, usage } = await generateText({
+      model,
+      system: buildSystemPrompt(selectedSlots.length),
+      prompt: buildUserPrompt({
+        projectTitle: project.title,
+        inputPrompt: run.inputPrompt,
+        includeMaps: Boolean(run.inputParameters?.includeMaps),
+        placements: selectedSlots,
+      }),
+      maxOutputTokens: Math.min(maxOutputTokens, 4096),
+    });
+
+    totalTokens = (usage?.inputTokens ?? 0) + (usage?.outputTokens ?? 0);
+    const parsed = parseJsonResponse(text);
+    candidatePlan = ArtDirectionPlanSchema.parse(parsed);
+  } catch {
+    candidatePlan = null;
+  }
+
+  const plan = materializeAutomaticPlan({
+    projectTitle: project.title,
+    inputPrompt: run.inputPrompt,
+    includeMaps: Boolean(run.inputParameters?.includeMaps),
+    seeds: selectedSlots,
+    candidatePlan,
+  });
+  const applicablePlacements = plan.placements;
+
+  const promptUpdatedDocuments = applyArtDirectionPlanToDocuments(
+    artReadyDocuments.map((document) => ({
       id: document.id,
       slug: document.slug,
-      content: document.content as DocumentContent | null,
+      content: document.content,
     })),
     applicablePlacements,
   );
 
+  const realized = await realizeArtPlacements({
+    userId: run.userId,
+    projectId: run.projectId,
+    placements: applicablePlacements,
+  });
+
+  const fullyUpdatedDocuments = applyRealizedArtToDocuments(
+    promptUpdatedDocuments.map((document) => ({
+      id: document.id,
+      slug: artReadyDocuments.find((candidate) => candidate.id === document.id)?.slug ?? '',
+      content: document.content,
+    })),
+    realized.successfulPlacements,
+  );
+
   await Promise.all(
-    updatedDocuments.map((document) =>
+    fullyUpdatedDocuments.map((document) =>
       prisma.projectDocument.update({
         where: { id: document.id },
         data: { content: document.content as any },
       }),
     ),
   );
-
-  const totalTokens = (usage?.inputTokens ?? 0) + (usage?.outputTokens ?? 0);
 
   const artifact = await prisma.generatedArtifact.create({
     data: {
@@ -369,6 +986,9 @@ export async function executeArtDirectionPass(
       jsonContent: {
         ...plan,
         placements: applicablePlacements,
+        generatedImages: realized.successfulPlacements,
+        failedImagePlacements: realized.failedPlacements,
+        skippedImageGenerationReason: realized.skippedReason,
       } as any,
       markdownContent: buildMarkdown({
         ...plan,
@@ -377,7 +997,12 @@ export async function executeArtDirectionPass(
       tokenCount: totalTokens,
       metadata: {
         slotCount: slots.length,
+        selectedPlacementCount: selectedSlots.length,
         appliedPlacementCount: applicablePlacements.length,
+        generatedImageCount: realized.successfulPlacements.length,
+        failedImageCount: realized.failedPlacements.length,
+        skippedImageGenerationReason: realized.skippedReason,
+        selectionMode: 'automatic',
       } as any,
     },
   });
@@ -396,5 +1021,11 @@ export async function executeArtDirectionPass(
     version: artifact.version,
   });
 
-  return { artifactId: artifact.id, placementCount: applicablePlacements.length };
+  return {
+    artifactId: artifact.id,
+    placementCount: applicablePlacements.length,
+    generatedImageCount: realized.successfulPlacements.length,
+    failedImageCount: realized.failedPlacements.length,
+    skippedImageGenerationReason: realized.skippedReason,
+  };
 }

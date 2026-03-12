@@ -289,7 +289,7 @@ describe('Typst Assembler', () => {
       });
 
       expect(source).toContain('#text(font: title-font, size: 28pt, weight: "bold")[The Ember Road]');
-      expect(source).toContain('#outline(title: none, depth: 3)');
+      expect(source).toContain('#outline(title: none, depth: 1)');
     });
 
     it('should not inject a synthetic table of contents for a short two-chapter one-shot', () => {
@@ -313,7 +313,7 @@ describe('Typst Assembler', () => {
       });
 
       expect(source).toContain('#text(font: title-font, size: 28pt, weight: "bold")[The Ember Road]');
-      expect(source).not.toContain('#outline(title: none, depth: 3)');
+      expect(source).not.toContain('#outline(title: none, depth: 1)');
     });
 
     it('should place table of contents on its own page without adding an extra blank page before the first chapter', () => {
@@ -348,7 +348,7 @@ describe('Typst Assembler', () => {
         projectTitle: 'The Ember Road',
       });
 
-      expect(source).toContain('#outline(title: none, depth: 3)');
+      expect(source).toContain('#outline(title: none, depth: 1)');
       expect(source).not.toContain('#pagebreak()\n\n#pagebreak()');
     });
 

@@ -1,7 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import {
   applyArtDirectionPlanToDocuments,
+  applyRealizedArtToDocuments,
   collectImageSlots,
+  ensureChapterHeaderImageSlot,
+  finalizeArtPrompt,
+  selectAutomaticArtSlots,
 } from '../../services/generation/art-direction.service.js';
 
 describe('art-direction helpers', () => {
@@ -65,6 +69,110 @@ describe('art-direction helpers', () => {
       { documentSlug: 'front-matter', blockType: 'titlePage', nodeIndex: 0 },
       { documentSlug: 'chapter-1', blockType: 'npcProfile', nodeIndex: 0 },
     ]);
+  });
+
+  it('automatically selects a complete art package without user decisions', () => {
+    const selected = selectAutomaticArtSlots([
+      {
+        documentId: 'doc-front',
+        documentSlug: 'front-matter',
+        documentTitle: 'Front Matter',
+        kind: 'front_matter',
+        blockType: 'titlePage',
+        nodeIndex: 0,
+        context: 'A black-glass mine under a crimson moon.',
+      },
+      {
+        documentId: 'doc-ch1',
+        documentSlug: 'chapter-1',
+        documentTitle: 'Chapter 1: The Descent',
+        kind: 'chapter',
+        blockType: 'chapterHeader',
+        nodeIndex: 0,
+        context: 'A rope bridge over a glowing chasm.',
+      },
+      {
+        documentId: 'doc-ch2',
+        documentSlug: 'chapter-2',
+        documentTitle: 'Chapter 2: The Negotiation',
+        kind: 'chapter',
+        blockType: 'chapterHeader',
+        nodeIndex: 0,
+        context: 'A tense audience with drow envoys.',
+      },
+      {
+        documentId: 'doc-map',
+        documentSlug: 'chapter-2',
+        documentTitle: 'Chapter 2: The Negotiation',
+        kind: 'chapter',
+        blockType: 'mapBlock',
+        nodeIndex: 4,
+        context: 'A fungal market carved into a cavern wall.',
+      },
+      {
+        documentId: 'doc-npc',
+        documentSlug: 'chapter-2',
+        documentTitle: 'Chapter 2: The Negotiation',
+        kind: 'chapter',
+        blockType: 'npcProfile',
+        nodeIndex: 5,
+        context: 'An elegant drow fixer with silver jewelry.',
+      },
+    ], { includeMaps: true });
+
+    expect(selected).toMatchObject([
+      { documentSlug: 'front-matter', blockType: 'titlePage', nodeIndex: 0, model: 'dall-e-3', size: '1024x1792' },
+      { documentSlug: 'chapter-1', blockType: 'chapterHeader', nodeIndex: 0, model: 'dall-e-3', size: '1792x1024' },
+      { documentSlug: 'chapter-2', blockType: 'chapterHeader', nodeIndex: 0, model: 'dall-e-3', size: '1792x1024' },
+      { documentSlug: 'chapter-2', blockType: 'mapBlock', nodeIndex: 4, model: 'gpt-image-1', size: '1024x1024' },
+      { documentSlug: 'chapter-2', blockType: 'npcProfile', nodeIndex: 5, model: 'dall-e-3', size: '1024x1024' },
+    ]);
+  });
+
+  it('skips map generation when maps are not requested', () => {
+    const selected = selectAutomaticArtSlots([
+      {
+        documentId: 'doc-front',
+        documentSlug: 'front-matter',
+        documentTitle: 'Front Matter',
+        kind: 'front_matter',
+        blockType: 'titlePage',
+        nodeIndex: 0,
+        context: 'Cover context',
+      },
+      {
+        documentId: 'doc-map',
+        documentSlug: 'chapter-1',
+        documentTitle: 'Chapter 1',
+        kind: 'chapter',
+        blockType: 'mapBlock',
+        nodeIndex: 1,
+        context: 'Battle map context',
+      },
+    ], { includeMaps: false });
+
+    expect(selected).toHaveLength(1);
+    expect(selected[0]).toMatchObject({
+      documentSlug: 'front-matter',
+      blockType: 'titlePage',
+    });
+  });
+
+  it('sanitizes generated prompts so images do not contain typography instructions', () => {
+    const coverPrompt = finalizeArtPrompt(
+      "A foreboding cover for The Blackglass Mine. The title is displayed in a mystical font with eerie shadows creeping around the letters.",
+      'titlePage',
+    );
+    const bannerPrompt = finalizeArtPrompt(
+      'A dark mine entrance beneath twisted branches.',
+      'chapterHeader',
+    );
+
+    expect(coverPrompt).not.toMatch(/mystical font/i);
+    expect(coverPrompt).not.toMatch(/letters/i);
+    expect(coverPrompt).toMatch(/no text, no lettering, no typography/i);
+    expect(bannerPrompt).toMatch(/negative space/i);
+    expect(bannerPrompt).toMatch(/chapter text/i);
   });
 
   it('applies prompts to matching document slots', () => {
@@ -133,6 +241,112 @@ describe('art-direction helpers', () => {
           attrs: {
             imagePrompt: '',
           },
+        },
+      ],
+    });
+  });
+
+  it('applies realized image assets to the correct image field', () => {
+    const updated = applyRealizedArtToDocuments(
+      [
+        {
+          id: 'doc-front',
+          slug: 'front-matter',
+          content: {
+            type: 'doc',
+            content: [
+              {
+                type: 'titlePage',
+                attrs: {
+                  title: 'The Blackglass Mine',
+                  coverImageUrl: '',
+                  imagePrompt: 'old prompt',
+                },
+              },
+            ],
+          },
+        },
+        {
+          id: 'doc-ch1',
+          slug: 'chapter-1',
+          content: {
+            type: 'doc',
+            content: [
+              {
+                type: 'npcProfile',
+                attrs: {
+                  name: 'Foreman Talia',
+                  portraitUrl: '',
+                  imagePrompt: '',
+                },
+              },
+            ],
+          },
+        },
+      ],
+      [
+        {
+          documentSlug: 'front-matter',
+          nodeIndex: 0,
+          blockType: 'titlePage',
+          prompt: 'A black-glass mine under a crimson moon.',
+          model: 'dall-e-3',
+          size: '1024x1792',
+          assetId: 'asset-cover',
+          assetUrl: '/uploads/project-1/cover.png',
+        },
+      ],
+    );
+
+    expect(updated[0].content).toMatchObject({
+      content: [
+        {
+          attrs: {
+            coverImageUrl: '/uploads/project-1/cover.png',
+            imagePrompt: 'A black-glass mine under a crimson moon.',
+            imageAssetId: 'asset-cover',
+          },
+        },
+      ],
+    });
+    expect(updated[1].content).toMatchObject({
+      content: [
+        {
+          attrs: {
+            portraitUrl: '',
+          },
+        },
+      ],
+    });
+  });
+
+  it('materializes a chapterHeader slot from a leading H1 heading', () => {
+    const content = ensureChapterHeaderImageSlot({
+      type: 'doc',
+      content: [
+        {
+          type: 'heading',
+          attrs: { level: 1 },
+          content: [{ type: 'text', text: 'The Village' }],
+        },
+        {
+          type: 'paragraph',
+          content: [{ type: 'text', text: 'Body copy.' }],
+        },
+      ],
+    }, 'Chapter 1: The Village');
+
+    expect(content).toMatchObject({
+      content: [
+        {
+          type: 'chapterHeader',
+          attrs: {
+            title: 'The Village',
+            chapterNumber: 'Chapter 1',
+          },
+        },
+        {
+          type: 'paragraph',
         },
       ],
     });

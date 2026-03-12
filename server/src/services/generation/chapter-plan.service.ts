@@ -10,6 +10,7 @@ import type {
 import { prisma } from '../../config/database.js';
 import { publishGenerationEvent } from './pubsub.service.js';
 import { parseJsonResponse } from './parse-json.js';
+import { normalizeGenerationContentType } from './content-type-normalizer.js';
 import {
   buildChapterPlanSystemPrompt,
   buildChapterPlanUserPrompt,
@@ -36,7 +37,10 @@ const TARGET_WORD_RANGES: Record<SectionSpec['contentType'], { min: number; max:
 const SectionSpecSchema = z.object({
   slug: z.string(),
   title: z.string(),
-  contentType: z.enum(['narrative', 'encounter', 'exploration', 'social', 'transition']),
+  contentType: z.preprocess(
+    normalizeGenerationContentType,
+    z.enum(['narrative', 'encounter', 'exploration', 'social', 'transition']),
+  ),
   targetWords: z.number(),
   outline: z.string(),
   scenePurpose: z.string().optional().default(''),
@@ -51,7 +55,11 @@ const SectionSpecSchema = z.object({
 const EncounterSpecSchema = z.object({
   name: z.string(),
   difficulty: z.enum(['easy', 'medium', 'hard', 'deadly']),
-  enemies: z.array(z.object({ name: z.string(), count: z.number(), cr: z.string() })),
+  enemies: z.array(z.object({
+    name: z.string(),
+    count: z.number(),
+    cr: z.preprocess((value) => String(value ?? '').trim(), z.string().min(1)),
+  })),
   environment: z.string(),
   tactics: z.string(),
   rewards: z.array(z.string()),

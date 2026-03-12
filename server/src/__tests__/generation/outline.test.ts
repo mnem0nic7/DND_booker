@@ -193,4 +193,38 @@ describe('Outline Service — executeOutlineGeneration', () => {
     expect(result.outline.appendices.length).toBe(1);
     expect(result.outline.appendices[0].slug).toBe('appendix-a-npcs');
   });
+
+  it('should coerce sloppy pipe-delimited contentType values from the model', async () => {
+    mockGenerateText.mockResolvedValueOnce({
+      text: JSON.stringify({
+        ...VALID_OUTLINE,
+        chapters: [
+          {
+            ...VALID_OUTLINE.chapters[0],
+            sections: [
+              {
+                ...VALID_OUTLINE.chapters[0].sections[0],
+                contentType: 'narrative | social | transition',
+              },
+              {
+                ...VALID_OUTLINE.chapters[0].sections[1],
+                contentType: 'social / transition',
+              },
+            ],
+          },
+          ...VALID_OUTLINE.chapters.slice(1),
+        ],
+      }),
+      usage: { inputTokens: 800, outputTokens: 1200 },
+    } as any);
+
+    const run = await createRun({
+      projectId: testProject.id, userId: testUser.id, prompt: 'test',
+    });
+
+    const result = await executeOutlineGeneration(run!, SAMPLE_BIBLE, {} as any, 8192);
+
+    expect(result.outline.chapters[0].sections[0].contentType).toBe('narrative');
+    expect(result.outline.chapters[0].sections[1].contentType).toBe('social');
+  });
 });

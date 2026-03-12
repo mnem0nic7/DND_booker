@@ -9,7 +9,7 @@ import type {
   ExportSectionReviewMetric,
   ExportUtilityReviewMetric,
 } from '@dnd-booker/shared';
-import { normalizeChapterHeaderTitle, normalizeEncounterEntries } from '@dnd-booker/shared';
+import { normalizeChapterHeaderTitle, normalizeEncounterEntries, normalizeRandomTableEntries } from '@dnd-booker/shared';
 
 const execFile = promisify(execFileCallback);
 
@@ -543,8 +543,12 @@ function findingPenalty(code: ExportReviewFinding['code']): number {
       return 12;
     case 'EXPORT_EMPTY_ENCOUNTER_TABLE':
       return 22;
+    case 'EXPORT_EMPTY_RANDOM_TABLE':
+      return 18;
     case 'EXPORT_PLACEHOLDER_STAT_BLOCK':
       return 24;
+    case 'EXPORT_OVERSIZED_DISPLAY_HEADING':
+      return 18;
     case 'EXPORT_LOW_UTILITY_DENSITY':
       return 16;
     case 'EXPORT_REVIEW_UNAVAILABLE':
@@ -649,6 +653,19 @@ function inspectDocumentContent(content: DocumentContent | null, documentTitle: 
         });
       }
 
+      if (nodeType === 'randomTable' && normalizeRandomTableEntries(node.attrs?.entries).length === 0) {
+        findings.push({
+          code: 'EXPORT_EMPTY_RANDOM_TABLE',
+          severity: 'error',
+          page: null,
+          message: `"${documentTitle}" includes an empty random table.`,
+          details: {
+            title: documentTitle,
+            blockType: nodeType,
+          },
+        });
+      }
+
       if (nodeType === 'statBlock' && isPlaceholderStatBlock(node)) {
         findings.push({
           code: 'EXPORT_PLACEHOLDER_STAT_BLOCK',
@@ -664,6 +681,21 @@ function inspectDocumentContent(content: DocumentContent | null, documentTitle: 
           },
         });
       }
+    }
+
+    if (nodeType === 'heading' && isOversizedDisplayHeading(node)) {
+      findings.push({
+        code: 'EXPORT_OVERSIZED_DISPLAY_HEADING',
+        severity: 'warning',
+        page: null,
+        message: `"${documentTitle}" includes an oversized display heading that is likely malformed.`,
+        details: {
+          title: documentTitle,
+          text: readNodeText(node).trim().slice(0, 180),
+          level: readNumberAttr(node, 'level'),
+          wordCount: readNodeText(node).trim().split(/\s+/).filter(Boolean).length,
+        },
+      });
     }
 
     if (!insideUtilityContainer && !isUtilityBlock && nodeType === 'paragraph' && hasParagraphText(node)) {
@@ -703,6 +735,15 @@ function isPlaceholderStatBlock(node: DocumentContent): boolean {
   if (!name.trim()) return true;
   if (!Number.isFinite(ac) || !Number.isFinite(hp)) return true;
   return ac <= 0 || hp <= 0;
+}
+
+function isOversizedDisplayHeading(node: DocumentContent): boolean {
+  const level = readNumberAttr(node, 'level');
+  if (!Number.isFinite(level) || level < 1 || level > 2) return false;
+
+  const text = readNodeText(node).trim();
+  const wordCount = text.split(/\s+/).filter(Boolean).length;
+  return text.length >= 70 || wordCount >= 10;
 }
 
 function readStringAttr(node: DocumentContent, key: string): string {

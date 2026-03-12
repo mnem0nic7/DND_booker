@@ -342,8 +342,14 @@ describe('TipTap-to-Typst Renderer', () => {
     it('should render a chapter header with number and title', () => {
       const result = renderTypstNode(node({
         type: 'chapterHeader',
-        attrs: { title: 'The Beginning', chapterNumber: 'Chapter 1', subtitle: 'An Introduction' },
+        attrs: {
+          title: 'The Beginning',
+          chapterNumber: 'Chapter 1',
+          subtitle: 'An Introduction',
+          backgroundImage: '/uploads/project-1/chapter-banner.png',
+        },
       }));
+      expect(result).toContain('image("/uploads/project-1/chapter-banner.png"');
       expect(result).toContain('Chapter 1');
       expect(result).toContain('= The Beginning');
       expect(result).toContain('theme-divider');
@@ -422,6 +428,18 @@ describe('TipTap-to-Typst Renderer', () => {
       expect(result).toContain('Nothing happens');
       expect(result).toContain('Wolves attack');
     });
+
+    it('returns no Typst for an empty random table', () => {
+      const result = renderTypstNode(node({
+        type: 'randomTable',
+        attrs: {
+          title: 'Hidden Path Discoveries',
+          dieType: 'd6',
+          entries: JSON.stringify([]),
+        },
+      }));
+      expect(result).toBe('');
+    });
   });
 
   describe('npcProfile', () => {
@@ -461,6 +479,19 @@ describe('TipTap-to-Typst Renderer', () => {
       expect(result).toContain('#table(');
       expect(result).toContain('d5');
       expect(result).toContain('2d4 wolves');
+      expect(result).toContain('breakable: false');
+    });
+
+    it('returns no Typst for an empty encounter table', () => {
+      const result = renderTypstNode(node({
+        type: 'encounterTable',
+        attrs: {
+          environment: 'Forest',
+          crRange: '1-5',
+          entries: JSON.stringify([]),
+        },
+      }));
+      expect(result).toBe('');
     });
   });
 
@@ -576,11 +607,11 @@ describe('TipTap-to-Typst Renderer', () => {
     it('should render a table of contents with outline', () => {
       const result = renderTypstNode(node({
         type: 'tableOfContents',
-        attrs: { title: 'Contents' },
+        attrs: { title: 'Contents', depth: 1 },
       }));
       expect(result).toContain('#set page(columns: 1)');
       expect(result).toContain('Contents');
-      expect(result).toContain('#outline(title: none, depth: 3)');
+      expect(result).toContain('#outline(title: none, depth: 1)');
       expect(result).toContain('#set page(columns: 2)');
     });
   });

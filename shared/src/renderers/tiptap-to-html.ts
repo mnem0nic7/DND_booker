@@ -10,6 +10,7 @@ import {
   escapeHtml,
   normalizeChapterHeaderTitle,
   normalizeEncounterEntries,
+  normalizeRandomTableEntries,
   safeCssUrl,
   safeUrl,
 } from './utils.js';
@@ -462,7 +463,9 @@ function renderMagicItem(attrs: Record<string, unknown>): string {
 function renderRandomTable(attrs: Record<string, unknown>): string {
   const title = escapeHtml(String(attrs.title || ''));
   const dieType = escapeHtml(String(attrs.dieType || 'd6'));
-  const entries = parseJsonArray<{ roll: string; result: string }>(String(attrs.entries || '[]'));
+  const entries = normalizeRandomTableEntries(attrs.entries);
+
+  if (entries.length === 0) return '';
 
   let html = `<div class="random-table">`;
   html += `<div class="random-table__header">`;
@@ -535,6 +538,7 @@ function renderEncounterTable(attrs: Record<string, unknown>): string {
   const environment = escapeHtml(String(attrs.environment || ''));
   const crRange = escapeHtml(String(attrs.crRange || ''));
   const entries = normalizeEncounterEntries(attrs.entries);
+  if (entries.length === 0) return '';
 
   let html = `<div class="encounter-table">`;
   html += `<div class="encounter-table__header">`;

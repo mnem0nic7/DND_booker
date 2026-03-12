@@ -126,4 +126,89 @@ describe('normalizeExportDocuments', () => {
       attrs: { title: 'DM Tips', calloutType: 'info' },
     });
   });
+
+  it('drops empty utility tables and their orphaned scaffolding', () => {
+    const documents = normalizeExportDocuments([
+      {
+        title: 'Chapter 3: Secrets Beneath',
+        sortOrder: 2,
+        kind: 'chapter',
+        content: doc([
+          {
+            type: 'paragraph',
+            content: [{ type: 'text', text: 'Use the following random table for discoveries in either path:' }],
+          },
+          {
+            type: 'heading',
+            attrs: { level: 2 },
+            content: [{ type: 'text', text: 'Hidden Path Discoveries' }],
+          },
+          {
+            type: 'randomTable',
+            attrs: {
+              title: 'Hidden Path Discoveries',
+              dieType: 'd6',
+              entries: JSON.stringify([]),
+            },
+          },
+          {
+            type: 'heading',
+            attrs: { level: 2 },
+            content: [{ type: 'text', text: 'Encounter Table' }],
+          },
+          {
+            type: 'encounterTable',
+            attrs: {
+              environment: 'Ancient hallways',
+              crRange: '4-6',
+              entries: JSON.stringify([]),
+            },
+          },
+          {
+            type: 'paragraph',
+            content: [{ type: 'text', text: 'Real body copy survives.' }],
+          },
+        ]),
+      },
+    ], 'Goblin Caper');
+
+    expect(documents[0].content?.content).toEqual([
+      {
+        type: 'paragraph',
+        content: [{ type: 'text', text: 'Real body copy survives.' }],
+      },
+    ]);
+  });
+
+  it('demotes malformed long display headings to normal paragraphs', () => {
+    const documents = normalizeExportDocuments([
+      {
+        title: 'Chapter 5',
+        sortOrder: 5,
+        kind: 'chapter',
+        content: doc([
+          {
+            type: 'heading',
+            attrs: { level: 1 },
+            content: [
+              {
+                type: 'text',
+                text: 'The Shadow Prism An ancient artifact of immense power that can control shadows but corrupts its wielder.',
+              },
+            ],
+          },
+        ]),
+      },
+    ], 'Goblin Caper');
+
+    expect(documents[0].content?.content?.[0]).toMatchObject({
+      type: 'paragraph',
+      content: [
+        {
+          type: 'text',
+          text: 'The Shadow Prism An ancient artifact of immense power that can control shadows but corrupts its wielder.',
+        },
+      ],
+    });
+  });
 });

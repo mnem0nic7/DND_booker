@@ -21,7 +21,15 @@ export async function processGenerationJob(job: Job<GenerationJobData>): Promise
 
   // Fetch the full run record so we have inputPrompt/inputParameters for intake
   const fullRun = await prisma.generationRun.findUniqueOrThrow({ where: { id: runId } });
-  const run = { id: runId, projectId, userId, inputPrompt: fullRun.inputPrompt, inputParameters: fullRun.inputParameters };
+  const run = {
+    id: runId,
+    projectId,
+    userId,
+    inputPrompt: fullRun.inputPrompt,
+    inputParameters: (fullRun.inputParameters && typeof fullRun.inputParameters === 'object' && !Array.isArray(fullRun.inputParameters))
+      ? fullRun.inputParameters as Record<string, unknown>
+      : null,
+  };
   const isPolished = fullRun.quality === 'polished';
   const isOneShot = fullRun.mode === 'one_shot';
 
@@ -201,12 +209,26 @@ export async function processGenerationJob(job: Job<GenerationJobData>): Promise
       await publishProgress('assembling', 'art_direction', 99);
       try {
         const artDirection = await executeArtDirectionPass(run, model, maxOutputTokens);
-        if (artDirection.placementCount > 0) {
+        if (artDirection.generatedImageCount > 0) {
           await publishGenerationEvent(runId, {
             type: 'run_warning',
             runId,
-            message: `Art direction prepared ${artDirection.placementCount} image prompt suggestion(s) for the generated one-shot.`,
+            message: `Art direction automatically generated ${artDirection.generatedImageCount} project image asset(s) across ${artDirection.placementCount} selected placement(s).`,
             severity: 'info',
+          });
+        } else if (artDirection.placementCount > 0 && artDirection.skippedImageGenerationReason) {
+          await publishGenerationEvent(runId, {
+            type: 'run_warning',
+            runId,
+            message: `Art direction selected ${artDirection.placementCount} image placement(s), but automatic image generation was skipped: ${artDirection.skippedImageGenerationReason}`,
+            severity: 'warning',
+          });
+        } else if (artDirection.placementCount > 0 && artDirection.failedImageCount > 0) {
+          await publishGenerationEvent(runId, {
+            type: 'run_warning',
+            runId,
+            message: `Art direction planned ${artDirection.placementCount} image placement(s), but ${artDirection.failedImageCount} image generation attempt(s) failed.`,
+            severity: 'warning',
           });
         }
       } catch (artErr) {

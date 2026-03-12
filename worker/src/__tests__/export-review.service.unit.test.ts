@@ -171,6 +171,14 @@ Page size: 612 x 792 pts (letter)
             type: 'doc',
             content: [
               {
+                type: 'randomTable',
+                attrs: {
+                  title: 'Hidden Path Discoveries',
+                  dieType: 'd6',
+                  entries: '[]',
+                },
+              },
+              {
                 type: 'encounterTable',
                 attrs: {
                   environment: 'Underdark trail',
@@ -196,9 +204,10 @@ Page size: 612 x 792 pts (letter)
       pageHeightPts: 792,
     });
 
+    expect(review.findings.map((finding) => finding.code)).toContain('EXPORT_EMPTY_RANDOM_TABLE');
     expect(review.findings.map((finding) => finding.code)).toContain('EXPORT_EMPTY_ENCOUNTER_TABLE');
     expect(review.findings.map((finding) => finding.code)).toContain('EXPORT_PLACEHOLDER_STAT_BLOCK');
-    expect(review.metrics.utilityCoverage[0].referenceBlockCount).toBe(2);
+    expect(review.metrics.utilityCoverage[0].referenceBlockCount).toBe(3);
   });
 
   it('flags prose-heavy chapters with weak utility density', () => {
@@ -229,6 +238,38 @@ Page size: 612 x 792 pts (letter)
 
     expect(review.findings.map((finding) => finding.code)).toContain('EXPORT_LOW_UTILITY_DENSITY');
     expect(review.metrics.utilityCoverage[0].utilityDensity).toBe(0);
+  });
+
+  it('flags malformed oversized display headings in chapter content', () => {
+    const review = analyzePdfExportLayout({
+      documents: [
+        {
+          title: 'Chapter 5: The Artifact',
+          kind: 'chapter',
+          content: {
+            type: 'doc',
+            content: [
+              {
+                type: 'heading',
+                attrs: { level: 1 },
+                content: [
+                  {
+                    type: 'text',
+                    text: 'The Shadow Prism An ancient artifact of immense power that can control shadows but corrupts its wielder.',
+                  },
+                ],
+              },
+            ],
+          },
+        },
+      ],
+      pages: [],
+      pageCount: 1,
+      pageWidthPts: 612,
+      pageHeightPts: 792,
+    });
+
+    expect(review.findings.map((finding) => finding.code)).toContain('EXPORT_OVERSIZED_DISPLAY_HEADING');
   });
 
   it('builds an unavailable review payload when review tooling fails', () => {

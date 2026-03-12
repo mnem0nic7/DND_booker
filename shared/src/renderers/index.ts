@@ -5,6 +5,7 @@ export {
   escapeTypst,
   normalizeChapterHeaderTitle,
   normalizeEncounterEntries,
+  normalizeRandomTableEntries,
   safeCssUrl,
   safeUrl,
 } from './utils.js';

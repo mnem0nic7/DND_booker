@@ -3,4 +3,4 @@
  * The canonical implementation lives in @dnd-booker/shared.
  */
 export { escapeHtml, normalizeChapterHeaderTitle, safeUrl, safeCssUrl } from '@dnd-booker/shared';
-export { normalizeEncounterEntries } from '@dnd-booker/shared';
+export { normalizeEncounterEntries, normalizeRandomTableEntries } from '@dnd-booker/shared';

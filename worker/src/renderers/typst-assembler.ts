@@ -173,6 +173,7 @@ function buildRenderQueue(
 ): AssembleTypstDocument[] {
   const longForm = isLongFormBook(documents);
   const syntheticToc = shouldInjectSyntheticTableOfContents(documents);
+  const syntheticTocDepth = getSyntheticTableOfContentsDepth(documents);
   const hasTitlePage = documents.some((doc) => documentContainsType(doc.content, 'titlePage'));
   const hasTableOfContents = documents.some((doc) => documentContainsType(doc.content, 'tableOfContents'));
   const chapterDocs = documents.filter((doc) => doc.kind === 'chapter' && doc.content != null);
@@ -200,7 +201,7 @@ function buildRenderQueue(
 
   if (syntheticToc && !hasTableOfContents) {
     const insertAt = queue.findIndex((doc) => doc.kind === 'chapter' || doc.kind === 'appendix' || doc.kind === 'back_matter');
-    queue.splice(insertAt === -1 ? queue.length : insertAt, 0, createSyntheticTableOfContents());
+    queue.splice(insertAt === -1 ? queue.length : insertAt, 0, createSyntheticTableOfContents(syntheticTocDepth));
   }
 
   return queue;
@@ -218,6 +219,16 @@ function shouldInjectSyntheticTableOfContents(documents: AssembleTypstDocument[]
     (doc) => doc.content != null && (doc.kind === 'chapter' || doc.kind === 'appendix')
   );
   return chapterLikeDocs.length >= 3;
+}
+
+function getSyntheticTableOfContentsDepth(documents: AssembleTypstDocument[]): number {
+  const chapterLikeDocs = documents.filter(
+    (doc) => doc.content != null && (doc.kind === 'chapter' || doc.kind === 'appendix')
+  );
+
+  if (chapterLikeDocs.length <= 6) return 1;
+  if (chapterLikeDocs.length <= 10) return 2;
+  return 3;
 }
 
 function ensureDocumentSectionOpener(
@@ -342,7 +353,7 @@ function createSyntheticTitlePage(projectTitle: string): AssembleTypstDocument {
   };
 }
 
-function createSyntheticTableOfContents(): AssembleTypstDocument {
+function createSyntheticTableOfContents(depth: number): AssembleTypstDocument {
   return {
     title: 'Table of Contents',
     kind: 'front_matter',
@@ -352,7 +363,7 @@ function createSyntheticTableOfContents(): AssembleTypstDocument {
       content: [
         {
           type: 'tableOfContents',
-          attrs: {},
+          attrs: { depth },
         },
       ],
     },
