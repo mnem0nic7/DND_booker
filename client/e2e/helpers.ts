@@ -561,9 +561,12 @@ export async function clearGenerationRunPanel(page: Page) {
  */
 export async function waitForGenerationCompletion(page: Page, timeoutMs = 240_000) {
   const dismissButton = page.getByRole('button', { name: 'Dismiss' }).first();
+  const reviewButton = page.getByRole('button', { name: /Review Output|Hide Review/ }).first();
   const completeStatus = page.getByText('Complete', { exact: true }).first();
   const cancelledStatus = page.getByText('Cancelled', { exact: true }).first();
   const failedStatus = page.getByText('Failed', { exact: true }).first();
+  const generationComplete = page.getByText('Generation complete', { exact: true }).first();
+  const cancelButton = page.getByRole('button', { name: 'Cancel' }).first();
 
   await expect
     .poll(async () => {
@@ -571,7 +574,11 @@ export async function waitForGenerationCompletion(page: Page, timeoutMs = 240_00
       if (await cancelledStatus.isVisible().catch(() => false)) return 'cancelled';
       const hasCompleteStatus = await completeStatus.isVisible().catch(() => false);
       const hasDismissButton = await dismissButton.isVisible().catch(() => false);
+      const hasReviewButton = await reviewButton.isVisible().catch(() => false);
+      const hasGenerationComplete = await generationComplete.isVisible().catch(() => false);
+      const hasCancelButton = await cancelButton.isVisible().catch(() => false);
       if (hasCompleteStatus && hasDismissButton) return 'completed';
+      if (hasDismissButton && hasReviewButton && hasGenerationComplete && !hasCancelButton) return 'completed';
       return 'running';
     }, { timeout: timeoutMs })
     .toBe('completed');

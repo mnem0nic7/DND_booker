@@ -117,11 +117,12 @@ export function GenerationRunPanel({ projectId }: Props) {
   const canResume = isPaused && Boolean(currentRun.currentStage)
     && (RUN_STATUS_TRANSITIONS.paused?.includes(currentRun.currentStage as RunStatus) ?? false);
 
-  const stageLabel =
-    (currentStage ? SUBSTAGE_LABELS[currentStage] : null) ??
-    STAGE_LABELS[(currentStage as RunStatus) ?? status] ??
-    STAGE_LABELS[status] ??
-    status;
+  const stageLabel = isTerminal
+    ? STAGE_LABELS[status] ?? status
+    : (currentStage ? SUBSTAGE_LABELS[currentStage] : null) ??
+      STAGE_LABELS[(currentStage as RunStatus) ?? status] ??
+      STAGE_LABELS[status] ??
+      status;
   const recentEvents = events.slice(-5);
 
   return (

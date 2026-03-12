@@ -123,10 +123,13 @@ export const useGenerationStore = create<GenerationState>((set, get) => ({
   fetchRun: async (projectId, runId) => {
     try {
       const { data } = await api.get(`/projects/${projectId}/ai/generation-runs/${runId}`);
+      const isTerminal = ['completed', 'failed', 'cancelled'].includes(data.status);
       set({
         currentRun: data,
-        progressPercent: data.progressPercent ?? 0,
-        currentStage: data.currentStage,
+        progressPercent: isTerminal && data.status === 'completed'
+          ? 100
+          : data.progressPercent ?? 0,
+        currentStage: isTerminal ? null : data.currentStage,
         artifactCount: data.artifactCount ?? 0,
       });
     } catch (err: unknown) {
@@ -143,10 +146,13 @@ export const useGenerationStore = create<GenerationState>((set, get) => ({
       const { data } = await api.get(`/projects/${projectId}/ai/generation-runs`);
       if (data.length > 0) {
         const latest = data[0];
+        const isTerminal = ['completed', 'failed', 'cancelled'].includes(latest.status);
         set({
           currentRun: latest,
-          progressPercent: latest.progressPercent ?? 0,
-          currentStage: latest.currentStage,
+          progressPercent: isTerminal && latest.status === 'completed'
+            ? 100
+            : latest.progressPercent ?? 0,
+          currentStage: isTerminal ? null : latest.currentStage,
         });
         if (ACTIVE_STATUSES.includes(latest.status)) {
           get().subscribeToRun(projectId, latest.id);
@@ -210,6 +216,10 @@ export const useGenerationStore = create<GenerationState>((set, get) => ({
 
     const controller = new AbortController();
     set({ _eventSource: controller });
+    const reconcileLatestRun = async () => {
+      if (controller.signal.aborted) return;
+      await get().fetchLatestRun(projectId);
+    };
 
     const token = getAccessToken();
     const url = `/api/projects/${projectId}/ai/generation-runs/${runId}/stream`;
@@ -222,7 +232,10 @@ export const useGenerationStore = create<GenerationState>((set, get) => ({
       signal: controller.signal,
     })
       .then(async (response) => {
-        if (!response.ok || !response.body) return;
+        if (!response.ok || !response.body) {
+          await reconcileLatestRun();
+          return;
+        }
 
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
@@ -263,6 +276,7 @@ export const useGenerationStore = create<GenerationState>((set, get) => ({
                     ? { ...state.currentRun, status: 'completed' as RunStatus }
                     : state.currentRun;
                   updates.progressPercent = 100;
+                  updates.currentStage = null;
                 }
 
                 if (event.type === 'run_failed') {
@@ -270,6 +284,7 @@ export const useGenerationStore = create<GenerationState>((set, get) => ({
                     ? { ...state.currentRun, status: 'failed' as RunStatus }
                     : state.currentRun;
                   updates.error = event.reason;
+                  updates.currentStage = null;
                 }
 
                 return updates as GenerationState;
@@ -279,9 +294,19 @@ export const useGenerationStore = create<GenerationState>((set, get) => ({
             }
           }
         }
+
+        await reconcileLatestRun();
       })
-      .catch(() => {
-        // Stream ended or aborted — normal on disconnect
+      .catch(async (err: unknown) => {
+        if (
+          controller.signal.aborted ||
+          (err instanceof DOMException && err.name === 'AbortError') ||
+          (err instanceof Error && err.name === 'AbortError')
+        ) {
+          return;
+        }
+
+        await reconcileLatestRun();
       });
   },
 
