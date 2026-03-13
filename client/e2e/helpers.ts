@@ -334,17 +334,40 @@ async function ensureEditorReady(page: Page) {
  */
 export async function openAiPanel(page: Page) {
   const chatInput = page.getByPlaceholder('Ask about your campaign...').first();
-  if (await chatInput.isVisible({ timeout: 1_000 }).catch(() => false)) {
-    return;
-  }
-  await page.getByRole('button', { name: /Show AI assistant|Hide AI assistant/ }).first().click();
-  await expect(page.locator('text=AI Assistant').first()).toBeVisible({ timeout: 5000 });
   const configureButton = page.getByRole('button', { name: 'Configure AI' }).first();
-  if (await configureButton.isVisible({ timeout: 10_000 }).catch(() => false)) {
+
+  for (let attempt = 0; attempt < 2; attempt++) {
+    if (await chatInput.isVisible({ timeout: 1_000 }).catch(() => false)) {
+      return;
+    }
+
+    await page.getByRole('button', { name: /Show AI assistant|Hide AI assistant/ }).first().click();
+    await expect(page.locator('text=AI Assistant').first()).toBeVisible({ timeout: 5000 });
+
+    const panelState = await expect
+      .poll(async () => {
+        if (await chatInput.isVisible().catch(() => false)) return 'ready';
+        if (await configureButton.isVisible().catch(() => false)) return 'needs-config';
+        return 'pending';
+      }, { timeout: 10_000 })
+      .not.toBe('pending')
+      .then(async () => {
+        if (await chatInput.isVisible().catch(() => false)) return 'ready';
+        return 'needs-config';
+      });
+
+    if (panelState === 'ready') {
+      return;
+    }
+
+    if (attempt === 0) {
+      await page.reload();
+      await ensureEditorReady(page);
+      continue;
+    }
+
     throw new Error(`AI assistant is not configured for ${TEST_EMAIL}. Save a valid provider and key before running this test.`);
   }
-
-  await expect(chatInput).toBeVisible({ timeout: 10_000 });
 }
 
 /**
