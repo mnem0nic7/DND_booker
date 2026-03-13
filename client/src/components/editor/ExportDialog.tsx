@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import type { ExportReview } from '@dnd-booker/shared';
+import type { ExportReview, ExportReviewCode, ExportReviewFinding } from '@dnd-booker/shared';
 import { useExportStore } from '../../stores/exportStore';
+import { useProjectStore } from '../../stores/projectStore';
 
 interface ExportDialogProps {
   projectId: string;
@@ -49,8 +50,36 @@ function formatPercent(value: number | null | undefined): string | null {
   return `${Math.round(value * 100)}%`;
 }
 
+const SAFE_FIXABLE_CODES = new Set<ExportReviewCode>([
+  'EXPORT_EMPTY_ENCOUNTER_TABLE',
+  'EXPORT_EMPTY_RANDOM_TABLE',
+  'EXPORT_PLACEHOLDER_STAT_BLOCK',
+  'EXPORT_OVERSIZED_DISPLAY_HEADING',
+]);
+
+function getFindingDocumentTitle(finding: ExportReviewFinding): string | null {
+  const title = finding.details && typeof finding.details === 'object'
+    ? (finding.details as Record<string, unknown>).title
+    : null;
+  return typeof title === 'string' && title.trim().length > 0 ? title.trim() : null;
+}
+
 export function ExportDialog({ projectId }: ExportDialogProps) {
-  const { isOpen, job, isExporting, error, exportHistory, closeDialog, startExport, fetchExportHistory, reset } = useExportStore();
+  const {
+    isOpen,
+    job,
+    isExporting,
+    isApplyingFixes,
+    error,
+    fixSummary,
+    exportHistory,
+    closeDialog,
+    startExport,
+    applyReviewFixes,
+    fetchExportHistory,
+    reset,
+  } = useExportStore();
+  const { documents, loadDocument } = useProjectStore();
   const [selectedFormat, setSelectedFormat] = useState<string>('pdf');
 
   useEffect(() => {
@@ -64,6 +93,10 @@ export function ExportDialog({ projectId }: ExportDialogProps) {
   const isJobActive = job && (job.status === 'queued' || job.status === 'processing');
   const isCompleted = job?.status === 'completed';
   const isFailed = job?.status === 'failed';
+  const isBusy = Boolean(isJobActive || isExporting || isApplyingFixes);
+  const fixableFindingCount = job?.review
+    ? job.review.findings.filter((finding) => SAFE_FIXABLE_CODES.has(finding.code)).length
+    : 0;
 
   const handleExport = () => {
     startExport(projectId, selectedFormat);
@@ -76,6 +109,20 @@ export function ExportDialog({ projectId }: ExportDialogProps) {
 
   const handleNewExport = () => {
     reset();
+  };
+
+  const handleApplyFixes = () => {
+    if (!job) return;
+    applyReviewFixes(projectId, job.id);
+  };
+
+  const handleOpenAffectedDocument = async (finding: ExportReviewFinding) => {
+    const title = getFindingDocumentTitle(finding);
+    if (!title) return;
+    const matchingDoc = documents.find((document) => document.title === title);
+    if (!matchingDoc) return;
+    await loadDocument(projectId, matchingDoc.id);
+    handleClose();
   };
 
   const handleDownload = (e: React.MouseEvent, jobId: string, format: string) => {
@@ -109,7 +156,7 @@ export function ExportDialog({ projectId }: ExportDialogProps) {
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b">
           <h2 className="text-lg font-semibold text-gray-900">Export Project</h2>
-          {!isJobActive && !isExporting && (
+          {!isBusy && (
             <button
               onClick={handleClose}
               className="text-gray-400 hover:text-gray-600 transition-colors"
@@ -125,6 +172,12 @@ export function ExportDialog({ projectId }: ExportDialogProps) {
 
         {/* Body */}
         <div className="px-6 py-4">
+          {fixSummary && (
+            <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2">
+              <p className="text-sm text-blue-900">{fixSummary}</p>
+            </div>
+          )}
+
           {/* Format selection (only when no active job) */}
           {!job && !isExporting && (
             <>
@@ -160,10 +213,10 @@ export function ExportDialog({ projectId }: ExportDialogProps) {
           )}
 
           {/* Exporting state (POST in progress) */}
-          {isExporting && (
+          {(isExporting || isApplyingFixes) && (
             <div className="text-center py-4">
               <div className="inline-block w-8 h-8 border-4 border-purple-200 border-t-purple-600 rounded-full animate-spin mb-3" />
-              <p className="text-sm text-gray-600">Starting export...</p>
+              <p className="text-sm text-gray-600">{isApplyingFixes ? 'Applying safe fixes...' : 'Starting export...'}</p>
             </div>
           )}
 
@@ -234,11 +287,37 @@ export function ExportDialog({ projectId }: ExportDialogProps) {
                             {finding.page ? `Page ${finding.page}` : 'Export'}
                           </p>
                           <p className="text-xs text-amber-800">{finding.message}</p>
+                          {getFindingDocumentTitle(finding) && documents.some((document) => document.title === getFindingDocumentTitle(finding)) && (
+                            <button
+                              onClick={() => handleOpenAffectedDocument(finding)}
+                              className="mt-2 text-[11px] font-medium text-amber-900 underline underline-offset-2 hover:text-amber-700"
+                            >
+                              Open affected document
+                            </button>
+                          )}
                         </div>
                       ))}
                     </div>
                   ) : (
                     <p className="text-xs text-green-700">No export-layout issues were detected in the final PDF.</p>
+                  )}
+                  {job.review.findings.length > 0 && (
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      {fixableFindingCount > 0 && (
+                        <button
+                          onClick={handleApplyFixes}
+                          disabled={isApplyingFixes}
+                          className="inline-flex items-center gap-2 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {isApplyingFixes ? 'Applying fixes...' : 'Apply Safe Fixes & Re-export'}
+                        </button>
+                      )}
+                      {job.review.findings.length > fixableFindingCount && (
+                        <p className="text-[11px] text-gray-500">
+                          Some issues still require manual editing in the affected document.
+                        </p>
+                      )}
+                    </div>
                   )}
                 </div>
               )}
@@ -320,7 +399,7 @@ export function ExportDialog({ projectId }: ExportDialogProps) {
         {/* Footer */}
         <div className="flex items-center justify-end gap-2 px-6 py-4 border-t bg-gray-50 rounded-b-lg">
           {/* Initial state: Cancel + Export */}
-          {!job && !isExporting && (
+          {!job && !isExporting && !isApplyingFixes && (
             <>
               <button
                 onClick={handleClose}
@@ -338,7 +417,7 @@ export function ExportDialog({ projectId }: ExportDialogProps) {
           )}
 
           {/* Active job: no actions (can't close while exporting) */}
-          {(isJobActive || isExporting) && (
+          {(isJobActive || isExporting || isApplyingFixes) && (
             <p className="text-xs text-gray-400">Please wait while your export is being generated.</p>
           )}
 

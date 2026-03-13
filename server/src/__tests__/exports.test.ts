@@ -241,6 +241,195 @@ describe('Export Routes', () => {
     });
   });
 
+  describe('POST /api/export-jobs/:id/fix', () => {
+    it('should apply safe export fixes and queue a replacement export', async () => {
+      const user = await prisma.user.findUniqueOrThrow({ where: { email: TEST_USER.email } });
+      const doc = await prisma.projectDocument.create({
+        data: {
+          projectId,
+          kind: 'chapter',
+          title: 'Chapter 1: Broken Tools',
+          slug: `broken-tools-${Date.now()}`,
+          sortOrder: 99,
+          content: {
+            type: 'doc',
+            content: [
+              {
+                type: 'encounterTable',
+                attrs: {
+                  environment: 'Mine',
+                  crRange: '1-4',
+                  entries: '[]',
+                },
+              },
+              {
+                type: 'randomTable',
+                attrs: {
+                  title: 'Complications',
+                  dieType: 'd6',
+                  entries: '[]',
+                },
+              },
+              {
+                type: 'statBlock',
+                attrs: {
+                  name: 'Broken Guardian',
+                  ac: 0,
+                  hp: 0,
+                },
+              },
+              {
+                type: 'heading',
+                attrs: { level: 1 },
+                content: [
+                  {
+                    type: 'text',
+                    text: 'The Shadow Prism An ancient artifact of immense power that can control shadows but corrupts its wielder.',
+                  },
+                ],
+              },
+            ],
+          },
+        },
+      });
+
+      const reviewedJob = await prisma.exportJob.create({
+        data: {
+          projectId,
+          userId: user.id,
+          format: 'pdf',
+          status: 'completed',
+          progress: 100,
+          outputUrl: '/output/reviewed-fixable.pdf',
+          reviewJson: {
+            status: 'needs_attention',
+            score: 18,
+            generatedAt: new Date().toISOString(),
+            summary: 'Export review found 4 issues.',
+            passCount: 1,
+            appliedFixes: [],
+            findings: [
+              {
+                code: 'EXPORT_EMPTY_ENCOUNTER_TABLE',
+                severity: 'error',
+                page: null,
+                message: '"Chapter 1: Broken Tools" includes an empty encounter table.',
+                details: { title: doc.title, blockType: 'encounterTable' },
+              },
+              {
+                code: 'EXPORT_EMPTY_RANDOM_TABLE',
+                severity: 'error',
+                page: null,
+                message: '"Chapter 1: Broken Tools" includes an empty random table.',
+                details: { title: doc.title, blockType: 'randomTable' },
+              },
+              {
+                code: 'EXPORT_PLACEHOLDER_STAT_BLOCK',
+                severity: 'error',
+                page: null,
+                message: '"Chapter 1: Broken Tools" includes a broken or placeholder stat block.',
+                details: { title: doc.title, blockType: 'statBlock' },
+              },
+              {
+                code: 'EXPORT_OVERSIZED_DISPLAY_HEADING',
+                severity: 'warning',
+                page: null,
+                message: '"Chapter 1: Broken Tools" includes an oversized display heading that is likely malformed.',
+                details: { title: doc.title, level: 1 },
+              },
+            ],
+            metrics: {
+              pageCount: 8,
+              pageWidthPts: 612,
+              pageHeightPts: 792,
+              lastPageFillRatio: 0.42,
+              sectionStarts: [],
+              utilityCoverage: [],
+            },
+          },
+          completedAt: new Date(),
+        },
+      });
+
+      try {
+        const res = await request(app)
+          .post(`/api/export-jobs/${reviewedJob.id}/fix`)
+          .set('Authorization', `Bearer ${accessToken}`);
+
+        expect(res.status).toBe(201);
+        expect(res.body.status).toBe('started');
+        expect(res.body.appliedFixCount).toBe(4);
+        expect(res.body.documentsUpdated).toBe(1);
+        expect(res.body.exportJob).toBeTruthy();
+        expect(res.body.exportJob.status).toBe('queued');
+        expect(res.body.exportJob.format).toBe('pdf');
+
+        const updatedDoc = await prisma.projectDocument.findUniqueOrThrow({ where: { id: doc.id } });
+        const content = updatedDoc.content as { type: string; content?: Array<{ type: string }> };
+        const nodeTypes = (content.content ?? []).map((node) => node.type);
+        expect(nodeTypes).not.toContain('encounterTable');
+        expect(nodeTypes).not.toContain('randomTable');
+        expect(nodeTypes).not.toContain('statBlock');
+        expect(nodeTypes).toContain('paragraph');
+      } finally {
+        await prisma.exportJob.deleteMany({ where: { projectId, userId: user.id, outputUrl: '/output/reviewed-fixable.pdf' } });
+        await prisma.projectDocument.delete({ where: { id: doc.id } });
+      }
+    });
+
+    it('should report when findings need manual revision instead of a safe fix', async () => {
+      const user = await prisma.user.findUniqueOrThrow({ where: { email: TEST_USER.email } });
+      const reviewedJob = await prisma.exportJob.create({
+        data: {
+          projectId,
+          userId: user.id,
+          format: 'pdf',
+          status: 'completed',
+          progress: 100,
+          outputUrl: '/output/reviewed-manual.pdf',
+          reviewJson: {
+            status: 'needs_attention',
+            score: 64,
+            generatedAt: new Date().toISOString(),
+            summary: 'Export review found 1 issue.',
+            passCount: 1,
+            appliedFixes: [],
+            findings: [
+              {
+                code: 'EXPORT_LOW_UTILITY_DENSITY',
+                severity: 'warning',
+                page: null,
+                message: '"Chapter 2: Too Much Lore" is prose-heavy and under-indexed for table use.',
+                details: { title: 'Chapter 2: Too Much Lore' },
+              },
+            ],
+            metrics: {
+              pageCount: 6,
+              pageWidthPts: 612,
+              pageHeightPts: 792,
+              lastPageFillRatio: 0.54,
+              sectionStarts: [],
+              utilityCoverage: [],
+            },
+          },
+          completedAt: new Date(),
+        },
+      });
+
+      try {
+        const res = await request(app)
+          .post(`/api/export-jobs/${reviewedJob.id}/fix`)
+          .set('Authorization', `Bearer ${accessToken}`);
+
+        expect(res.status).toBe(400);
+        expect(res.body.error).toContain('No automatic fixes');
+        expect(res.body.result.status).toBe('no_fixes');
+      } finally {
+        await prisma.exportJob.delete({ where: { id: reviewedJob.id } });
+      }
+    });
+  });
+
   describe('GET /api/export-jobs/:id/download', () => {
     let pendingJobId: string;
 

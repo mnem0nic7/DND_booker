@@ -66,6 +66,32 @@ router.get('/export-jobs/:id', validateUuid('id'), asyncHandler(async (req: Auth
   }
 }));
 
+// POST /api/export-jobs/:id/fix — apply safe document fixes from export review and queue a re-export
+router.post('/export-jobs/:id/fix', validateUuid('id'), exportRateLimit, asyncHandler(async (req: AuthRequest, res: Response) => {
+  try {
+    const result = await exportService.fixExportJobIssues(req.params.id as string, req.userId!);
+    if (!result) {
+      res.status(404).json({ error: 'Export job not found' });
+      return;
+    }
+
+    if (result.status === 'no_review') {
+      res.status(400).json({ error: result.summary, result });
+      return;
+    }
+
+    if (result.status === 'no_fixes') {
+      res.status(400).json({ error: result.summary, result });
+      return;
+    }
+
+    res.status(201).json(result);
+  } catch (err) {
+    console.error('[Export] Failed to apply export fixes:', err);
+    res.status(500).json({ error: 'Failed to apply export fixes.' });
+  }
+}));
+
 // GET /api/export-jobs/:id/download — authenticated file download
 router.get('/export-jobs/:id/download', validateUuid('id'), asyncHandler(async (req: AuthRequest, res: Response) => {
   try {

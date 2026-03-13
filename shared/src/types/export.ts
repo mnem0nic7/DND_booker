@@ -19,6 +19,11 @@ export type ExportReviewAutoFix =
   | 'shrink_h1_headings'
   | 'dedicated_end_page'
   | 'dedicated_chapter_openers';
+export type ExportReviewSafeFixAction =
+  | 'remove_empty_encounter_tables'
+  | 'remove_empty_random_tables'
+  | 'remove_placeholder_stat_blocks'
+  | 'demote_oversized_display_headings';
 
 export interface ExportReviewFinding {
   code: ExportReviewCode;
@@ -64,6 +69,23 @@ export interface ExportReview {
   appliedFixes: ExportReviewAutoFix[];
   findings: ExportReviewFinding[];
   metrics: ExportReviewMetrics;
+}
+
+export interface ExportReviewFixChange {
+  code: ExportReviewCode;
+  action: ExportReviewSafeFixAction;
+  title: string | null;
+  count: number;
+}
+
+export interface ExportReviewFixResult {
+  status: 'started' | 'no_review' | 'no_fixes';
+  summary: string;
+  appliedFixCount: number;
+  documentsUpdated: number;
+  changes: ExportReviewFixChange[];
+  unsupportedFindingCount: number;
+  exportJob: ExportJob | null;
 }
 
 export interface ExportJob {

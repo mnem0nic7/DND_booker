@@ -1,17 +1,20 @@
 import { create } from 'zustand';
 import { AxiosError } from 'axios';
-import type { ExportJob } from '@dnd-booker/shared';
+import type { ExportJob, ExportReviewFixResult } from '@dnd-booker/shared';
 import api from '../lib/api';
 
 interface ExportState {
   isOpen: boolean;
   job: ExportJob | null;
   isExporting: boolean;
+  isApplyingFixes: boolean;
   error: string | null;
+  fixSummary: string | null;
   exportHistory: ExportJob[];
   openDialog: () => void;
   closeDialog: () => void;
   startExport: (projectId: string, format: string) => Promise<void>;
+  applyReviewFixes: (projectId: string, exportJobId: string) => Promise<void>;
   pollJobStatus: (jobId: string) => Promise<void>;
   fetchExportHistory: (projectId: string) => Promise<void>;
   reset: () => void;
@@ -33,7 +36,9 @@ export const useExportStore = create<ExportState>((set, get) => ({
   isOpen: false,
   job: null,
   isExporting: false,
+  isApplyingFixes: false,
   error: null,
+  fixSummary: null,
   exportHistory: [],
 
   openDialog: () => set({ isOpen: true }),
@@ -45,7 +50,7 @@ export const useExportStore = create<ExportState>((set, get) => ({
 
   startExport: async (projectId: string, format: string) => {
     clearPollTimer();
-    set({ isExporting: true, error: null, job: null });
+    set({ isExporting: true, isApplyingFixes: false, error: null, fixSummary: null, job: null });
 
     try {
       const { data } = await api.post(`/projects/${projectId}/export`, { format });
@@ -58,6 +63,36 @@ export const useExportStore = create<ExportState>((set, get) => ({
     }
   },
 
+  applyReviewFixes: async (projectId, exportJobId) => {
+    clearPollTimer();
+    set({ isApplyingFixes: true, error: null, fixSummary: null });
+
+    try {
+      const { data } = await api.post<ExportReviewFixResult>(`/export-jobs/${exportJobId}/fix`);
+      if (!data.exportJob) {
+        set({
+          isApplyingFixes: false,
+          error: data.summary || 'No automatic export fixes were available.',
+        });
+        return;
+      }
+
+      set({
+        job: data.exportJob,
+        isApplyingFixes: false,
+        fixSummary: data.summary,
+      });
+      get().pollJobStatus(data.exportJob.id);
+      get().fetchExportHistory(projectId);
+    } catch (err) {
+      const message = err instanceof AxiosError ? err.response?.data?.error : null;
+      set({
+        isApplyingFixes: false,
+        error: message || 'Failed to apply export fixes',
+      });
+    }
+  },
+
   pollJobStatus: async (jobId: string) => {
     try {
       const { data } = await api.get(`/export-jobs/${jobId}`);
@@ -67,6 +102,9 @@ export const useExportStore = create<ExportState>((set, get) => ({
         clearPollTimer();
         if (data.status === 'failed') {
           set({ error: data.errorMessage || 'Export failed' });
+        }
+        if (data.projectId) {
+          get().fetchExportHistory(data.projectId).catch(() => {});
         }
         return;
       }
@@ -100,6 +138,6 @@ export const useExportStore = create<ExportState>((set, get) => ({
 
   reset: () => {
     clearPollTimer();
-    set({ job: null, isExporting: false, error: null });
+    set({ job: null, isExporting: false, isApplyingFixes: false, error: null, fixSummary: null });
   },
 }));

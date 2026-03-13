@@ -3,7 +3,7 @@ import { execFile } from 'node:child_process';
 import { mkdir } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { promisify } from 'node:util';
-import { TEST_EMAIL, TEST_OLLAMA_BASE_URL, TEST_OLLAMA_MODEL, TEST_PASSWORD } from './test-account';
+import { TEST_EMAIL, TEST_OLLAMA_MODEL, TEST_PASSWORD } from './test-account';
 
 const AI_PROGRESS_POLL_MS = 1_000;
 const DEFAULT_AI_STALL_TIMEOUT_MS = 120_000;
@@ -340,29 +340,8 @@ export async function openAiPanel(page: Page) {
   await page.getByRole('button', { name: /Show AI assistant|Hide AI assistant/ }).first().click();
   await expect(page.locator('text=AI Assistant').first()).toBeVisible({ timeout: 5000 });
   const configureButton = page.getByRole('button', { name: 'Configure AI' }).first();
-
-  const panelState = await expect
-    .poll(async () => {
-      if (await chatInput.isVisible().catch(() => false)) return 'ready';
-      if (await configureButton.isVisible().catch(() => false)) return 'needs-config';
-      return 'pending';
-    }, { timeout: 10_000 })
-    .not.toBe('pending')
-    .then(async () => {
-      if (await chatInput.isVisible().catch(() => false)) return 'ready';
-      return 'needs-config';
-    });
-
-  if (panelState === 'needs-config') {
-    await configureAiSettings(page, {
-      provider: 'ollama',
-      model: TEST_OLLAMA_MODEL,
-      baseUrl: TEST_OLLAMA_BASE_URL,
-    });
-    await page.reload();
-    await ensureEditorReady(page);
-    await page.getByRole('button', { name: /Show AI assistant|Hide AI assistant/ }).first().click();
-    await expect(page.locator('text=AI Assistant').first()).toBeVisible({ timeout: 5000 });
+  if (await configureButton.isVisible({ timeout: 10_000 }).catch(() => false)) {
+    throw new Error(`AI assistant is not configured for ${TEST_EMAIL}. Save a valid provider and key before running this test.`);
   }
 
   await expect(chatInput).toBeVisible({ timeout: 10_000 });

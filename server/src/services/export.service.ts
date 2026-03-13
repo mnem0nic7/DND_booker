@@ -1,8 +1,9 @@
-import type { ExportJob as SharedExportJob, ExportReview } from '@dnd-booker/shared';
+import type { ExportJob as SharedExportJob, ExportReview, ExportReviewFixResult } from '@dnd-booker/shared';
 import { Queue, ConnectionOptions } from 'bullmq';
 import type { ExportJob as PrismaExportJob } from '@prisma/client';
 import { prisma } from '../config/database.js';
 import { redis } from '../config/redis.js';
+import { applySafeExportReviewFixes } from './export-fix.service.js';
 
 const exportQueue = new Queue('export', { connection: redis as unknown as ConnectionOptions });
 
@@ -38,6 +39,25 @@ export async function listExportJobs(projectId: string, userId: string, limit = 
   });
 
   return jobs.map(serializeExportJob);
+}
+
+export async function fixExportJobIssues(id: string, userId: string): Promise<ExportReviewFixResult | null> {
+  const job = await prisma.exportJob.findFirst({ where: { id, userId } });
+  if (!job) return null;
+
+  const result = await applySafeExportReviewFixes(job as PrismaExportJob & { reviewJson: ExportReview | null });
+  if (result.status !== 'started') {
+    return {
+      ...result,
+      exportJob: null,
+    };
+  }
+
+  const nextJob = await createExportJob(result.projectId, result.userId, result.format);
+  return {
+    ...result,
+    exportJob: nextJob,
+  };
 }
 
 function serializeExportJob(job: PrismaExportJob): SharedExportJob {
