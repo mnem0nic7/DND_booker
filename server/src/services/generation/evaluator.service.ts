@@ -1,4 +1,4 @@
-import { generateText, type LanguageModel } from 'ai';
+import type { LanguageModel } from 'ai';
 import { z } from 'zod';
 import type { BibleContent, EvaluationFinding, EvaluationWeights, AcceptanceThreshold } from '@dnd-booker/shared';
 import { EVALUATION_WEIGHTS, ACCEPTANCE_THRESHOLDS } from '@dnd-booker/shared';
@@ -14,6 +14,7 @@ import {
   buildEvaluateArtifactSystemPrompt,
   buildEvaluateArtifactUserPrompt,
 } from './prompts/evaluate-artifact.prompt.js';
+import { generateTextWithTimeout } from './model-timeouts.js';
 
 const FindingSchema = z.object({
   severity: z.enum(['critical', 'major', 'minor', 'informational']),
@@ -160,7 +161,7 @@ export async function evaluateArtifact(
     deterministicLayoutFindings,
   );
 
-  const { text, usage } = await generateText({
+  const { text, usage } = await generateTextWithTimeout(`Artifact evaluation for ${artifact.title}`, {
     model, system, prompt, maxOutputTokens,
   });
 

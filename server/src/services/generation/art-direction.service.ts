@@ -1,4 +1,4 @@
-import { generateText, type LanguageModel } from 'ai';
+import type { LanguageModel } from 'ai';
 import { z } from 'zod';
 import { normalizeChapterHeaderTitle, type DocumentContent, type DocumentKind } from '@dnd-booker/shared';
 import { prisma } from '../../config/database.js';
@@ -7,6 +7,7 @@ import { parseJsonResponse } from './parse-json.js';
 import { getAiSettings, getDecryptedApiKey } from '../ai-settings.service.js';
 import { generateAiImage } from '../ai-image.service.js';
 import { createAsset } from '../asset.service.js';
+import { generateTextWithTimeout } from './model-timeouts.js';
 
 type ImageCapableBlockType =
   | 'titlePage'
@@ -971,7 +972,7 @@ export async function executeArtDirectionPass(
   let totalTokens = 0;
 
   try {
-    const { text, usage } = await generateText({
+    const { text, usage } = await generateTextWithTimeout('Art direction prompt generation', {
       model,
       system: buildSystemPrompt(selectedSlots.length),
       prompt: buildUserPrompt({

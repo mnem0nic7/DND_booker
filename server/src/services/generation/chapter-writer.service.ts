@@ -1,4 +1,4 @@
-import { generateText, type LanguageModel } from 'ai';
+import type { LanguageModel } from 'ai';
 import type { BibleContent, ChapterPlan, ChapterOutlineEntry } from '@dnd-booker/shared';
 import { prisma } from '../../config/database.js';
 import { publishGenerationEvent } from './pubsub.service.js';
@@ -8,6 +8,7 @@ import {
   buildChapterDraftSystemPrompt,
   buildChapterDraftUserPrompt,
 } from './prompts/chapter-draft.prompt.js';
+import { generateTextWithTimeout } from './model-timeouts.js';
 
 export interface ChapterDraftResult {
   artifactId: string;
@@ -47,7 +48,7 @@ export async function executeChapterDraftGeneration(
     context.priorChapterSummaries,
   );
 
-  const { text, usage } = await generateText({
+  const { text, usage } = await generateTextWithTimeout(`Chapter draft generation for ${chapter.title}`, {
     model, system, prompt, maxOutputTokens,
   });
 

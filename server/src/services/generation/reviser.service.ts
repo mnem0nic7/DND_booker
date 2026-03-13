@@ -1,4 +1,4 @@
-import { generateText, type LanguageModel } from 'ai';
+import type { LanguageModel } from 'ai';
 import type { BibleContent, EvaluationFinding } from '@dnd-booker/shared';
 import { prisma } from '../../config/database.js';
 import { publishGenerationEvent } from './pubsub.service.js';
@@ -9,6 +9,7 @@ import {
   buildReviseArtifactSystemPrompt,
   buildReviseArtifactUserPrompt,
 } from './prompts/revise-artifact.prompt.js';
+import { generateTextWithTimeout } from './model-timeouts.js';
 
 const MAX_REVISIONS = 2;
 
@@ -95,7 +96,7 @@ export async function reviseArtifact(
     layoutAnalysis?.summary ?? null,
   );
 
-  const { text, usage } = await generateText({
+  const { text, usage } = await generateTextWithTimeout(`Artifact revision for ${artifact.title}`, {
     model, system, prompt, maxOutputTokens,
   });
 

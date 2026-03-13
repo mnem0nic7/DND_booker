@@ -1,9 +1,10 @@
-import { generateText, type LanguageModel } from 'ai';
+import type { LanguageModel } from 'ai';
 import { z } from 'zod';
 import type { NormalizedInput, BibleContent } from '@dnd-booker/shared';
 import { prisma } from '../../config/database.js';
 import { publishGenerationEvent } from './pubsub.service.js';
 import { parseJsonResponse } from './parse-json.js';
+import { generateTextWithTimeout } from './model-timeouts.js';
 import {
   buildCampaignBibleSystemPrompt,
   buildCampaignBibleUserPrompt,
@@ -84,7 +85,7 @@ export async function executeBibleGeneration(
   const system = buildCampaignBibleSystemPrompt();
   const prompt = buildCampaignBibleUserPrompt(normalizedInput);
 
-  const { text, usage } = await generateText({
+  const { text, usage } = await generateTextWithTimeout('Campaign bible generation', {
     model,
     system,
     prompt,

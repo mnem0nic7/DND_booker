@@ -1,4 +1,4 @@
-import { generateText, type LanguageModel } from 'ai';
+import type { LanguageModel } from 'ai';
 import { z } from 'zod';
 import type {
   BibleContent,
@@ -11,6 +11,7 @@ import { prisma } from '../../config/database.js';
 import { publishGenerationEvent } from './pubsub.service.js';
 import { parseJsonResponse } from './parse-json.js';
 import { normalizeGenerationContentType } from './content-type-normalizer.js';
+import { generateTextWithTimeout } from './model-timeouts.js';
 import {
   buildChapterPlanSystemPrompt,
   buildChapterPlanUserPrompt,
@@ -92,7 +93,7 @@ export async function executeChapterPlanGeneration(
   const system = buildChapterPlanSystemPrompt();
   const prompt = buildChapterPlanUserPrompt(chapter, bible, entitySummaries);
 
-  const { text, usage } = await generateText({
+  const { text, usage } = await generateTextWithTimeout(`Chapter plan generation for ${chapter.title}`, {
     model, system, prompt, maxOutputTokens,
   });
 

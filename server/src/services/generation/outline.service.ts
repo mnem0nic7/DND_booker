@@ -1,10 +1,11 @@
-import { generateText, type LanguageModel } from 'ai';
+import type { LanguageModel } from 'ai';
 import { z } from 'zod';
 import type { BibleContent, ChapterOutline } from '@dnd-booker/shared';
 import { prisma } from '../../config/database.js';
 import { publishGenerationEvent } from './pubsub.service.js';
 import { parseJsonResponse } from './parse-json.js';
 import { normalizeGenerationContentType } from './content-type-normalizer.js';
+import { generateTextWithTimeout } from './model-timeouts.js';
 import {
   buildChapterOutlineSystemPrompt,
   buildChapterOutlineUserPrompt,
@@ -62,7 +63,7 @@ export async function executeOutlineGeneration(
   const system = buildChapterOutlineSystemPrompt();
   const prompt = buildChapterOutlineUserPrompt(bible);
 
-  const { text, usage } = await generateText({
+  const { text, usage } = await generateTextWithTimeout('Chapter outline generation', {
     model, system, prompt, maxOutputTokens,
   });
 

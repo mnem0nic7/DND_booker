@@ -1,4 +1,4 @@
-import { generateText, type LanguageModel } from 'ai';
+import type { LanguageModel } from 'ai';
 import { z } from 'zod';
 import type {
   BibleContent,
@@ -17,6 +17,7 @@ import { buildLocationBriefSystemPrompt, buildLocationBriefUserPrompt } from './
 import { buildFactionProfileSystemPrompt, buildFactionProfileUserPrompt } from './prompts/faction-profile.prompt.js';
 import { buildEncounterBundleSystemPrompt, buildEncounterBundleUserPrompt } from './prompts/encounter-bundle.prompt.js';
 import { buildItemBundleSystemPrompt, buildItemBundleUserPrompt } from './prompts/item-bundle.prompt.js';
+import { generateTextWithTimeout } from './model-timeouts.js';
 
 // ---------- Zod Schemas ----------
 
@@ -181,7 +182,7 @@ export async function expandCanonEntity(
   const system = config.buildSystem();
   const prompt = config.buildUser(entitySeed, bible);
 
-  const { text, usage } = await generateText({
+  const { text, usage } = await generateTextWithTimeout(`Canon expansion for ${entity.canonicalName}`, {
     model, system, prompt, maxOutputTokens,
   });
 

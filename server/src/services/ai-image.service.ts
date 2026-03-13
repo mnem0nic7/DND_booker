@@ -15,6 +15,16 @@ interface GenerateImageOptions {
   quality?: string;
 }
 
+const DEFAULT_IMAGE_TIMEOUT_MS = 180_000;
+
+function resolveImageTimeoutMs(): number {
+  const parsed = Number.parseInt(process.env.AI_IMAGE_TIMEOUT_MS ?? '', 10);
+  if (Number.isFinite(parsed) && parsed > 0) {
+    return parsed;
+  }
+  return DEFAULT_IMAGE_TIMEOUT_MS;
+}
+
 export async function generateAiImage(
   apiKey: string,
   options: GenerateImageOptions,
@@ -35,12 +45,26 @@ export async function generateAiImage(
     providerOptions.openai = { quality };
   }
 
-  const { image } = await generateImage({
-    model: openai.image(model),
-    prompt,
-    size: size as `${number}x${number}`,
-    ...(Object.keys(providerOptions).length > 0 ? { providerOptions } : {}),
-  });
+  const timeoutMs = resolveImageTimeoutMs();
+  let image;
+  try {
+    ({ image } = await generateImage({
+      model: openai.image(model),
+      prompt,
+      size: size as `${number}x${number}`,
+      ...(Object.keys(providerOptions).length > 0 ? { providerOptions } : {}),
+      abortSignal: AbortSignal.timeout(timeoutMs),
+    }));
+  } catch (error) {
+    if (error instanceof Error && (
+      error.name === 'AbortError'
+      || error.name === 'TimeoutError'
+      || /aborted|timeout/i.test(error.message)
+    )) {
+      throw new Error(`Image generation timed out after ${Math.round(timeoutMs / 1000)}s`);
+    }
+    throw error;
+  }
 
   return {
     base64: image.base64,

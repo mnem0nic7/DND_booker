@@ -1,9 +1,10 @@
-import { generateText, type LanguageModel } from 'ai';
+import type { LanguageModel } from 'ai';
 import { z } from 'zod';
 import type { NormalizedInput, GenerationConstraints } from '@dnd-booker/shared';
 import { prisma } from '../../config/database.js';
 import { publishGenerationEvent } from './pubsub.service.js';
 import { parseJsonResponse } from './parse-json.js';
+import { generateTextWithTimeout } from './model-timeouts.js';
 import {
   buildNormalizeInputSystemPrompt,
   buildNormalizeInputUserPrompt,
@@ -54,7 +55,7 @@ export async function executeIntake(
     run.inputParameters as GenerationConstraints | null,
   );
 
-  const { text, usage } = await generateText({
+  const { text, usage } = await generateTextWithTimeout('Input normalization', {
     model,
     system,
     prompt,
