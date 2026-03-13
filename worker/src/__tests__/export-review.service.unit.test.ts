@@ -210,6 +210,43 @@ Page size: 612 x 792 pts (letter)
     expect(review.metrics.utilityCoverage[0].referenceBlockCount).toBe(3);
   });
 
+  it('flags suspicious but non-placeholder stat blocks for manual review', () => {
+    const review = analyzePdfExportLayout({
+      documents: [
+        {
+          title: 'Chapter 2: Phantom Threats',
+          kind: 'chapter',
+          content: {
+            type: 'doc',
+            content: [
+              {
+                type: 'statBlock',
+                attrs: {
+                  name: 'Phantom Apparition',
+                  ac: 13,
+                  hp: 10,
+                  speed: '0 ft., fly 40 ft. (hover)',
+                  str: 10,
+                  dex: 10,
+                  con: 10,
+                  int: 10,
+                  wis: 10,
+                  cha: 10,
+                },
+              },
+            ],
+          },
+        },
+      ],
+      pages: [],
+      pageCount: 1,
+      pageWidthPts: 612,
+      pageHeightPts: 792,
+    });
+
+    expect(review.findings.map((finding) => finding.code)).toContain('EXPORT_SUSPICIOUS_STAT_BLOCK');
+  });
+
   it('flags prose-heavy chapters with weak utility density', () => {
     const review = analyzePdfExportLayout({
       documents: [
@@ -238,6 +275,54 @@ Page size: 612 x 792 pts (letter)
 
     expect(review.findings.map((finding) => finding.code)).toContain('EXPORT_LOW_UTILITY_DENSITY');
     expect(review.metrics.utilityCoverage[0].utilityDensity).toBe(0);
+  });
+
+  it('credits structured utility prose and bullet lists when measuring utility density', () => {
+    const review = analyzePdfExportLayout({
+      documents: [
+        {
+          title: 'Chapter 2: Into the Mine',
+          kind: 'chapter',
+          content: {
+            type: 'doc',
+            content: [
+              {
+                type: 'paragraph',
+                content: [{ type: 'text', text: 'Exploration Challenge: Choose which tunnel the party investigates first.' }],
+              },
+              {
+                type: 'bulletList',
+                content: [
+                  {
+                    type: 'listItem',
+                    content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Path 1: A glow suggests useful lore deeper in the mine.' }] }],
+                  },
+                  {
+                    type: 'listItem',
+                    content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Path 2: Sobs draw the party toward a dangerous spirit.' }] }],
+                  },
+                ],
+              },
+              {
+                type: 'paragraph',
+                content: [{ type: 'text', text: 'Consequence Summary: Success reveals a shortcut while failure draws hostile phantoms.' }],
+              },
+              {
+                type: 'paragraph',
+                content: [{ type: 'text', text: 'A short connective paragraph keeps the scene moving.' }],
+              },
+            ],
+          },
+        },
+      ],
+      pages: [],
+      pageCount: 1,
+      pageWidthPts: 612,
+      pageHeightPts: 792,
+    });
+
+    expect(review.findings.map((finding) => finding.code)).not.toContain('EXPORT_LOW_UTILITY_DENSITY');
+    expect(review.metrics.utilityCoverage[0].utilityDensity).toBeGreaterThan(0.14);
   });
 
   it('flags malformed oversized display headings in chapter content', () => {

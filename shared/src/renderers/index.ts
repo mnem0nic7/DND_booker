@@ -1,6 +1,7 @@
 export { tiptapToHtml, renderNode } from './tiptap-to-html.js';
 export { tiptapToTypst, renderTypstNode } from './tiptap-to-typst.js';
 export {
+  assessStatBlockAttrs,
   escapeHtml,
   escapeTypst,
   normalizeChapterHeaderTitle,

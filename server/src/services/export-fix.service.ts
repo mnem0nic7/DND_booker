@@ -7,8 +7,8 @@ import type {
   ExportReviewFixResult,
 } from '@dnd-booker/shared';
 import {
+  assessStatBlockAttrs,
   normalizeEncounterEntries,
-  normalizeStatBlockAttrs,
   resolveRandomTableEntries,
 } from '@dnd-booker/shared';
 import type { ExportJob as PrismaExportJob } from '@prisma/client';
@@ -62,14 +62,7 @@ function getFindingTitle(finding: ExportReview['findings'][number]): string | nu
 }
 
 function isPlaceholderStatBlock(node: DocumentContent): boolean {
-  const attrs = normalizeStatBlockAttrs(node.attrs ?? {});
-  const name = typeof attrs.name === 'string' ? attrs.name : attrs.name == null ? '' : String(attrs.name);
-  const ac = Number(attrs.ac);
-  const hp = Number(attrs.hp);
-
-  if (!name.trim()) return true;
-  if (!Number.isFinite(ac) || !Number.isFinite(hp)) return true;
-  return ac <= 0 || hp <= 0;
+  return assessStatBlockAttrs(node.attrs ?? {}).isPlaceholder;
 }
 
 function isOversizedDisplayHeading(node: DocumentContent): boolean {

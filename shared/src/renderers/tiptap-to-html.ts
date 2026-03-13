@@ -699,9 +699,10 @@ function renderPageBorder(attrs: Record<string, unknown>): string {
 
 function renderTitlePage(attrs: Record<string, unknown>): string {
   const title = escapeHtml(String(attrs.title || ''));
-  const subtitle = String(attrs.subtitle || '');
-  const author = String(attrs.author || '');
+  const subtitle = String(attrs.subtitle || '').trim();
+  const author = String(attrs.author || '').trim();
   const coverImageUrl = String(attrs.coverImageUrl || '');
+  const hasSecondaryMeta = Boolean(subtitle || author);
 
   let html = `<div class="title-page">`;
   html += `<div class="title-page__content">`;
@@ -714,7 +715,9 @@ function renderTitlePage(attrs: Record<string, unknown>): string {
   if (subtitle) {
     html += `<p class="title-page__subtitle">${escapeHtml(subtitle)}</p>`;
   }
-  html += `<div class="title-page__ornament">&#10022;</div>`;
+  if (hasSecondaryMeta) {
+    html += `<div class="title-page__ornament">&#10022;</div>`;
+  }
   if (author) {
     html += `<p class="title-page__author">by ${escapeHtml(author)}</p>`;
   }

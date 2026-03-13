@@ -27,6 +27,12 @@ const REFERENCE_HEAVY_BLOCKS = new Set<ChapterPlanBlockType>([
   'handout',
 ]);
 
+const ACTIONABLE_SUPPORT_BLOCKS = new Set<ChapterPlanBlockType>([
+  'readAloud',
+  'dmTips',
+  'handout',
+]);
+
 const TARGET_WORD_RANGES: Record<SectionSpec['contentType'], { min: number; max: number }> = {
   narrative: { min: 600, max: 1200 },
   encounter: { min: 800, max: 1500 },
@@ -151,6 +157,7 @@ function normalizeChapterPlan(
   );
 
   ensureReferenceHeavyCoverage(normalizedSections);
+  ensureSupportCoverage(normalizedSections);
 
   return {
     ...plan,
@@ -208,29 +215,24 @@ function normalizeBlocks(
   switch (contentType) {
     case 'narrative':
       normalized.add('readAloud');
-      if (!normalized.has('dmTips') && !normalized.has('handout')) {
-        normalized.add('dmTips');
-      }
-      if (!hasReferenceHeavyBlock({ blocksNeeded: Array.from(normalized) })) {
-        normalized.add('handout');
-      }
+      normalized.add('dmTips');
+      normalized.add('handout');
       break;
     case 'encounter':
       normalized.add('readAloud');
       normalized.add('encounterTable');
       normalized.add('statBlock');
+      normalized.add('dmTips');
       break;
     case 'exploration':
       normalized.add('readAloud');
-      if (!normalized.has('randomTable') && !normalized.has('handout')) {
-        normalized.add('randomTable');
-      }
+      normalized.add('randomTable');
+      normalized.add('handout');
+      normalized.add('dmTips');
       break;
     case 'social':
-      if (!normalized.has('npcProfile') && !normalized.has('dmTips') && !normalized.has('handout')) {
-        normalized.add('npcProfile');
-      }
-      if (!normalized.has('dmTips')) normalized.add('dmTips');
+      normalized.add('npcProfile');
+      normalized.add('dmTips');
       break;
     case 'transition':
       break;
@@ -259,6 +261,10 @@ function hasReferenceHeavyBlock(section: Pick<SectionSpec, 'blocksNeeded'>): boo
   return section.blocksNeeded.some((block) => REFERENCE_HEAVY_BLOCKS.has(block));
 }
 
+function hasActionableSupportBlock(section: Pick<SectionSpec, 'blocksNeeded'>): boolean {
+  return section.blocksNeeded.some((block) => ACTIONABLE_SUPPORT_BLOCKS.has(block));
+}
+
 function referenceFallbackForSection(contentType: SectionSpec['contentType']): ChapterPlanBlockType {
   switch (contentType) {
     case 'encounter':
@@ -271,6 +277,27 @@ function referenceFallbackForSection(contentType: SectionSpec['contentType']): C
       return 'handout';
     case 'transition':
       return 'dmTips';
+  }
+}
+
+function supportFallbackForSection(contentType: SectionSpec['contentType']): ChapterPlanBlockType {
+  switch (contentType) {
+    case 'encounter':
+    case 'social':
+    case 'transition':
+      return 'dmTips';
+    case 'exploration':
+    case 'narrative':
+      return 'handout';
+  }
+}
+
+function ensureSupportCoverage(sections: ChapterPlan['sections']): void {
+  for (const section of sections) {
+    if (section.contentType === 'transition') continue;
+    if (hasActionableSupportBlock(section)) continue;
+
+    section.blocksNeeded.push(supportFallbackForSection(section.contentType));
   }
 }
 

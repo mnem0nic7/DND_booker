@@ -670,6 +670,16 @@ describe('TipTap-to-Typst Renderer', () => {
       expect(result).toContain('fit: "cover"');
       expect(result).toContain('The Blackglass Mine');
     });
+
+    it('omits the ornament when subtitle and author are blank', () => {
+      const result = renderTypstNode(node({
+        type: 'titlePage',
+        attrs: { title: 'The Blackglass Mine', subtitle: '', author: '' },
+      }));
+
+      expect(result).not.toContain('\\u{2726}');
+      expect(result).not.toContain('by ');
+    });
   });
 
   describe('tableOfContents', () => {

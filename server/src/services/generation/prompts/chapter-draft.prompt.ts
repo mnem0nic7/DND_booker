@@ -34,6 +34,8 @@ Content rules:
 - Social sections should surface leverage, asks, tells, and likely reactions.
 - Exploration sections should surface clues, hazards, discoveries, and consequences.
 - Encounter sections should surface terrain, enemy tactics, triggers, rewards, and aftermath.
+- Use the planned utility blocks as real block markers. Do not replace them with plain prose summaries.
+- If a section includes route choices, discoveries, loot, tactics, or consequence summaries, prefer bullets, tables, handouts, or callouts over dense exposition.
 - Keep connective prose lean. Avoid long atmospheric passages unless they are boxed read-aloud text.
 - End sections with actionable hooks, stakes, or consequences for the next section
 - Do NOT include JSON wrapping — output raw markdown only`;
@@ -121,6 +123,7 @@ export function buildChapterDraftUserPrompt(
     `Write the full chapter prose. Target: ${plan.readAloudCount} read-aloud boxes, ${plan.dmTipCount} DM tips.`,
     `Difficulty progression: ${plan.difficultyProgression}`,
     'Prioritize reusable DM utility. If a point can be delivered with a stat block, table, NPC profile, handout, or short callout, use the block instead of extra exposition.',
+    'Every non-transition section should visibly contain at least two DM-usable utilities such as a boxed read-aloud, tactical callout, encounter table, NPC card, random table, or handout.',
   );
 
   return parts.join('\n');

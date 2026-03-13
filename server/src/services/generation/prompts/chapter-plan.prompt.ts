@@ -56,17 +56,18 @@ Rules:
 - Every encounter section MUST have a matching encounter spec
 - contentType must be ONE value only: narrative, encounter, exploration, social, or transition. Never return a pipe-delimited list.
 - Every non-transition section MUST include scenePurpose, playerObjective, decisionPoint, and consequenceSummary
-- Every non-transition section MUST include at least one reusable DM utility block in blocksNeeded
-- Narrative sections should usually include readAloud plus dmTips or handout
-- Encounter sections MUST include encounterTable and usually statBlock
-- Exploration sections MUST include randomTable or handout
-- Social sections MUST include npcProfile or dmTips
-- Across the chapter, aim for at least one reference-heavy block (statBlock, encounterTable, npcProfile, magicItem, spellCard, randomTable, handout) for every 2 non-transition sections
+- Every non-transition section MUST include at least two reusable DM utility blocks in blocksNeeded
+- Narrative sections should include readAloud plus dmTips and usually handout
+- Encounter sections MUST include encounterTable, statBlock, and dmTips for tactics, triggers, and aftermath
+- Exploration sections MUST include randomTable or handout, and should usually include both
+- Social sections MUST include npcProfile and dmTips
+- Across the chapter, aim for at least one reference-heavy block (statBlock, encounterTable, npcProfile, magicItem, spellCard, randomTable, handout) in every non-transition section
 - entityReferences must use slugs from the campaign bible
 - readAloudCount: 1-2 per narrative section, 1 per encounter
 - dmTipCount: 1-2 per chapter
 - Difficulty should escalate within the chapter and across the adventure
-- Optimize for table usability, not fiction recital. The plan should give a DM actionable scenes, not just plot summary.`;
+- Optimize for table usability, not fiction recital. The plan should give a DM actionable scenes, not just plot summary.
+- Exploration and confrontation chapters like "Into the Mine" or "Secrets Beneath" must surface route choices, hazards, clues, rewards, and consequence summaries as reusable utility blocks, not buried prose.`;
 }
 
 export function buildChapterPlanUserPrompt(
@@ -81,7 +82,7 @@ export function buildChapterPlanUserPrompt(
     `Target pages: ${chapter.targetPages}`,
     `Summary: ${chapter.summary}`,
     '',
-    'Planning priority: make this chapter table-ready for a DM. Prefer scene goals, choices, consequences, and reusable utility blocks over long prose summary.',
+    'Planning priority: make this chapter table-ready for a DM. Prefer scene goals, choices, consequences, checks, hazards, rewards, and reusable utility blocks over long prose summary.',
     '',
     'Sections from outline:',
     ...chapter.sections.map(s =>

@@ -778,9 +778,10 @@ function renderGenericTable(rows?: TipTapNode[]): string {
 
 function renderTitlePage(attrs: Record<string, unknown>): string {
   const title = escapeTypst(String(attrs.title || ''));
-  const subtitle = String(attrs.subtitle || '');
-  const author = String(attrs.author || '');
+  const subtitle = String(attrs.subtitle || '').trim();
+  const author = String(attrs.author || '').trim();
   const coverImageUrl = String(attrs.coverImageUrl || '');
+  const hasSecondaryMeta = Boolean(subtitle || author);
 
   let t = '';
   t += `#set page(columns: 1)\n`;
@@ -799,8 +800,10 @@ function renderTitlePage(attrs: Record<string, unknown>): string {
     t += `  #v(8pt)\n`;
     t += `  #text(size: 16pt, style: "italic")[${escapeTypst(subtitle)}]\n`;
   }
-  t += `  #v(12pt)\n`;
-  t += `  \\u{2726}\n`; // ornament
+  if (hasSecondaryMeta) {
+    t += `  #v(12pt)\n`;
+    t += `  \\u{2726}\n`; // ornament
+  }
   if (author) {
     t += `  #v(8pt)\n`;
     t += `  #text(size: 12pt)[by ${escapeTypst(author)}]\n`;

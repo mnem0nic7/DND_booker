@@ -506,9 +506,15 @@ function stripShortFormTableOfContents(
   nodes: DocumentContent[],
   options: NormalizeExportOptions & { chapterLikeCount: number },
 ): DocumentContent[] {
-  if (options.projectType !== 'one_shot') return nodes;
-  if (options.chapterLikeCount > 4) return nodes;
+  if (!shouldStripShortFormTableOfContents(options)) return nodes;
   return nodes.filter((node) => node.type !== 'tableOfContents');
+}
+
+function shouldStripShortFormTableOfContents(
+  options: NormalizeExportOptions & { chapterLikeCount: number },
+): boolean {
+  if (options.chapterLikeCount <= 4) return true;
+  return options.projectType === 'one_shot' && options.chapterLikeCount <= 5;
 }
 
 function stripEmptyParagraphs(nodes: DocumentContent[]): DocumentContent[] {

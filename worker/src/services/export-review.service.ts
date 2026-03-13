@@ -10,9 +10,9 @@ import type {
   ExportUtilityReviewMetric,
 } from '@dnd-booker/shared';
 import {
+  assessStatBlockAttrs,
   normalizeChapterHeaderTitle,
   normalizeEncounterEntries,
-  normalizeStatBlockAttrs,
   resolveRandomTableEntries,
 } from '@dnd-booker/shared';
 
@@ -34,6 +34,8 @@ const UTILITY_BLOCK_WEIGHTS: Record<string, number> = {
   encounterTable: 1.25,
   handout: 1,
   mapBlock: 1,
+  bulletList: 0.5,
+  orderedList: 0.5,
 };
 
 const REFERENCE_BLOCK_TYPES = new Set([
@@ -552,6 +554,8 @@ function findingPenalty(code: ExportReviewFinding['code']): number {
       return 18;
     case 'EXPORT_PLACEHOLDER_STAT_BLOCK':
       return 24;
+    case 'EXPORT_SUSPICIOUS_STAT_BLOCK':
+      return 12;
     case 'EXPORT_OVERSIZED_DISPLAY_HEADING':
       return 18;
     case 'EXPORT_LOW_UTILITY_DENSITY':
@@ -671,21 +675,43 @@ function inspectDocumentContent(content: DocumentContent | null, documentTitle: 
         });
       }
 
-      if (nodeType === 'statBlock' && isPlaceholderStatBlock(node)) {
-        const normalizedAttrs = normalizeStatBlockAttrs(node.attrs ?? {});
-        findings.push({
-          code: 'EXPORT_PLACEHOLDER_STAT_BLOCK',
-          severity: 'error',
-          page: null,
-          message: `"${documentTitle}" includes a broken or placeholder stat block.`,
-          details: {
-            title: documentTitle,
-            blockType: nodeType,
-            name: typeof normalizedAttrs.name === 'string' ? normalizedAttrs.name : readStringAttr(node, 'name'),
-            ac: Number(normalizedAttrs.ac),
-            hp: Number(normalizedAttrs.hp),
-          },
-        });
+      if (nodeType === 'statBlock') {
+        const assessment = assessStatBlockAttrs(node.attrs ?? {});
+
+        if (assessment.isPlaceholder) {
+          findings.push({
+            code: 'EXPORT_PLACEHOLDER_STAT_BLOCK',
+            severity: 'error',
+            page: null,
+            message: `"${documentTitle}" includes a broken or placeholder stat block.`,
+            details: {
+              title: documentTitle,
+              blockType: nodeType,
+              name: typeof assessment.normalizedAttrs.name === 'string'
+                ? assessment.normalizedAttrs.name
+                : readStringAttr(node, 'name'),
+              ac: Number(assessment.normalizedAttrs.ac),
+              hp: Number(assessment.normalizedAttrs.hp),
+              flags: assessment.flags,
+            },
+          });
+        } else if (assessment.isSuspicious) {
+          findings.push({
+            code: 'EXPORT_SUSPICIOUS_STAT_BLOCK',
+            severity: 'warning',
+            page: null,
+            message: `"${documentTitle}" includes a suspicious stat block that likely needs review.`,
+            details: {
+              title: documentTitle,
+              blockType: nodeType,
+              name: typeof assessment.normalizedAttrs.name === 'string'
+                ? assessment.normalizedAttrs.name
+                : readStringAttr(node, 'name'),
+              speed: String(assessment.normalizedAttrs.speed ?? ''),
+              flags: assessment.flags,
+            },
+          });
+        }
       }
     }
 
@@ -704,8 +730,13 @@ function inspectDocumentContent(content: DocumentContent | null, documentTitle: 
       });
     }
 
-    if (!insideUtilityContainer && !isUtilityBlock && nodeType === 'paragraph' && hasParagraphText(node)) {
-      proseParagraphCount += 1;
+    if (!insideUtilityContainer && !isUtilityBlock) {
+      if (nodeType === 'paragraph' && isStructuredUtilityParagraph(node)) {
+        utilityBlockCount += 1;
+        utilityWeight += 0.5;
+      } else if (nodeType === 'paragraph' && hasParagraphText(node)) {
+        proseParagraphCount += 1;
+      }
     }
 
     for (const child of node.content ?? []) {
@@ -733,17 +764,6 @@ function readNodeText(node: DocumentContent): string {
   return (node.content ?? []).map((child) => readNodeText(child)).join(' ');
 }
 
-function isPlaceholderStatBlock(node: DocumentContent): boolean {
-  const attrs = normalizeStatBlockAttrs(node.attrs ?? {});
-  const name = typeof attrs.name === 'string' ? attrs.name : attrs.name == null ? '' : String(attrs.name);
-  const ac = Number(attrs.ac);
-  const hp = Number(attrs.hp);
-
-  if (!name.trim()) return true;
-  if (!Number.isFinite(ac) || !Number.isFinite(hp)) return true;
-  return ac <= 0 || hp <= 0;
-}
-
 function isOversizedDisplayHeading(node: DocumentContent): boolean {
   const level = readNumberAttr(node, 'level');
   if (!Number.isFinite(level) || level < 1 || level > 2) return false;
@@ -751,6 +771,32 @@ function isOversizedDisplayHeading(node: DocumentContent): boolean {
   const text = readNodeText(node).trim();
   const wordCount = text.split(/\s+/).filter(Boolean).length;
   return text.length >= 70 || wordCount >= 10;
+}
+
+function isStructuredUtilityParagraph(node: DocumentContent): boolean {
+  const text = readNodeText(node).trim();
+  if (!text) return false;
+
+  const labelMatch = text.match(/^([^:]{3,48}):/);
+  if (!labelMatch) return false;
+
+  const label = normalizeText(labelMatch[1]);
+  return [
+    'combat initiation',
+    'combat mechanics',
+    'encounter details',
+    'exploration challenge',
+    'key insights include',
+    'key insights',
+    'potential rewards',
+    'reward summary',
+    'consequence summary',
+    'tactics',
+    'hazards',
+    'checks',
+    'player options',
+    'options with the cursed treasure',
+  ].includes(label);
 }
 
 function readStringAttr(node: DocumentContent, key: string): string {

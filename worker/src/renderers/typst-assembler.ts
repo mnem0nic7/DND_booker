@@ -223,7 +223,8 @@ function shouldInjectSyntheticTableOfContents(
   const chapterLikeDocs = documents.filter(
     (doc) => doc.content != null && (doc.kind === 'chapter' || doc.kind === 'appendix')
   );
-  if (projectType === 'one_shot' && chapterLikeDocs.length <= 4) return false;
+  if (chapterLikeDocs.length <= 4) return false;
+  if (projectType === 'one_shot' && chapterLikeDocs.length <= 5) return false;
   return chapterLikeDocs.length >= 3;
 }
 

@@ -262,7 +262,7 @@ describe('Typst Assembler', () => {
       expect(source).toContain('fill: theme-secondary');
     });
 
-    it('should inject title page and table of contents for multi-chapter book exports', () => {
+    it('should inject title page and table of contents for longer multi-chapter book exports', () => {
       const source = assembleTypst({
         documents: [
           {
@@ -282,6 +282,18 @@ describe('Typst Assembler', () => {
             kind: 'chapter',
             content: docWithParagraph('Chapter three body'),
             sortOrder: 3,
+          },
+          {
+            title: 'Ashes at Noon',
+            kind: 'chapter',
+            content: docWithParagraph('Chapter four body'),
+            sortOrder: 4,
+          },
+          {
+            title: 'The Aftermath',
+            kind: 'chapter',
+            content: docWithParagraph('Chapter five body'),
+            sortOrder: 5,
           },
         ],
         theme: 'classic-parchment',
@@ -359,6 +371,18 @@ describe('Typst Assembler', () => {
             kind: 'chapter',
             content: docWithParagraph('Chapter three body'),
             sortOrder: 4,
+          },
+          {
+            title: 'Ashes at Noon',
+            kind: 'chapter',
+            content: docWithParagraph('Chapter four body'),
+            sortOrder: 5,
+          },
+          {
+            title: 'The Aftermath',
+            kind: 'chapter',
+            content: docWithParagraph('Chapter five body'),
+            sortOrder: 6,
           },
         ],
         theme: 'classic-parchment',

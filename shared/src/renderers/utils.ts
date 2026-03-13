@@ -15,6 +15,20 @@ export interface NormalizedRandomTableEntry {
   result: string;
 }
 
+export type StatBlockSanityFlag =
+  | 'missing_name'
+  | 'invalid_ac'
+  | 'invalid_hp'
+  | 'default_ability_scores'
+  | 'suspicious_speed';
+
+export interface StatBlockSanityAssessment {
+  normalizedAttrs: Record<string, unknown>;
+  flags: StatBlockSanityFlag[];
+  isPlaceholder: boolean;
+  isSuspicious: boolean;
+}
+
 function pickFirst(raw: Record<string, unknown>, keys: string[]): unknown {
   for (const key of keys) {
     if (raw[key] !== undefined && raw[key] !== null && raw[key] !== '') {
@@ -220,6 +234,7 @@ export function normalizeStatBlockAttrs(attrs: Record<string, unknown>): Record<
   const stringAliases: Array<[string, string[]]> = [
     ['acType', ['acType', 'armorType']],
     ['hitDice', ['hitDice']],
+    ['speed', ['speed', 'movement', 'movementSpeed', 'speedText']],
     ['cr', ['cr', 'challengeRating']],
     ['xp', ['xp', 'experience']],
     ['savingThrows', ['savingThrows', 'savingThrowsText']],
@@ -248,6 +263,49 @@ export function normalizeStatBlockAttrs(attrs: Record<string, unknown>): Record<
   }
 
   return normalized;
+}
+
+function hasDefaultAbilityScores(attrs: Record<string, unknown>): boolean {
+  const abilityKeys = ['str', 'dex', 'con', 'int', 'wis', 'cha'] as const;
+  return abilityKeys.every((key) => {
+    const score = normalizeNumber(attrs[key]);
+    return score === undefined || score === 10;
+  });
+}
+
+function hasSuspiciousSpeed(value: unknown): boolean {
+  const speed = normalizeString(value).trim().toLowerCase();
+  if (!speed) return false;
+
+  if (/^0\s*ft\.?$/i.test(speed)) return true;
+  if (/^0\s*ft\.?\s*,/i.test(speed)) return true;
+  if (/\b0\s*ft\.?\b/i.test(speed) && /\b(fly|hover|swim|climb|burrow)\b/i.test(speed)) {
+    return true;
+  }
+
+  return false;
+}
+
+export function assessStatBlockAttrs(attrs: Record<string, unknown>): StatBlockSanityAssessment {
+  const normalizedAttrs = normalizeStatBlockAttrs(attrs);
+  const flags: StatBlockSanityFlag[] = [];
+
+  const name = normalizeString(normalizedAttrs.name).trim();
+  const ac = normalizeNumber(normalizedAttrs.ac);
+  const hp = normalizeNumber(normalizedAttrs.hp);
+
+  if (!name) flags.push('missing_name');
+  if (ac === undefined || ac <= 0) flags.push('invalid_ac');
+  if (hp === undefined || hp <= 0) flags.push('invalid_hp');
+  if (hasDefaultAbilityScores(normalizedAttrs)) flags.push('default_ability_scores');
+  if (hasSuspiciousSpeed(normalizedAttrs.speed)) flags.push('suspicious_speed');
+
+  return {
+    normalizedAttrs,
+    flags,
+    isPlaceholder: flags.includes('missing_name') || flags.includes('invalid_ac') || flags.includes('invalid_hp'),
+    isSuspicious: flags.includes('default_ability_scores') || flags.includes('suspicious_speed'),
+  };
 }
 
 export function normalizeNpcProfileAttrs(attrs: Record<string, unknown>): Record<string, unknown> {

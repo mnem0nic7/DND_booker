@@ -233,9 +233,64 @@ describe('Chapter Plan Service — executeChapterPlanGeneration', () => {
     expect(result.plan.sections[1].targetWords).toBeGreaterThanOrEqual(800);
     expect(result.plan.sections[1].blocksNeeded).toContain('encounterTable');
     expect(result.plan.sections[1].blocksNeeded).toContain('statBlock');
+    expect(result.plan.sections[1].blocksNeeded).toContain('dmTips');
     expect(result.plan.readAloudCount).toBeGreaterThanOrEqual(2);
     expect(result.plan.dmTipCount).toBeGreaterThanOrEqual(1);
     expect(result.plan.difficultyProgression).toBeTruthy();
+  });
+
+  it('adds deterministic utility fallbacks for exploration and social sections', async () => {
+    mockGenerateText.mockResolvedValueOnce({
+      text: JSON.stringify({
+        chapterSlug: 'ch-1',
+        chapterTitle: 'Chapter 1: The Village',
+        sections: [
+          {
+            slug: 'arrival',
+            title: 'Arrival',
+            contentType: 'exploration',
+            targetWords: 700,
+            outline: 'The party surveys the mine entrance.',
+            keyBeats: ['Choose a route'],
+            entityReferences: ['chief-gnarltooth'],
+            blocksNeeded: [],
+          },
+          {
+            slug: 'ambush',
+            title: 'Goblin Ambush',
+            contentType: 'social',
+            targetWords: 500,
+            outline: 'The mayor bargains for help.',
+            keyBeats: ['Hear the mayor out'],
+            entityReferences: ['chief-gnarltooth'],
+            blocksNeeded: [],
+          },
+        ],
+        encounters: [],
+        entityReferences: ['chief-gnarltooth'],
+        readAloudCount: 0,
+        dmTipCount: 0,
+        difficultyProgression: '',
+      }),
+      usage: { inputTokens: 1000, outputTokens: 1500 },
+    } as any);
+
+    const run = await createRun({
+      projectId: testProject.id, userId: testUser.id, prompt: 'test',
+    });
+
+    const result = await executeChapterPlanGeneration(
+      run!, SAMPLE_CHAPTER, SAMPLE_BIBLE,
+      SAMPLE_BIBLE.entities.map(e => ({ slug: e.slug, entityType: e.entityType, name: e.name, summary: e.summary })),
+      {} as any, 8192,
+    );
+
+    expect(result.plan.sections[0].blocksNeeded).toEqual(
+      expect.arrayContaining(['readAloud', 'randomTable', 'handout', 'dmTips']),
+    );
+    expect(result.plan.sections[1].blocksNeeded).toEqual(
+      expect.arrayContaining(['npcProfile', 'dmTips']),
+    );
   });
 
   it('should throw on malformed AI response', async () => {
