@@ -72,10 +72,15 @@ export async function transitionRunStatus(
 
   if (newStatus === 'completed' || newStatus === 'failed' || newStatus === 'cancelled') {
     data.completedAt = now;
+    data.currentStage = null;
   }
 
   if (newStatus === 'failed' && failureReason) {
     data.failureReason = failureReason;
+  }
+
+  if (newStatus === 'completed') {
+    data.progressPercent = 100;
   }
 
   if (!['completed', 'failed', 'cancelled', 'paused', 'queued'].includes(newStatus)) {

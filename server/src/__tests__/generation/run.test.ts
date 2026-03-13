@@ -153,6 +153,8 @@ describe('GenerationRun Service', () => {
       const completed = await transitionRunStatus(run!.id, userId, 'completed');
       expect(completed!.status).toBe('completed');
       expect(completed!.completedAt).not.toBeNull();
+      expect(completed!.currentStage).toBeNull();
+      expect(completed!.progressPercent).toBe(100);
     });
 
     it('should set failureReason when reaching failed', async () => {
@@ -160,6 +162,7 @@ describe('GenerationRun Service', () => {
       const failed = await transitionRunStatus(run!.id, userId, 'failed', 'Provider returned 500');
       expect(failed!.status).toBe('failed');
       expect(failed!.failureReason).toBe('Provider returned 500');
+      expect(failed!.currentStage).toBeNull();
     });
   });
 });
