@@ -23,6 +23,7 @@ export interface AssembleTypstOptions {
   documents: AssembleTypstDocument[];
   theme: string;
   projectTitle: string;
+  projectType?: string | null;
   printReady?: boolean;
   exportPolish?: {
     h1SizePt?: number;
@@ -36,14 +37,14 @@ export interface AssembleTypstOptions {
  * theme, and title.
  */
 export function assembleTypst(options: AssembleTypstOptions): string {
-  const { documents, theme, projectTitle, printReady = false, exportPolish } = options;
+  const { documents, theme, projectTitle, projectType = null, printReady = false, exportPolish } = options;
   const h1SizePt = exportPolish?.h1SizePt ?? 23;
   const endCapMode = exportPolish?.endCapMode ?? 'inline';
   const chapterOpenerMode = exportPolish?.chapterOpenerMode ?? 'inline';
 
   // Sort documents by sortOrder
   const sorted = [...documents].sort((a, b) => a.sortOrder - b.sortOrder);
-  const renderQueue = buildRenderQueue(sorted, projectTitle, chapterOpenerMode);
+  const renderQueue = buildRenderQueue(sorted, projectTitle, chapterOpenerMode, projectType);
 
   // 1. Theme variables
   const themeVars = getTypstThemeVariables(theme);
@@ -169,10 +170,11 @@ export function assembleTypst(options: AssembleTypstOptions): string {
 function buildRenderQueue(
   documents: AssembleTypstDocument[],
   projectTitle: string,
-  chapterOpenerMode: ChapterOpenerMode
+  chapterOpenerMode: ChapterOpenerMode,
+  projectType: string | null
 ): AssembleTypstDocument[] {
   const longForm = isLongFormBook(documents);
-  const syntheticToc = shouldInjectSyntheticTableOfContents(documents);
+  const syntheticToc = shouldInjectSyntheticTableOfContents(documents, projectType);
   const syntheticTocDepth = getSyntheticTableOfContentsDepth(documents);
   const hasTitlePage = documents.some((doc) => documentContainsType(doc.content, 'titlePage'));
   const hasTableOfContents = documents.some((doc) => documentContainsType(doc.content, 'tableOfContents'));
@@ -214,10 +216,14 @@ function isLongFormBook(documents: AssembleTypstDocument[]): boolean {
   return chapterLikeDocs.length >= 2;
 }
 
-function shouldInjectSyntheticTableOfContents(documents: AssembleTypstDocument[]): boolean {
+function shouldInjectSyntheticTableOfContents(
+  documents: AssembleTypstDocument[],
+  projectType: string | null,
+): boolean {
   const chapterLikeDocs = documents.filter(
     (doc) => doc.content != null && (doc.kind === 'chapter' || doc.kind === 'appendix')
   );
+  if (projectType === 'one_shot' && chapterLikeDocs.length <= 4) return false;
   return chapterLikeDocs.length >= 3;
 }
 

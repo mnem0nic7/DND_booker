@@ -211,4 +211,46 @@ describe('normalizeExportDocuments', () => {
       ],
     });
   });
+
+  it('removes a table of contents from short one-shot front matter', () => {
+    const documents = normalizeExportDocuments([
+      {
+        title: 'Front Matter',
+        sortOrder: 0,
+        kind: 'front_matter',
+        content: doc([
+          { type: 'titlePage', attrs: { title: 'The Blackglass Mine' } },
+          { type: 'tableOfContents', attrs: { title: 'Table of Contents' } },
+        ]),
+      },
+      {
+        title: 'The Town',
+        sortOrder: 1,
+        kind: 'chapter',
+        content: doc([{ type: 'paragraph', content: [{ type: 'text', text: 'Town copy.' }] }]),
+      },
+      {
+        title: 'The Mine',
+        sortOrder: 2,
+        kind: 'chapter',
+        content: doc([{ type: 'paragraph', content: [{ type: 'text', text: 'Mine copy.' }] }]),
+      },
+      {
+        title: 'Deeper Mysteries',
+        sortOrder: 3,
+        kind: 'chapter',
+        content: doc([{ type: 'paragraph', content: [{ type: 'text', text: 'Mystery copy.' }] }]),
+      },
+      {
+        title: 'The Final Stand',
+        sortOrder: 4,
+        kind: 'chapter',
+        content: doc([{ type: 'paragraph', content: [{ type: 'text', text: 'Finale copy.' }] }]),
+      },
+    ], 'The Blackglass Mine', { projectType: 'one_shot' });
+
+    expect(documents[0].content?.content).toEqual([
+      { type: 'titlePage', attrs: { title: 'The Blackglass Mine', subtitle: '', author: '' } },
+    ]);
+  });
 });

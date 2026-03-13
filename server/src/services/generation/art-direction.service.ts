@@ -126,6 +126,36 @@ export interface ArtDirectionResult {
   skippedImageGenerationReason: string | null;
 }
 
+function normalizeText(value: string | null | undefined): string {
+  return String(value ?? '').trim();
+}
+
+function looksLikeWorkspaceTitle(value: string): boolean {
+  const normalized = normalizeText(value).toLowerCase();
+  return normalized.includes('workspace') || normalized.startsWith('untitled');
+}
+
+function isPlaceholderPublicationTitle(value: string): boolean {
+  const normalized = normalizeText(value);
+  return normalized.length === 0
+    || normalized === 'Adventure Title'
+    || normalized === 'One-Shot Title'
+    || normalized === 'Campaign Title';
+}
+
+function resolvePublicationTitle(projectTitle: string, bibleTitle?: string | null): string {
+  const preferredBibleTitle = normalizeText(bibleTitle);
+  if (preferredBibleTitle) return preferredBibleTitle;
+  return normalizeText(projectTitle);
+}
+
+function shouldAutoInsertFrontMatterToc(projectType: string | null | undefined, chapterLikeCount: number): boolean {
+  if (projectType === 'one_shot') {
+    return chapterLikeCount >= 5;
+  }
+  return chapterLikeCount >= 3;
+}
+
 function getTopLevelNodes(content: DocumentContent | null | undefined): DocumentContent[] {
   return Array.isArray(content?.content) ? content.content : [];
 }
@@ -416,7 +446,7 @@ export function applyArtDirectionPlanToDocuments(
   });
 }
 
-function ensureTitlePageSlot(content: DocumentContent | null, projectTitle: string): DocumentContent {
+export function ensureTitlePageSlot(content: DocumentContent | null, projectTitle: string): DocumentContent {
   const nodes = getTopLevelNodes(content);
   if (nodes.length === 0) {
     return {
@@ -425,7 +455,27 @@ function ensureTitlePageSlot(content: DocumentContent | null, projectTitle: stri
     };
   }
 
-  if (documentContainsType(content, 'titlePage')) return content as DocumentContent;
+  if (documentContainsType(content, 'titlePage')) {
+    return {
+      type: 'doc',
+      content: nodes.map((node) => {
+        if (node.type !== 'titlePage') return node;
+
+        const currentTitle = normalizeText(String(node.attrs?.title || ''));
+        if (!isPlaceholderPublicationTitle(currentTitle) && !looksLikeWorkspaceTitle(currentTitle)) {
+          return node;
+        }
+
+        return {
+          ...node,
+          attrs: {
+            ...(node.attrs ?? {}),
+            title: projectTitle,
+          },
+        };
+      }),
+    };
+  }
 
   return {
     type: 'doc',
@@ -486,6 +536,7 @@ async function ensureArtDirectionReadyDocuments(input: {
   runId: string;
   projectId: string;
   projectTitle: string;
+  projectType: string | null | undefined;
   documents: Array<{
     id: string;
     slug: string;
@@ -521,7 +572,7 @@ async function ensureArtDirectionReadyDocuments(input: {
           type: 'doc',
           content: [
             { type: 'titlePage', attrs: { title: input.projectTitle, coverImageUrl: '', imagePrompt: '' } },
-            ...(chapterLikeCount >= 3
+            ...(shouldAutoInsertFrontMatterToc(input.projectType, chapterLikeCount)
               ? [{ type: 'tableOfContents', attrs: { title: 'Table of Contents', depth: 1 } }]
               : []),
           ],
@@ -848,9 +899,14 @@ export async function executeArtDirectionPass(
   model: LanguageModel,
   maxOutputTokens: number,
 ): Promise<ArtDirectionResult> {
-  const [project, documents] = await Promise.all([
+  const [project, bible, documents] = await Promise.all([
     prisma.project.findUnique({
       where: { id: run.projectId },
+      select: { title: true, type: true },
+    }),
+    prisma.campaignBible.findFirst({
+      where: { runId: run.id, projectId: run.projectId },
+      orderBy: { createdAt: 'desc' },
       select: { title: true },
     }),
     prisma.projectDocument.findMany({
@@ -870,10 +926,13 @@ export async function executeArtDirectionPass(
     };
   }
 
+  const publicationTitle = resolvePublicationTitle(project.title, bible?.title);
+
   const artReadyDocuments = await ensureArtDirectionReadyDocuments({
     runId: run.id,
     projectId: run.projectId,
-    projectTitle: project.title,
+    projectTitle: publicationTitle,
+    projectType: project.type,
     documents: documents.map((document) => ({
       id: document.id,
       slug: document.slug,
@@ -916,7 +975,7 @@ export async function executeArtDirectionPass(
       model,
       system: buildSystemPrompt(selectedSlots.length),
       prompt: buildUserPrompt({
-        projectTitle: project.title,
+        projectTitle: publicationTitle,
         inputPrompt: run.inputPrompt,
         includeMaps: Boolean(run.inputParameters?.includeMaps),
         placements: selectedSlots,
@@ -932,7 +991,7 @@ export async function executeArtDirectionPass(
   }
 
   const plan = materializeAutomaticPlan({
-    projectTitle: project.title,
+    projectTitle: publicationTitle,
     inputPrompt: run.inputPrompt,
     includeMaps: Boolean(run.inputParameters?.includeMaps),
     seeds: selectedSlots,

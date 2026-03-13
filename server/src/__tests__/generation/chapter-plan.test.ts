@@ -225,6 +225,7 @@ describe('Chapter Plan Service — executeChapterPlanGeneration', () => {
     expect(result.plan.sections[0].targetWords).toBeLessThanOrEqual(1200);
     expect(result.plan.sections[0].blocksNeeded).toContain('readAloud');
     expect(result.plan.sections[0].blocksNeeded).toContain('dmTips');
+    expect(result.plan.sections[0].blocksNeeded).toContain('handout');
     expect(result.plan.sections[0].scenePurpose).toBeTruthy();
     expect(result.plan.sections[0].playerObjective).toBeTruthy();
     expect(result.plan.sections[0].decisionPoint).toBeTruthy();

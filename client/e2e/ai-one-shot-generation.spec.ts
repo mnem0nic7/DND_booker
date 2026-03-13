@@ -8,6 +8,7 @@ import {
   startExportAndWaitForCompletion,
   waitForGenerationCompletion,
 } from './helpers';
+import { TEST_OLLAMA_BASE_URL, TEST_OLLAMA_MODEL } from './test-account';
 
 const REVIEW_PROJECT_TITLE = 'AI One-Shot Quick Review Workspace';
 const EXPORT_PDF_PATH = resolve(process.cwd(), '..', 'test-results', 'one-shot-export.pdf');
@@ -28,8 +29,9 @@ test.describe('AI One-Shot Generation', () => {
 
     await login(page);
     await configureAiSettings(page, {
-      provider: 'openai',
-      model: 'gpt-4o',
+      provider: 'ollama',
+      model: TEST_OLLAMA_MODEL,
+      baseUrl: TEST_OLLAMA_BASE_URL,
     });
 
     await openProjectByTitleOrCreate(page, REVIEW_PROJECT_TITLE, 'blank', {

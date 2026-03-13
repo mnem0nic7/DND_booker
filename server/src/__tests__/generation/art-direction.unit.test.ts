@@ -4,6 +4,7 @@ import {
   applyRealizedArtToDocuments,
   collectImageSlots,
   ensureChapterHeaderImageSlot,
+  ensureTitlePageSlot,
   finalizeArtPrompt,
   selectAutomaticArtSlots,
 } from '../../services/generation/art-direction.service.js';
@@ -347,6 +348,33 @@ describe('art-direction helpers', () => {
         },
         {
           type: 'paragraph',
+        },
+      ],
+    });
+  });
+
+  it('replaces workspace-like title-page titles with the generated publication title', () => {
+    const content = ensureTitlePageSlot({
+      type: 'doc',
+      content: [
+        {
+          type: 'titlePage',
+          attrs: {
+            title: 'AI One-Shot Quick Review Workspace',
+            coverImageUrl: '',
+            imagePrompt: '',
+          },
+        },
+      ],
+    }, 'The Blackglass Mine');
+
+    expect(content).toMatchObject({
+      content: [
+        {
+          type: 'titlePage',
+          attrs: {
+            title: 'The Blackglass Mine',
+          },
         },
       ],
     });

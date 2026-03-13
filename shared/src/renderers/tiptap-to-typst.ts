@@ -215,6 +215,14 @@ function renderTypstNodeImpl(node: TipTapNode): string {
     case 'columnBreak':
       return `#colbreak()\n`;
 
+    case 'table':
+      return renderGenericTable(node.content);
+
+    case 'tableRow':
+    case 'tableHeader':
+    case 'tableCell':
+      return renderInlineChildren(node.content);
+
     // ── D&D Blocks ──
     case 'statBlock':
       return renderStatBlock(attrs);
@@ -720,6 +728,41 @@ function renderPageBorder(attrs: Record<string, unknown>): string {
   return `// page-border: ${escapeTypst(borderStyle)}\n#line(length: 100%, stroke: theme-divider)\n\n`;
 }
 
+function renderGenericTable(rows?: TipTapNode[]): string {
+  const parsedRows = (rows ?? [])
+    .filter((row) => row.type === 'tableRow')
+    .map((row) => (row.content ?? [])
+      .filter((cell) => cell.type === 'tableHeader' || cell.type === 'tableCell')
+      .map((cell) => renderInlineChildren(cell.content).trim()));
+
+  if (parsedRows.length === 0) return '';
+
+  const columnCount = Math.max(...parsedRows.map((row) => row.length));
+  if (!Number.isFinite(columnCount) || columnCount <= 0) return '';
+
+  let t = '';
+  t += `#table(\n`;
+  t += `  columns: ${columnCount},\n`;
+  t += `  stroke: theme-divider,\n`;
+  t += `  inset: 6pt,\n`;
+  t += `  fill: (x, y) => if y == 0 { luma(235) } else { white },\n`;
+
+  parsedRows.forEach((row, rowIndex) => {
+    const padded = [...row];
+    while (padded.length < columnCount) padded.push('');
+
+    padded.forEach((cell) => {
+      const content = cell || ' ';
+      t += rowIndex === 0
+        ? `  [*${content}*],\n`
+        : `  [${content}],\n`;
+    });
+  });
+
+  t += `)\n\n`;
+  return t;
+}
+
 // ── Structure Block Renderers ──
 
 function renderTitlePage(attrs: Record<string, unknown>): string {
@@ -733,8 +776,9 @@ function renderTitlePage(attrs: Record<string, unknown>): string {
   t += `#align(center)[\n`;
 
   if (coverImageUrl) {
-    t += `  #image("${escapeTypstUrl(coverImageUrl)}", width: 80%)\n`;
-    t += `  #v(1fr)\n`;
+    t += `  #block(width: 100%, below: 18pt)[\n`;
+    t += `    #image("${escapeTypstUrl(coverImageUrl)}", width: 100%, height: 4.85in, fit: "cover")\n`;
+    t += `  ]\n`;
   } else {
     t += `  #v(1fr)\n`;
   }

@@ -8,6 +8,10 @@ interface ExportDocument {
   kind?: DocumentKind | null;
 }
 
+interface NormalizeExportOptions {
+  projectType?: string | null;
+}
+
 const TITLE_PLACEHOLDERS = new Set([
   'Adventure Title',
   'Campaign Title',
@@ -52,12 +56,20 @@ const SELF_PAGINATING_NODE_TYPES = new Set([
 
 export function normalizeExportDocuments<T extends ExportDocument>(
   documents: T[],
-  projectTitle: string
+  projectTitle: string,
+  options: NormalizeExportOptions = {},
 ): T[] {
+  const chapterLikeCount = documents.filter(
+    (document) => document.content != null && (document.kind === 'chapter' || document.kind === 'appendix'),
+  ).length;
+
   return documents.flatMap((document) => {
     if (document.content == null) return [document];
 
-    const content = normalizeExportContent(document.content, projectTitle);
+    const content = normalizeExportContent(document.content, projectTitle, {
+      ...options,
+      chapterLikeCount,
+    });
     if (content == null || isEffectivelyEmpty(content)) return [];
 
     return [{
@@ -67,7 +79,11 @@ export function normalizeExportDocuments<T extends ExportDocument>(
   });
 }
 
-function normalizeExportContent(content: DocumentContent, projectTitle: string): DocumentContent | null {
+function normalizeExportContent(
+  content: DocumentContent,
+  projectTitle: string,
+  options: NormalizeExportOptions & { chapterLikeCount: number },
+): DocumentContent | null {
   const nodes = getTopLevelNodes(content)
     .map((node) => normalizeNode(node, projectTitle))
     .filter((node): node is DocumentContent => node != null);
@@ -76,12 +92,14 @@ function normalizeExportContent(content: DocumentContent, projectTitle: string):
   const withoutPlaceholderScaffold = stripPlaceholderAdventureScaffold(repairedMarkdownBleedThrough);
   const withoutOrphanedUtilityScaffold = stripOrphanedUtilityScaffold(withoutPlaceholderScaffold);
   const withoutRedundantBreaks = stripRedundantStructuralPageBreaks(withoutOrphanedUtilityScaffold);
+  const withoutShortFormToc = stripShortFormTableOfContents(withoutRedundantBreaks, options);
+  const withoutEmptyParagraphs = stripEmptyParagraphs(withoutShortFormToc);
 
-  if (withoutRedundantBreaks.length === 0) return null;
+  if (withoutEmptyParagraphs.length === 0) return null;
 
   return {
     type: 'doc',
-    content: withoutRedundantBreaks,
+    content: withoutEmptyParagraphs,
   };
 }
 
@@ -326,6 +344,19 @@ function stripRedundantStructuralPageBreaks(nodes: DocumentContent[]): DocumentC
   return result;
 }
 
+function stripShortFormTableOfContents(
+  nodes: DocumentContent[],
+  options: NormalizeExportOptions & { chapterLikeCount: number },
+): DocumentContent[] {
+  if (options.projectType !== 'one_shot') return nodes;
+  if (options.chapterLikeCount > 4) return nodes;
+  return nodes.filter((node) => node.type !== 'tableOfContents');
+}
+
+function stripEmptyParagraphs(nodes: DocumentContent[]): DocumentContent[] {
+  return nodes.filter((node) => !isEmptyParagraph(node));
+}
+
 function findPreviousNonBreakNode(nodes: DocumentContent[]): DocumentContent | null {
   for (let index = nodes.length - 1; index >= 0; index -= 1) {
     if (nodes[index].type !== 'pageBreak') return nodes[index];
@@ -365,6 +396,10 @@ function isPlaceholderAdventureHeading(node: DocumentContent | undefined): boole
 function isPlaceholderAdventureParagraph(node: DocumentContent | undefined): boolean {
   if (node?.type !== 'paragraph') return false;
   return PLACEHOLDER_BODY_PARAGRAPHS.has(readInlineText(node));
+}
+
+function isEmptyParagraph(node: DocumentContent): boolean {
+  return node.type === 'paragraph' && readInlineText(node).trim().length === 0;
 }
 
 function getTopLevelNodes(content: DocumentContent): DocumentContent[] {

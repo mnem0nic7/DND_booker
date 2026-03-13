@@ -210,6 +210,9 @@ function normalizeBlocks(
       if (!normalized.has('dmTips') && !normalized.has('handout')) {
         normalized.add('dmTips');
       }
+      if (!hasReferenceHeavyBlock({ blocksNeeded: Array.from(normalized) })) {
+        normalized.add('handout');
+      }
       break;
     case 'encounter':
       normalized.add('readAloud');
@@ -237,9 +240,7 @@ function normalizeBlocks(
 
 function ensureReferenceHeavyCoverage(sections: ChapterPlan['sections']): void {
   const nonTransitionSections = sections.filter((section) => section.contentType !== 'transition');
-  const targetCount = nonTransitionSections.length === 0
-    ? 0
-    : Math.max(1, Math.ceil(nonTransitionSections.length / 2));
+  const targetCount = nonTransitionSections.length;
   let currentCount = nonTransitionSections.filter(hasReferenceHeavyBlock).length;
 
   if (currentCount >= targetCount) return;

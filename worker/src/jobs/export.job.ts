@@ -36,6 +36,32 @@ interface PdfRenderResult {
   review: ExportReview;
 }
 
+function readExportTitleFromContent(content: DocumentContent | null): string | null {
+  if (!content) return null;
+  if (content.type === 'titlePage') {
+    const value = String(content.attrs?.title || '').trim();
+    return value || null;
+  }
+
+  for (const child of content.content ?? []) {
+    const nested = readExportTitleFromContent(child);
+    if (nested) return nested;
+  }
+
+  return null;
+}
+
+function resolveExportProjectTitle(
+  docs: Array<{ title: string; content: DocumentContent | null; sortOrder: number; kind?: DocumentKind | null }>,
+  fallbackTitle: string,
+): string {
+  const titlePageTitle = docs
+    .map((doc) => readExportTitleFromContent(doc.content))
+    .find((value): value is string => Boolean(value?.trim()));
+
+  return titlePageTitle ?? fallbackTitle;
+}
+
 export function rewriteUploadUrlsInValue(value: unknown): unknown {
   if (typeof value === 'string') {
     const parsed = parseProjectAssetUrl(value);
@@ -142,7 +168,10 @@ export async function processExportJob(job: Job<ExportJobData>): Promise<void> {
           sortOrder: 0,
         }];
 
-    const docs = normalizeExportDocuments(rawDocs, exportJob.project.title);
+    const docs = normalizeExportDocuments(rawDocs, exportJob.project.title, {
+      projectType: exportJob.project.type,
+    });
+    const exportTitle = resolveExportProjectTitle(docs, exportJob.project.title);
 
     await job.updateProgress(50);
 
@@ -162,7 +191,8 @@ export async function processExportJob(job: Job<ExportJobData>): Promise<void> {
         filepath,
         docs,
         theme,
-        projectTitle: exportJob.project.title,
+        projectTitle: exportTitle,
+        projectType: exportJob.project.type,
         printReady: format === 'print_pdf',
       });
 
@@ -175,7 +205,8 @@ export async function processExportJob(job: Job<ExportJobData>): Promise<void> {
           filepath: polishedFilepath,
           docs,
           theme,
-          projectTitle: exportJob.project.title,
+          projectTitle: exportTitle,
+          projectType: exportJob.project.type,
           printReady: format === 'print_pdf',
           autoFixes,
         });
@@ -226,7 +257,7 @@ export async function processExportJob(job: Job<ExportJobData>): Promise<void> {
       const html = assembleHtml({
         documents: docs,
         theme,
-        projectTitle: exportJob.project.title,
+        projectTitle: exportTitle,
       });
       const serverBaseUrl = process.env.SERVER_BASE_URL || 'http://localhost:4000';
       const resolvedHtml = html.replace(/(?:src|href)="(\/uploads\/[^"]+)"/g, (_match, p1) => {
@@ -288,10 +319,11 @@ async function renderPdfVariant(input: {
   docs: Array<{ title: string; content: DocumentContent | null; sortOrder: number; kind?: DocumentKind | null }>;
   theme: string;
   projectTitle: string;
+  projectType?: string | null;
   printReady: boolean;
   autoFixes?: ExportReviewAutoFix[];
 }): Promise<PdfRenderResult> {
-  const { filepath, docs, theme, projectTitle, printReady, autoFixes = [] } = input;
+  const { filepath, docs, theme, projectTitle, projectType = null, printReady, autoFixes = [] } = input;
   const assetsDir = path.resolve(process.cwd(), 'assets');
   const fontsDir = path.join(assetsDir, 'fonts');
   const outputDir = path.dirname(filepath);
@@ -303,6 +335,7 @@ async function renderPdfVariant(input: {
       documents: rewrittenDocs,
       theme,
       projectTitle,
+      projectType,
       printReady,
       exportPolish: {
         h1SizePt: autoFixes.includes('shrink_h1_headings') ? 21 : undefined,

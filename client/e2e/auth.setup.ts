@@ -1,10 +1,11 @@
 import { test as setup, expect, type Page } from '@playwright/test';
-
-const TEST_EMAIL = 'm7.ga.77@gmail.com';
-const TEST_PASSWORD = '2Rickie2!';
-const AUTH_FILE = 'e2e/.auth/user.json';
-const OLLAMA_MODEL = 'llama3.2:3b';
-const OLLAMA_BASE_URL = 'http://host.docker.internal:11434';
+import {
+  AUTH_FILE,
+  TEST_EMAIL,
+  TEST_OLLAMA_BASE_URL,
+  TEST_OLLAMA_MODEL,
+  TEST_PASSWORD,
+} from './test-account';
 
 async function configureOllamaForTests(page: Page) {
   const result = await page.evaluate(async ({ model, baseUrl }) => {
@@ -52,7 +53,7 @@ async function configureOllamaForTests(page: Page) {
       status: settingsResponse.status,
       body: await settingsResponse.text(),
     };
-  }, { model: OLLAMA_MODEL, baseUrl: OLLAMA_BASE_URL });
+  }, { model: TEST_OLLAMA_MODEL, baseUrl: TEST_OLLAMA_BASE_URL });
 
   expect(result.ok, `Failed to configure Ollama test settings during ${result.step}: ${result.status} ${result.body}`).toBe(true);
 }

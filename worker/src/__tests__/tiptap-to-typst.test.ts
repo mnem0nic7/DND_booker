@@ -601,6 +601,18 @@ describe('TipTap-to-Typst Renderer', () => {
       expect(result).toContain('#pagebreak()');
       expect(result).toContain('#set page(columns: 2)');
     });
+
+    it('keeps cover art and typeset title on the same title page', () => {
+      const result = renderTypstNode(node({
+        type: 'titlePage',
+        attrs: { title: 'The Blackglass Mine', coverImageUrl: '/uploads/project-1/cover.png' },
+      }));
+
+      expect(result).toContain('#image("');
+      expect(result).toContain('height: 4.85in');
+      expect(result).toContain('fit: "cover"');
+      expect(result).toContain('The Blackglass Mine');
+    });
   });
 
   describe('tableOfContents', () => {
@@ -613,6 +625,34 @@ describe('TipTap-to-Typst Renderer', () => {
       expect(result).toContain('Contents');
       expect(result).toContain('#outline(title: none, depth: 1)');
       expect(result).toContain('#set page(columns: 2)');
+    });
+  });
+
+  describe('table', () => {
+    it('renders generic markdown tables as real Typst tables', () => {
+      const result = renderTypstNode(node({
+        type: 'table',
+        content: [
+          {
+            type: 'tableRow',
+            content: [
+              { type: 'tableHeader', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Roll' }] }] },
+              { type: 'tableHeader', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Sound' }] }] },
+            ],
+          },
+          {
+            type: 'tableRow',
+            content: [
+              { type: 'tableCell', content: [{ type: 'paragraph', content: [{ type: 'text', text: '1' }] }] },
+              { type: 'tableCell', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Whispering voices' }] }] },
+            ],
+          },
+        ],
+      }));
+
+      expect(result).toContain('#table(');
+      expect(result).toContain('[*Roll*]');
+      expect(result).toContain('[Whispering voices]');
     });
   });
 

@@ -316,6 +316,23 @@ describe('Typst Assembler', () => {
       expect(source).not.toContain('#outline(title: none, depth: 1)');
     });
 
+    it('should suppress a synthetic table of contents for a four-chapter one-shot export', () => {
+      const source = assembleTypst({
+        documents: [
+          { title: 'The Town', kind: 'chapter', content: docWithParagraph('Chapter one body'), sortOrder: 1 },
+          { title: 'The Mine', kind: 'chapter', content: docWithParagraph('Chapter two body'), sortOrder: 2 },
+          { title: 'Deeper Mysteries', kind: 'chapter', content: docWithParagraph('Chapter three body'), sortOrder: 3 },
+          { title: 'The Final Stand', kind: 'chapter', content: docWithParagraph('Chapter four body'), sortOrder: 4 },
+        ],
+        theme: 'classic-parchment',
+        projectTitle: 'The Blackglass Mine',
+        projectType: 'one_shot',
+      });
+
+      expect(source).toContain('#text(font: title-font, size: 28pt, weight: "bold")[The Blackglass Mine]');
+      expect(source).not.toContain('#outline(title: none, depth: 1)');
+    });
+
     it('should place table of contents on its own page without adding an extra blank page before the first chapter', () => {
       const source = assembleTypst({
         documents: [
