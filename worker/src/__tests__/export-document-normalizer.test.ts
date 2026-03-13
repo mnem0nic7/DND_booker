@@ -127,6 +127,66 @@ describe('normalizeExportDocuments', () => {
     });
   });
 
+  it('repairs structured block bleed-through leaked inside bullet lists', () => {
+    const documents = normalizeExportDocuments([
+      {
+        title: 'Chapter 1: The Village',
+        sortOrder: 1,
+        kind: 'chapter',
+        content: doc([
+          {
+            type: 'bulletList',
+            content: [
+              {
+                type: 'listItem',
+                content: [{
+                  type: 'paragraph',
+                  content: [{
+                    type: 'text',
+                    text: ':::npcProfile {"name":"Eldira Voss","race":"Human","role":"Tavern Keeper","traits":"Superstitious, distrustful","notes":"Knows about the previous mining operations."} :::',
+                  }],
+                }],
+              },
+              {
+                type: 'listItem',
+                content: [{
+                  type: 'paragraph',
+                  content: [{
+                    type: 'text',
+                    text: ':::npcProfile {"name":"Mira Thorne","race":"Elf","role":"Healer","traits":"Empathetic, observant","notes":"Hesitant to speak of the curse."} :::',
+                  }],
+                }],
+              },
+            ],
+          },
+        ]),
+      },
+    ], 'Goblin Caper');
+
+    const nodes = documents[0].content?.content ?? [];
+    expect(nodes).toHaveLength(2);
+    expect(nodes[0]).toMatchObject({
+      type: 'npcProfile',
+      attrs: {
+        name: 'Eldira Voss',
+        race: 'Human',
+        class: 'Tavern Keeper',
+        personalityTraits: 'Superstitious, distrustful',
+        description: 'Knows about the previous mining operations.',
+      },
+    });
+    expect(nodes[1]).toMatchObject({
+      type: 'npcProfile',
+      attrs: {
+        name: 'Mira Thorne',
+        race: 'Elf',
+        class: 'Healer',
+        personalityTraits: 'Empathetic, observant',
+        description: 'Hesitant to speak of the curse.',
+      },
+    });
+  });
+
   it('drops empty utility tables and their orphaned scaffolding', () => {
     const documents = normalizeExportDocuments([
       {
@@ -180,6 +240,69 @@ describe('normalizeExportDocuments', () => {
     ]);
   });
 
+  it('normalizes legacy stat block and random table attrs during export cleanup', () => {
+    const documents = normalizeExportDocuments([
+      {
+        title: 'Chapter 2: Into the Mine',
+        sortOrder: 2,
+        kind: 'chapter',
+        content: doc([
+          {
+            type: 'statBlock',
+            attrs: {
+              name: 'Phantom Apparition',
+              armorClass: 13,
+              hitPoints: 10,
+              strength: 1,
+              dexterity: 15,
+              reactions: JSON.stringify([{ type: 'Incorporeal Movement', description: 'The apparition moves through creatures.' }]),
+            },
+          },
+          {
+            type: 'randomTable',
+            attrs: {
+              title: 'Hidden Path Discoveries',
+              dieType: 'd6',
+              results: JSON.stringify([
+                { result: 1, description: 'A cracked lantern still flickers.' },
+                { result: 2, description: 'Footprints end at a cave wall.' },
+              ]),
+            },
+          },
+        ]),
+      },
+    ], 'Goblin Caper');
+
+    const nodes = documents[0].content?.content ?? [];
+    expect(nodes).toHaveLength(2);
+    expect(nodes[0]).toMatchObject({
+      type: 'statBlock',
+      attrs: {
+        name: 'Phantom Apparition',
+        armorClass: 13,
+        hitPoints: 10,
+        strength: 1,
+        dexterity: 15,
+        reactions: JSON.stringify([{ name: 'Incorporeal Movement', description: 'The apparition moves through creatures.' }]),
+        ac: 13,
+        hp: 10,
+        str: 1,
+        dex: 15,
+      },
+    });
+    expect(nodes[1]).toEqual({
+      type: 'randomTable',
+      attrs: {
+        title: 'Hidden Path Discoveries',
+        dieType: 'd6',
+        entries: JSON.stringify([
+          { roll: '1', result: 'A cracked lantern still flickers.' },
+          { roll: '2', result: 'Footprints end at a cave wall.' },
+        ]),
+      },
+    });
+  });
+
   it('demotes malformed long display headings to normal paragraphs', () => {
     const documents = normalizeExportDocuments([
       {
@@ -210,6 +333,50 @@ describe('normalizeExportDocuments', () => {
         },
       ],
     });
+  });
+
+  it('removes a duplicated chapter title heading immediately after a chapter header', () => {
+    const documents = normalizeExportDocuments([
+      {
+        title: 'Chapter 3: The Gravel Guardian\'s Chamber',
+        sortOrder: 3,
+        kind: 'chapter',
+        content: doc([
+          {
+            type: 'chapterHeader',
+            attrs: {
+              chapterNumber: 'Chapter 3',
+              title: 'The Gravel Guardian\'s Chamber',
+            },
+          },
+          {
+            type: 'heading',
+            attrs: { level: 2 },
+            content: [{ type: 'text', text: 'Chapter 3: The Gravel Guardian\'s Chamber' }],
+          },
+          {
+            type: 'heading',
+            attrs: { level: 2 },
+            content: [{ type: 'text', text: 'Confronting the Gravel Guardian' }],
+          },
+        ]),
+      },
+    ], 'Goblin Caper');
+
+    expect(documents[0].content?.content).toEqual([
+      {
+        type: 'chapterHeader',
+        attrs: {
+          chapterNumber: 'Chapter 3',
+          title: 'The Gravel Guardian\'s Chamber',
+        },
+      },
+      {
+        type: 'heading',
+        attrs: { level: 2 },
+        content: [{ type: 'text', text: 'Confronting the Gravel Guardian' }],
+      },
+    ]);
   });
 
   it('removes a table of contents from short one-shot front matter', () => {

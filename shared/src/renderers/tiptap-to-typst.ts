@@ -15,13 +15,17 @@ import {
   escapeTypstUrl,
   normalizeChapterHeaderTitle,
   normalizeEncounterEntries,
-  normalizeRandomTableEntries,
+  normalizeNpcProfileAttrs,
+  normalizeStatBlockAttrs,
+  resolveRandomTableEntries,
 } from './utils.js';
 
 type TipTapNode = DocumentContent;
 
 interface NameDesc {
   name: string;
+  type?: string;
+  title?: string;
   description?: string;
   desc?: string;
 }
@@ -44,6 +48,10 @@ function parseJsonArray<T>(json: string): T[] {
 
 function getNameDescDescription(entry: NameDesc | null | undefined): string {
   return String(entry?.description ?? entry?.desc ?? '');
+}
+
+function getNameDescName(entry: NameDesc | null | undefined): string {
+  return String(entry?.name ?? entry?.type ?? entry?.title ?? '').trim();
 }
 
 function levelLabel(level: number, school: string): string {
@@ -296,21 +304,22 @@ function renderTypstNodeImpl(node: TipTapNode): string {
 // ── D&D Block Renderers ──
 
 function renderStatBlock(attrs: Record<string, unknown>): string {
-  const name = escapeTypst(String(attrs.name || ''));
-  const size = escapeTypst(String(attrs.size || ''));
-  const type = escapeTypst(String(attrs.type || ''));
-  const alignment = escapeTypst(String(attrs.alignment || ''));
-  const ac = Number(attrs.ac) || 0;
-  const acType = String(attrs.acType || '');
-  const hp = Number(attrs.hp) || 0;
-  const hitDice = String(attrs.hitDice || '');
-  const speed = escapeTypst(String(attrs.speed || ''));
+  const normalized = normalizeStatBlockAttrs(attrs);
+  const name = escapeTypst(String(normalized.name || ''));
+  const size = escapeTypst(String(normalized.size || ''));
+  const type = escapeTypst(String(normalized.type || ''));
+  const alignment = escapeTypst(String(normalized.alignment || ''));
+  const ac = Number(normalized.ac) || 0;
+  const acType = String(normalized.acType || '');
+  const hp = Number(normalized.hp) || 0;
+  const hitDice = String(normalized.hitDice || '');
+  const speed = escapeTypst(String(normalized.speed || ''));
 
   const abilityNames = ['str', 'dex', 'con', 'int', 'wis', 'cha'] as const;
   const abilityLabels = ['STR', 'DEX', 'CON', 'INT', 'WIS', 'CHA'];
 
   let t = '';
-  t += `#block(width: 100%, fill: theme-stat-block-bg, stroke: (top: 4pt + theme-stat-block-border, bottom: 4pt + theme-stat-block-border), inset: 12pt)[\n`;
+  t += `#block(width: 100%, fill: theme-stat-block-bg, stroke: (top: 4pt + theme-stat-block-border, bottom: 4pt + theme-stat-block-border), inset: 12pt, breakable: false)[\n`;
   t += `  #set text(font: stat-font)\n`;
 
   // Header
@@ -332,7 +341,8 @@ function renderStatBlock(attrs: Record<string, unknown>): string {
   const headerCells: string[] = [];
   const scoreCells: string[] = [];
   for (let i = 0; i < abilityNames.length; i++) {
-    const score = Number(attrs[abilityNames[i]]) || 10;
+    const rawScore = Number(normalized[abilityNames[i]]);
+    const score = Number.isFinite(rawScore) ? rawScore : 10;
     headerCells.push(`[*${abilityLabels[i]}*]`);
     scoreCells.push(`[${score} (${getModifier(score)})]`);
   }
@@ -353,54 +363,54 @@ function renderStatBlock(attrs: Record<string, unknown>): string {
   ];
 
   for (const [key, label] of optionalProps) {
-    const value = String(attrs[key] || '');
+    const value = String(normalized[key] || '');
     if (value) {
       t += `  *${label}* ${escapeTypst(value)}\n`;
     }
   }
 
   // Challenge rating
-  const cr = String(attrs.cr || '');
-  const xp = String(attrs.xp || '');
+  const cr = String(normalized.cr || '');
+  const xp = String(normalized.xp || '');
   if (cr || xp) {
     t += `  *Challenge* ${escapeTypst(cr)}${xp ? ` (${escapeTypst(xp)} XP)` : ''}\n`;
   }
 
   // Traits
-  const traits = parseJsonArray<NameDesc>(String(attrs.traits || '[]'));
+  const traits = parseJsonArray<NameDesc>(String(normalized.traits || '[]'));
   if (traits.length > 0) {
     t += `  #line(length: 100%, stroke: 1.5pt + theme-primary)\n`;
     for (const trait of traits) {
-      t += `  _*${escapeTypst(trait.name)}.*_ ${escapeTypst(getNameDescDescription(trait))}\n\n`;
+      t += `  _*${escapeTypst(getNameDescName(trait))}.*_ ${escapeTypst(getNameDescDescription(trait))}\n\n`;
     }
   }
 
   // Actions
-  const actions = parseJsonArray<NameDesc>(String(attrs.actions || '[]'));
+  const actions = parseJsonArray<NameDesc>(String(normalized.actions || '[]'));
   if (actions.length > 0) {
     t += `  #text(size: 14pt, weight: "bold", fill: theme-primary)[Actions]\n`;
     t += `  #line(length: 100%, stroke: 0.5pt + theme-primary)\n`;
     for (const action of actions) {
-      t += `  _*${escapeTypst(action.name)}.*_ ${escapeTypst(getNameDescDescription(action))}\n\n`;
+      t += `  _*${escapeTypst(getNameDescName(action))}.*_ ${escapeTypst(getNameDescDescription(action))}\n\n`;
     }
   }
 
   // Reactions
-  const reactions = parseJsonArray<NameDesc>(String(attrs.reactions || '[]'));
+  const reactions = parseJsonArray<NameDesc>(String(normalized.reactions || '[]'));
   if (reactions.length > 0) {
     t += `  #text(size: 14pt, weight: "bold", fill: theme-primary)[Reactions]\n`;
     t += `  #line(length: 100%, stroke: 0.5pt + theme-primary)\n`;
     for (const reaction of reactions) {
-      t += `  _*${escapeTypst(reaction.name)}.*_ ${escapeTypst(getNameDescDescription(reaction))}\n\n`;
+      t += `  _*${escapeTypst(getNameDescName(reaction))}.*_ ${escapeTypst(getNameDescDescription(reaction))}\n\n`;
     }
   }
 
   // Legendary Actions
-  const legendaryActions = parseJsonArray<NameDesc>(String(attrs.legendaryActions || '[]'));
+  const legendaryActions = parseJsonArray<NameDesc>(String(normalized.legendaryActions || '[]'));
   if (legendaryActions.length > 0) {
     t += `  #text(size: 14pt, weight: "bold", fill: theme-primary)[Legendary Actions]\n`;
     t += `  #line(length: 100%, stroke: 0.5pt + theme-primary)\n`;
-    const legendaryDescription = String(attrs.legendaryDescription || '');
+    const legendaryDescription = String(normalized.legendaryDescription || '');
     if (legendaryDescription) {
       t += `  ${escapeTypst(legendaryDescription)}\n\n`;
     }
@@ -520,7 +530,7 @@ function renderMagicItem(attrs: Record<string, unknown>): string {
 function renderRandomTable(attrs: Record<string, unknown>): string {
   const title = escapeTypst(String(attrs.title || ''));
   const dieType = escapeTypst(String(attrs.dieType || 'd6'));
-  const entries = normalizeRandomTableEntries(attrs.entries);
+  const entries = resolveRandomTableEntries(attrs);
 
   if (entries.length === 0) return '';
 
@@ -541,18 +551,19 @@ function renderRandomTable(attrs: Record<string, unknown>): string {
 }
 
 function renderNpcProfile(attrs: Record<string, unknown>): string {
-  const name = escapeTypst(String(attrs.name || ''));
-  const race = escapeTypst(String(attrs.race || ''));
-  const npcClass = escapeTypst(String(attrs.class || ''));
-  const description = String(attrs.description || '');
-  const personalityTraits = String(attrs.personalityTraits || '');
-  const ideals = String(attrs.ideals || '');
-  const bonds = String(attrs.bonds || '');
-  const flaws = String(attrs.flaws || '');
-  const portraitUrl = String(attrs.portraitUrl || '');
+  const normalized = normalizeNpcProfileAttrs(attrs);
+  const name = escapeTypst(String(normalized.name || ''));
+  const race = escapeTypst(String(normalized.race || ''));
+  const npcClass = escapeTypst(String(normalized.class || ''));
+  const description = String(normalized.description || '');
+  const personalityTraits = String(normalized.personalityTraits || '');
+  const ideals = String(normalized.ideals || '');
+  const bonds = String(normalized.bonds || '');
+  const flaws = String(normalized.flaws || '');
+  const portraitUrl = String(normalized.portraitUrl || '');
 
   let t = '';
-  t += `#block(width: 100%, stroke: theme-primary + 1pt, inset: 12pt, radius: 2pt)[\n`;
+  t += `#block(width: 100%, stroke: theme-primary + 1pt, inset: 12pt, radius: 2pt, breakable: false)[\n`;
 
   // Header with optional portrait
   if (portraitUrl) {

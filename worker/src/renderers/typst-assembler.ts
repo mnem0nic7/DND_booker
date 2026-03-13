@@ -4,7 +4,7 @@
  * setup, typography, heading show rules, and rendered document content.
  */
 
-import { DocumentContent, DocumentKind } from '@dnd-booker/shared';
+import { DocumentContent, DocumentKind, normalizeChapterHeaderTitle } from '@dnd-booker/shared';
 import { tiptapToTypst } from './tiptap-to-typst.js';
 import { getTypstThemeVariables } from './typst-themes.js';
 
@@ -147,7 +147,7 @@ export function assembleTypst(options: AssembleTypstOptions): string {
 
     if (chapterOpenerMode === 'dedicated_page' && (doc.kind === 'chapter' || doc.kind === 'appendix')) {
       t += renderDedicatedChapterOpening(doc.title, doc.chapterNumberLabel);
-      rendered = tiptapToTypst(stripLeadingSectionOpener(doc.content, doc.title));
+      rendered = tiptapToTypst(stripLeadingSectionOpener(doc.content, doc.title, doc.chapterNumberLabel));
       if (!rendered.trim()) {
         hasRenderedDocument = true;
         previousEndedWithPageBreak = true;
@@ -256,13 +256,21 @@ function ensureDocumentSectionOpener(
       type: 'doc',
       content: [
         { type: 'chapterHeader', attrs: openerAttrs },
-        ...stripLeadingDuplicateTitleHeading(getTopLevelNodes(document.content), document.title),
+        ...stripLeadingDuplicateTitleHeading(
+          getTopLevelNodes(document.content),
+          document.title,
+          openerAttrs.chapterNumber ? String(openerAttrs.chapterNumber) : null,
+        ),
       ],
     },
   };
 }
 
-function stripLeadingDuplicateTitleHeading(nodes: DocumentContent[], documentTitle: string): DocumentContent[] {
+function stripLeadingDuplicateTitleHeading(
+  nodes: DocumentContent[],
+  documentTitle: string,
+  chapterNumberLabel: string | null,
+): DocumentContent[] {
   const firstMeaningfulIndex = nodes.findIndex((node) => node.type !== 'pageBreak' && node.type !== 'columnBreak');
   if (firstMeaningfulIndex === -1) return nodes;
 
@@ -273,14 +281,20 @@ function stripLeadingDuplicateTitleHeading(nodes: DocumentContent[], documentTit
   if (level < 1 || level > 3) return nodes;
 
   const headingText = renderInlineText(firstNode.content);
-  if (!headingText || normalizeSectionTitle(headingText) !== normalizeSectionTitle(documentTitle)) {
+  const normalizedHeadingText = normalizeChapterHeaderTitle(headingText, chapterNumberLabel ?? '');
+  const normalizedDocumentTitle = normalizeChapterHeaderTitle(documentTitle, chapterNumberLabel ?? '');
+  if (!headingText || normalizeSectionTitle(normalizedHeadingText) !== normalizeSectionTitle(normalizedDocumentTitle)) {
     return nodes;
   }
 
   return nodes.filter((_node, index) => index !== firstMeaningfulIndex);
 }
 
-function stripLeadingSectionOpener(content: DocumentContent, documentTitle: string): DocumentContent {
+function stripLeadingSectionOpener(
+  content: DocumentContent,
+  documentTitle: string,
+  chapterNumberLabel: string | null,
+): DocumentContent {
   const nodes = [...getTopLevelNodes(content)];
   if (nodes.length === 0) return content;
 
@@ -296,7 +310,9 @@ function stripLeadingSectionOpener(content: DocumentContent, documentTitle: stri
 
     if (node.type === 'heading' && Number(node.attrs?.level) === 1) {
       const headingText = renderInlineText(node.content);
-      if (!headingText || normalizeSectionTitle(headingText) === normalizeSectionTitle(documentTitle)) {
+      const normalizedHeadingText = normalizeChapterHeaderTitle(headingText, chapterNumberLabel ?? '');
+      const normalizedDocumentTitle = normalizeChapterHeaderTitle(documentTitle, chapterNumberLabel ?? '');
+      if (!headingText || normalizeSectionTitle(normalizedHeadingText) === normalizeSectionTitle(normalizedDocumentTitle)) {
         openerIndex = i;
       }
       break;

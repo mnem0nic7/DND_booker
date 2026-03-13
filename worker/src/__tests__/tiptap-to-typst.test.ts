@@ -310,6 +310,27 @@ describe('TipTap-to-Typst Renderer', () => {
       expect(result).toContain('Melee Weapon Attack: +6 to hit.');
       expect(result).toContain('Gain +2 AC until the start of its next turn.');
     });
+
+    it('should render legacy stat block aliases and keep the card unsplit', () => {
+      const result = renderTypstNode(node({
+        type: 'statBlock',
+        attrs: {
+          name: 'Phantom Apparition',
+          armorClass: 13,
+          hitPoints: 10,
+          strength: 1,
+          dexterity: 15,
+          reactions: JSON.stringify([{ type: 'Incorporeal Movement', description: 'The apparition moves through creatures and objects.' }]),
+        },
+      }));
+
+      expect(result).toContain('breakable: false');
+      expect(result).toContain('*Armor Class* 13');
+      expect(result).toContain('*Hit Points* 10');
+      expect(result).toContain('1 (-5)');
+      expect(result).toContain('15 (+2)');
+      expect(result).toContain('*Incorporeal Movement.*');
+    });
   });
 
   describe('readAloudBox', () => {
@@ -440,6 +461,24 @@ describe('TipTap-to-Typst Renderer', () => {
       }));
       expect(result).toBe('');
     });
+
+    it('should render legacy results arrays for random tables', () => {
+      const result = renderTypstNode(node({
+        type: 'randomTable',
+        attrs: {
+          title: 'Hidden Path Discoveries',
+          dieType: 'd6',
+          results: JSON.stringify([
+            { result: 1, description: 'A cracked lantern still flickers.' },
+            { result: 2, description: 'Footprints end at a cave wall.' },
+          ]),
+        },
+      }));
+
+      expect(result).toContain('Hidden Path Discoveries');
+      expect(result).toContain('A cracked lantern still flickers.');
+      expect(result).toContain('Footprints end at a cave wall.');
+    });
   });
 
   describe('npcProfile', () => {
@@ -458,6 +497,24 @@ describe('TipTap-to-Typst Renderer', () => {
       expect(result).toContain('Elf');
       expect(result).toContain('Wizard');
       expect(result).toContain('*Personality Traits.*');
+    });
+
+    it('should normalize legacy npcProfile role, traits, and notes fields', () => {
+      const result = renderTypstNode(node({
+        type: 'npcProfile',
+        attrs: {
+          name: 'Eldira Voss',
+          race: 'Human',
+          role: 'Tavern Keeper',
+          traits: 'Superstitious, distrustful',
+          notes: 'Knows about the previous mining operations.',
+        },
+      }));
+
+      expect(result).toContain('Eldira Voss');
+      expect(result).toContain('Human Tavern Keeper');
+      expect(result).toContain('Knows about the previous mining operations.');
+      expect(result).toContain('Superstitious, distrustful');
     });
   });
 

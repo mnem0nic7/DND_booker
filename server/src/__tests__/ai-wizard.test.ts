@@ -110,6 +110,23 @@ describe('markdownToTipTap', () => {
     });
   });
 
+  it('should convert same-line structured npcProfile blocks inside bullet lists into block nodes', () => {
+    const md = '- :::npcProfile {"name":"Eldira Voss","race":"Human","role":"Tavern Keeper","traits":"Superstitious, distrustful","notes":"Knows about the previous mining operations."} :::';
+    const result = markdownToTipTap(md);
+
+    expect(result.content).toHaveLength(1);
+    expect(result.content![0]).toMatchObject({
+      type: 'npcProfile',
+      attrs: {
+        name: 'Eldira Voss',
+        race: 'Human',
+        class: 'Tavern Keeper',
+        personalityTraits: 'Superstitious, distrustful',
+        description: 'Knows about the previous mining operations.',
+      },
+    });
+  });
+
   it('should convert :::statBlock blocks with JSON attrs', () => {
     const md = ':::statBlock\n{"name":"Goblin","size":"Small","type":"humanoid"}\n:::';
     const result = markdownToTipTap(md);
@@ -120,6 +137,24 @@ describe('markdownToTipTap', () => {
       size: 'Small',
       type: 'humanoid',
     });
+  });
+
+  it('should normalize same-line structured block JSON aliases for legacy stat blocks', () => {
+    const md = ':::statBlock {"name":"Phantom Apparition","armorClass":13,"hitPoints":10,"strength":1,"dexterity":15,"actions":[{"name":"Life Drain","description":"Melee Spell Attack: +4 to hit."}],"reactions":[{"type":"Incorporeal Movement","description":"The apparition moves through creatures."}]} :::';
+    const result = markdownToTipTap(md);
+
+    expect(result.content![0]).toMatchObject({
+      type: 'statBlock',
+      attrs: {
+        name: 'Phantom Apparition',
+        ac: 13,
+        hp: 10,
+        str: 1,
+        dex: 15,
+      },
+    });
+    expect(result.content![0].attrs?.actions).toContain('Life Drain');
+    expect(result.content![0].attrs?.reactions).toContain('Incorporeal Movement');
   });
 
   it('should handle :::sidebarCallout with default attrs', () => {

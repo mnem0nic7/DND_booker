@@ -8,7 +8,8 @@ import type {
 } from '@dnd-booker/shared';
 import {
   normalizeEncounterEntries,
-  normalizeRandomTableEntries,
+  normalizeStatBlockAttrs,
+  resolveRandomTableEntries,
 } from '@dnd-booker/shared';
 import type { ExportJob as PrismaExportJob } from '@prisma/client';
 import { prisma } from '../config/database.js';
@@ -61,9 +62,10 @@ function getFindingTitle(finding: ExportReview['findings'][number]): string | nu
 }
 
 function isPlaceholderStatBlock(node: DocumentContent): boolean {
-  const name = readStringAttr(node, 'name');
-  const ac = readNumberAttr(node, 'ac');
-  const hp = readNumberAttr(node, 'hp');
+  const attrs = normalizeStatBlockAttrs(node.attrs ?? {});
+  const name = typeof attrs.name === 'string' ? attrs.name : attrs.name == null ? '' : String(attrs.name);
+  const ac = Number(attrs.ac);
+  const hp = Number(attrs.hp);
 
   if (!name.trim()) return true;
   if (!Number.isFinite(ac) || !Number.isFinite(hp)) return true;
@@ -120,7 +122,7 @@ function transformNode(
   if (
     enabledCodes.has('EXPORT_EMPTY_RANDOM_TABLE')
     && node.type === 'randomTable'
-    && normalizeRandomTableEntries(node.attrs?.entries).length === 0
+    && resolveRandomTableEntries(node.attrs ?? {}).length === 0
   ) {
     fixes.randomTablesRemoved += 1;
     return { node: null, fixes };

@@ -9,7 +9,12 @@ import type {
   ExportSectionReviewMetric,
   ExportUtilityReviewMetric,
 } from '@dnd-booker/shared';
-import { normalizeChapterHeaderTitle, normalizeEncounterEntries, normalizeRandomTableEntries } from '@dnd-booker/shared';
+import {
+  normalizeChapterHeaderTitle,
+  normalizeEncounterEntries,
+  normalizeStatBlockAttrs,
+  resolveRandomTableEntries,
+} from '@dnd-booker/shared';
 
 const execFile = promisify(execFileCallback);
 
@@ -653,7 +658,7 @@ function inspectDocumentContent(content: DocumentContent | null, documentTitle: 
         });
       }
 
-      if (nodeType === 'randomTable' && normalizeRandomTableEntries(node.attrs?.entries).length === 0) {
+      if (nodeType === 'randomTable' && resolveRandomTableEntries(node.attrs ?? {}).length === 0) {
         findings.push({
           code: 'EXPORT_EMPTY_RANDOM_TABLE',
           severity: 'error',
@@ -667,6 +672,7 @@ function inspectDocumentContent(content: DocumentContent | null, documentTitle: 
       }
 
       if (nodeType === 'statBlock' && isPlaceholderStatBlock(node)) {
+        const normalizedAttrs = normalizeStatBlockAttrs(node.attrs ?? {});
         findings.push({
           code: 'EXPORT_PLACEHOLDER_STAT_BLOCK',
           severity: 'error',
@@ -675,9 +681,9 @@ function inspectDocumentContent(content: DocumentContent | null, documentTitle: 
           details: {
             title: documentTitle,
             blockType: nodeType,
-            name: readStringAttr(node, 'name'),
-            ac: readNumberAttr(node, 'ac'),
-            hp: readNumberAttr(node, 'hp'),
+            name: typeof normalizedAttrs.name === 'string' ? normalizedAttrs.name : readStringAttr(node, 'name'),
+            ac: Number(normalizedAttrs.ac),
+            hp: Number(normalizedAttrs.hp),
           },
         });
       }
@@ -728,9 +734,10 @@ function readNodeText(node: DocumentContent): string {
 }
 
 function isPlaceholderStatBlock(node: DocumentContent): boolean {
-  const name = readStringAttr(node, 'name');
-  const ac = readNumberAttr(node, 'ac');
-  const hp = readNumberAttr(node, 'hp');
+  const attrs = normalizeStatBlockAttrs(node.attrs ?? {});
+  const name = typeof attrs.name === 'string' ? attrs.name : attrs.name == null ? '' : String(attrs.name);
+  const ac = Number(attrs.ac);
+  const hp = Number(attrs.hp);
 
   if (!name.trim()) return true;
   if (!Number.isFinite(ac) || !Number.isFinite(hp)) return true;

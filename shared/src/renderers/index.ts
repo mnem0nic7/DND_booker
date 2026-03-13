@@ -5,7 +5,10 @@ export {
   escapeTypst,
   normalizeChapterHeaderTitle,
   normalizeEncounterEntries,
+  normalizeNpcProfileAttrs,
   normalizeRandomTableEntries,
+  normalizeStatBlockAttrs,
+  resolveRandomTableEntries,
   safeCssUrl,
   safeUrl,
 } from './utils.js';

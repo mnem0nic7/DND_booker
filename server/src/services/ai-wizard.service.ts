@@ -2,6 +2,11 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '../config/database.js';
 import { generateText } from 'ai';
 import type { WizardPhase, WizardParameters, WizardOutline, WizardOutlineSection, WizardGeneratedSection, WizardQuestion } from '@dnd-booker/shared';
+import {
+  normalizeNpcProfileAttrs,
+  normalizeRandomTableEntries,
+  normalizeStatBlockAttrs,
+} from '@dnd-booker/shared';
 import { getSupportedBlockTypes } from './ai-content.service.js';
 
 // ── Session CRUD ────────────────────────────────────────────────
@@ -212,6 +217,13 @@ export function markdownToTipTap(markdown: string): TipTapNode {
     const rawLine = lines[i];
     const line = rawLine.trimStart();
 
+    const sameLineBlockNodes = parseSameLineWizardBlock(line);
+    if (sameLineBlockNodes) {
+      content.push(...sameLineBlockNodes);
+      i++;
+      continue;
+    }
+
     // ── Fenced D&D block: :::blockType ... ::: (with optional attrs like title="...")
     const blockMatch = line.match(/^:::(\w+)(.*)$/);
     if (blockMatch) {
@@ -255,21 +267,10 @@ export function markdownToTipTap(markdown: string): TipTapNode {
           content: parseInlineContent(blockContent),
         });
       } else {
-        // Structured blocks — try to parse JSON attrs
-        try {
-          const attrs = JSON.parse(blockContent);
-          // Normalize array fields that TipTap expects as JSON-encoded strings
-          // (AI sometimes outputs real arrays instead of stringified JSON arrays)
-          const arrayFields = ['traits', 'actions', 'reactions', 'legendaryActions',
-            'features', 'entries', 'keyEntries'];
-          for (const field of arrayFields) {
-            if (Array.isArray(attrs[field])) {
-              attrs[field] = JSON.stringify(attrs[field]);
-            }
-          }
-          content.push({ type: blockType, attrs });
-        } catch {
-          // If JSON parse fails, treat as a paragraph
+        const structuredBlockNode = parseStructuredBlockNode(rawBlockType, blockContent);
+        if (structuredBlockNode) {
+          content.push(structuredBlockNode);
+        } else {
           content.push(...parseInlineContent(blockContent));
         }
       }
@@ -294,13 +295,26 @@ export function markdownToTipTap(markdown: string): TipTapNode {
       const items: TipTapNode[] = [];
       while (i < lines.length && lines[i].trimStart().match(/^[-*]\s+/)) {
         const itemText = lines[i].trimStart().replace(/^[-*]\s+/, '');
+        const sameLineBlock = parseSameLineWizardBlock(itemText);
+        if (sameLineBlock) {
+          if (items.length > 0) {
+            content.push({ type: 'bulletList', content: [...items] });
+            items.length = 0;
+          }
+          content.push(...sameLineBlock);
+          i++;
+          continue;
+        }
+
         items.push({
           type: 'listItem',
           content: [{ type: 'paragraph', content: parseInlineMarks(itemText) }],
         });
         i++;
       }
-      content.push({ type: 'bulletList', content: items });
+      if (items.length > 0) {
+        content.push({ type: 'bulletList', content: items });
+      }
       continue;
     }
 
@@ -309,13 +323,26 @@ export function markdownToTipTap(markdown: string): TipTapNode {
       const items: TipTapNode[] = [];
       while (i < lines.length && lines[i].trimStart().match(/^\d+\.\s+/)) {
         const itemText = lines[i].trimStart().replace(/^\d+\.\s+/, '');
+        const sameLineBlock = parseSameLineWizardBlock(itemText);
+        if (sameLineBlock) {
+          if (items.length > 0) {
+            content.push({ type: 'orderedList', content: [...items] });
+            items.length = 0;
+          }
+          content.push(...sameLineBlock);
+          i++;
+          continue;
+        }
+
         items.push({
           type: 'listItem',
           content: [{ type: 'paragraph', content: parseInlineMarks(itemText) }],
         });
         i++;
       }
-      content.push({ type: 'orderedList', content: items });
+      if (items.length > 0) {
+        content.push({ type: 'orderedList', content: items });
+      }
       continue;
     }
 
@@ -483,6 +510,75 @@ function createInlineProseBlock(rawBlockType: string, inlinePayload: string): Ti
     type: 'readAloudBox',
     content,
   };
+}
+
+function parseSameLineWizardBlock(text: string): TipTapNode[] | null {
+  const match = text.trim().match(/^:::(\w+)\s+([\s\S]*?)\s*:::\s*$/);
+  if (!match) return null;
+
+  const rawBlockType = match[1];
+  const payload = match[2].trim();
+  if (!payload) return [];
+
+  if (isInlineProseBlock(rawBlockType, payload)) {
+    return [createInlineProseBlock(rawBlockType, payload)];
+  }
+
+  const structuredBlockNode = parseStructuredBlockNode(rawBlockType, payload);
+  return structuredBlockNode ? [structuredBlockNode] : parseInlineContent(payload);
+}
+
+function normalizeStructuredBlockAttrs(
+  blockType: string,
+  rawAttrs: Record<string, unknown>,
+): Record<string, unknown> {
+  const attrs = { ...rawAttrs };
+  const arrayFields = [
+    'traits',
+    'actions',
+    'reactions',
+    'legendaryActions',
+    'features',
+    'entries',
+    'keyEntries',
+  ];
+
+  for (const field of arrayFields) {
+    if (Array.isArray(attrs[field])) {
+      attrs[field] = JSON.stringify(attrs[field]);
+    }
+  }
+
+  if (blockType === 'statBlock') {
+    return normalizeStatBlockAttrs(attrs);
+  }
+
+  if (blockType === 'npcProfile') {
+    return normalizeNpcProfileAttrs(attrs);
+  }
+
+  if (blockType === 'randomTable') {
+    const entries = normalizeRandomTableEntries(attrs.entries ?? attrs.results);
+    delete attrs.results;
+    attrs.entries = JSON.stringify(entries);
+    return attrs;
+  }
+
+  return attrs;
+}
+
+function parseStructuredBlockNode(rawBlockType: string, blockContent: string): TipTapNode | null {
+  const blockType = normalizeWizardBlockType(rawBlockType);
+
+  try {
+    const parsedAttrs = JSON.parse(blockContent) as Record<string, unknown>;
+    return {
+      type: blockType,
+      attrs: normalizeStructuredBlockAttrs(blockType, parsedAttrs),
+    };
+  } catch {
+    return null;
+  }
 }
 
 /** Parse a block of text into paragraphs */

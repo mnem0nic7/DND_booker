@@ -676,5 +676,43 @@ describe('Typst Assembler', () => {
       expect(source.match(/\[Arrival at Dawn\]/g)?.length).toBe(1);
       expect(source).not.toContain('= Arrival at Dawn');
     });
+
+    it('should strip a prefixed leading H1 when rendering a dedicated chapter opener page', () => {
+      const source = assembleTypst({
+        documents: [
+          {
+            title: 'The Gravel Guardian\'s Chamber',
+            kind: 'chapter',
+            chapterNumberLabel: 'Chapter 1',
+            content: {
+              type: 'doc',
+              content: [
+                {
+                  type: 'heading',
+                  attrs: { level: 1 },
+                  content: [{ type: 'text', text: 'Chapter 1: The Gravel Guardian\'s Chamber' }],
+                },
+                paragraph('The chamber trembles as the guardian stirs.'),
+              ],
+            },
+            sortOrder: 1,
+          },
+          {
+            title: 'The Final Curse',
+            kind: 'chapter',
+            chapterNumberLabel: 'Chapter 2',
+            content: docWithParagraph('A second chapter keeps the export in long-form mode.'),
+            sortOrder: 2,
+          },
+        ],
+        theme: 'classic-parchment',
+        projectTitle: 'The Blackglass Mine',
+        exportPolish: { chapterOpenerMode: 'dedicated_page' },
+      });
+
+      expect(source).toContain('[The Gravel Guardian\'s Chamber]');
+      expect(source).not.toContain('= Chapter 3: The Gravel Guardian\'s Chamber');
+      expect(source).not.toContain('= Chapter 1: The Gravel Guardian\'s Chamber');
+    });
   });
 });

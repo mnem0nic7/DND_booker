@@ -211,4 +211,61 @@ describe('renderNode — stat block compatibility', () => {
     expect(html).toContain('Melee Weapon Attack: +6 to hit.');
     expect(html).toContain('Gain +2 AC until the start of its next turn.');
   });
+
+  it('should render legacy stat block aliases for numbers and reaction names', () => {
+    const html = renderNode({
+      type: 'statBlock',
+      attrs: {
+        name: 'Phantom Apparition',
+        armorClass: 13,
+        hitPoints: 10,
+        strength: 1,
+        dexterity: 15,
+        reactions: JSON.stringify([{ type: 'Incorporeal Movement', description: 'The apparition moves through creatures and objects.' }]),
+      },
+    } as any);
+
+    expect(html).toContain('Armor Class</span> 13');
+    expect(html).toContain('Hit Points</span> 10');
+    expect(html).toContain('1 (-5)');
+    expect(html).toContain('15 (+2)');
+    expect(html).toContain('Incorporeal Movement');
+  });
+});
+
+describe('renderNode — legacy block aliases', () => {
+  it('should render legacy random table results arrays', () => {
+    const html = renderNode({
+      type: 'randomTable',
+      attrs: {
+        title: 'Hidden Path Discoveries',
+        dieType: 'd6',
+        results: JSON.stringify([
+          { result: 1, description: 'A cracked lantern still flickers.' },
+          { result: 2, description: 'Footprints end at a cave wall.' },
+        ]),
+      },
+    } as any);
+
+    expect(html).toContain('Hidden Path Discoveries');
+    expect(html).toContain('A cracked lantern still flickers.');
+    expect(html).toContain('Footprints end at a cave wall.');
+  });
+
+  it('should render legacy npc profile role, traits, and notes fields', () => {
+    const html = renderNode({
+      type: 'npcProfile',
+      attrs: {
+        name: 'Eldira Voss',
+        race: 'Human',
+        role: 'Tavern Keeper',
+        traits: 'Superstitious, distrustful',
+        notes: 'Knows about the previous mining operations.',
+      },
+    } as any);
+
+    expect(html).toContain('Human Tavern Keeper');
+    expect(html).toContain('Superstitious, distrustful');
+    expect(html).toContain('Knows about the previous mining operations.');
+  });
 });

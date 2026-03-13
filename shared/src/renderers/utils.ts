@@ -15,6 +15,66 @@ export interface NormalizedRandomTableEntry {
   result: string;
 }
 
+function pickFirst(raw: Record<string, unknown>, keys: string[]): unknown {
+  for (const key of keys) {
+    if (raw[key] !== undefined && raw[key] !== null && raw[key] !== '') {
+      return raw[key];
+    }
+  }
+  return undefined;
+}
+
+function normalizeNumber(value: unknown): number | undefined {
+  if (value === null || value === undefined || value === '') return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+interface NameDescLike {
+  name?: unknown;
+  type?: unknown;
+  title?: unknown;
+  label?: unknown;
+  description?: unknown;
+  desc?: unknown;
+  notes?: unknown;
+  text?: unknown;
+}
+
+function normalizeNameDescList(value: unknown): string {
+  let parsed: unknown;
+  if (typeof value === 'string') {
+    try {
+      parsed = JSON.parse(value);
+    } catch {
+      return value;
+    }
+  } else {
+    parsed = value;
+  }
+
+  if (!Array.isArray(parsed)) return '[]';
+
+  const normalized = parsed.flatMap((entry) => {
+    if (entry == null || typeof entry !== 'object') return [];
+
+    const raw = entry as NameDescLike;
+    const name = normalizeString(raw.name ?? raw.type ?? raw.title ?? raw.label).trim();
+    const description = normalizeString(
+      raw.description ?? raw.desc ?? raw.notes ?? raw.text,
+    ).trim();
+
+    if (!name && !description) return [];
+
+    const result: Record<string, string> = {};
+    if (name) result.name = name;
+    if (description) result.description = description;
+    return [result];
+  });
+
+  return JSON.stringify(normalized);
+}
+
 export function escapeHtml(text: unknown): string {
   return normalizeString(text)
     .replace(/&/g, '&amp;')
@@ -127,13 +187,88 @@ export function normalizeRandomTableEntries(value: unknown): NormalizedRandomTab
     if (entry == null || typeof entry !== 'object') return [];
 
     const raw = entry as Record<string, unknown>;
-    const roll = normalizeString(raw.roll).trim();
-    const result = normalizeString(raw.result).trim();
+    const roll = normalizeString(raw.roll ?? (typeof raw.result === 'number' ? raw.result : '')).trim();
+    const result = normalizeString(
+      raw.description ?? raw.result ?? raw.outcome,
+    ).trim();
 
     if (!roll || !result) return [];
 
     return [{ roll, result }];
   });
+}
+
+export function normalizeStatBlockAttrs(attrs: Record<string, unknown>): Record<string, unknown> {
+  const normalized: Record<string, unknown> = { ...attrs };
+
+  const numberAliases: Array<[string, string[]]> = [
+    ['ac', ['ac', 'armorClass']],
+    ['hp', ['hp', 'hitPoints']],
+    ['str', ['str', 'strength']],
+    ['dex', ['dex', 'dexterity']],
+    ['con', ['con', 'constitution']],
+    ['int', ['int', 'intelligence']],
+    ['wis', ['wis', 'wisdom']],
+    ['cha', ['cha', 'charisma']],
+  ];
+
+  for (const [target, aliases] of numberAliases) {
+    const value = normalizeNumber(pickFirst(normalized, aliases));
+    if (value !== undefined) normalized[target] = value;
+  }
+
+  const stringAliases: Array<[string, string[]]> = [
+    ['acType', ['acType', 'armorType']],
+    ['hitDice', ['hitDice']],
+    ['cr', ['cr', 'challengeRating']],
+    ['xp', ['xp', 'experience']],
+    ['savingThrows', ['savingThrows', 'savingThrowsText']],
+    ['damageResistances', ['damageResistances', 'resistances']],
+    ['damageImmunities', ['damageImmunities', 'immunities']],
+    ['conditionImmunities', ['conditionImmunities']],
+    ['senses', ['senses']],
+    ['languages', ['languages']],
+  ];
+
+  for (const [target, aliases] of stringAliases) {
+    const value = normalizeString(pickFirst(normalized, aliases)).trim();
+    if (value) normalized[target] = value;
+  }
+
+  const arrayAliases: Array<[string, string[]]> = [
+    ['traits', ['traits']],
+    ['actions', ['actions']],
+    ['reactions', ['reactions']],
+    ['legendaryActions', ['legendaryActions', 'legendaryAbilities']],
+  ];
+
+  for (const [target, aliases] of arrayAliases) {
+    const value = pickFirst(normalized, aliases);
+    if (value !== undefined) normalized[target] = normalizeNameDescList(value);
+  }
+
+  return normalized;
+}
+
+export function normalizeNpcProfileAttrs(attrs: Record<string, unknown>): Record<string, unknown> {
+  const normalized: Record<string, unknown> = { ...attrs };
+
+  const classLike = normalizeString(pickFirst(normalized, ['class', 'role'])).trim();
+  if (classLike) normalized.class = classLike;
+
+  const description = normalizeString(pickFirst(normalized, ['description', 'notes'])).trim();
+  if (description) normalized.description = description;
+
+  const personalityTraits = normalizeString(
+    pickFirst(normalized, ['personalityTraits', 'traits']),
+  ).trim();
+  if (personalityTraits) normalized.personalityTraits = personalityTraits;
+
+  return normalized;
+}
+
+export function resolveRandomTableEntries(attrs: Record<string, unknown>): NormalizedRandomTableEntry[] {
+  return normalizeRandomTableEntries(attrs.entries ?? attrs.results);
 }
 
 export function normalizeChapterHeaderTitle(title: unknown, chapterNumber: unknown): string {

@@ -10,7 +10,9 @@ import {
   escapeHtml,
   normalizeChapterHeaderTitle,
   normalizeEncounterEntries,
-  normalizeRandomTableEntries,
+  normalizeNpcProfileAttrs,
+  normalizeStatBlockAttrs,
+  resolveRandomTableEntries,
   safeCssUrl,
   safeUrl,
 } from './utils.js';
@@ -19,6 +21,8 @@ type TipTapNode = DocumentContent;
 
 interface NameDesc {
   name: string;
+  type?: string;
+  title?: string;
   description?: string;
   desc?: string;
 }
@@ -39,6 +43,10 @@ function parseJsonArray<T>(json: string): T[] {
 
 function getNameDescDescription(entry: NameDesc | null | undefined): string {
   return String(entry?.description ?? entry?.desc ?? '');
+}
+
+function getNameDescName(entry: NameDesc | null | undefined): string {
+  return String(entry?.name ?? entry?.type ?? entry?.title ?? '').trim();
 }
 
 function levelLabel(level: number, school: string): string {
@@ -252,15 +260,16 @@ export function renderNode(node: TipTapNode): string {
 // ── D&D Block Renderers ──
 
 function renderStatBlock(attrs: Record<string, unknown>): string {
-  const name = escapeHtml(String(attrs.name || ''));
-  const size = escapeHtml(String(attrs.size || ''));
-  const type = escapeHtml(String(attrs.type || ''));
-  const alignment = escapeHtml(String(attrs.alignment || ''));
-  const ac = Number(attrs.ac) || 0;
-  const acType = String(attrs.acType || '');
-  const hp = Number(attrs.hp) || 0;
-  const hitDice = String(attrs.hitDice || '');
-  const speed = escapeHtml(String(attrs.speed || ''));
+  const normalized = normalizeStatBlockAttrs(attrs);
+  const name = escapeHtml(String(normalized.name || ''));
+  const size = escapeHtml(String(normalized.size || ''));
+  const type = escapeHtml(String(normalized.type || ''));
+  const alignment = escapeHtml(String(normalized.alignment || ''));
+  const ac = Number(normalized.ac) || 0;
+  const acType = String(normalized.acType || '');
+  const hp = Number(normalized.hp) || 0;
+  const hitDice = String(normalized.hitDice || '');
+  const speed = escapeHtml(String(normalized.speed || ''));
 
   const abilityNames = ['str', 'dex', 'con', 'int', 'wis', 'cha'] as const;
   const abilityLabels = ['STR', 'DEX', 'CON', 'INT', 'WIS', 'CHA'];
@@ -281,7 +290,8 @@ function renderStatBlock(attrs: Record<string, unknown>): string {
   // Ability scores
   html += `<div class="stat-block__abilities">`;
   for (let i = 0; i < abilityNames.length; i++) {
-    const score = Number(attrs[abilityNames[i]]) || 10;
+    const rawScore = Number(normalized[abilityNames[i]]);
+    const score = Number.isFinite(rawScore) ? rawScore : 10;
     html += `<div class="stat-block__ability">`;
     html += `<div class="stat-block__ability-name">${abilityLabels[i]}</div>`;
     html += `<div class="stat-block__ability-score">${score} (${getModifier(score)})</div>`;
@@ -302,56 +312,56 @@ function renderStatBlock(attrs: Record<string, unknown>): string {
   ];
 
   for (const [key, label] of optionalProps) {
-    const value = String(attrs[key] || '');
+    const value = String(normalized[key] || '');
     if (value) {
       html += `<div class="stat-block__property"><span class="stat-block__property-name">${label}</span> ${escapeHtml(value)}</div>`;
     }
   }
 
   // Challenge rating
-  const cr = String(attrs.cr || '');
-  const xp = String(attrs.xp || '');
+  const cr = String(normalized.cr || '');
+  const xp = String(normalized.xp || '');
   if (cr || xp) {
     html += `<div class="stat-block__property"><span class="stat-block__property-name">Challenge</span> ${escapeHtml(cr)}${xp ? ` (${escapeHtml(xp)} XP)` : ''}</div>`;
   }
 
   // Traits
-  const traits = parseJsonArray<NameDesc>(String(attrs.traits || '[]'));
+  const traits = parseJsonArray<NameDesc>(String(normalized.traits || '[]'));
   if (traits.length > 0) {
     html += `<hr class="stat-block__divider" />`;
     for (const trait of traits) {
-      html += `<div class="stat-block__trait"><span class="stat-block__trait-name">${escapeHtml(trait.name)}.</span> ${escapeHtml(getNameDescDescription(trait))}</div>`;
+      html += `<div class="stat-block__trait"><span class="stat-block__trait-name">${escapeHtml(getNameDescName(trait))}.</span> ${escapeHtml(getNameDescDescription(trait))}</div>`;
     }
   }
 
   // Actions
-  const actions = parseJsonArray<NameDesc>(String(attrs.actions || '[]'));
+  const actions = parseJsonArray<NameDesc>(String(normalized.actions || '[]'));
   if (actions.length > 0) {
     html += `<div class="stat-block__section-title">Actions</div>`;
     for (const action of actions) {
-      html += `<div class="stat-block__trait"><span class="stat-block__trait-name">${escapeHtml(action.name)}.</span> ${escapeHtml(getNameDescDescription(action))}</div>`;
+      html += `<div class="stat-block__trait"><span class="stat-block__trait-name">${escapeHtml(getNameDescName(action))}.</span> ${escapeHtml(getNameDescDescription(action))}</div>`;
     }
   }
 
   // Reactions
-  const reactions = parseJsonArray<NameDesc>(String(attrs.reactions || '[]'));
+  const reactions = parseJsonArray<NameDesc>(String(normalized.reactions || '[]'));
   if (reactions.length > 0) {
     html += `<div class="stat-block__section-title">Reactions</div>`;
     for (const reaction of reactions) {
-      html += `<div class="stat-block__trait"><span class="stat-block__trait-name">${escapeHtml(reaction.name)}.</span> ${escapeHtml(getNameDescDescription(reaction))}</div>`;
+      html += `<div class="stat-block__trait"><span class="stat-block__trait-name">${escapeHtml(getNameDescName(reaction))}.</span> ${escapeHtml(getNameDescDescription(reaction))}</div>`;
     }
   }
 
   // Legendary Actions
-  const legendaryActions = parseJsonArray<NameDesc>(String(attrs.legendaryActions || '[]'));
+  const legendaryActions = parseJsonArray<NameDesc>(String(normalized.legendaryActions || '[]'));
   if (legendaryActions.length > 0) {
     html += `<div class="stat-block__section-title">Legendary Actions</div>`;
-    const legendaryDescription = String(attrs.legendaryDescription || '');
+    const legendaryDescription = String(normalized.legendaryDescription || '');
     if (legendaryDescription) {
       html += `<div class="stat-block__trait">${escapeHtml(legendaryDescription)}</div>`;
     }
     for (const la of legendaryActions) {
-      html += `<div class="stat-block__trait"><span class="stat-block__trait-name">${escapeHtml(la.name)}.</span> ${escapeHtml(getNameDescDescription(la))}</div>`;
+      html += `<div class="stat-block__trait"><span class="stat-block__trait-name">${escapeHtml(getNameDescName(la))}.</span> ${escapeHtml(getNameDescDescription(la))}</div>`;
     }
   }
 
@@ -463,7 +473,7 @@ function renderMagicItem(attrs: Record<string, unknown>): string {
 function renderRandomTable(attrs: Record<string, unknown>): string {
   const title = escapeHtml(String(attrs.title || ''));
   const dieType = escapeHtml(String(attrs.dieType || 'd6'));
-  const entries = normalizeRandomTableEntries(attrs.entries);
+  const entries = resolveRandomTableEntries(attrs);
 
   if (entries.length === 0) return '';
 
@@ -485,15 +495,16 @@ function renderRandomTable(attrs: Record<string, unknown>): string {
 }
 
 function renderNpcProfile(attrs: Record<string, unknown>): string {
-  const name = escapeHtml(String(attrs.name || ''));
-  const race = escapeHtml(String(attrs.race || ''));
-  const npcClass = escapeHtml(String(attrs.class || ''));
-  const description = String(attrs.description || '');
-  const personalityTraits = String(attrs.personalityTraits || '');
-  const ideals = String(attrs.ideals || '');
-  const bonds = String(attrs.bonds || '');
-  const flaws = String(attrs.flaws || '');
-  const portraitUrl = String(attrs.portraitUrl || '');
+  const normalized = normalizeNpcProfileAttrs(attrs);
+  const name = escapeHtml(String(normalized.name || ''));
+  const race = escapeHtml(String(normalized.race || ''));
+  const npcClass = escapeHtml(String(normalized.class || ''));
+  const description = String(normalized.description || '');
+  const personalityTraits = String(normalized.personalityTraits || '');
+  const ideals = String(normalized.ideals || '');
+  const bonds = String(normalized.bonds || '');
+  const flaws = String(normalized.flaws || '');
+  const portraitUrl = String(normalized.portraitUrl || '');
 
   let html = `<div class="npc-profile">`;
 
