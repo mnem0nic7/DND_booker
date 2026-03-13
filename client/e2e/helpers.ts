@@ -23,6 +23,13 @@ type AiSettingsInput = {
   baseUrl?: string;
 };
 
+type StoredAiSettings = {
+  provider: 'anthropic' | 'openai' | 'ollama' | null;
+  model: string | null;
+  hasApiKey: boolean;
+  baseUrl: string | null;
+};
+
 async function isOllamaGenerationActive(model = TEST_OLLAMA_MODEL): Promise<boolean> {
   try {
     const { stdout } = await execFileAsync('ollama', ['ps']);
@@ -71,6 +78,37 @@ async function getAccessToken(page: Page): Promise<string> {
   }
 
   return result.accessToken;
+}
+
+async function getStoredAiSettings(page: Page): Promise<StoredAiSettings> {
+  const accessToken = await getAccessToken(page);
+  const result = await page.evaluate(async ({ token }) => {
+    const response = await fetch('/api/ai/settings', {
+      credentials: 'include',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      return {
+        ok: false,
+        status: response.status,
+        body: await response.text(),
+      };
+    }
+
+    return {
+      ok: true,
+      settings: await response.json(),
+    };
+  }, { token: accessToken });
+
+  if (!result.ok) {
+    throw new Error(`Failed to load AI settings: ${result.status} ${result.body}`);
+  }
+
+  return result.settings as StoredAiSettings;
 }
 
 async function findProjectByTitle(page: Page, title: string): Promise<ProjectLookup | null> {
@@ -179,6 +217,17 @@ export async function configureAiSettings(page: Page, settings: AiSettingsInput)
 
   if (!result.ok) {
     throw new Error(`Failed to configure AI settings: ${result.status} ${result.body}`);
+  }
+
+  const storedSettings = await getStoredAiSettings(page);
+  const isConfigured = storedSettings.provider === 'ollama'
+    ? !!storedSettings.baseUrl
+    : storedSettings.hasApiKey;
+
+  if (storedSettings.provider !== settings.provider || storedSettings.model !== settings.model || !isConfigured) {
+    throw new Error(
+      `AI settings did not persist as expected. Got provider=${storedSettings.provider ?? 'null'} model=${storedSettings.model ?? 'null'} configured=${String(isConfigured)}.`,
+    );
   }
 }
 
@@ -344,26 +393,42 @@ export async function openAiPanel(page: Page) {
     await page.getByRole('button', { name: /Show AI assistant|Hide AI assistant/ }).first().click();
     await expect(page.locator('text=AI Assistant').first()).toBeVisible({ timeout: 5000 });
 
-    const panelState = await expect
-      .poll(async () => {
-        if (await chatInput.isVisible().catch(() => false)) return 'ready';
-        if (await configureButton.isVisible().catch(() => false)) return 'needs-config';
-        return 'pending';
-      }, { timeout: 10_000 })
-      .not.toBe('pending')
-      .then(async () => {
-        if (await chatInput.isVisible().catch(() => false)) return 'ready';
-        return 'needs-config';
-      });
+    const deadline = Date.now() + 15_000;
+    let serverConfigured = false;
 
-    if (panelState === 'ready') {
-      return;
+    while (Date.now() < deadline) {
+      if (await chatInput.isVisible({ timeout: 1_000 }).catch(() => false)) {
+        return;
+      }
+
+      if (await configureButton.isVisible({ timeout: 250 }).catch(() => false)) {
+        try {
+          const storedSettings = await getStoredAiSettings(page);
+          serverConfigured = storedSettings.provider === 'ollama'
+            ? !!storedSettings.baseUrl
+            : storedSettings.hasApiKey;
+
+          if (!serverConfigured) {
+            throw new Error(`AI assistant is not configured for ${TEST_EMAIL}. Save a valid provider and key before running this test.`);
+          }
+        } catch (error) {
+          if (error instanceof Error && error.message.startsWith('AI assistant is not configured')) {
+            throw error;
+          }
+        }
+      }
+
+      await page.waitForTimeout(500);
     }
 
     if (attempt === 0) {
       await page.reload();
       await ensureEditorReady(page);
       continue;
+    }
+
+    if (serverConfigured) {
+      throw new Error(`AI assistant settings exist for ${TEST_EMAIL}, but the configured chat input never became available in the UI.`);
     }
 
     throw new Error(`AI assistant is not configured for ${TEST_EMAIL}. Save a valid provider and key before running this test.`);
