@@ -7,10 +7,12 @@
 import {
   DocumentContent,
   LayoutPlan,
+  PageModel,
   PagePreset,
   extractTocEntriesFromDocuments,
   getCanonicalLayoutCss,
   renderContentWithLayoutPlan,
+  renderFlowContentWithLayoutPlan,
 } from '@dnd-booker/shared';
 import { escapeHtml } from './utils.js';
 
@@ -21,10 +23,12 @@ export interface AssembleOptions {
     sortOrder: number;
     kind?: string | null;
     layoutPlan?: LayoutPlan | null;
+    pageModel?: PageModel | null;
   }>;
   theme: string;
   projectTitle: string;
   pagePreset?: PagePreset;
+  renderMode?: 'paged' | 'flow';
 }
 
 /** Map theme name to CSS custom property overrides.
@@ -288,7 +292,7 @@ function buildTocEntriesHtml(entries: Array<{ level: number; prefix: string; tit
  * Assemble a complete HTML document from project documents, theme, and title.
  */
 export function assembleHtml(options: AssembleOptions): string {
-  const { documents, theme, projectTitle, pagePreset = 'standard_pdf' } = options;
+  const { documents, theme, projectTitle, pagePreset = 'standard_pdf', renderMode = 'paged' } = options;
 
   // Sort documents by sortOrder
   const sorted = [...documents].sort((a, b) => a.sortOrder - b.sortOrder);
@@ -297,18 +301,35 @@ export function assembleHtml(options: AssembleOptions): string {
   const tocEntries = extractTocEntriesFromDocuments(sorted);
 
   // Render each document's canonical layout HTML
+  let pageNumberOffset = 0;
   const documentHtmlParts = sorted.map((doc) => {
     const rendered = doc.content
-      ? renderContentWithLayoutPlan({
-          content: doc.content,
-          layoutPlan: doc.layoutPlan ?? null,
-          preset: pagePreset,
-          options: {
-            documentKind: doc.kind ?? null,
-            documentTitle: doc.title,
-          },
-        })
+      ? (renderMode === 'flow'
+        ? renderFlowContentWithLayoutPlan({
+            content: doc.content,
+            layoutPlan: doc.layoutPlan ?? null,
+            preset: pagePreset,
+            options: {
+              documentKind: doc.kind ?? null,
+              documentTitle: doc.title,
+            },
+          })
+        : renderContentWithLayoutPlan({
+            content: doc.content,
+            layoutPlan: doc.layoutPlan ?? null,
+            pageModel: doc.pageModel ?? null,
+            preset: pagePreset,
+            options: {
+              documentKind: doc.kind ?? null,
+              documentTitle: doc.title,
+            },
+            footerTitle: projectTitle,
+            pageNumberOffset,
+          }))
       : null;
+    if (renderMode === 'paged' && rendered?.pageModel) {
+      pageNumberOffset += rendered.pageModel.pages.length;
+    }
     return `<section class="document" data-title="${escapeHtml(doc.title)}" data-kind="${escapeHtml(String(doc.kind ?? ''))}">
       <div class="ProseMirror">
         ${rendered?.html ?? ''}
@@ -330,9 +351,11 @@ export function assembleHtml(options: AssembleOptions): string {
   }
 
   const themeVars = getThemeVariables(theme);
-  const pageMargin = pagePreset === 'print_pdf'
-    ? '0.875in 0.75in 0.875in 0.75in'
-    : '0.75in';
+  const pageMargin = renderMode === 'paged'
+    ? '0in'
+    : pagePreset === 'print_pdf'
+      ? '0.875in 0.75in 0.875in 0.75in'
+      : '0.75in';
 
   return `<!DOCTYPE html>
 <html lang="en">

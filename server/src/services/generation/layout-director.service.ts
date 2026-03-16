@@ -1,7 +1,7 @@
 import {
-  buildDefaultLayoutPlan,
   compilePageModel,
   ensureStableNodeIds,
+  recommendLayoutPlan,
   type DocumentContent,
   type LayoutRecipe,
 } from '@dnd-booker/shared';
@@ -61,7 +61,7 @@ export async function executeLayoutDirectorPass(run: { id: string; projectId: st
     if (!content) continue;
 
     const normalizedContent = ensureStableNodeIds(content);
-    const layoutPlan = buildDefaultLayoutPlan(normalizedContent, {
+    const layoutPlan = recommendLayoutPlan(normalizedContent, document.layoutPlan as any, {
       documentKind: document.kind,
       documentTitle: document.title,
     });

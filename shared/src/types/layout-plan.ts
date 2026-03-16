@@ -16,6 +16,7 @@ export type LayoutRecipe =
   | 'full_page_insert';
 export type LayoutColumnBalanceTarget = 'balanced' | 'dense_left' | 'dense_right';
 export type PagePreset = 'standard_pdf' | 'print_pdf' | 'editor_preview' | 'epub';
+export type PageRegionKind = 'hero' | 'full_width' | 'column_left' | 'column_right' | 'full_page';
 
 export interface LayoutPlanBlock {
   nodeId: string;
@@ -34,6 +35,55 @@ export interface LayoutPlan {
   blocks: LayoutPlanBlock[];
 }
 
+export interface LayoutFlowFragment {
+  nodeId: string;
+  sourceIndex: number;
+  presentationOrder: number;
+  span: LayoutSpan;
+  placement: LayoutPlacement;
+  groupId: string | null;
+  keepTogether: boolean;
+  allowWrapBelow: boolean;
+  nodeType: string;
+  content: DocumentContent;
+  unitId: string;
+  isHero: boolean;
+  isOpener: boolean;
+}
+
+export interface LayoutFlowUnit {
+  id: string;
+  fragmentNodeIds: string[];
+  fragmentIndexes: number[];
+  span: LayoutSpan;
+  placement: LayoutPlacement;
+  groupId: string | null;
+  keepTogether: boolean;
+  allowWrapBelow: boolean;
+  isHero: boolean;
+  isOpener: boolean;
+}
+
+export interface LayoutFlowModel {
+  preset: PagePreset;
+  sectionRecipe: LayoutRecipe | null;
+  columnBalanceTarget: LayoutColumnBalanceTarget;
+  fragments: LayoutFlowFragment[];
+  units: LayoutFlowUnit[];
+}
+
+export interface MeasuredLayoutBounds {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface MeasuredLayoutUnitMetric {
+  unitId: string;
+  heightPx: number;
+}
+
 export interface PageModelFragment {
   nodeId: string;
   sourceIndex: number;
@@ -45,23 +95,45 @@ export interface PageModelFragment {
   allowWrapBelow: boolean;
   nodeType: string;
   content: DocumentContent;
+  unitId: string;
+  pageIndex: number;
+  columnIndex: number | null;
+  region: PageRegionKind;
+  bounds: MeasuredLayoutBounds;
+  isHero: boolean;
+  isOpener: boolean;
+}
+
+export interface PageModelColumnMetrics {
+  leftFillRatio: number | null;
+  rightFillRatio: number | null;
+  deltaRatio: number | null;
 }
 
 export interface PageModelPage {
   index: number;
+  preset: PagePreset;
   recipe: LayoutRecipe | null;
   fragments: PageModelFragment[];
+  contentHeightPx: number;
+  fillRatio: number;
+  columnMetrics: PageModelColumnMetrics;
+  nodeIds: string[];
+  documentIds: string[];
+  openerDocumentId: string | null;
 }
 
 export interface PageModel {
   preset: PagePreset;
   pages: PageModelPage[];
   fragments: PageModelFragment[];
+  flow: LayoutFlowModel;
   metrics: {
     fragmentCount: number;
     heroFragmentCount: number;
     groupedFragmentCount: number;
     keepTogetherCount: number;
+    pageCount: number;
   };
 }
 

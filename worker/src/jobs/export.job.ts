@@ -5,12 +5,13 @@ import type {
   ExportReview,
   ExportReviewAutoFix,
   LayoutPlan,
+  PageModel,
 } from '@dnd-booker/shared';
-import { resolveLayoutPlan } from '@dnd-booker/shared';
+import { recommendLayoutPlan, resolveLayoutPlan } from '@dnd-booker/shared';
 import { prisma } from '../config/database.js';
 import { assembleHtml } from '../renderers/html-assembler.js';
 import { normalizeExportDocuments } from '../renderers/export-document-normalizer.js';
-import { generateHtmlPdf } from '../generators/html-pdf.generator.js';
+import { generateHtmlPdf, measureDocumentPageModels } from '../generators/html-pdf.generator.js';
 import { generateEpub } from '../generators/epub.generator.js';
 import {
   buildUnavailableExportReview,
@@ -91,6 +92,7 @@ export function rewriteUploadUrlsInDocs(
     sortOrder: number;
     kind?: DocumentKind | null;
     layoutPlan?: LayoutPlan | null;
+    pageModel?: PageModel | null;
   }>,
 ) {
   return docs.map((doc) => ({
@@ -217,6 +219,7 @@ export async function processExportJob(job: Job<ExportJobData>): Promise<void> {
           projectType: exportJob.project.type,
           printReady: format === 'print_pdf',
           autoFixes,
+          reviewCodes: baseRender.review.findings.map((finding) => finding.code),
         });
 
         if (isBetterExportReview(polishedRender.review, baseRender.review)) {
@@ -335,16 +338,37 @@ async function renderPdfVariant(input: {
   projectType?: string | null;
   printReady: boolean;
   autoFixes?: ExportReviewAutoFix[];
+  reviewCodes?: string[];
 }): Promise<PdfRenderResult> {
-  const { filepath, docs, theme, projectTitle, projectType = null, printReady, autoFixes = [] } = input;
+  const { filepath, docs, theme, projectTitle, projectType = null, printReady, autoFixes = [], reviewCodes = [] } = input;
   const renderDocs = autoFixes.includes('refresh_layout_plan')
-    ? docs.map((doc) => ({ ...doc, layoutPlan: null }))
+    ? docs.map((doc) => ({
+        ...doc,
+        layoutPlan: doc.content
+          ? recommendLayoutPlan(doc.content, doc.layoutPlan ?? null, {
+              documentKind: doc.kind ?? null,
+              documentTitle: doc.title,
+              reviewCodes,
+              isShortBook: projectType === 'one_shot',
+            })
+          : doc.layoutPlan ?? null,
+      }))
     : docs;
-  const html = assembleHtml({
+  const measuredPageModels = await measureDocumentPageModels({
     documents: renderDocs,
+    theme,
+    pagePreset: printReady ? 'print_pdf' : 'standard_pdf',
+  });
+  const measuredDocs = renderDocs.map((doc, index) => ({
+    ...doc,
+    pageModel: measuredPageModels[index] ?? null,
+  }));
+  const html = assembleHtml({
+    documents: measuredDocs,
     theme,
     projectTitle,
     pagePreset: printReady ? 'print_pdf' : 'standard_pdf',
+    renderMode: 'paged',
   });
   const resolvedHtml = await rewriteUploadUrlsToEmbeddedDataUrls(html);
   const buffer = await generateHtmlPdf({
@@ -354,10 +378,11 @@ async function renderPdfVariant(input: {
   await fs.writeFile(filepath, buffer);
 
   try {
-    const reviewedDocs = renderDocs.map((doc) => ({
+    const reviewedDocs = measuredDocs.map((doc) => ({
       title: doc.title,
       kind: doc.kind ?? null,
       content: doc.content,
+      pageModel: doc.pageModel ?? null,
       layoutPlan: doc.content
         ? resolveLayoutPlan(doc.content, doc.layoutPlan ?? null, {
             documentKind: doc.kind ?? null,

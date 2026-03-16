@@ -7,6 +7,7 @@ import type {
   ExportReview,
   ExportReviewFinding,
   LayoutPlan,
+  PageModel,
   ExportSectionReviewMetric,
   ExportUtilityReviewMetric,
 } from '@dnd-booker/shared';
@@ -56,6 +57,7 @@ interface ReviewableDocument {
   kind?: DocumentKind | null;
   content?: DocumentContent | null;
   layoutPlan?: LayoutPlan | null;
+  pageModel?: PageModel | null;
 }
 
 interface PdfWord {
@@ -98,12 +100,19 @@ export async function reviewPdfExport(
   filepath: string,
   documents: ReviewableDocument[]
 ): Promise<ExportReview> {
-  const [pdfInfoOutput, bboxOutput] = await Promise.all([
-    runPdfinfo(filepath),
-    runPdftotextBbox(filepath),
-  ]);
-
+  const pdfInfoOutput = await runPdfinfo(filepath);
   const pdfInfo = parsePdfInfoOutput(pdfInfoOutput);
+
+  if (documents.some((document) => document.pageModel && document.pageModel.pages.length > 0)) {
+    return analyzePdfExportLayoutFromPageModels({
+      documents,
+      pageCount: pdfInfo.pageCount,
+      pageWidthPts: pdfInfo.pageWidthPts,
+      pageHeightPts: pdfInfo.pageHeightPts,
+    });
+  }
+
+  const bboxOutput = await runPdftotextBbox(filepath);
   const pages = parseBboxLayoutXhtml(bboxOutput);
 
   return analyzePdfExportLayout({
@@ -212,6 +221,14 @@ export function analyzePdfExportLayout(input: {
   pageHeightPts: number | null;
 }): ExportReview {
   const { documents, pages, pageCount, pageWidthPts, pageHeightPts } = input;
+  if (documents.some((document) => document.pageModel && document.pageModel.pages.length > 0)) {
+    return analyzePdfExportLayoutFromPageModels({
+      documents,
+      pageCount,
+      pageWidthPts,
+      pageHeightPts,
+    });
+  }
   const findings: ExportReviewFinding[] = [];
   const sectionStarts: ExportSectionReviewMetric[] = [];
   const utilityCoverage: ExportUtilityReviewMetric[] = [];
@@ -323,6 +340,151 @@ export function analyzePdfExportLayout(input: {
     findings,
     metrics: {
       pageCount,
+      pageWidthPts,
+      pageHeightPts,
+      lastPageFillRatio: lastPageFillRatio === null ? null : roundRatio(lastPageFillRatio),
+      sectionStarts,
+      utilityCoverage,
+    },
+  };
+}
+
+function analyzePdfExportLayoutFromPageModels(input: {
+  documents: ReviewableDocument[];
+  pageCount: number;
+  pageWidthPts: number | null;
+  pageHeightPts: number | null;
+}): ExportReview {
+  const { documents, pageCount, pageWidthPts, pageHeightPts } = input;
+  const findings: ExportReviewFinding[] = [];
+  const sectionStarts: ExportSectionReviewMetric[] = [];
+  const utilityCoverage: ExportUtilityReviewMetric[] = [];
+  const globalPages: Array<{
+    page: number;
+    fillRatio: number;
+    isOpener: boolean;
+    isFullPageInsert: boolean;
+    leftFillRatio: number | null;
+    rightFillRatio: number | null;
+    deltaRatio: number | null;
+  }> = [];
+  let pageOffset = 0;
+
+  for (const document of documents) {
+    const contentReview = analyzeDocumentUtility(document);
+    utilityCoverage.push(contentReview.metric);
+    findings.push(...contentReview.findings);
+
+    const pageModel = document.pageModel ?? null;
+    if (pageModel) {
+      for (const page of pageModel.pages) {
+        globalPages.push({
+          page: page.index + pageOffset,
+          fillRatio: page.fillRatio,
+          isOpener: Boolean(page.openerDocumentId),
+          isFullPageInsert: page.fragments.some((fragment) => fragment.region === 'full_page'),
+          leftFillRatio: page.columnMetrics.leftFillRatio,
+          rightFillRatio: page.columnMetrics.rightFillRatio,
+          deltaRatio: page.columnMetrics.deltaRatio,
+        });
+      }
+    }
+
+    if (document.kind !== 'chapter' && document.kind !== 'appendix') {
+      pageOffset += pageModel?.pages.length ?? 0;
+      continue;
+    }
+
+    const openerPage = pageModel?.pages.find((page) =>
+      page.fragments.some((fragment) => fragment.isOpener || fragment.isHero || fragment.nodeType === 'chapterHeader'),
+    ) ?? pageModel?.pages[0] ?? null;
+    const openerFragment = openerPage?.fragments.find((fragment) =>
+      fragment.isOpener || fragment.isHero || fragment.nodeType === 'chapterHeader',
+    ) ?? openerPage?.fragments[0] ?? null;
+    const topRatio = openerPage && openerFragment
+      ? openerFragment.bounds.y / Math.max(1, openerPage.contentHeightPx)
+      : null;
+
+    sectionStarts.push({
+      title: document.title,
+      kind: document.kind ?? null,
+      page: openerPage ? openerPage.index + pageOffset : null,
+      topRatio: topRatio === null ? null : roundRatio(topRatio),
+      lineCount: openerFragment ? 1 : null,
+      hyphenated: false,
+    });
+
+    if (openerPage && topRatio !== null && topRatio > CHAPTER_OPENER_TOP_RATIO_THRESHOLD) {
+      findings.push({
+        code: 'EXPORT_CHAPTER_OPENER_LOW',
+        severity: 'warning',
+        page: openerPage.index + pageOffset,
+        message: `"${document.title}" starts too low on page ${openerPage.index + pageOffset}.`,
+        details: {
+          title: document.title,
+          kind: document.kind ?? null,
+          topRatio: roundRatio(topRatio),
+          threshold: CHAPTER_OPENER_TOP_RATIO_THRESHOLD,
+        },
+      });
+    }
+
+    pageOffset += pageModel?.pages.length ?? 0;
+  }
+
+  findings.push(...analyzeMeasuredPageLayout(globalPages));
+
+  const effectivePageCount = pageCount || globalPages.length;
+
+  if (
+    effectivePageCount <= 10 &&
+    documents.some((document) => documentContainsNodeType(document.content ?? null, 'tableOfContents'))
+  ) {
+    findings.push({
+      code: 'EXPORT_OVERLONG_TOC_FOR_SHORT_BOOK',
+      severity: 'warning',
+      page: 2,
+      message: 'A short one-shot still includes a table of contents that is likely wasting front-matter space.',
+      details: { pageCount: effectivePageCount },
+    });
+  }
+
+  const lastPageFillRatio = globalPages.at(-1)?.fillRatio ?? null;
+  const lastDocument = documents.at(-1);
+  if (
+    lastPageFillRatio !== null &&
+    lastPageFillRatio < LAST_PAGE_FILL_RATIO_THRESHOLD &&
+    lastDocument?.kind !== 'back_matter'
+  ) {
+    findings.push({
+      code: 'EXPORT_LAST_PAGE_UNDERFILLED',
+      severity: 'warning',
+      page: (globalPages.at(-1)?.page ?? effectivePageCount) || null,
+      message: `The last page is underfilled and ends at ${Math.round(lastPageFillRatio * 100)}% of usable page height.`,
+      details: {
+        fillRatio: roundRatio(lastPageFillRatio),
+        threshold: LAST_PAGE_FILL_RATIO_THRESHOLD,
+      },
+    });
+  }
+
+  const score = Math.max(
+    0,
+    100 - findings.reduce((total, finding) => total + findingPenalty(finding.code), 0),
+  );
+
+  return {
+    status: findings.length > 0 ? 'needs_attention' : 'passed',
+    score,
+    generatedAt: new Date().toISOString(),
+    summary: findings.length > 0
+      ? `Export review found ${findings.length} issue${findings.length === 1 ? '' : 's'} across ${effectivePageCount} page${effectivePageCount === 1 ? '' : 's'}.`
+      : `Export review passed across ${effectivePageCount} page${effectivePageCount === 1 ? '' : 's'}.`,
+    passCount: 1,
+    appliedFixes: [],
+    findings,
+    metrics: {
+      pageCount: effectivePageCount,
       pageWidthPts,
       pageHeightPts,
       lastPageFillRatio: lastPageFillRatio === null ? null : roundRatio(lastPageFillRatio),
@@ -667,8 +829,9 @@ function analyzeDocumentLayout(document: ReviewableDocument): ExportReviewFindin
   const findings: ExportReviewFinding[] = [];
   const content = document.content ?? null;
   const layoutPlan = document.layoutPlan ?? null;
+  const pageModel = document.pageModel ?? null;
 
-  if (hasHeroCandidate(content) && !hasStrongHeroPlacement(layoutPlan)) {
+  if (hasHeroCandidate(content) && !hasStrongHeroPlacement(layoutPlan, pageModel)) {
     findings.push({
       code: 'EXPORT_WEAK_HERO_PLACEMENT',
       severity: 'warning',
@@ -681,7 +844,7 @@ function analyzeDocumentLayout(document: ReviewableDocument): ExportReviewFindin
     });
   }
 
-  if (hasEncounterPacketContent(content) && !hasEncounterPacketGrouping(layoutPlan)) {
+  if (hasEncounterPacketContent(content) && !hasEncounterPacketGrouping(layoutPlan, pageModel)) {
     findings.push({
       code: 'EXPORT_SPLIT_SCENE_PACKET',
       severity: 'warning',
@@ -900,6 +1063,63 @@ function analyzePageLayout(pages: PdfPage[], sectionStartPages: Set<number>): Ex
   return findings;
 }
 
+function analyzeMeasuredPageLayout(pages: Array<{
+  page: number;
+  fillRatio: number;
+  isOpener: boolean;
+  isFullPageInsert: boolean;
+  leftFillRatio: number | null;
+  rightFillRatio: number | null;
+  deltaRatio: number | null;
+}>): ExportReviewFinding[] {
+  const findings: ExportReviewFinding[] = [];
+
+  for (let index = 0; index < pages.length; index += 1) {
+    const page = pages[index];
+    if (!page) continue;
+    const isInterior = page.page > 1 && page.page < pages.length;
+
+    if (
+      isInterior
+      && !page.isOpener
+      && !page.isFullPageInsert
+      && page.fillRatio < 0.58
+    ) {
+      findings.push({
+        code: 'EXPORT_UNUSED_PAGE_REGION',
+        severity: 'warning',
+        page: page.page,
+        message: `Page ${page.page} leaves a large unused region that should be reclaimed by layout.`,
+        details: {
+          fillRatio: roundRatio(page.fillRatio),
+        },
+      });
+    }
+
+    if (
+      !page.isOpener
+      && page.deltaRatio !== null
+      && page.deltaRatio > 0.18
+      && page.leftFillRatio !== null
+      && page.rightFillRatio !== null
+    ) {
+      findings.push({
+        code: 'EXPORT_UNBALANCED_COLUMNS',
+        severity: 'warning',
+        page: page.page,
+        message: `Page ${page.page} has noticeably unbalanced columns.`,
+        details: {
+          deltaRatio: roundRatio(page.deltaRatio),
+          leftBottomRatio: roundRatio(page.leftFillRatio),
+          rightBottomRatio: roundRatio(page.rightFillRatio),
+        },
+      });
+    }
+  }
+
+  return findings;
+}
+
 function measureColumnBalance(page: PdfPage): {
   deltaRatio: number;
   leftBottomRatio: number;
@@ -942,7 +1162,10 @@ function hasEncounterPacketContent(content: DocumentContent | null): boolean {
     || documentContainsNodeType(content, 'randomTable');
 }
 
-function hasStrongHeroPlacement(layoutPlan: LayoutPlan | null): boolean {
+function hasStrongHeroPlacement(layoutPlan: LayoutPlan | null, pageModel: PageModel | null): boolean {
+  if (pageModel) {
+    return pageModel.fragments.some((fragment) => fragment.isHero || fragment.region === 'hero');
+  }
   const blocks = Array.isArray(layoutPlan?.blocks) ? layoutPlan.blocks : [];
   return Boolean(
     blocks.some((block) => block.span === 'both_columns' && (
@@ -952,7 +1175,19 @@ function hasStrongHeroPlacement(layoutPlan: LayoutPlan | null): boolean {
   );
 }
 
-function hasEncounterPacketGrouping(layoutPlan: LayoutPlan | null): boolean {
+function hasEncounterPacketGrouping(layoutPlan: LayoutPlan | null, pageModel: PageModel | null): boolean {
+  if (pageModel) {
+    const unitPages = new Map<string, Set<number>>();
+    for (const fragment of pageModel.fragments) {
+      if (!fragment.groupId?.startsWith('encounter-packet')) continue;
+      const entry = unitPages.get(fragment.unitId) ?? new Set<number>();
+      entry.add(fragment.pageIndex);
+      unitPages.set(fragment.unitId, entry);
+    }
+
+    if (unitPages.size === 0) return false;
+    return [...unitPages.values()].every((pages) => pages.size === 1);
+  }
   const blocks = Array.isArray(layoutPlan?.blocks) ? layoutPlan.blocks : [];
   return Boolean(
     blocks.some((block) => block.groupId?.startsWith('encounter-packet')),

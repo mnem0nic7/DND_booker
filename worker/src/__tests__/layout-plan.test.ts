@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  compileFlowModel,
+  compileMeasuredPageModel,
   compilePageModel,
   renderContentWithLayoutPlan,
   validateLayoutPlan,
@@ -135,5 +137,44 @@ describe('layout-plan', () => {
 
     expect(encounterHtml).toContain('layout-group-packet');
     expect(encounterHtml).toContain('data-node-type="statBlock"');
+  });
+
+  it('builds a measured multi-page model with a hero opener and balanced body flow', () => {
+    const content: DocumentContent = {
+      type: 'doc',
+      content: [
+        {
+          type: 'chapterHeader',
+          attrs: {
+            title: 'Into the Mine',
+            chapterNumber: 'Chapter 2',
+            backgroundImage: '/uploads/project/chapter-two.png',
+          },
+        },
+        paragraph('Opening body copy.'),
+        paragraph('Exploration details.'),
+        paragraph('Encounter setup.'),
+        paragraph('More scene support.'),
+      ],
+    };
+
+    const flow = compileFlowModel(content, null, 'standard_pdf', {
+      documentKind: 'chapter',
+      documentTitle: 'Into the Mine',
+    });
+    const measurements = flow.flow.units.map((unit, index) => ({
+      unitId: unit.id,
+      heightPx: index === 0 ? 260 : 520,
+    }));
+    const pageModel = compileMeasuredPageModel(flow.flow, [
+      ...measurements,
+    ], {
+      documentKind: 'chapter',
+      documentTitle: 'Into the Mine',
+    });
+
+    expect(pageModel.pages.length).toBeGreaterThan(1);
+    expect(pageModel.pages[0]?.fragments.some((fragment) => fragment.region === 'hero')).toBe(true);
+    expect(pageModel.pages[0]?.columnMetrics.leftFillRatio).not.toBeNull();
   });
 });

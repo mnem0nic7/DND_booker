@@ -161,6 +161,113 @@ Page size: 612 x 792 pts (letter)
     expect(review.findings.map((finding) => finding.code)).not.toContain('EXPORT_SECTION_TITLE_WRAP');
   });
 
+  it('uses measured page models for chapter starts instead of front-matter text mentions', () => {
+    const review = analyzePdfExportLayout({
+      documents: [
+        {
+          title: 'DM Brief',
+          kind: 'front_matter',
+          content: {
+            type: 'doc',
+            content: [
+              {
+                type: 'paragraph',
+                content: [{ type: 'text', text: 'Chapter 2: Approaching the Mine is where the danger escalates.' }],
+              },
+            ],
+          },
+          pageModel: {
+            preset: 'standard_pdf',
+            flow: { preset: 'standard_pdf', sectionRecipe: 'intro_split_spread', columnBalanceTarget: 'balanced', fragments: [], units: [] },
+            pages: [{
+              index: 1,
+              preset: 'standard_pdf',
+              recipe: 'intro_split_spread',
+              fragments: [],
+              contentHeightPx: 864,
+              fillRatio: 0.6,
+              columnMetrics: { leftFillRatio: 0.6, rightFillRatio: null, deltaRatio: null },
+              nodeIds: [],
+              documentIds: ['DM Brief'],
+              openerDocumentId: null,
+            }],
+            fragments: [],
+            metrics: { fragmentCount: 0, heroFragmentCount: 0, groupedFragmentCount: 0, keepTogetherCount: 0, pageCount: 1 },
+          },
+        },
+        {
+          title: 'Approaching the Mine',
+          kind: 'chapter',
+          pageModel: {
+            preset: 'standard_pdf',
+            flow: { preset: 'standard_pdf', sectionRecipe: 'chapter_hero_split', columnBalanceTarget: 'balanced', fragments: [], units: [] },
+            pages: [{
+              index: 1,
+              preset: 'standard_pdf',
+              recipe: 'chapter_hero_split',
+              fragments: [
+                {
+                  nodeId: 'chapter-header',
+                  sourceIndex: 0,
+                  presentationOrder: 0,
+                  span: 'both_columns',
+                  placement: 'hero_top',
+                  groupId: null,
+                  keepTogether: true,
+                  allowWrapBelow: true,
+                  nodeType: 'chapterHeader',
+                  content: { type: 'chapterHeader', attrs: { title: 'Approaching the Mine' } },
+                  unitId: 'unit:chapter-header',
+                  pageIndex: 1,
+                  columnIndex: null,
+                  region: 'hero',
+                  bounds: { x: 0, y: 24, width: 672, height: 220 },
+                  isHero: true,
+                  isOpener: true,
+                },
+              ],
+              contentHeightPx: 864,
+              fillRatio: 0.72,
+              columnMetrics: { leftFillRatio: 0.72, rightFillRatio: 0.68, deltaRatio: 0.04 },
+              nodeIds: ['chapter-header'],
+              documentIds: ['Approaching the Mine'],
+              openerDocumentId: 'Approaching the Mine',
+            }],
+            fragments: [
+              {
+                nodeId: 'chapter-header',
+                sourceIndex: 0,
+                presentationOrder: 0,
+                span: 'both_columns',
+                placement: 'hero_top',
+                groupId: null,
+                keepTogether: true,
+                allowWrapBelow: true,
+                nodeType: 'chapterHeader',
+                content: { type: 'chapterHeader', attrs: { title: 'Approaching the Mine' } },
+                unitId: 'unit:chapter-header',
+                pageIndex: 1,
+                columnIndex: null,
+                region: 'hero',
+                bounds: { x: 0, y: 24, width: 672, height: 220 },
+                isHero: true,
+                isOpener: true,
+              },
+            ],
+            metrics: { fragmentCount: 1, heroFragmentCount: 1, groupedFragmentCount: 0, keepTogetherCount: 1, pageCount: 1 },
+          },
+        },
+      ],
+      pages: [],
+      pageCount: 2,
+      pageWidthPts: 612,
+      pageHeightPts: 792,
+    });
+
+    expect(review.metrics.sectionStarts[0].page).toBe(2);
+    expect(review.findings.map((finding) => finding.code)).not.toContain('EXPORT_CHAPTER_OPENER_LOW');
+  });
+
   it('flags broken utility blocks directly from exported document content', () => {
     const review = analyzePdfExportLayout({
       documents: [

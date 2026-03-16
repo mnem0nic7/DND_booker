@@ -1,11 +1,10 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type MouseEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type DragEvent, type MouseEvent } from 'react';
 import type { Editor } from '@tiptap/react';
 import {
   getCanonicalLayoutCss,
-  renderContentWithLayoutPlan,
-  type DocumentContent,
   type LayoutPlan,
 } from '@dnd-booker/shared';
+import { useMeasuredLayoutDocument } from '../../lib/useMeasuredLayoutDocument';
 
 type DropPlacement = 'before' | 'after';
 
@@ -35,34 +34,21 @@ export function RenderedDocumentCanvas({
   onSelectNodeId,
   onReorderNode,
 }: RenderedDocumentCanvasProps) {
-  const [html, setHtml] = useState('');
   const [dropTarget, setDropTarget] = useState<DropTargetState | null>(null);
   const draggedNodeIdRef = useRef<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-
-  const updateHtml = useCallback(() => {
-    if (!editor) return;
-    const json = editor.getJSON() as DocumentContent;
-    const rendered = renderContentWithLayoutPlan({
-      content: json,
-      layoutPlan,
-      preset: 'editor_preview',
-      options: {
-        documentKind,
-        documentTitle,
-      },
-    });
-    setHtml(rendered.html);
-  }, [documentKind, documentTitle, editor, layoutPlan]);
-
-  useEffect(() => {
-    if (!editor) return;
-    updateHtml();
-    editor.on('update', updateHtml);
-    return () => {
-      editor.off('update', updateHtml);
-    };
-  }, [editor, updateHtml]);
+  const {
+    measurementHtml,
+    renderedHtml,
+    measurementRef,
+  } = useMeasuredLayoutDocument({
+    editor,
+    layoutPlan,
+    documentKind,
+    documentTitle,
+    preset: 'editor_preview',
+    footerTitle: documentTitle,
+  });
 
   useEffect(() => {
     const container = containerRef.current;
@@ -77,7 +63,7 @@ export function RenderedDocumentCanvas({
         element.classList.add(dropTarget.placement === 'before' ? 'layout-editor-drop-before' : 'layout-editor-drop-after');
       }
     });
-  }, [dropTarget, html, selectedNodeId]);
+  }, [dropTarget, renderedHtml, selectedNodeId]);
 
   const getDropPlacement = (event: DragEvent<HTMLElement>, element: HTMLElement): DropPlacement => {
     const rect = element.getBoundingClientRect();
@@ -152,15 +138,25 @@ export function RenderedDocumentCanvas({
 
   const canvasHtml = useMemo(
     () => ({
-      __html: `<div class="ProseMirror">${html}</div>`,
+      __html: renderedHtml,
     }),
-    [html],
+    [renderedHtml],
+  );
+
+  const measurementMarkup = useMemo(
+    () => ({
+      __html: measurementHtml,
+    }),
+    [measurementHtml],
   );
 
   return (
-    <div className="editor-outer parity-editor-outer" data-theme={theme}>
+    <div className="editor-outer parity-editor-outer relative" data-theme={theme}>
       <style>{getCanonicalLayoutCss()}</style>
-      <div className="page-canvas editor-themed-content parity-page-canvas">
+      <div className="parity-measure-host" aria-hidden="true">
+        <div ref={measurementRef} className="page-canvas editor-themed-content parity-measure-canvas" dangerouslySetInnerHTML={measurementMarkup} />
+      </div>
+      <div className="editor-themed-content parity-page-canvas">
         <div
           ref={containerRef}
           className="parity-render-surface"
@@ -172,10 +168,6 @@ export function RenderedDocumentCanvas({
           onDragEnd={handleDragEnd}
           dangerouslySetInnerHTML={canvasHtml}
         />
-        <div className="page-footer">
-          <span>{documentTitle ?? ''}</span>
-          <span>{documentKind === 'chapter' ? 'Layout Canvas' : ''}</span>
-        </div>
       </div>
     </div>
   );

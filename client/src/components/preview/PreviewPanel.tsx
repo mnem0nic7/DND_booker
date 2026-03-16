@@ -1,8 +1,7 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Editor } from '@tiptap/react';
-import { renderContentWithLayoutPlan } from '@dnd-booker/shared';
-import type { DocumentContent, LayoutPlan } from '@dnd-booker/shared';
-import { PreviewRenderer } from './PreviewRenderer';
+import { getCanonicalLayoutCss, type LayoutPlan } from '@dnd-booker/shared';
+import { useMeasuredLayoutDocument } from '../../lib/useMeasuredLayoutDocument';
 
 interface PreviewPanelProps {
   editor: Editor | null;
@@ -32,35 +31,16 @@ export function PreviewPanel({
   documentTitle = null,
 }: PreviewPanelProps) {
   const [zoom, setZoom] = useState<ZoomLevel>(75);
-  const [html, setHtml] = useState('');
   const [containerWidth, setContainerWidth] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
-
-  const updateHtml = useCallback(() => {
-    if (editor) {
-      const json = editor.getJSON() as DocumentContent;
-      const rendered = renderContentWithLayoutPlan({
-        content: json,
-        layoutPlan,
-        preset: 'editor_preview',
-        options: {
-          documentKind,
-          documentTitle,
-        },
-      });
-      setHtml(rendered.html);
-    }
-  }, [documentKind, documentTitle, editor, layoutPlan]);
-
-  // Subscribe to editor updates for real-time preview
-  useEffect(() => {
-    if (!editor) return;
-    updateHtml();
-    editor.on('update', updateHtml);
-    return () => {
-      editor.off('update', updateHtml);
-    };
-  }, [editor, updateHtml]);
+  const { measurementHtml, renderedHtml, measurementRef, pageModel } = useMeasuredLayoutDocument({
+    editor,
+    layoutPlan,
+    documentKind,
+    documentTitle,
+    preset: 'editor_preview',
+    footerTitle: documentTitle,
+  });
 
   // Measure container width for fit-to-width scaling
   useEffect(() => {
@@ -81,6 +61,10 @@ export function PreviewPanel({
   const availableWidth = Math.max(containerWidth - padding, 100);
   const fitScale = availableWidth / PAGE_WIDTH;
   const scale = fitScale * (zoom / 75); // 75% = fit-to-width baseline
+  const pageCount = Math.max(1, pageModel?.pages.length ?? 1);
+  const previewHeight = (PAGE_WIDTH * (11 / 8.5) * pageCount) + (Math.max(0, pageCount - 1) * 32);
+  const previewMarkup = useMemo(() => ({ __html: renderedHtml }), [renderedHtml]);
+  const measurementMarkup = useMemo(() => ({ __html: measurementHtml }), [measurementHtml]);
 
   return (
     <div className="flex flex-col h-full border-l bg-gray-100">
@@ -109,22 +93,26 @@ export function PreviewPanel({
 
       {/* Preview content area */}
       <div ref={containerRef} className="flex-1 overflow-auto p-4">
+        <style>{getCanonicalLayoutCss()}</style>
+        <div className="parity-measure-host" aria-hidden="true">
+          <div ref={measurementRef} className="page-canvas editor-themed-content parity-measure-canvas" data-theme={theme} dangerouslySetInnerHTML={measurementMarkup} />
+        </div>
         <div
-          className="mx-auto bg-white rounded-sm"
+          data-theme={theme}
+          className="mx-auto editor-themed-content rounded-sm"
           style={{
             width: PAGE_WIDTH,
-            minHeight: PAGE_WIDTH * (11 / 8.5),
+            minHeight: previewHeight,
             transform: `scale(${scale})`,
             transformOrigin: 'top left',
             // Shrink the container box to match the visual scaled size
-            marginBottom: -(PAGE_WIDTH * (11 / 8.5)) * (1 - scale),
+            marginBottom: -(previewHeight) * (1 - scale),
             marginRight: -PAGE_WIDTH * (1 - scale),
             boxShadow:
               '0 1px 3px rgba(0,0,0,0.08), 0 4px 12px rgba(0,0,0,0.06), 0 -1px 0 rgba(0,0,0,0.02)',
           }}
-        >
-          <PreviewRenderer html={html} theme={theme} />
-        </div>
+          dangerouslySetInnerHTML={previewMarkup}
+        />
       </div>
     </div>
   );
