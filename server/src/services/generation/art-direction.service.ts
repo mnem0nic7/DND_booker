@@ -5,7 +5,7 @@ import { prisma } from '../../config/database.js';
 import { publishGenerationEvent } from './pubsub.service.js';
 import { parseJsonResponse } from './parse-json.js';
 import { getAiSettings, getDecryptedApiKey } from '../ai-settings.service.js';
-import { generateAiImage } from '../ai-image.service.js';
+import { generateAiImage, stripImageTextRenderingInstructions } from '../ai-image.service.js';
 import { createAsset } from '../asset.service.js';
 import { generateTextWithTimeout } from './model-timeouts.js';
 import { resolveDocumentLayout } from '../layout-plan.service.js';
@@ -68,18 +68,18 @@ const IMAGE_ATTR_BY_BLOCK: Record<ImageCapableBlockType, string> = {
 };
 
 const RECOMMENDED_MODEL_BY_BLOCK: Record<ImageCapableBlockType, 'dall-e-3' | 'gpt-image-1'> = {
-  titlePage: 'dall-e-3',
-  chapterHeader: 'dall-e-3',
-  fullBleedImage: 'dall-e-3',
+  titlePage: 'gpt-image-1',
+  chapterHeader: 'gpt-image-1',
+  fullBleedImage: 'gpt-image-1',
   mapBlock: 'gpt-image-1',
-  backCover: 'dall-e-3',
-  npcProfile: 'dall-e-3',
+  backCover: 'gpt-image-1',
+  npcProfile: 'gpt-image-1',
 };
 
 const RECOMMENDED_SIZE_BY_BLOCK: Record<ImageCapableBlockType, string> = {
-  titlePage: '1024x1792',
-  chapterHeader: '1792x1024',
-  fullBleedImage: '1792x1024',
+  titlePage: '1024x1536',
+  chapterHeader: '1536x1024',
+  fullBleedImage: '1536x1024',
   mapBlock: '1024x1024',
   backCover: '1024x1024',
   npcProfile: '1024x1024',
@@ -286,16 +286,8 @@ function buildBlockSpecificSuffix(blockType: ImageCapableBlockType): string {
   }
 }
 
-function removePromptTextRenderingInstructions(value: string): string {
-  return value
-    .replace(/\b(the )?title (is|should be|appears|appearing|displayed|written)[^.]*\.?/gi, ' ')
-    .replace(/\b(display|show|include|render)\s+(the\s+)?title[^.]*\.?/gi, ' ')
-    .replace(/\b(mystical|ornate|decorative|stylized)\s+font[^.]*\.?/gi, ' ')
-    .replace(/\b(lettering|typography|caption|logo|watermark)[^.]*\.?/gi, ' ');
-}
-
 export function finalizeArtPrompt(prompt: string, blockType: ImageCapableBlockType): string {
-  const cleaned = removePromptTextRenderingInstructions(prompt)
+  const cleaned = stripImageTextRenderingInstructions(prompt)
     .replace(/\s+/g, ' ')
     .replace(/\s+\./g, '.')
     .trim()
@@ -802,8 +794,8 @@ Return ONLY valid JSON with this shape:
       "blockType": "titlePage",
       "prompt": "detailed image prompt",
       "rationale": "why this image matters",
-      "model": "dall-e-3",
-      "size": "1024x1792"
+      "model": "gpt-image-1",
+      "size": "1024x1536"
     }
   ]
 }

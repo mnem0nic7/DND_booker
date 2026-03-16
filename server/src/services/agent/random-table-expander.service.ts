@@ -5,6 +5,7 @@ import { prisma } from '../../config/database.js';
 import type { CritiqueBacklogItem, DocumentContent } from '@dnd-booker/shared';
 import {
   assessRandomTableEntries,
+  strengthenRandomTableEntries,
 } from '@dnd-booker/shared';
 
 interface NormalizedRandomTableEntry {
@@ -14,17 +15,6 @@ interface NormalizedRandomTableEntry {
 
 function cloneNode<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
-}
-
-function enrichEntryDeterministically(entry: NormalizedRandomTableEntry): NormalizedRandomTableEntry {
-  const base = entry.result.replace(/\.+$/, '').trim();
-  const suffix = /dc\s*\d+/i.test(base)
-    ? 'The result should immediately change the scene and force a follow-up choice.'
-    : 'The result should introduce a clear clue, danger, or social complication the DM can run immediately.';
-  return {
-    roll: entry.roll,
-    result: `${base}. ${suffix}`,
-  };
 }
 
 async function expandEntriesWithModel(input: {
@@ -146,7 +136,7 @@ export async function expandRandomTablesFromBacklog(input: {
           const assessment = assessRandomTableEntries(attrs.entries ?? attrs.results);
           if (!assessment.isThin) return null;
 
-          let nextEntries = assessment.normalizedEntries.map(enrichEntryDeterministically);
+          let nextEntries = strengthenRandomTableEntries(assessment.normalizedEntries);
           try {
             const generatedEntries = await expandEntriesWithModel({
               userId: input.userId,
@@ -154,7 +144,9 @@ export async function expandRandomTablesFromBacklog(input: {
               tableTitle: String(attrs.title ?? attrs.name ?? document.title),
               entries: assessment.normalizedEntries,
             });
-            const generatedAssessment = assessRandomTableEntries(generatedEntries);
+            const generatedAssessment = assessRandomTableEntries(
+              strengthenRandomTableEntries(generatedEntries),
+            );
             if (
               generatedAssessment.normalizedEntries.length === assessment.normalizedEntries.length
               && generatedAssessment.thinEntryCount <= assessment.thinEntryCount
@@ -165,7 +157,9 @@ export async function expandRandomTablesFromBacklog(input: {
             // Fall back to deterministic expansion if the model call fails.
           }
 
-          const nextAssessment = assessRandomTableEntries(nextEntries);
+          const nextAssessment = assessRandomTableEntries(
+            strengthenRandomTableEntries(nextEntries),
+          );
           if (nextAssessment.thinEntryCount > assessment.thinEntryCount) {
             return null;
           }

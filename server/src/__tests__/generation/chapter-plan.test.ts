@@ -388,4 +388,39 @@ describe('Chapter Plan Service — executeChapterPlanGeneration', () => {
 
     expect(result.plan.encounters[0].enemies[0].cr).toBe('0.25');
   });
+
+  it('defaults missing plan arrays instead of failing generation', async () => {
+    mockGenerateText.mockResolvedValueOnce({
+      text: JSON.stringify({
+        chapterSlug: 'ch-1',
+        chapterTitle: 'Chapter 1: The Village',
+        sections: [
+          {
+            slug: 'arrival',
+            title: 'Arrival',
+            contentType: 'narrative',
+            targetWords: 800,
+            outline: 'The party arrives in the village.',
+            keyBeats: ['Arrive at dusk'],
+            blocksNeeded: ['readAloud'],
+          },
+        ],
+      }),
+      usage: { inputTokens: 1000, outputTokens: 1500 },
+    } as any);
+
+    const run = await createRun({
+      projectId: testProject.id, userId: testUser.id, prompt: 'test',
+    });
+
+    const result = await executeChapterPlanGeneration(
+      run!, SAMPLE_CHAPTER, SAMPLE_BIBLE,
+      SAMPLE_BIBLE.entities.map(e => ({ slug: e.slug, entityType: e.entityType, name: e.name, summary: e.summary })),
+      {} as any, 8192,
+    );
+
+    expect(result.plan.encounters).toEqual([]);
+    expect(result.plan.entityReferences).toEqual([]);
+    expect(result.plan.sections[0].entityReferences).toEqual([]);
+  });
 });

@@ -8,6 +8,7 @@ import {
   normalizeStatBlockAttrs,
 } from '@dnd-booker/shared';
 import { getSupportedBlockTypes } from './ai-content.service.js';
+import { parseJsonResponse } from './generation/parse-json.js';
 
 // ── Session CRUD ────────────────────────────────────────────────
 
@@ -620,7 +621,23 @@ function parseStructuredBlockNode(rawBlockType: string, blockContent: string): T
       attrs: normalizeStructuredBlockAttrs(blockType, parsedAttrs),
     };
   } catch {
-    return null;
+    try {
+      const recovered = parseJsonResponse(blockContent);
+      const parsedAttrs = Array.isArray(recovered) && (blockType === 'randomTable' || blockType === 'encounterTable')
+        ? { entries: recovered }
+        : recovered;
+
+      if (!parsedAttrs || typeof parsedAttrs !== 'object' || Array.isArray(parsedAttrs)) {
+        return null;
+      }
+
+      return {
+        type: blockType,
+        attrs: normalizeStructuredBlockAttrs(blockType, parsedAttrs as Record<string, unknown>),
+      };
+    } catch {
+      return null;
+    }
   }
 }
 

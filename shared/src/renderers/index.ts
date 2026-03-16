@@ -18,4 +18,5 @@ export {
   resolveRandomTableEntries,
   safeCssUrl,
   safeUrl,
+  strengthenRandomTableEntries,
 } from './utils.js';

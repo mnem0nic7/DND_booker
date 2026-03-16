@@ -15,7 +15,7 @@ const targetInsertSchema = z.object({
 const imageRequestSchema = z.object({
   id: z.string(),
   prompt: z.string().min(10).max(4000).describe('Detailed image generation prompt'),
-  model: z.enum(['dall-e-3', 'gpt-image-1']).default('dall-e-3'),
+  model: z.enum(['dall-e-3', 'gpt-image-1']).default('gpt-image-1'),
   size: z.string().default('1024x1024'),
   target: z.union([targetUpdateSchema, targetInsertSchema]).describe('Where to place the generated image'),
 });

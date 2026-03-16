@@ -14,5 +14,6 @@ export {
   normalizeStructuredText,
   safeUrl,
   safeCssUrl,
+  strengthenRandomTableEntries,
 } from '@dnd-booker/shared';
 export { normalizeEncounterEntries, normalizeRandomTableEntries } from '@dnd-booker/shared';

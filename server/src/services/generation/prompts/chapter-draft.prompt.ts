@@ -35,7 +35,7 @@ Content rules:
 - Exploration sections should surface clues, hazards, discoveries, and consequences.
 - Encounter sections should surface terrain, enemy tactics, triggers, rewards, and aftermath.
 - Every encounter section should read like a runnable encounter packet: setup, trigger, terrain, opposition, tactics, payoff, and consequences must be easy to scan.
-- If you emit a :::randomTable block, every entry must be runnable. Each result should tell the DM the immediate situation, the active threat or opportunity, and the clue, reward, or consequence. Do not write bare results like "2d4 shadows" or "A miner spirit".
+- If you emit a :::randomTable block, every entry must be runnable. Each result should be 16-32 words and tell the DM the immediate situation, the active threat or opportunity, and the clue, reward, or consequence. Do not write bare results like "2d4 shadows" or "A miner spirit".
 - NPC profiles must include actionable table data: goal, what they know, leverage, and likely reaction, not just personality color.
 - If a scene introduces multiple named townsfolk, witnesses, or informants, emit each one as a separate :::npcProfile block instead of a numbered list with prose bullets.
 - Use the planned utility blocks as real block markers. Do not replace them with plain prose summaries.
@@ -80,7 +80,7 @@ export function buildChapterDraftUserPrompt(
       sectionNotes.push('Encounter packet: keep setup, terrain, enemy tactics, reward, and aftermath easy to scan.');
     }
     if (section.blocksNeeded.includes('randomTable')) {
-      sectionNotes.push('Random encounter table entries must each include situation, threat or opportunity, and payoff.');
+      sectionNotes.push('Random encounter table entries must each include situation, threat or opportunity, and payoff in 16-32 words.');
     }
     if (section.blocksNeeded.includes('npcProfile')) {
       sectionNotes.push('NPC profiles must include goal, what they know, leverage, and likely reaction.');

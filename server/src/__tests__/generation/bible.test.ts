@@ -295,4 +295,24 @@ describe('Bible Service — executeBibleGeneration', () => {
     expect(call.prompt).toContain('one_shot');
     expect(call.prompt).toContain('classic fantasy');
   });
+
+  it('backfills missing entities from normalized input when the model omits them', async () => {
+    const { entities: _ignored, ...responseWithoutEntities } = VALID_BIBLE_RESPONSE as any;
+    mockGenerateText.mockResolvedValueOnce({
+      text: JSON.stringify(responseWithoutEntities),
+      usage: { inputTokens: 900, outputTokens: 1800 },
+    } as any);
+
+    const run = await createRun({
+      projectId: testProject.id,
+      userId: testUser.id,
+      prompt: 'A goblin cave adventure',
+    });
+
+    const result = await executeBibleGeneration(run!, SAMPLE_INPUT, {} as any, 8192);
+
+    expect(result.entities.length).toBeGreaterThan(0);
+    expect(result.entities.some((entity) => entity.canonicalName === 'Chief Gnarltooth')).toBe(true);
+    expect(result.entities.some((entity) => entity.canonicalName === 'Duskhollow Caves')).toBe(true);
+  });
 });

@@ -13,22 +13,25 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   text-align: center;
-  padding: 3rem 2rem;
+  padding: 0.85rem 1rem 0.7rem;
+  gap: 0.42rem;
 }
 
 .title-page__cover-image {
   width: 100%;
-  max-width: 400px;
-  margin-bottom: 2rem;
+  max-width: 640px;
+  margin-bottom: 0.32rem;
 }
 
 .title-page__cover-image img {
   width: 100%;
+  max-height: 620px;
   height: auto;
+  object-fit: contain;
   border: 1px solid var(--accent-secondary);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.24);
 }
 
 .title-page__cover-placeholder {
@@ -51,26 +54,26 @@
 
 .title-page__title {
   font-family: var(--heading-font);
-  font-size: 2.5rem;
+  font-size: 2.15rem;
   font-weight: 700;
   color: var(--accent-color);
-  margin: 0 0 0.5rem;
+  margin: 0 0 0.18rem;
   line-height: 1.1;
   letter-spacing: 0.02em;
   text-transform: uppercase;
 }
 
 .title-page__subtitle {
-  font-size: 1.25rem;
+  font-size: 0.98rem;
   font-style: italic;
   color: var(--accent-color);
-  margin: 0 0 1.5rem;
+  margin: 0 0 0.42rem;
 }
 
 .title-page__ornament {
-  font-size: 1.5rem;
+  font-size: 1.15rem;
   color: var(--accent-secondary);
-  margin: 0.5rem 0 1rem;
+  margin: 0.32rem 0 0.46rem;
   letter-spacing: 0.5rem;
 }
 

@@ -1,7 +1,7 @@
 .chapter-header {
   position: relative;
   width: 100%;
-  padding: 2.5rem 2rem 2rem;
+  padding: 1.65rem 1.1rem 1rem;
   margin: 1.5rem 0;
   text-align: center;
   page-break-before: always;
@@ -21,10 +21,11 @@
 /* Chapter number */
 .chapter-header__number {
   font-family: var(--heading-font);
-  font-size: 1em;
+  font-size: 0.8em;
   font-weight: 400;
-  text-transform: uppercase;
-  letter-spacing: 0.2em;
+  text-transform: none;
+  font-variant: small-caps;
+  letter-spacing: 0.02em;
   color: var(--accent-color);
   margin-bottom: 0.25rem;
 }
@@ -32,7 +33,7 @@
 /* Title */
 .chapter-header__title {
   font-family: var(--heading-font);
-  font-size: 2.5em;
+  font-size: 2.1em;
   font-weight: 700;
   color: var(--text-color);
   margin: 0;
@@ -41,20 +42,20 @@
 
 /* Decorative underline */
 .chapter-header__underline {
-  width: 120px;
+  width: 90px;
   height: 3px;
   background: var(--border-decoration);
-  margin: 0.75rem auto;
+  margin: 0.35rem auto;
   border-radius: 2px;
 }
 
 /* Subtitle */
 .chapter-header__subtitle {
   font-family: var(--body-font);
-  font-size: 1.1em;
+  font-size: 0.92em;
   font-style: italic;
   color: var(--accent-color);
-  margin-top: 0.25rem;
+  margin-top: 0.18rem;
 }
 
 /* Delete button */

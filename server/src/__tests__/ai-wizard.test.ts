@@ -223,6 +223,31 @@ Keep the pressure on as the party crosses the threshold.
     expect(result.content![0].attrs?.reactions).toContain('Incorporeal Movement');
   });
 
+  it('should recover loose random-table JSON that uses response fields', () => {
+    const md = ":::randomTable {title:'Artifact Interactions', dieType:'d10', entries:[{result:1,response:'The **Glowing Crystal** flares, revealing a hidden passage.'},{result:2,response:'Touching the **Miner\\'s Pick** triggers a painful curse.'}],} :::";
+    const result = markdownToTipTap(md);
+
+    expect(result.content![0]).toMatchObject({
+      type: 'randomTable',
+      attrs: {
+        title: 'Artifact Interactions',
+        dieType: 'd10',
+      },
+    });
+
+    const entries = JSON.parse(String(result.content![0].attrs?.entries ?? '[]')) as Array<{ roll: string; result: string }>;
+    expect(entries).toEqual([
+      {
+        roll: '1',
+        result: 'The **Glowing Crystal** flares, revealing a hidden passage.',
+      },
+      {
+        roll: '2',
+        result: 'Touching the **Miner\'s Pick** triggers a painful curse.',
+      },
+    ]);
+  });
+
   it('should handle :::sidebarCallout with default attrs', () => {
     const md = ':::sidebarCallout\nImportant note about the dungeon.\n:::';
     const result = markdownToTipTap(md);

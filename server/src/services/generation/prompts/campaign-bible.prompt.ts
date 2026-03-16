@@ -79,6 +79,7 @@ Entity detail fields by type:
 
 Rules:
 - Create ALL significant NPCs, locations, and factions as entities
+- Never omit the entities field. If you genuinely have no entities, return "entities": [] instead of leaving it out
 - Every chapter must have at least one associated entity
 - Page budgets must sum to approximately the page target
 - Act structure must cover the full level range

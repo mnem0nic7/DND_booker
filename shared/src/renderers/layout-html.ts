@@ -195,7 +195,7 @@ export function getCanonicalLayoutCss(): string {
     .layout-page-stack {
       display: flex;
       flex-direction: column;
-      gap: 0.85rem;
+      gap: 0.55rem;
     }
 
     .layout-page {
@@ -221,13 +221,13 @@ export function getCanonicalLayoutCss(): string {
 
     .layout-page__hero,
     .layout-page__full-width {
-      margin-bottom: 0.55rem;
+      margin-bottom: 0.3rem;
     }
 
     .layout-page__columns {
       display: grid;
       grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-      gap: var(--layout-column-gap, 22px);
+      gap: var(--layout-column-gap, 18px);
       align-items: start;
       min-height: 0;
       flex: 1;
@@ -241,13 +241,13 @@ export function getCanonicalLayoutCss(): string {
       min-width: 0;
       display: flex;
       flex-direction: column;
-      gap: 0.4rem;
+      gap: 0.28rem;
     }
 
     .layout-unit,
     .layout-fragment,
     .layout-group {
-      margin-bottom: 0.4rem;
+      margin-bottom: 0.28rem;
     }
 
     .layout-flow-root > .layout-unit,
@@ -279,14 +279,14 @@ export function getCanonicalLayoutCss(): string {
     .layout-group-npc-grid {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 0.8rem;
+      gap: 0.6rem;
       align-items: start;
     }
 
     .layout-group-packet {
       display: grid;
       grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
-      gap: 0.8rem;
+      gap: 0.6rem;
       align-items: start;
       break-inside: avoid;
       page-break-inside: avoid;

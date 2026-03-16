@@ -1,14 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useAiStore } from '../../stores/aiStore';
 
-type ImageModel = 'dall-e-3' | 'gpt-image-1';
+type ImageModel = 'gpt-image-1';
 
 const MODEL_SIZES: Record<ImageModel, { label: string; value: string }[]> = {
-  'dall-e-3': [
-    { label: 'Square (1024x1024)', value: '1024x1024' },
-    { label: 'Landscape (1792x1024)', value: '1792x1024' },
-    { label: 'Portrait (1024x1792)', value: '1024x1792' },
-  ],
   'gpt-image-1': [
     { label: 'Square (1024x1024)', value: '1024x1024' },
     { label: 'Landscape (1536x1024)', value: '1536x1024' },
@@ -18,11 +13,11 @@ const MODEL_SIZES: Record<ImageModel, { label: string; value: string }[]> = {
 
 const BLOCK_DEFAULTS: Record<string, { size: string; hint: string }> = {
   titlePage: {
-    size: '1024x1792',
+    size: '1024x1536',
     hint: 'Fantasy cover art for a D&D adventure...',
   },
   fullBleedImage: {
-    size: '1792x1024',
+    size: '1536x1024',
     hint: 'Fantasy illustration for a D&D sourcebook...',
   },
   mapBlock: {
@@ -34,7 +29,7 @@ const BLOCK_DEFAULTS: Record<string, { size: string; hint: string }> = {
     hint: 'Author portrait or small illustration...',
   },
   chapterHeader: {
-    size: '1792x1024',
+    size: '1536x1024',
     hint: 'Wide fantasy landscape banner...',
   },
   npcProfile: {
@@ -62,7 +57,7 @@ export function AiImageGenerateButton({
 
   const [isOpen, setIsOpen] = useState(false);
   const [prompt, setPrompt] = useState(initialPrompt || '');
-  const [model, setModel] = useState<ImageModel>('dall-e-3');
+  const model: ImageModel = 'gpt-image-1';
   const [size, setSize] = useState(defaults.size);
   const [quality, setQuality] = useState('standard');
   const [error, setError] = useState('');
@@ -76,17 +71,6 @@ export function AiImageGenerateButton({
   // Only show when provider is OpenAI with an API key
   const isAvailable = settings?.provider === 'openai' && settings?.hasApiKey;
   if (!isAvailable) return null;
-
-  // When model changes, reset size to first valid option if current isn't valid
-  function handleModelChange(newModel: ImageModel) {
-    setModel(newModel);
-    const validSizes = MODEL_SIZES[newModel].map((s) => s.value);
-    if (!validSizes.includes(size)) {
-      // Pick block-type default if valid for new model, otherwise first option
-      const blockDefault = BLOCK_DEFAULTS[blockType]?.size;
-      setSize(blockDefault && validSizes.includes(blockDefault) ? blockDefault : validSizes[0]);
-    }
-  }
 
   async function handleGenerate() {
     if (!prompt.trim()) return;
@@ -133,19 +117,6 @@ export function AiImageGenerateButton({
 
       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
         <label style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1, minWidth: '120px' }}>
-          <span style={{ fontSize: '11px', opacity: 0.7 }}>Model</span>
-          <select
-            value={model}
-            onChange={(e) => handleModelChange(e.target.value as ImageModel)}
-            className="ai-generate-input"
-            style={{ padding: '4px 6px', minHeight: 'unset' }}
-          >
-            <option value="dall-e-3">DALL-E 3</option>
-            <option value="gpt-image-1">GPT Image 1</option>
-          </select>
-        </label>
-
-        <label style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1, minWidth: '120px' }}>
           <span style={{ fontSize: '11px', opacity: 0.7 }}>Size</span>
           <select
             value={size}
@@ -168,8 +139,7 @@ export function AiImageGenerateButton({
             style={{ padding: '4px 6px', minHeight: 'unset' }}
           >
             <option value="standard">Standard</option>
-            <option value="hd">HD</option>
-            {model === 'gpt-image-1' && <option value="high">High</option>}
+            <option value="high">High</option>
           </select>
         </label>
       </div>

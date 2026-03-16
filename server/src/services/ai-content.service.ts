@@ -79,21 +79,12 @@ Block rules:
 - For general questions or brainstorming, respond conversationally — only use JSON blocks when generating insertable content
 
 === AI IMAGE GENERATION ===
-The editor supports AI image generation for 6 image-capable block types: Title Page (cover art), Full Bleed Image (illustrations), Map Block (battle maps), Back Cover (author photo/art), Chapter Header (background banner), and NPC Profile (character portrait). Users with an OpenAI API key can generate images directly in each block's edit panel using DALL-E 3 or GPT Image 1. Existing uploaded/generated project assets can also be reused from the asset browser.
+The editor supports AI image generation for 6 image-capable block types: Title Page (cover art), Full Bleed Image (illustrations), Map Block (battle maps), Back Cover (author photo/art), Chapter Header (background banner), and NPC Profile (character portrait). Users with an OpenAI API key can generate images directly in each block's edit panel using GPT Image 1. Existing uploaded/generated project assets can also be reused from the asset browser.
 
-**When to recommend DALL-E 3:**
-- Artistic illustrations, cover art, character portraits, scenic landscapes
-- When the user wants a specific artistic style (vivid, dramatic, painterly)
-- Fantasy book covers, chapter banners, atmospheric scenes
-- Best for: visual storytelling, mood-setting imagery, polished final art
-- Sizes: 1024x1024 (square), 1792x1024 (landscape), 1024x1792 (portrait)
-
-**When to recommend GPT Image 1:**
-- Maps, diagrams, technical illustrations, layouts with text/labels
-- Handout-style images (wanted posters, letters, scrolls with legible text)
-- When text rendering accuracy matters (signs, runes, inscriptions)
-- Architectural plans, dungeon cross-sections, city layouts
-- Best for: precision, text in images, technical/schematic content
+**GPT Image 1 usage guidance:**
+- Use it for all in-app image generation: cover art, chapter banners, portraits, illustrations, and maps
+- Best for: one consistent visual pipeline across book art, maps, and utility images
+- The system overlays titles separately, so prompts should avoid asking for visible words inside the image
 - Sizes: 1024x1024 (square), 1536x1024 (landscape), 1024x1536 (portrait)
 
 **Size recommendations by block type:**
@@ -107,7 +98,7 @@ The editor supports AI image generation for 6 image-capable block types: Title P
 **Prompt tips you can share with users:**
 - Be specific about style: "oil painting style", "ink and watercolor", "old parchment map"
 - Reference D&D aesthetics: "in the style of official D&D 5e sourcebook art"
-- For maps: specify "top-down view", "no text labels" or "with labeled rooms"
+- For maps: specify "top-down view", "unlabeled rooms", and clear landmarks
 - For covers: describe the focal subject, background, lighting, and mood
 - Include "fantasy RPG" or "Dungeons & Dragons" to anchor the genre
 
@@ -124,15 +115,15 @@ Format:
     {
       "id": "img-1",
       "prompt": "A dramatic fantasy oil painting of a dark castle...",
-      "model": "dall-e-3",
-      "size": "1024x1792",
+      "model": "gpt-image-1",
+      "size": "1024x1536",
       "target": { "nodeIndex": 0, "attr": "coverImageUrl" }
     },
     {
       "id": "img-2",
       "prompt": "A wide fantasy landscape showing rolling hills...",
-      "model": "dall-e-3",
-      "size": "1792x1024",
+      "model": "gpt-image-1",
+      "size": "1536x1024",
       "target": { "insertAfter": 5, "blockType": "fullBleedImage", "attr": "src" }
     }
   ]
@@ -158,8 +149,8 @@ RULES:
 - Reference node indices from the DOCUMENT STRUCTURE outline above for existing blocks
 - Only emit \`_generateImage\` when the user explicitly asks for image creation/generation
 - For existing blocks, verify the node type matches the attr (e.g., don't set coverImageUrl on a statBlock)
-- Model selection: use "dall-e-3" for artistic illustrations and "gpt-image-1" for maps/diagrams with text
-- Size selection: portrait (1024x1792) for covers, landscape (1792x1024) for wide illustrations/banners, square (1024x1024) for maps/portraits
+- Model selection: use "gpt-image-1" for all in-app image generation requests
+- Size selection: portrait (1024x1536) for covers, landscape (1536x1024) for wide illustrations/banners, square (1024x1024) for maps/portraits
 === END IMAGE GENERATION CONTROL BLOCK ===
 === END AI IMAGE GENERATION ===
 

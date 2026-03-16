@@ -416,7 +416,7 @@ export function assembleHtml(options: AssembleOptions): string {
       font-family: var(--font-body);
       color: var(--color-text);
       background: #3d4656;
-      line-height: 1.45;
+      line-height: 1.36;
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
     }
@@ -428,10 +428,11 @@ export function assembleHtml(options: AssembleOptions): string {
     .page-canvas {
       --page-width: 816px;
       --page-height: 1056px;
-      --page-padding: ${pagePreset === 'print_pdf' ? '60px' : '68px'};
+      --page-padding: ${pagePreset === 'print_pdf' ? '56px' : '60px'};
       --content-height: calc(var(--page-height) - (var(--page-padding) * 2));
-      --page-content-height: calc(var(--content-height) - 48px);
-      --margin-reserve: 48px;
+      --page-content-height: calc(var(--content-height) - 40px);
+      --margin-reserve: 40px;
+      --layout-column-gap: 18px;
 
       width: var(--page-width);
       height: var(--page-height);
@@ -453,7 +454,7 @@ export function assembleHtml(options: AssembleOptions): string {
       position: relative;
       color: var(--text-color);
       font-family: var(--body-font);
-      font-size: 8.95pt;
+      font-size: 8.55pt;
       font-feature-settings: 'kern' 1, 'liga' 1;
       -webkit-font-smoothing: antialiased;
       -moz-osx-font-smoothing: grayscale;
@@ -477,10 +478,10 @@ export function assembleHtml(options: AssembleOptions): string {
     }
 
     p {
-      margin: 0.28em 0;
+      margin: 0.22em 0;
       text-align: justify;
       text-indent: var(--paragraph-indent, 1em);
-      line-height: 1.3;
+      line-height: 1.24;
       widows: 2;
       orphans: 2;
     }
@@ -494,33 +495,33 @@ export function assembleHtml(options: AssembleOptions): string {
     }
 
     h1 {
-      font-size: 16pt;
-      margin-top: 1.35em;
-      margin-bottom: 0.45em;
-    }
-
-    h2 {
-      font-size: 13pt;
-      margin-top: 1.1em;
+      font-size: 15pt;
+      margin-top: 1.15em;
       margin-bottom: 0.35em;
     }
 
-    h3 {
-      font-size: 11pt;
+    h2 {
+      font-size: 12.4pt;
       margin-top: 0.95em;
-      margin-bottom: 0.3em;
+      margin-bottom: 0.28em;
+    }
+
+    h3 {
+      font-size: 10.7pt;
+      margin-top: 0.8em;
+      margin-bottom: 0.24em;
     }
 
     h4 {
-      font-size: 10pt;
-      margin-top: 0.75em;
-      margin-bottom: 0.2em;
+      font-size: 9.7pt;
+      margin-top: 0.62em;
+      margin-bottom: 0.16em;
       font-weight: bold;
     }
 
     .page-footer {
       position: absolute;
-      bottom: 24px;
+      bottom: 20px;
       left: var(--page-padding);
       right: var(--page-padding);
       font-size: 0.65rem;
@@ -771,35 +772,37 @@ export function assembleHtml(options: AssembleOptions): string {
     /* Chapter Header */
     .chapter-header {
       text-align: center;
-      padding: 2.4rem 1.5rem 1.6rem;
+      padding: 1.65rem 1.1rem 1rem;
       margin: 0;
     }
 
     .chapter-header__number {
       font-family: var(--font-heading);
-      font-size: 0.88rem;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
+      font-size: 0.8rem;
+      text-transform: none;
+      font-variant: small-caps;
+      letter-spacing: 0.02em;
       color: var(--color-primary);
       white-space: nowrap;
     }
 
     .chapter-header__title {
-      font-size: 1.7rem;
-      margin: 0.35rem 0;
+      font-size: 1.48rem;
+      margin: 0.25rem 0;
     }
 
     .chapter-header__underline {
-      width: 4rem;
+      width: 3.25rem;
       height: 3px;
       background: var(--color-divider);
-      margin: 0.5rem auto;
+      margin: 0.35rem auto;
     }
 
     .chapter-header__subtitle {
       font-style: italic;
       color: var(--color-primary);
-      margin-top: 0.35rem;
+      margin-top: 0.18rem;
+      font-size: 0.92rem;
     }
 
     /* Spell Card */
@@ -892,29 +895,29 @@ export function assembleHtml(options: AssembleOptions): string {
 
     /* Random Table */
     .random-table {
-      margin: 0.7rem 0;
+      margin: 0.55rem 0;
       page-break-inside: avoid;
     }
 
     .random-table__header {
       display: flex;
       align-items: center;
-      gap: 0.5rem;
-      margin-bottom: 0.5rem;
+      gap: 0.4rem;
+      margin-bottom: 0.24rem;
     }
 
     .random-table__title {
       font-family: var(--font-heading);
       color: var(--color-heading);
       margin: 0;
-      font-size: 1.1rem;
+      font-size: 1rem;
     }
 
     .random-table__die-badge {
       background: var(--color-primary);
       color: white;
-      font-size: 0.7rem;
-      padding: 0.1rem 0.4rem;
+      font-size: 0.66rem;
+      padding: 0.08rem 0.34rem;
       border-radius: 3px;
       font-weight: bold;
     }
@@ -1256,39 +1259,48 @@ export function assembleHtml(options: AssembleOptions): string {
     /* Title Page */
     .title-page {
       text-align: center;
-      padding: 1.4rem 1rem 1rem;
+      padding: 0.6rem 0.55rem 0.55rem;
     }
 
     .title-page__content {
       display: flex;
       flex-direction: column;
       align-items: center;
-      min-height: calc(var(--content-height) - 96px);
+      min-height: calc(var(--content-height) - 72px);
+      justify-content: flex-start;
+      gap: 0.38rem;
+      padding-top: 0.2rem;
+    }
+
+    .title-page__cover-image {
+      width: 100%;
+      display: flex;
       justify-content: center;
     }
 
     .title-page__cover-image img {
-      max-width: 94%;
-      max-height: 440px;
-      margin-bottom: 0.95rem;
-      box-shadow: 0 10px 26px rgba(0, 0, 0, 0.24);
+      width: min(100%, 640px);
+      max-height: 620px;
+      object-fit: contain;
+      margin-bottom: 0.32rem;
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.24);
     }
 
     .title-page__title {
-      font-size: 2.35rem;
-      margin-bottom: 0.28rem;
+      font-size: 2.15rem;
+      margin-bottom: 0.18rem;
     }
 
     .title-page__subtitle {
-      font-size: 1.05rem;
+      font-size: 0.98rem;
       font-style: italic;
-      margin-bottom: 0.75rem;
+      margin-bottom: 0.42rem;
     }
 
     .title-page__ornament {
-      font-size: 1.35rem;
+      font-size: 1.15rem;
       color: var(--color-primary);
-      margin: 0.7rem 0;
+      margin: 0.32rem 0 0.46rem;
     }
 
     .title-page__author {

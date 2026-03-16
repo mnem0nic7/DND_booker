@@ -110,9 +110,9 @@ interface PagePresetMetrics {
   columnGapPx: number;
 }
 
-const COLUMN_FLOW_UNIT_GAP_PX = 10;
-const FULL_WIDTH_UNIT_GAP_PX = 12;
-const HERO_UNIT_GAP_PX = 16;
+const COLUMN_FLOW_UNIT_GAP_PX = 6;
+const FULL_WIDTH_UNIT_GAP_PX = 8;
+const HERO_UNIT_GAP_PX = 10;
 
 function stableStringify(value: unknown): string {
   if (value === null || typeof value !== 'object') {
@@ -186,7 +186,7 @@ function isShortLeadIn(node: DocumentContent | undefined): boolean {
 function isWideRandomTable(node: DocumentContent | undefined): boolean {
   return Boolean(node)
     && node?.type === 'randomTable'
-    && resolveRandomTableEntries(node.attrs ?? {}).length >= 8;
+    && resolveRandomTableEntries(node.attrs ?? {}).length >= 10;
 }
 
 function detectRecipe(blocks: DocumentContent[], options: ResolveLayoutPlanOptions): LayoutRecipe | null {
@@ -672,11 +672,11 @@ function getPagePresetMetrics(
     return {
       pageWidthPx: 816,
       pageHeightPx: 1056,
-      pagePaddingX: 60,
-      pagePaddingY: 60,
-      footerReservePx: 48,
+      pagePaddingX: 56,
+      pagePaddingY: 56,
+      footerReservePx: 40,
       columnCount: isSingleColumnDocument ? 1 : 2,
-      columnGapPx: 22,
+      columnGapPx: 18,
     };
   }
 
@@ -696,22 +696,22 @@ function getPagePresetMetrics(
     return {
       pageWidthPx: 816,
       pageHeightPx: 1056,
-      pagePaddingX: 72,
-      pagePaddingY: 72,
-      footerReservePx: 48,
+      pagePaddingX: 60,
+      pagePaddingY: 60,
+      footerReservePx: 40,
       columnCount: isSingleColumnDocument ? 1 : 2,
-      columnGapPx: 22,
+      columnGapPx: 18,
     };
   }
 
   return {
     pageWidthPx: 816,
     pageHeightPx: 1056,
-    pagePaddingX: 68,
-    pagePaddingY: 68,
-    footerReservePx: 48,
+    pagePaddingX: 60,
+    pagePaddingY: 60,
+    footerReservePx: 40,
     columnCount: isSingleColumnDocument ? 1 : 2,
-    columnGapPx: 22,
+    columnGapPx: 18,
   };
 }
 
@@ -730,8 +730,12 @@ function buildLayoutFlowUnits(fragments: LayoutFlowFragment[]): LayoutFlowUnit[]
     if (shouldGroup && currentUnit && currentUnit.groupId === fragment.groupId) {
       currentUnit.fragmentNodeIds.push(fragment.nodeId);
       currentUnit.fragmentIndexes.push(fragment.sourceIndex);
+      currentUnit.span = mergeUnitSpan(currentUnit.span, fragment.span);
+      currentUnit.placement = mergeUnitPlacement(currentUnit.placement, fragment.placement);
       currentUnit.keepTogether = currentUnit.keepTogether || fragment.keepTogether;
       currentUnit.allowWrapBelow = currentUnit.allowWrapBelow || fragment.allowWrapBelow;
+      currentUnit.isHero = currentUnit.isHero || fragment.isHero;
+      currentUnit.isOpener = currentUnit.isOpener || fragment.isOpener;
       continue;
     }
 
@@ -751,6 +755,24 @@ function buildLayoutFlowUnits(fragments: LayoutFlowFragment[]): LayoutFlowUnit[]
   }
 
   return units;
+}
+
+function mergeUnitSpan(current: LayoutSpan, next: LayoutSpan): LayoutSpan {
+  if (current === 'full_page' || next === 'full_page') return 'full_page';
+  if (current === 'both_columns' || next === 'both_columns') return 'both_columns';
+  return 'column';
+}
+
+function mergeUnitPlacement(current: LayoutPlacement, next: LayoutPlacement): LayoutPlacement {
+  const rank: Record<LayoutPlacement, number> = {
+    inline: 0,
+    side_panel: 1,
+    bottom_panel: 2,
+    hero_top: 3,
+    full_page_insert: 4,
+  };
+
+  return rank[next] > rank[current] ? next : current;
 }
 
 function estimateUnitHeight(unit: LayoutFlowUnit, fragments: LayoutFlowFragment[]): number {
@@ -940,12 +962,38 @@ function assignUnitToPage(args: {
   }
 }
 
-function shouldUseFullWidthRegion(unit: LayoutFlowUnit): boolean {
+function getUnitNodeTypes(unit: LayoutFlowUnit, flow: LayoutFlowModel): Set<string> {
+  const nodeTypes = new Set<string>();
+  for (const fragment of flow.fragments) {
+    if (unit.fragmentNodeIds.includes(fragment.nodeId)) {
+      nodeTypes.add(fragment.nodeType);
+    }
+  }
+  return nodeTypes;
+}
+
+function shouldUseFullWidthRegion(
+  unit: LayoutFlowUnit,
+  flow: LayoutFlowModel,
+  height: number,
+  contentHeight: number,
+): boolean {
   if (unit.span === 'both_columns') return true;
   if (!unit.groupId) return false;
-  return unit.groupId.startsWith('npc-roster')
-    || unit.groupId.startsWith('encounter-packet')
-    || unit.groupId.startsWith('utility-table');
+
+  const nodeTypes = getUnitNodeTypes(unit, flow);
+  if (unit.groupId.startsWith('npc-roster')) return true;
+  if (unit.groupId.startsWith('encounter-packet')) {
+    return nodeTypes.has('mapBlock')
+      || nodeTypes.has('handout')
+      || height >= contentHeight * 0.48;
+  }
+  if (unit.groupId.startsWith('utility-table')) {
+    return nodeTypes.has('mapBlock')
+      || nodeTypes.has('handout');
+  }
+
+  return false;
 }
 
 function chooseColumn(
@@ -1099,7 +1147,7 @@ export function compileMeasuredPageModel(
       continue;
     }
 
-    if (shouldUseFullWidthRegion(unit)) {
+    if (shouldUseFullWidthRegion(unit, flow, height, contentHeight)) {
       const nextY = Math.max(leftHeight, rightHeight, reservedTop);
       if (nextY > 0 && nextY + height > contentHeight) {
         startNewPage();

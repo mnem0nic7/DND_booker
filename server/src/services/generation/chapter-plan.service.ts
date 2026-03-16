@@ -54,9 +54,9 @@ const SectionSpecSchema = z.object({
   playerObjective: z.string().optional().default(''),
   decisionPoint: z.string().optional().default(''),
   consequenceSummary: z.string().optional().default(''),
-  keyBeats: z.array(z.string()),
-  entityReferences: z.array(z.string()),
-  blocksNeeded: z.array(z.string()),
+  keyBeats: z.array(z.string()).default([]),
+  entityReferences: z.array(z.string()).default([]),
+  blocksNeeded: z.array(z.string()).default([]),
 });
 
 const EncounterSpecSchema = z.object({
@@ -66,21 +66,21 @@ const EncounterSpecSchema = z.object({
     name: z.string(),
     count: z.number(),
     cr: z.preprocess((value) => String(value ?? '').trim(), z.string().min(1)),
-  })),
+  })).default([]),
   environment: z.string(),
   tactics: z.string(),
-  rewards: z.array(z.string()),
+  rewards: z.array(z.string()).default([]),
 });
 
 const ChapterPlanSchema = z.object({
   chapterSlug: z.string(),
   chapterTitle: z.string(),
   sections: z.array(SectionSpecSchema),
-  encounters: z.array(EncounterSpecSchema),
-  entityReferences: z.array(z.string()),
-  readAloudCount: z.number(),
-  dmTipCount: z.number(),
-  difficultyProgression: z.string(),
+  encounters: z.array(EncounterSpecSchema).default([]),
+  entityReferences: z.array(z.string()).default([]),
+  readAloudCount: z.number().default(0),
+  dmTipCount: z.number().default(0),
+  difficultyProgression: z.string().default(''),
 });
 
 export interface ChapterPlanResult {

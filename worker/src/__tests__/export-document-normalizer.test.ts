@@ -153,7 +153,7 @@ describe('normalizeExportDocuments', () => {
     ], 'Goblin Caper');
 
     const nodes = documents[0].content?.content ?? [];
-    expect(nodes).toHaveLength(2);
+    expect(nodes.length).toBeGreaterThan(1);
     expect(nodes[0]).toMatchObject({
       type: 'randomTable',
       attrs: {
@@ -166,6 +166,55 @@ describe('normalizeExportDocuments', () => {
       attrs: {
         nodeId: 'randomtable-main-part-2',
         title: 'Chilling Discoveries (cont.)',
+      },
+    });
+    expect(nodes.at(-1)).toMatchObject({
+      type: 'randomTable',
+      attrs: {
+        title: 'Chilling Discoveries (cont.)',
+      },
+    });
+  });
+
+  it('splits verbose random tables by word budget even when they stay under the raw entry cap', () => {
+    const entries = Array.from({ length: 10 }, (_, index) => ({
+      roll: String(index + 1),
+      result: `Outcome ${index + 1} presents an immediate threat, a forced choice, and a clue that changes the next scene for the party.`,
+    }));
+
+    const documents = normalizeExportDocuments([
+      {
+        title: 'Chapter 2: The Mine',
+        sortOrder: 2,
+        kind: 'chapter',
+        content: doc([
+          {
+            type: 'randomTable',
+            attrs: {
+              nodeId: 'randomtable-verbose',
+              title: 'Artifact Interactions',
+              dieType: 'd10',
+              entries: JSON.stringify(entries),
+            },
+          },
+        ]),
+      },
+    ], 'Goblin Caper');
+
+    const nodes = documents[0].content?.content ?? [];
+    expect(nodes.length).toBeGreaterThan(1);
+    expect(nodes[0]).toMatchObject({
+      type: 'randomTable',
+      attrs: {
+        nodeId: 'randomtable-verbose',
+        title: 'Artifact Interactions',
+      },
+    });
+    expect(nodes[1]).toMatchObject({
+      type: 'randomTable',
+      attrs: {
+        nodeId: 'randomtable-verbose-part-2',
+        title: 'Artifact Interactions (cont.)',
       },
     });
   });
@@ -543,17 +592,19 @@ describe('normalizeExportDocuments', () => {
         dex: 15,
       },
     });
-    expect(nodes[1]).toEqual({
+    expect(nodes[1]).toMatchObject({
       type: 'randomTable',
       attrs: {
         title: 'Hidden Path Discoveries',
         dieType: 'd6',
-        entries: JSON.stringify([
-          { roll: '1', result: 'A cracked lantern still flickers.' },
-          { roll: '2', result: 'Footprints end at a cave wall.' },
-        ]),
       },
     });
+
+    const entries = JSON.parse(String(nodes[1]?.attrs?.entries ?? '[]')) as Array<{ roll: string; result: string }>;
+    expect(entries).toHaveLength(2);
+    expect(entries[0]?.result).toMatch(/A cracked lantern still flickers/i);
+    expect(entries[0]?.result).toMatch(/choice or check|resource spend/i);
+    expect(entries[1]?.result).toMatch(/Footprints end at a cave wall/i);
   });
 
   it('demotes malformed long display headings to normal paragraphs', () => {
@@ -765,6 +816,129 @@ describe('normalizeExportDocuments', () => {
     ], 'The Blackglass Mine');
 
     expect(documents).toHaveLength(0);
+  });
+
+  it('strengthens thin random tables into runnable export text', () => {
+    const documents = normalizeExportDocuments([
+      {
+        title: 'Chapter 2: The Mine',
+        sortOrder: 2,
+        kind: 'chapter',
+        content: doc([
+          {
+            type: 'randomTable',
+            attrs: {
+              title: 'Echoes in the Dark',
+              dieType: 'd6',
+              entries: JSON.stringify([
+                { roll: '1', result: '2d4 shadows' },
+                { roll: '2', result: 'A miner spirit' },
+              ]),
+            },
+          },
+        ]),
+      },
+    ], 'The Blackglass Mine');
+
+    const entries = JSON.parse(String(documents[0].content?.content?.[0]?.attrs?.entries ?? '[]')) as Array<{ roll: string; result: string }>;
+    expect(entries[0]?.result).toMatch(/immediate threat|immediate complication/i);
+    expect(entries[1]?.result).toMatch(/clue|advantage|consequence/i);
+  });
+
+  it('recovers malformed random-table JSON paragraphs that follow a random-table heading', () => {
+    const documents = normalizeExportDocuments([
+      {
+        title: 'Chapter 2: The Mine Entrance',
+        sortOrder: 2,
+        kind: 'chapter',
+        content: doc([
+          {
+            type: 'heading',
+            attrs: { level: 4 },
+            content: [{ type: 'text', text: 'Random Table: Artifact Interactions' }],
+          },
+          {
+            type: 'paragraph',
+            content: [
+              {
+                type: 'text',
+                text: '{"result": 1, "response": "The Glowing Crystal flares, revealing a hidden passage."}, {"result": 2, "response": "Touching the Miners\' Pick triggers a painful curse."}',
+              },
+            ],
+          },
+        ]),
+      },
+    ], 'The Blackglass Mine');
+
+    const recovered = documents[0].content?.content?.[0];
+    expect(recovered).toMatchObject({
+      type: 'randomTable',
+      attrs: {
+        title: 'Artifact Interactions',
+        dieType: 'd2',
+      },
+    });
+
+    const entries = JSON.parse(String(recovered?.attrs?.entries ?? '[]')) as Array<{ roll: string; result: string }>;
+    expect(entries).toHaveLength(2);
+    expect(entries[0]?.roll).toBe('1');
+    expect(entries[0]?.result).toMatch(/Glowing Crystal flares/i);
+    expect(entries[1]?.roll).toBe('2');
+    expect(entries[1]?.result).toMatch(/Miners' Pick triggers a painful curse/i);
+  });
+
+  it('drops stale layout plans when export normalization materially changes top-level blocks', () => {
+    const documents = normalizeExportDocuments([
+      {
+        title: 'Chapter 2: The Mine Entrance',
+        sortOrder: 2,
+        kind: 'chapter',
+        layoutPlan: {
+          version: 1,
+          sectionRecipe: 'utility_table_spread',
+          columnBalanceTarget: 'balanced',
+          blocks: [
+            {
+              nodeId: 'heading-random-table',
+              presentationOrder: 0,
+              span: 'column',
+              placement: 'inline',
+              groupId: null,
+              keepTogether: false,
+              allowWrapBelow: false,
+            },
+            {
+              nodeId: 'paragraph-random-table',
+              presentationOrder: 1,
+              span: 'column',
+              placement: 'inline',
+              groupId: null,
+              keepTogether: false,
+              allowWrapBelow: false,
+            },
+          ],
+        },
+        content: doc([
+          {
+            type: 'heading',
+            attrs: { level: 4, nodeId: 'heading-random-table' },
+            content: [{ type: 'text', text: 'Random Table: Artifact Interactions' }],
+          },
+          {
+            type: 'paragraph',
+            attrs: { nodeId: 'paragraph-random-table' },
+            content: [
+              {
+                type: 'text',
+                text: '{"result": 1, "response": "The Glowing Crystal flares, revealing a hidden passage."}, {"result": 2, "response": "Touching the Miners\' Pick triggers a painful curse."}',
+              },
+            ],
+          },
+        ]),
+      },
+    ], 'The Blackglass Mine');
+
+    expect((documents[0] as { layoutPlan?: unknown }).layoutPlan).toBeNull();
   });
 
   it('preserves detail-style encounter packets without weighted table rows', () => {

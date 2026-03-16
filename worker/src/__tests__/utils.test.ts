@@ -9,6 +9,7 @@ import {
   normalizeStatBlockAttrs,
   safeCssUrl,
   safeUrl,
+  strengthenRandomTableEntries,
 } from '../renderers/utils.js';
 import { renderNode } from '../renderers/tiptap-to-html.js';
 
@@ -138,6 +139,18 @@ describe('Worker Renderer Utils', () => {
   });
 
   describe('assessRandomTableEntries', () => {
+    it('normalizes response-style random table entries from loose structured data', () => {
+      const assessment = assessRandomTableEntries([
+        { result: 1, response: 'The Glowing Crystal flares and reveals a hidden route.' },
+        { result: 2, response: 'Touching the Miners\' Pick triggers a painful curse.' },
+      ]);
+
+      expect(assessment.normalizedEntries).toEqual([
+        { roll: '1', result: 'The Glowing Crystal flares and reveals a hidden route.' },
+        { roll: '2', result: 'Touching the Miners\' Pick triggers a painful curse.' },
+      ]);
+    });
+
     it('flags thin random encounter results', () => {
       const assessment = assessRandomTableEntries(JSON.stringify([
         { roll: '1-2', result: '2d4 shadows' },
@@ -154,6 +167,17 @@ describe('Worker Renderer Utils', () => {
         { roll: '3-4', result: 'Two shadows detach from a lantern glow and stalk the rear guard; if routed, they leave behind a blackglass shard worth 15 gp.' },
       ]));
 
+      expect(assessment.isThin).toBe(false);
+      expect(assessment.thinEntryCount).toBe(0);
+    });
+
+    it('strengthens thin random encounter results into runnable entries', () => {
+      const strengthened = strengthenRandomTableEntries([
+        { roll: '1-2', result: '2d4 shadows' },
+        { roll: '3-4', result: 'A miner spirit' },
+      ]);
+
+      const assessment = assessRandomTableEntries(strengthened);
       expect(assessment.isThin).toBe(false);
       expect(assessment.thinEntryCount).toBe(0);
     });

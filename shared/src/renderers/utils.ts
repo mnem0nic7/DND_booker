@@ -298,7 +298,7 @@ export function normalizeRandomTableEntries(value: unknown): NormalizedRandomTab
     const raw = entry as Record<string, unknown>;
     const roll = normalizeString(raw.roll ?? (typeof raw.result === 'number' ? raw.result : '')).trim();
     const result = normalizeString(
-      raw.description ?? raw.result ?? raw.outcome,
+      raw.description ?? raw.response ?? raw.resultText ?? raw.outcome ?? raw.result,
     ).trim();
 
     if (!roll || !result) return [];
@@ -450,6 +450,41 @@ export function assessRandomTableEntries(value: unknown): RandomTableUsabilityAs
     averageWordCount,
     isThin: entryAssessments.length > 0 && thinEntryCount >= Math.ceil(entryAssessments.length / 2),
   };
+}
+
+function buildRunnableRandomTableResult(result: string): string {
+  const trimmed = normalizeString(result)
+    .replace(/\s+/g, ' ')
+    .replace(/[.;,\s]+$/g, '')
+    .trim();
+  if (!trimmed) return '';
+
+  const lower = trimmed.toLowerCase();
+  const pressureClause = /\b(ghost|spirit|shadow|wraith|specter|monster|patrol|ambush|trap|hazard|collapse|curse|attack)\b/.test(lower)
+    ? 'Run it as an immediate threat that forces a fast reaction.'
+    : /\b(villager|miner|merchant|guard|priest|witness|survivor|npc)\b/.test(lower)
+      ? 'Play it as a tense social complication with a demand, warning, or bargain.'
+      : 'Treat it as an immediate complication that forces a choice or check.';
+  const payoffClause = /\b(map|journal|badge|sigil|gem|idol|key|letter|note|tracks?|tool|altar|shrine|corpse|bones)\b/.test(lower)
+    ? 'Careful play uncovers a clue or useful resource for the next scene.'
+    : 'Resolve it with a clue, consequence, or advantage that changes the scene.';
+
+  return `${trimmed}. ${pressureClause} ${payoffClause}`;
+}
+
+export function strengthenRandomTableEntries(value: unknown): NormalizedRandomTableEntry[] {
+  const assessment = assessRandomTableEntries(value);
+
+  return assessment.normalizedEntries.map((entry, index) => {
+    const flags = assessment.entryAssessments[index]?.flags ?? [];
+    if (flags.length === 0) return entry;
+
+    const improved = buildRunnableRandomTableResult(entry.result);
+    return {
+      roll: entry.roll,
+      result: improved || entry.result,
+    };
+  });
 }
 
 export function normalizeStatBlockAttrs(attrs: Record<string, unknown>): Record<string, unknown> {

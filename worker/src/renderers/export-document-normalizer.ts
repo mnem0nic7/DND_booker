@@ -4,8 +4,10 @@ import {
   normalizeChapterHeaderTitle,
   normalizeEncounterTableAttrs,
   normalizeNpcProfileAttrs,
+  normalizeRandomTableEntries,
   normalizeStatBlockAttrs,
   resolveRandomTableEntries,
+  strengthenRandomTableEntries,
 } from '@dnd-booker/shared';
 
 interface ExportDocument {
@@ -61,7 +63,8 @@ const SELF_PAGINATING_NODE_TYPES = new Set([
   'backCover',
 ]);
 
-const MAX_RANDOM_TABLE_ENTRIES_PER_EXPORT_BLOCK = 10;
+const MAX_RANDOM_TABLE_ENTRIES_PER_EXPORT_BLOCK = 8;
+const MAX_RANDOM_TABLE_WORDS_PER_EXPORT_BLOCK = 90;
 
 export function normalizeExportDocuments<T extends ExportDocument>(
   documents: T[],
@@ -81,9 +84,12 @@ export function normalizeExportDocuments<T extends ExportDocument>(
     });
     if (content == null || isEffectivelyEmpty(content)) return [];
 
+    const shouldResetLayout = hasMaterialTopLevelLayoutChange(document.content, content);
+
     return [{
       ...document,
       content,
+      ...(shouldResetLayout && 'layoutPlan' in document ? { layoutPlan: null } : {}),
     }];
   });
 }
@@ -100,7 +106,8 @@ function normalizeExportContent(
   const repairedMarkdownBleedThrough = repairMarkdownBleedThrough(nodes);
   const withoutControlMarkers = stripControlMarkerParagraphs(repairedMarkdownBleedThrough);
   const withNpcCards = upgradeNpcRosterLists(withoutControlMarkers);
-  const withoutPlaceholderScaffold = stripPlaceholderAdventureScaffold(withNpcCards);
+  const withRecoveredRandomTables = recoverMalformedRandomTableSections(withNpcCards);
+  const withoutPlaceholderScaffold = stripPlaceholderAdventureScaffold(withRecoveredRandomTables);
   const withoutDuplicateChapterHeadings = stripDuplicateChapterHeadings(withoutPlaceholderScaffold);
   const withCompactPrepChecklist = collapsePrepChecklistSection(withoutDuplicateChapterHeadings);
   const withoutOrphanedUtilityScaffold = stripOrphanedUtilityScaffold(withCompactPrepChecklist);
@@ -207,7 +214,7 @@ function normalizeEncounterTableNode(node: DocumentContent): DocumentContent | n
 
 function normalizeRandomTableNode(node: DocumentContent): DocumentContent | null {
   const attrs = { ...(node.attrs ?? {}) };
-  const entries = resolveRandomTableEntries(attrs);
+  const entries = strengthenRandomTableEntries(resolveRandomTableEntries(attrs));
   if (entries.length === 0) return null;
   attrs.entries = JSON.stringify(entries);
   delete attrs.results;
@@ -222,14 +229,14 @@ function splitOversizedRandomTables(nodes: DocumentContent[]): DocumentContent[]
     if (node.type !== 'randomTable') return [node];
 
     const attrs = { ...(node.attrs ?? {}) };
-    const entries = resolveRandomTableEntries(attrs);
-    if (entries.length <= MAX_RANDOM_TABLE_ENTRIES_PER_EXPORT_BLOCK) {
+    const entries = strengthenRandomTableEntries(resolveRandomTableEntries(attrs));
+    const chunks = chunkRandomTableEntries(entries);
+    if (chunks.length <= 1) {
       return [node];
     }
 
     const baseTitle = normalizeText(attrs.title) || 'Random Table';
     const baseNodeId = normalizeText(attrs.nodeId) || `randomtable-export-${index + 1}`;
-    const chunks = chunkEntries(entries, MAX_RANDOM_TABLE_ENTRIES_PER_EXPORT_BLOCK);
 
     return chunks.map((chunk, chunkIndex) => ({
       ...node,
@@ -243,10 +250,29 @@ function splitOversizedRandomTables(nodes: DocumentContent[]): DocumentContent[]
   });
 }
 
-function chunkEntries<T>(entries: T[], chunkSize: number): T[][] {
-  const chunks: T[][] = [];
-  for (let index = 0; index < entries.length; index += chunkSize) {
-    chunks.push(entries.slice(index, index + chunkSize));
+function chunkRandomTableEntries(entries: Array<{ roll: string; result: string }>): Array<Array<{ roll: string; result: string }>> {
+  const chunks: Array<Array<{ roll: string; result: string }>> = [];
+  let currentChunk: Array<{ roll: string; result: string }> = [];
+  let currentWordCount = 0;
+
+  for (const entry of entries) {
+    const entryWordCount = entry.result.split(/\s+/).filter(Boolean).length;
+    const wouldExceedCount = currentChunk.length >= MAX_RANDOM_TABLE_ENTRIES_PER_EXPORT_BLOCK;
+    const wouldExceedWords = currentChunk.length > 0
+      && currentWordCount + entryWordCount > MAX_RANDOM_TABLE_WORDS_PER_EXPORT_BLOCK;
+
+    if (wouldExceedCount || wouldExceedWords) {
+      chunks.push(currentChunk);
+      currentChunk = [];
+      currentWordCount = 0;
+    }
+
+    currentChunk.push(entry);
+    currentWordCount += entryWordCount;
+  }
+
+  if (currentChunk.length > 0) {
+    chunks.push(currentChunk);
   }
   return chunks;
 }
@@ -275,7 +301,7 @@ function normalizeStructuredBleedThroughNode(
     case 'npcProfile':
       return { type: 'npcProfile', attrs: normalizeNpcProfileAttrs(attrs) };
     case 'randomTable': {
-      const entries = resolveRandomTableEntries(attrs);
+      const entries = strengthenRandomTableEntries(resolveRandomTableEntries(attrs));
       const normalizedAttrs = { ...attrs };
       delete normalizedAttrs.results;
       return {
@@ -709,6 +735,40 @@ function upgradeNpcRosterLists(nodes: DocumentContent[]): DocumentContent[] {
   return result;
 }
 
+function recoverMalformedRandomTableSections(nodes: DocumentContent[]): DocumentContent[] {
+  const result: DocumentContent[] = [];
+
+  for (let index = 0; index < nodes.length; index += 1) {
+    const node = nodes[index];
+    const title = extractRandomTableTitle(node);
+    const nextNode = nodes[index + 1];
+
+    if (!title || nextNode?.type !== 'paragraph') {
+      result.push(node);
+      continue;
+    }
+
+    const entries = parseMalformedRandomTableParagraph(nextNode);
+    if (entries.length === 0) {
+      result.push(node);
+      continue;
+    }
+
+    result.push({
+      type: 'randomTable',
+      attrs: {
+        nodeId: normalizeText(nextNode.attrs?.nodeId) || normalizeText(node.attrs?.nodeId),
+        title,
+        dieType: inferRandomTableDieType(entries),
+        entries: JSON.stringify(strengthenRandomTableEntries(entries)),
+      },
+    });
+    index += 1;
+  }
+
+  return result;
+}
+
 function extractNpcRosterName(node: DocumentContent): string | null {
   if (node.type !== 'orderedList') return null;
   const items = node.content ?? [];
@@ -773,6 +833,61 @@ function buildNpcProfileFromRosterPair(name: string, node: DocumentContent): Doc
       likelyReaction,
     }),
   };
+}
+
+function extractRandomTableTitle(node: DocumentContent): string | null {
+  if (node.type !== 'heading') return null;
+  const text = readInlineText(node).trim();
+  if (!text) return null;
+
+  const match = text.match(/^random table\s*:\s*(.+)$/i);
+  if (!match) return null;
+
+  return normalizeText(match[1]) || 'Random Table';
+}
+
+function parseMalformedRandomTableParagraph(node: DocumentContent): Array<{ roll: string; result: string }> {
+  const text = readInlineText(node).trim();
+  if (!text || !text.includes('"response"') || !text.includes('"result"')) return [];
+
+  const directEntries = parseRecoveredRandomTableEntries(text);
+  if (directEntries.length > 0) return directEntries;
+
+  const objectMatches = text.match(/\{[^{}]+\}/g) ?? [];
+  if (objectMatches.length === 0) return [];
+
+  return parseRecoveredRandomTableEntries(`[${objectMatches.join(',')}]`);
+}
+
+function parseRecoveredRandomTableEntries(value: string): Array<{ roll: string; result: string }> {
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    if (Array.isArray(parsed)) {
+      return normalizeRandomTableEntries(parsed);
+    }
+    if (parsed && typeof parsed === 'object') {
+      return normalizeRandomTableEntries(
+        (parsed as Record<string, unknown>).entries
+        ?? (parsed as Record<string, unknown>).results
+        ?? parsed,
+      );
+    }
+  } catch {
+    return [];
+  }
+
+  return [];
+}
+
+function inferRandomTableDieType(entries: Array<{ roll: string; result: string }>): string {
+  const numericRolls = entries.map((entry) => {
+    const match = entry.roll.match(/^(\d+)$/);
+    return match ? Number(match[1]) : null;
+  });
+
+  if (numericRolls.some((roll) => roll == null)) return '';
+  const highestRoll = Math.max(...numericRolls.filter((roll): roll is number => roll != null));
+  return highestRoll > 0 ? `d${highestRoll}` : '';
 }
 
 function splitMalformedProseContainer(
@@ -989,6 +1104,28 @@ function getTopLevelNodes(content: DocumentContent): DocumentContent[] {
   }
 
   return [content];
+}
+
+function hasMaterialTopLevelLayoutChange(
+  original: DocumentContent,
+  normalized: DocumentContent,
+): boolean {
+  const originalSignature = getTopLevelSignature(original);
+  const normalizedSignature = getTopLevelSignature(normalized);
+
+  if (originalSignature.length !== normalizedSignature.length) return true;
+
+  return originalSignature.some((entry, index) => {
+    const next = normalizedSignature[index];
+    return entry.nodeId !== next?.nodeId || entry.type !== next?.type;
+  });
+}
+
+function getTopLevelSignature(content: DocumentContent): Array<{ nodeId: string; type: string }> {
+  return getTopLevelNodes(content).map((node, index) => ({
+    nodeId: normalizeText(node.attrs?.nodeId) || `${node.type}-${index}`,
+    type: node.type,
+  }));
 }
 
 function isEffectivelyEmpty(content: DocumentContent): boolean {

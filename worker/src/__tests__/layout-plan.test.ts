@@ -315,6 +315,15 @@ describe('layout-plan', () => {
 
     expect(utilityGroupIds.size).toBe(1);
     expect(flow.flow.fragments.find((fragment) => fragment.nodeType === 'randomTable')?.placement).toBe('side_panel');
+
+    const pageModel = compileMeasuredPageModel(flow.flow, flow.flow.units.map((unit, index) => ({
+      unitId: unit.id,
+      heightPx: index === 0 ? 260 : 180,
+    })), {
+      documentKind: 'chapter',
+      documentTitle: 'Chapter 2: The Mine',
+    });
+    expect(pageModel.fragments.find((fragment) => fragment.nodeType === 'randomTable')?.columnIndex).not.toBeNull();
   });
 
   it('promotes large random tables to both-column layout blocks', () => {
@@ -326,7 +335,7 @@ describe('layout-plan', () => {
           attrs: {
             title: 'Mine Encounters',
             dieType: 'd10',
-            entries: JSON.stringify(Array.from({ length: 8 }, (_, index) => ({
+            entries: JSON.stringify(Array.from({ length: 10 }, (_, index) => ({
               roll: String(index + 1),
               result: `Encounter ${index + 1}`,
             }))),
@@ -341,5 +350,49 @@ describe('layout-plan', () => {
     });
 
     expect(flow.flow.fragments.find((fragment) => fragment.nodeType === 'randomTable')?.span).toBe('both_columns');
+  });
+
+  it('keeps grouped utility packets full-width when the random table anchor is both-column', () => {
+    const content: DocumentContent = {
+      type: 'doc',
+      content: [
+        {
+          type: 'heading',
+          attrs: { level: 2 },
+          content: [{ type: 'text', text: 'Artifact Interactions' }],
+        },
+        {
+          type: 'randomTable',
+          attrs: {
+            title: 'Artifact Interactions',
+            dieType: 'd10',
+            entries: JSON.stringify(Array.from({ length: 10 }, (_, index) => ({
+              roll: String(index + 1),
+              result: `Entry ${index + 1} describes a threat, choice, and reward in enough detail to need width.`,
+            }))),
+          },
+        },
+        paragraph('Use the results to shape the fallout that follows the artifact scene.'),
+      ],
+    };
+
+    const flow = compileFlowModel(content, null, 'standard_pdf', {
+      documentKind: 'chapter',
+      documentTitle: 'Chapter 2: The Mine',
+    });
+
+    const utilityUnit = flow.flow.units.find((unit) => unit.groupId?.startsWith('utility-table'));
+    expect(utilityUnit?.span).toBe('both_columns');
+
+    const pageModel = compileMeasuredPageModel(flow.flow, flow.flow.units.map((unit) => ({
+      unitId: unit.id,
+      heightPx: unit.id === utilityUnit?.id ? 320 : 140,
+    })), {
+      documentKind: 'chapter',
+      documentTitle: 'Chapter 2: The Mine',
+    });
+
+    expect(pageModel.fragments.find((fragment) => fragment.nodeType === 'randomTable')?.region).toBe('full_width');
+    expect(pageModel.fragments.find((fragment) => fragment.nodeType === 'randomTable')?.columnIndex).toBeNull();
   });
 });

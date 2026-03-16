@@ -109,10 +109,11 @@
   /* Page dimension custom properties — single source of truth */
   --page-width: 816px;
   --page-height: 1056px;
-  --page-padding: 72px;
-  --content-height: 912px;          /* page-height - 2×padding */
-  --page-content-height: 864px;     /* content-height - margin-reserve */
-  --margin-reserve: 48px;
+  --page-padding: 60px;
+  --content-height: 936px;          /* page-height - 2×padding */
+  --page-content-height: 896px;     /* content-height - margin-reserve */
+  --margin-reserve: 40px;
+  --layout-column-gap: 18px;
 
   width: var(--page-width);
   min-height: var(--page-height);
@@ -127,7 +128,7 @@
   position: relative;
   color: var(--text-color);
   font-family: var(--body-font);
-  font-size: 9.5pt;
+  font-size: 8.55pt;
   font-feature-settings: 'kern' 1, 'liga' 1;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -156,7 +157,7 @@
 
 .page-canvas .ProseMirror {
   column-count: 2;
-  column-gap: 32px;
+  column-gap: var(--layout-column-gap);
   column-rule: 1px solid var(--column-rule-color, rgba(0,0,0,0.06));
   outline: none;
   min-height: var(--content-height);

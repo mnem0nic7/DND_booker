@@ -122,11 +122,11 @@ describe('art-direction helpers', () => {
     ], { includeMaps: true });
 
     expect(selected).toMatchObject([
-      { documentSlug: 'front-matter', blockType: 'titlePage', nodeIndex: 0, model: 'dall-e-3', size: '1024x1792' },
-      { documentSlug: 'chapter-1', blockType: 'chapterHeader', nodeIndex: 0, model: 'dall-e-3', size: '1792x1024' },
-      { documentSlug: 'chapter-2', blockType: 'chapterHeader', nodeIndex: 0, model: 'dall-e-3', size: '1792x1024' },
+      { documentSlug: 'front-matter', blockType: 'titlePage', nodeIndex: 0, model: 'gpt-image-1', size: '1024x1536' },
+      { documentSlug: 'chapter-1', blockType: 'chapterHeader', nodeIndex: 0, model: 'gpt-image-1', size: '1536x1024' },
+      { documentSlug: 'chapter-2', blockType: 'chapterHeader', nodeIndex: 0, model: 'gpt-image-1', size: '1536x1024' },
       { documentSlug: 'chapter-2', blockType: 'mapBlock', nodeIndex: 4, model: 'gpt-image-1', size: '1024x1024' },
-      { documentSlug: 'chapter-2', blockType: 'npcProfile', nodeIndex: 5, model: 'dall-e-3', size: '1024x1024' },
+      { documentSlug: 'chapter-2', blockType: 'npcProfile', nodeIndex: 5, model: 'gpt-image-1', size: '1024x1024' },
     ]);
   });
 
@@ -221,8 +221,8 @@ describe('art-direction helpers', () => {
           blockType: 'titlePage',
           prompt: 'A dramatic fantasy cover showing a black-glass mine entrance under a red moon.',
           rationale: 'Strong focal cover image for the adventure.',
-          model: 'dall-e-3',
-          size: '1024x1792',
+          model: 'gpt-image-1',
+          size: '1024x1536',
         },
       ],
     );
@@ -291,8 +291,8 @@ describe('art-direction helpers', () => {
           nodeIndex: 0,
           blockType: 'titlePage',
           prompt: 'A black-glass mine under a crimson moon.',
-          model: 'dall-e-3',
-          size: '1024x1792',
+          model: 'gpt-image-1',
+          size: '1024x1536',
           assetId: 'asset-cover',
           assetUrl: '/uploads/project-1/cover.png',
         },

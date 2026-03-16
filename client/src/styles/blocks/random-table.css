@@ -1,26 +1,27 @@
 .random-table {
   font-family: var(--body-font);
   background: var(--stat-block-bg);
-  padding: 1rem;
+  padding: 0.62rem;
   border: 1px solid var(--table-header-bg);
-  max-width: 480px;
+  width: 100%;
+  max-width: none;
   position: relative;
 }
 
 .random-table__header {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 0.5rem;
+  gap: 0.4rem;
+  margin-bottom: 0.24rem;
 }
 
 .random-table__title {
   font-family: var(--heading-font);
-  font-size: 1.25em;
+  font-size: 1em;
   font-weight: 700;
   color: var(--table-header-bg);
   margin: 0;
-  line-height: 1.2;
+  line-height: 1.1;
 }
 
 .random-table__die-badge {
@@ -30,9 +31,9 @@
   background: var(--table-header-bg);
   color: var(--table-stripe-bg);
   font-family: system-ui, sans-serif;
-  font-size: 0.7em;
+  font-size: 0.66em;
   font-weight: 700;
-  padding: 0.15rem 0.45rem;
+  padding: 0.08rem 0.34rem;
   border-radius: 9999px;
   text-transform: lowercase;
 }
@@ -40,20 +41,20 @@
 .random-table__table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.875em;
+  font-size: 0.72em;
 }
 
 .random-table__th {
   background: var(--table-header-bg);
   color: var(--table-stripe-bg);
-  padding: 0.35rem 0.5rem;
+  padding: 0.18rem 0.32rem;
   text-align: left;
   font-weight: 700;
-  font-size: 0.8em;
+  font-size: 0.66em;
 }
 
 .random-table__th--roll {
-  width: 3.5rem;
+  width: 2.8rem;
   text-align: center;
 }
 
@@ -66,9 +67,9 @@
 }
 
 .random-table__td {
-  padding: 0.3rem 0.5rem;
+  padding: 0.16rem 0.32rem;
   border-bottom: 1px solid var(--stat-block-border);
-  line-height: 1.4;
+  line-height: 1.15;
 }
 
 .random-table__td--roll {

@@ -3,6 +3,8 @@ import { createOpenAI } from '@ai-sdk/openai';
 
 export type ImageModel = 'dall-e-3' | 'gpt-image-1';
 
+const TEXTLESS_IMAGE_PROMPT_SUFFIX = 'No visible words, no letters, no typography, no captions, no labels, no logos, no watermark.';
+
 const ALLOWED_SIZES: Record<ImageModel, string[]> = {
   'dall-e-3': ['1024x1024', '1792x1024', '1024x1792'],
   'gpt-image-1': ['1024x1024', '1536x1024', '1024x1536'],
@@ -17,6 +19,32 @@ interface GenerateImageOptions {
 
 const DEFAULT_IMAGE_TIMEOUT_MS = 180_000;
 
+export function stripImageTextRenderingInstructions(value: string): string {
+  return value
+    .replace(/\b(the\s+)?title\s+(is|should be|appears|appearing|displayed|written|reads?)\b[^.?!]*[.?!]?/gi, ' ')
+    .replace(/\b(display|show|include|render|add|put|write)\s+(the\s+)?(title|text|caption|quote|slogan|label|labels|words|lettering|typography|logo|watermark)\b[^.?!]*[.?!]?/gi, ' ')
+    .replace(/\b(text|words)\s+(that\s+)?(read|reads|say|says|stating?)\b[^.?!]*[.?!]?/gi, ' ')
+    .replace(/\b(mystical|ornate|decorative|stylized)\s+font\b[^.?!]*[.?!]?/gi, ' ')
+    .replace(/\b(lettering|typography|caption|quote|slogan|label|labels|logo|watermark)\b[^.?!]*[.?!]?/gi, ' ');
+}
+
+export function sanitizeImagePrompt(prompt: string): string {
+  const cleaned = stripImageTextRenderingInstructions(String(prompt ?? ''))
+    .replace(/\s+/g, ' ')
+    .replace(/\s+([.?!,;:])/g, '$1')
+    .trim()
+    .replace(/[.;,\s]+$/g, '');
+
+  return [
+    cleaned,
+    TEXTLESS_IMAGE_PROMPT_SUFFIX,
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 function resolveImageTimeoutMs(): number {
   const parsed = Number.parseInt(process.env.AI_IMAGE_TIMEOUT_MS ?? '', 10);
   if (Number.isFinite(parsed) && parsed > 0) {
@@ -30,6 +58,7 @@ export async function generateAiImage(
   options: GenerateImageOptions,
 ): Promise<{ base64: string; mimeType: string }> {
   const { prompt, model, size, quality } = options;
+  const sanitizedPrompt = sanitizeImagePrompt(prompt);
 
   const sizes = ALLOWED_SIZES[model];
   if (!sizes.includes(size)) {
@@ -50,7 +79,7 @@ export async function generateAiImage(
   try {
     ({ image } = await generateImage({
       model: openai.image(model),
-      prompt,
+      prompt: sanitizedPrompt,
       size: size as `${number}x${number}`,
       ...(Object.keys(providerOptions).length > 0 ? { providerOptions } : {}),
       abortSignal: AbortSignal.timeout(timeoutMs),
