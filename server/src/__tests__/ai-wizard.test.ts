@@ -127,6 +127,57 @@ describe('markdownToTipTap', () => {
     });
   });
 
+  it('should convert heading-prefixed same-line wizard blocks into real block nodes', () => {
+    const md = '    #### Handout :::handout {"title":"Caution: Blackglass Mine","style":"letter","content":"Beware the mine."} :::\n    #### Read Aloud :::readAloud The mine entrance exhales a grave-cold breath. :::';
+    const result = markdownToTipTap(md);
+
+    expect(result.content).toHaveLength(2);
+    expect(result.content![0]).toMatchObject({
+      type: 'handout',
+      attrs: {
+        title: 'Caution: Blackglass Mine',
+        style: 'letter',
+        content: 'Beware the mine.',
+      },
+    });
+    expect(result.content![1]).toMatchObject({
+      type: 'readAloudBox',
+    });
+  });
+
+  it('should split malformed fenced dmTips blocks that swallow later headings and block markers', () => {
+    const md = `:::dmTips
+Keep the pressure on as the party crosses the threshold.
+#### Handout :::handout {"title":"Caution: Blackglass Mine","style":"letter","content":"Beware the mine."} :::
+### Strange Occurrences
+#### Read Aloud :::readAloud The mine entrance exhales a grave-cold breath. :::
+:::`;
+
+    const result = markdownToTipTap(md);
+    const types = result.content!.map((node) => node.type);
+
+    expect(types).toEqual(['sidebarCallout', 'handout', 'heading', 'readAloudBox']);
+    expect(result.content![0]).toMatchObject({
+      type: 'sidebarCallout',
+      attrs: { title: 'DM Tips', calloutType: 'info' },
+    });
+    expect(result.content![1]).toMatchObject({
+      type: 'handout',
+      attrs: {
+        title: 'Caution: Blackglass Mine',
+        style: 'letter',
+      },
+    });
+    expect(result.content![2]).toMatchObject({
+      type: 'heading',
+      attrs: { level: 3 },
+      content: [{ text: 'Strange Occurrences' }],
+    });
+    expect(result.content![3]).toMatchObject({
+      type: 'readAloudBox',
+    });
+  });
+
   it('should convert :::statBlock blocks with JSON attrs', () => {
     const md = ':::statBlock\n{"name":"Goblin","size":"Small","type":"humanoid"}\n:::';
     const result = markdownToTipTap(md);
@@ -136,6 +187,21 @@ describe('markdownToTipTap', () => {
       name: 'Goblin',
       size: 'Small',
       type: 'humanoid',
+    });
+  });
+
+  it('should recover wizard blocks wrapped inside triple-backtick code fences', () => {
+    const md = '```json\n:::statBlock\n{"name":"Gravel Guardian","armorClass":15,"hitPoints":85}\n```\n';
+    const result = markdownToTipTap(md);
+
+    expect(result.content).toHaveLength(1);
+    expect(result.content![0]).toMatchObject({
+      type: 'statBlock',
+      attrs: {
+        name: 'Gravel Guardian',
+        ac: 15,
+        hp: 85,
+      },
     });
   });
 

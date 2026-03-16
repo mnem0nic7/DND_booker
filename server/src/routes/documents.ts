@@ -7,6 +7,7 @@ import {
   listDocuments,
   getDocument,
   updateDocumentContent,
+  updateDocumentLayout,
   updateDocumentTitle,
   reorderDocuments,
 } from '../services/document.service.js';
@@ -29,6 +30,28 @@ const titleSchema = z.object({
 
 const reorderSchema = z.object({
   orderedIds: z.array(z.string().uuid()),
+});
+
+const layoutPlanSchema = z.object({
+  version: z.literal(1),
+  sectionRecipe: z.enum([
+    'chapter_hero_split',
+    'intro_split_spread',
+    'npc_roster_grid',
+    'encounter_packet_spread',
+    'utility_table_spread',
+    'full_page_insert',
+  ]).nullable(),
+  columnBalanceTarget: z.enum(['balanced', 'dense_left', 'dense_right']),
+  blocks: z.array(z.object({
+    nodeId: z.string().min(1),
+    presentationOrder: z.number().int(),
+    span: z.enum(['column', 'both_columns', 'full_page']),
+    placement: z.enum(['inline', 'hero_top', 'side_panel', 'bottom_panel', 'full_page_insert']),
+    groupId: z.string().min(1).nullable(),
+    keepTogether: z.boolean(),
+    allowWrapBelow: z.boolean(),
+  })),
 });
 
 // GET /documents — List project documents (no content)
@@ -85,6 +108,31 @@ documentRoutes.put(
     }
 
     const doc = await updateDocumentContent(docId, authReq.userId!, parsed.data as any);
+    if (!doc) {
+      res.status(404).json({ error: 'Document not found' });
+      return;
+    }
+
+    res.json(doc);
+  }),
+);
+
+// PUT /documents/:docId/layout — Update document layout plan
+documentRoutes.put(
+  '/documents/:docId/layout',
+  requireAuth,
+  validateUuid('projectId', 'docId'),
+  asyncHandler(async (req, res) => {
+    const authReq = req as AuthRequest;
+    const docId = req.params.docId as string;
+
+    const parsed = layoutPlanSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'Invalid layout plan', details: parsed.error.flatten() });
+      return;
+    }
+
+    const doc = await updateDocumentLayout(docId, authReq.userId!, parsed.data as any);
     if (!doc) {
       res.status(404).json({ error: 'Document not found' });
       return;

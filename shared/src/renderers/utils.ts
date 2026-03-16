@@ -15,6 +15,25 @@ export interface NormalizedRandomTableEntry {
   result: string;
 }
 
+export type RandomTableUsabilityFlag =
+  | 'too_brief'
+  | 'missing_operational_detail';
+
+export interface RandomTableEntryAssessment {
+  roll: string;
+  result: string;
+  wordCount: number;
+  flags: RandomTableUsabilityFlag[];
+}
+
+export interface RandomTableUsabilityAssessment {
+  normalizedEntries: NormalizedRandomTableEntry[];
+  entryAssessments: RandomTableEntryAssessment[];
+  thinEntryCount: number;
+  averageWordCount: number;
+  isThin: boolean;
+}
+
 export type StatBlockSanityFlag =
   | 'missing_name'
   | 'invalid_ac'
@@ -212,6 +231,47 @@ export function normalizeRandomTableEntries(value: unknown): NormalizedRandomTab
   });
 }
 
+function hasOperationalEncounterDetail(text: string): boolean {
+  const normalized = normalizeString(text).trim().toLowerCase();
+  if (!normalized) return false;
+
+  if (/[;:]/.test(normalized)) return true;
+  if (/dc\s*\d+/.test(normalized)) return true;
+
+  return /\b(attack|ambush|approach|bargain|check|clue|consequence|discover|demand|escape|flee|follow|hazard|hide|hook|insight|investigat|loot|offer|patrol|reaction|reward|save|search|stake|tactic|threat|tracks?|warn)\b/.test(normalized);
+}
+
+export function assessRandomTableEntries(value: unknown): RandomTableUsabilityAssessment {
+  const normalizedEntries = normalizeRandomTableEntries(value);
+  const entryAssessments = normalizedEntries.map((entry) => {
+    const wordCount = entry.result.split(/\s+/).filter(Boolean).length;
+    const flags: RandomTableUsabilityFlag[] = [];
+
+    if (wordCount < 10) flags.push('too_brief');
+    if (!hasOperationalEncounterDetail(entry.result)) flags.push('missing_operational_detail');
+
+    return {
+      roll: entry.roll,
+      result: entry.result,
+      wordCount,
+      flags,
+    };
+  });
+
+  const thinEntryCount = entryAssessments.filter((entry) => entry.flags.length > 0).length;
+  const averageWordCount = entryAssessments.length === 0
+    ? 0
+    : entryAssessments.reduce((sum, entry) => sum + entry.wordCount, 0) / entryAssessments.length;
+
+  return {
+    normalizedEntries,
+    entryAssessments,
+    thinEntryCount,
+    averageWordCount,
+    isThin: entryAssessments.length > 0 && thinEntryCount >= Math.ceil(entryAssessments.length / 2),
+  };
+}
+
 export function normalizeStatBlockAttrs(attrs: Record<string, unknown>): Record<string, unknown> {
   const normalized: Record<string, unknown> = { ...attrs };
 
@@ -321,6 +381,26 @@ export function normalizeNpcProfileAttrs(attrs: Record<string, unknown>): Record
     pickFirst(normalized, ['personalityTraits', 'traits']),
   ).trim();
   if (personalityTraits) normalized.personalityTraits = personalityTraits;
+
+  const goal = normalizeString(
+    pickFirst(normalized, ['goal', 'goalOrNeed', 'wants']),
+  ).trim();
+  if (goal) normalized.goal = goal;
+
+  const whatTheyKnow = normalizeString(
+    pickFirst(normalized, ['whatTheyKnow', 'knowledge', 'secret', 'secrets']),
+  ).trim();
+  if (whatTheyKnow) normalized.whatTheyKnow = whatTheyKnow;
+
+  const leverage = normalizeString(
+    pickFirst(normalized, ['leverage', 'pressurePoint', 'whatChangesTheirMind']),
+  ).trim();
+  if (leverage) normalized.leverage = leverage;
+
+  const likelyReaction = normalizeString(
+    pickFirst(normalized, ['likelyReaction', 'firstReaction', 'reaction']),
+  ).trim();
+  if (likelyReaction) normalized.likelyReaction = likelyReaction;
 
   return normalized;
 }

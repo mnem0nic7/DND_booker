@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { getCanonicalLayoutCss } from '@dnd-booker/shared';
 
 interface PreviewRendererProps {
   html: string;
@@ -39,6 +40,7 @@ export function PreviewRenderer({ html, theme }: PreviewRendererProps) {
 <head>
   <style>
     ${cssText}
+    ${getCanonicalLayoutCss()}
 
     /* Preview-specific overrides for print-like appearance */
     body {

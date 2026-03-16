@@ -147,7 +147,7 @@ export function assembleTypst(options: AssembleTypstOptions): string {
 
     if (chapterOpenerMode === 'dedicated_page' && (doc.kind === 'chapter' || doc.kind === 'appendix')) {
       t += renderDedicatedChapterOpening(doc.title, doc.chapterNumberLabel);
-      rendered = tiptapToTypst(stripLeadingSectionOpener(doc.content, doc.title, doc.chapterNumberLabel));
+      rendered = tiptapToTypst(stripLeadingSectionOpener(doc.content, doc.title, doc.chapterNumberLabel ?? null));
       if (!rendered.trim()) {
         hasRenderedDocument = true;
         previousEndedWithPageBreak = true;

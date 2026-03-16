@@ -189,6 +189,47 @@ describe('Document Routes', () => {
     });
   });
 
+  describe('PUT /api/projects/:projectId/documents/:docId/layout', () => {
+    it('should update the persisted layout plan for a document', async () => {
+      const currentDoc = await request(app)
+        .get(`/api/projects/${projectId}/documents/${docId1}`)
+        .set('Authorization', `Bearer ${accessToken}`);
+
+      expect(currentDoc.status).toBe(200);
+      const currentLayoutPlan = currentDoc.body.layoutPlan;
+      expect(Array.isArray(currentLayoutPlan.blocks)).toBe(true);
+      expect(currentLayoutPlan.blocks.length).toBeGreaterThan(0);
+
+      const reversedBlocks = [...currentLayoutPlan.blocks]
+        .reverse()
+        .map((block: {
+          nodeId: string;
+          presentationOrder: number;
+          span: string;
+          placement: string;
+          groupId: string | null;
+          keepTogether: boolean;
+          allowWrapBelow: boolean;
+        }, index: number) => ({
+          ...block,
+          presentationOrder: index,
+        }));
+
+      const res = await request(app)
+        .put(`/api/projects/${projectId}/documents/${docId1}/layout`)
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({
+          ...currentLayoutPlan,
+          blocks: reversedBlocks,
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.body.layoutPlan).toBeDefined();
+      expect(res.body.layoutPlan.blocks[0].nodeId).toBe(reversedBlocks[0].nodeId);
+      expect(res.body.layoutPlan.blocks[0].presentationOrder).toBe(0);
+    });
+  });
+
   describe('POST /api/projects/:projectId/documents/reorder', () => {
     it('should change the sort order of documents', async () => {
       // Reverse the order: doc2 first, doc1 second

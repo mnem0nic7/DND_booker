@@ -1,49 +1,15 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
-import { ErrorBoundary } from '../ErrorBoundary';
-import type { DocumentContent } from '@dnd-booker/shared';
-import StarterKit from '@tiptap/starter-kit';
-import Underline from '@tiptap/extension-underline';
-import Link from '@tiptap/extension-link';
-import TextAlign from '@tiptap/extension-text-align';
-import Superscript from '@tiptap/extension-superscript';
-import Subscript from '@tiptap/extension-subscript';
-import Highlight from '@tiptap/extension-highlight';
-import { TextStyle } from '@tiptap/extension-text-style';
-import { FontSize } from '../../extensions/FontSize';
-import { DropCap } from '../../extensions/DropCap';
-import { Table } from '@tiptap/extension-table';
-import { TableRow } from '@tiptap/extension-table-row';
-import { TableHeader } from '@tiptap/extension-table-header';
-import { TableCell } from '@tiptap/extension-table-cell';
-import { StatBlock } from '../blocks/StatBlock/StatBlockExtension';
-import { ReadAloudBox } from '../blocks/ReadAloudBox/ReadAloudBoxExtension';
-import { SidebarCallout } from '../blocks/SidebarCallout/SidebarCalloutExtension';
-import { ChapterHeader } from '../blocks/ChapterHeader/ChapterHeaderExtension';
-import { SpellCard } from '../blocks/SpellCard/SpellCardExtension';
-import { MagicItem } from '../blocks/MagicItem/MagicItemExtension';
-import { RandomTable } from '../blocks/RandomTable/RandomTableExtension';
-import { NpcProfile } from '../blocks/NpcProfile/NpcProfileExtension';
-import { EncounterTable } from '../blocks/EncounterTable/EncounterTableExtension';
-import { ClassFeature } from '../blocks/ClassFeature/ClassFeatureExtension';
-import { RaceBlock } from '../blocks/RaceBlock/RaceBlockExtension';
-import { FullBleedImage } from '../blocks/FullBleedImage/FullBleedImageExtension';
-import { MapBlock } from '../blocks/MapBlock/MapBlockExtension';
-import { Handout } from '../blocks/Handout/HandoutExtension';
-import { PageBorder } from '../blocks/PageBorder/PageBorderExtension';
-import { PageBreak } from '../blocks/PageBreak/PageBreakExtension';
-import { ColumnBreak } from '../blocks/ColumnBreak/ColumnBreakExtension';
-import { TitlePage } from '../blocks/TitlePage/TitlePageExtension';
-import { TableOfContents } from '../blocks/TableOfContents/TableOfContentsExtension';
-import { CreditsPage } from '../blocks/CreditsPage/CreditsPageExtension';
-import { BackCover } from '../blocks/BackCover/BackCoverExtension';
-import { AutoPagination } from '../../extensions/AutoPagination';
+import type { DocumentContent, LayoutPlan } from '@dnd-booker/shared';
+import { ensureStableNodeIds } from '@dnd-booker/shared';
 import { usePageAlignment } from '../../hooks/usePageAlignment';
+import { buildEditorExtensions } from '../../lib/buildEditorExtensions';
 import { Toolbar } from './Toolbar';
 import { FloatingBlockPicker } from './FloatingBlockPicker';
 import { ExportDialog } from './ExportDialog';
 import { ProjectAssetGalleryDialog } from './ProjectAssetGalleryDialog';
-import { PropertiesPanel } from './PropertiesPanel';
+import { RenderedDocumentCanvas } from './RenderedDocumentCanvas';
+import { SelectedBlockEditorPanel } from './SelectedBlockEditorPanel';
 import { PreviewPanel } from '../preview/PreviewPanel';
 import { useThemeStore } from '../../stores/themeStore';
 import { useExportStore } from '../../stores/exportStore';
@@ -57,10 +23,22 @@ type PageSize = 'letter' | 'a4' | 'a5';
 interface EditorLayoutProps {
   projectId: string;
   content: DocumentContent;
+  layoutPlan?: LayoutPlan | null;
+  documentKind?: string | null;
+  documentTitle?: string | null;
   onUpdate: (content: DocumentContent) => void;
+  onLayoutPlanUpdate?: (layoutPlan: LayoutPlan) => Promise<void> | void;
 }
 
-export function EditorLayout({ projectId, content, onUpdate }: EditorLayoutProps) {
+export function EditorLayout({
+  projectId,
+  content,
+  layoutPlan = null,
+  documentKind = null,
+  documentTitle = null,
+  onUpdate,
+  onLayoutPlanUpdate,
+}: EditorLayoutProps) {
   const [showBlockPicker, setShowBlockPicker] = useState(false);
   const [showProperties, setShowProperties] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
@@ -74,10 +52,12 @@ export function EditorLayout({ projectId, content, onUpdate }: EditorLayoutProps
   const [pageSize, setPageSize] = useState<PageSize>('letter');
   const [showTexture, setShowTexture] = useState(true);
   const [sectionName, setSectionName] = useState('');
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [localLayoutPlan, setLocalLayoutPlan] = useState<LayoutPlan | null>(layoutPlan);
 
   const editor = useEditor({
-    extensions: [StarterKit.configure({ link: false, underline: false }), Underline, Link.configure({ openOnClick: false, HTMLAttributes: { rel: 'noopener noreferrer nofollow' } }), TextAlign.configure({ types: ['heading', 'paragraph'] }), Superscript, Subscript, Highlight.configure({ multicolor: true }), TextStyle, FontSize, DropCap, Table.configure({ resizable: false }), TableRow, TableHeader, TableCell, StatBlock, ReadAloudBox, SidebarCallout, ChapterHeader, SpellCard, MagicItem, RandomTable, NpcProfile, EncounterTable, ClassFeature, RaceBlock, FullBleedImage, MapBlock, Handout, PageBorder, PageBreak, ColumnBreak, TitlePage, TableOfContents, CreditsPage, BackCover, AutoPagination],
-    content,
+    extensions: buildEditorExtensions({ includeAutoPagination: true }),
+    content: ensureStableNodeIds(content),
     immediatelyRender: false,
     onUpdate: ({ editor: ed }) => {
       onUpdate(ed.getJSON());
@@ -88,19 +68,33 @@ export function EditorLayout({ projectId, content, onUpdate }: EditorLayoutProps
   usePageAlignment(editor);
 
   useEffect(() => {
+    setLocalLayoutPlan(layoutPlan);
+  }, [layoutPlan]);
+
+  useEffect(() => {
     if (!editor) return;
     const updateSection = () => {
       let found = '';
+      let selectedNode: string | null = null;
       const pos = editor.state.selection.$anchor.pos;
+      editor.state.doc.forEach((node, offset) => {
+        const nodeStart = offset + 1;
+        const nodeEnd = nodeStart + node.nodeSize - 1;
+        if (pos >= nodeStart && pos <= nodeEnd && typeof node.attrs?.nodeId === 'string') {
+          selectedNode = String(node.attrs.nodeId);
+        }
+      });
       editor.state.doc.nodesBetween(0, pos, (node) => {
         if (node.type.name === 'heading' && node.attrs.level === 1) {
           found = node.textContent;
         }
       });
       setSectionName(found);
+      setSelectedNodeId(selectedNode);
     };
     editor.on('selectionUpdate', updateSection);
     editor.on('update', updateSection);
+    updateSection();
     return () => {
       editor.off('selectionUpdate', updateSection);
       editor.off('update', updateSection);
@@ -114,9 +108,49 @@ export function EditorLayout({ projectId, content, onUpdate }: EditorLayoutProps
     }
   }, [pageSize, columnCount]);
 
+  const selectNodeById = useCallback((nodeId: string) => {
+    if (!editor) return;
+    editor.state.doc.forEach((node, offset) => {
+      if (String(node.attrs?.nodeId ?? '') !== nodeId) return;
+      editor.commands.focus();
+      editor.commands.setNodeSelection(offset + 1);
+    });
+    setSelectedNodeId(nodeId);
+    setShowProperties(true);
+  }, [editor]);
+
+  const handleReorderNode = useCallback(async (draggedNodeId: string, targetNodeId: string, placement: 'before' | 'after') => {
+    if (!localLayoutPlan || !onLayoutPlanUpdate) return;
+
+    const orderedBlocks = [...localLayoutPlan.blocks].sort((left, right) => left.presentationOrder - right.presentationOrder);
+    const draggedIndex = orderedBlocks.findIndex((block) => block.nodeId === draggedNodeId);
+    const targetIndex = orderedBlocks.findIndex((block) => block.nodeId === targetNodeId);
+    if (draggedIndex === -1 || targetIndex === -1) return;
+
+    const [draggedBlock] = orderedBlocks.splice(draggedIndex, 1);
+    const insertionIndexBase = orderedBlocks.findIndex((block) => block.nodeId === targetNodeId);
+    const insertionIndex = placement === 'before' ? insertionIndexBase : insertionIndexBase + 1;
+    orderedBlocks.splice(insertionIndex, 0, draggedBlock);
+
+    const nextLayoutPlan: LayoutPlan = {
+      ...localLayoutPlan,
+      blocks: orderedBlocks.map((block, index) => ({
+        ...block,
+        presentationOrder: index,
+      })),
+    };
+
+    setLocalLayoutPlan(nextLayoutPlan);
+    try {
+      await onLayoutPlanUpdate(nextLayoutPlan);
+    } catch {
+      setLocalLayoutPlan(localLayoutPlan);
+    }
+  }, [localLayoutPlan, onLayoutPlanUpdate]);
+
   return (
     <div className="flex h-full overflow-hidden">
-      {/* Center: Toolbar + Editor */}
+      {/* Center: Toolbar + Page Canvas */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Toolbar */}
         <div className="flex items-center border-b bg-white flex-nowrap">
@@ -229,25 +263,21 @@ export function EditorLayout({ projectId, content, onUpdate }: EditorLayoutProps
           />
         )}
 
-        {/* Editor content area */}
-        <div className="editor-outer" data-theme={currentTheme}>
-          <div
-            className="page-canvas editor-themed-content"
-            data-columns={columnCount}
-            {...(pageSize !== 'letter' ? { 'data-page-size': pageSize } : {})}
-            {...(!showTexture ? { 'data-texture-off': '' } : {})}
-          >
-            {editor && (
-              <ErrorBoundary fallbackMessage="A block encountered an error. Try removing the last edited block.">
-                <EditorContent editor={editor} />
-              </ErrorBoundary>
-            )}
-            <div className="page-footer">
-              <span>{sectionName}</span>
-              <span></span>
-            </div>
-          </div>
+        {/* Hidden source editor keeps TipTap as the canonical content engine. */}
+        <div className="sr-only" aria-hidden="true">
+          {editor && <EditorContent editor={editor} />}
         </div>
+
+        <RenderedDocumentCanvas
+          editor={editor}
+          theme={currentTheme}
+          layoutPlan={localLayoutPlan}
+          documentKind={documentKind}
+          documentTitle={documentTitle ?? sectionName}
+          selectedNodeId={selectedNodeId}
+          onSelectNodeId={selectNodeById}
+          onReorderNode={handleReorderNode}
+        />
       </div>
 
       {/* Right sidebar container — smooth width transitions */}
@@ -268,8 +298,21 @@ export function EditorLayout({ projectId, content, onUpdate }: EditorLayoutProps
             }`}
           >
             {showingAi && <AiChatPanel projectId={projectId} editor={editor} />}
-            {showingPreview && <PreviewPanel editor={editor} theme={currentTheme} />}
-            {showingProps && <PropertiesPanel editor={editor} />}
+            {showingPreview && (
+              <PreviewPanel
+                editor={editor}
+                theme={currentTheme}
+                layoutPlan={localLayoutPlan}
+                documentKind={documentKind}
+                documentTitle={documentTitle}
+              />
+            )}
+            {showingProps && (
+              <SelectedBlockEditorPanel
+                editor={editor}
+                selectedNodeId={selectedNodeId}
+              />
+            )}
           </div>
         );
       })()}

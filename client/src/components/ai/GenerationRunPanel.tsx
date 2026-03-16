@@ -27,6 +27,7 @@ const SUBSTAGE_LABELS: Record<string, string> = {
   publication_polish: 'Polishing Layout',
   preflight_recheck: 'Rechecking Layout',
   art_direction: 'Planning Artwork',
+  layout_director: 'Directing Layout',
 };
 
 const ACTIVE_STATUSES: RunStatus[] = [

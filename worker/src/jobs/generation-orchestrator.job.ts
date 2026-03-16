@@ -38,6 +38,7 @@ export async function processGenerationJob(job: Job<GenerationJobData>): Promise
   const { publishGenerationEvent } = await import('../../../server/src/services/generation/pubsub.service.js');
   const { executeBibleGeneration } = await import('../../../server/src/services/generation/bible.service.js');
   const { executeOutlineGeneration } = await import('../../../server/src/services/generation/outline.service.js');
+  const { executeFrontMatterGeneration } = await import('../../../server/src/services/generation/front-matter.service.js');
   const { expandAllCanonEntities } = await import('../../../server/src/services/generation/canon.service.js');
   const { executeChapterPlanGeneration } = await import('../../../server/src/services/generation/chapter-plan.service.js');
   const { executeChapterDraftGeneration } = await import('../../../server/src/services/generation/chapter-writer.service.js');
@@ -47,6 +48,7 @@ export async function processGenerationJob(job: Job<GenerationJobData>): Promise
   const { runPreflight } = await import('../../../server/src/services/generation/preflight.service.js');
   const { executePublicationPolish } = await import('../../../server/src/services/generation/publication-polish.service.js');
   const { executeArtDirectionPass } = await import('../../../server/src/services/generation/art-direction.service.js');
+  const { executeLayoutDirectorPass } = await import('../../../server/src/services/generation/layout-director.service.js');
   const { executeIntake } = await import('../../../server/src/services/generation/intake.service.js');
 
   async function publishProgress(status: string, stage: string, percent: number) {
@@ -81,6 +83,8 @@ export async function processGenerationJob(job: Job<GenerationJobData>): Promise
 
     const { outline } = await executeOutlineGeneration(run, bibleContent, model, maxOutputTokens);
     await publishProgress('planning', 'planning', 40);
+
+    await executeFrontMatterGeneration(run, bibleContent, outline);
 
     // Stage 2: Asset Generation
     await transitionRunStatus(runId, userId, 'generating_assets');
@@ -240,6 +244,27 @@ export async function processGenerationJob(job: Job<GenerationJobData>): Promise
           severity: 'warning',
         });
       }
+    }
+
+    await publishProgress('assembling', 'layout_director', 99);
+    try {
+      const layoutDirector = await executeLayoutDirectorPass(run);
+      if (layoutDirector.documentsUpdated > 0) {
+        await publishGenerationEvent(runId, {
+          type: 'run_warning',
+          runId,
+          message: `Layout director refreshed canonical presentation plans for ${layoutDirector.documentsUpdated} document(s).`,
+          severity: 'info',
+        });
+      }
+    } catch (layoutErr) {
+      const message = layoutErr instanceof Error ? layoutErr.message : String(layoutErr);
+      await publishGenerationEvent(runId, {
+        type: 'run_warning',
+        runId,
+        message: `Layout director pass failed: ${message}`,
+        severity: 'warning',
+      });
     }
 
     // Complete

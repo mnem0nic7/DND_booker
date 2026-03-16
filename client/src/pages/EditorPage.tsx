@@ -1,6 +1,6 @@
 import { useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import type { DocumentContent } from '@dnd-booker/shared';
+import type { DocumentContent, LayoutPlan } from '@dnd-booker/shared';
 import { useProjectStore } from '../stores/projectStore';
 import { useAuthStore } from '../stores/authStore';
 import { useThemeStore } from '../stores/themeStore';
@@ -28,6 +28,7 @@ export default function EditorPage() {
     isLoadingDocument,
     fetchDocuments,
     updateDocumentContent,
+    updateDocumentLayoutPlan,
     clearActiveDocument,
   } = useProjectStore();
 
@@ -73,6 +74,13 @@ export default function EditorPage() {
       updateDocumentContent(content);
     },
     [updateDocumentContent],
+  );
+
+  const handleDocumentLayoutPlanUpdate = useCallback(
+    async (layoutPlan: LayoutPlan) => {
+      await updateDocumentLayoutPlan(layoutPlan);
+    },
+    [updateDocumentLayoutPlan],
   );
 
   return (
@@ -152,7 +160,11 @@ export default function EditorPage() {
               key={activeDocument.id}
               projectId={projectId!}
               content={activeDocument.content as DocumentContent}
+              layoutPlan={activeDocument.layoutPlan}
+              documentKind={activeDocument.kind}
+              documentTitle={activeDocument.title}
               onUpdate={handleDocumentContentUpdate}
+              onLayoutPlanUpdate={handleDocumentLayoutPlanUpdate}
             />
           ) : documents.length > 0 && !activeDocument ? (
             <div className="flex items-center justify-center h-full text-gray-400">

@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { escapeHtml, normalizeChapterHeaderTitle, safeCssUrl, safeUrl } from '../renderers/utils.js';
+import {
+  assessRandomTableEntries,
+  escapeHtml,
+  normalizeChapterHeaderTitle,
+  normalizeNpcProfileAttrs,
+  safeCssUrl,
+  safeUrl,
+} from '../renderers/utils.js';
 import { renderNode } from '../renderers/tiptap-to-html.js';
 
 describe('Worker Renderer Utils', () => {
@@ -124,6 +131,47 @@ describe('Worker Renderer Utils', () => {
 
     it('should preserve titles that do not duplicate the chapter number', () => {
       expect(normalizeChapterHeaderTitle('The Village', 'Chapter 1')).toBe('The Village');
+    });
+  });
+
+  describe('assessRandomTableEntries', () => {
+    it('flags thin random encounter results', () => {
+      const assessment = assessRandomTableEntries(JSON.stringify([
+        { roll: '1-2', result: '2d4 shadows' },
+        { roll: '3-4', result: 'A miner spirit' },
+      ]));
+
+      expect(assessment.isThin).toBe(true);
+      expect(assessment.thinEntryCount).toBe(2);
+    });
+
+    it('accepts detailed runnable random encounter results', () => {
+      const assessment = assessRandomTableEntries(JSON.stringify([
+        { roll: '1-2', result: 'A sobbing miner spirit begs for help beside a collapsed shaft; a DC 12 Religion check calms it and reveals a hidden route deeper into the mine.' },
+        { roll: '3-4', result: 'Two shadows detach from a lantern glow and stalk the rear guard; if routed, they leave behind a blackglass shard worth 15 gp.' },
+      ]));
+
+      expect(assessment.isThin).toBe(false);
+      expect(assessment.thinEntryCount).toBe(0);
+    });
+  });
+
+  describe('normalizeNpcProfileAttrs', () => {
+    it('normalizes actionable social fields when present', () => {
+      const normalized = normalizeNpcProfileAttrs({
+        name: 'Eldira Voss',
+        role: 'Tavern Keeper',
+        goalOrNeed: 'Keep the townsfolk calm until dawn.',
+        knowledge: 'The first miners heard voices near the blackglass seam.',
+        pressurePoint: 'Proof that the curse can reach the tavern cellar.',
+        firstReaction: 'She stonewalls strangers until they mention the missing miners.',
+      });
+
+      expect(normalized.class).toBe('Tavern Keeper');
+      expect(normalized.goal).toBe('Keep the townsfolk calm until dawn.');
+      expect(normalized.whatTheyKnow).toBe('The first miners heard voices near the blackglass seam.');
+      expect(normalized.leverage).toBe('Proof that the curse can reach the tavern cellar.');
+      expect(normalized.likelyReaction).toBe('She stonewalls strangers until they mention the missing miners.');
     });
   });
 });

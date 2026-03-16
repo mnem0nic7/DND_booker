@@ -225,7 +225,7 @@ export function markdownToTipTap(markdown: string): TipTapNode {
     }
 
     // ── Fenced D&D block: :::blockType ... ::: (with optional attrs like title="...")
-    const blockMatch = line.match(/^:::(\w+)(.*)$/);
+    const blockMatch = line.match(/^\s*:::(\w+)(.*)$/);
     if (blockMatch) {
       const rawBlockType = blockMatch[1];
       const blockType = normalizeWizardBlockType(rawBlockType);
@@ -249,6 +249,7 @@ export function markdownToTipTap(markdown: string): TipTapNode {
 
       // For structured blocks (statBlock, spellCard, etc.), parse JSON attrs
       if (['readAloudBox', 'sidebarCallout'].includes(blockType)) {
+        const { primaryContent, remainder } = splitMalformedProseBlockContent(blockContent);
         // Parse inline attributes (e.g., title="Custom Title" calloutType="warning")
         const parsedAttrs: Record<string, string> = {};
         const attrRegex = /(\w+)="([^"]*)"/g;
@@ -264,8 +265,11 @@ export function markdownToTipTap(markdown: string): TipTapNode {
         content.push({
           type: blockType,
           attrs,
-          content: parseInlineContent(blockContent),
+          content: parseInlineContent(primaryContent || blockContent),
         });
+        if (remainder) {
+          content.push(...(markdownToTipTap(remainder).content ?? []));
+        }
       } else {
         const structuredBlockNode = parseStructuredBlockNode(rawBlockType, blockContent);
         if (structuredBlockNode) {
@@ -278,7 +282,7 @@ export function markdownToTipTap(markdown: string): TipTapNode {
     }
 
     // ── Heading
-    const headingMatch = line.match(/^(#{1,6})\s+(.+)$/);
+    const headingMatch = line.match(/^\s*(#{1,6})\s+(.+)$/);
     if (headingMatch) {
       const level = headingMatch[1].length;
       content.push({
@@ -357,11 +361,17 @@ export function markdownToTipTap(markdown: string): TipTapNode {
         i++;
       }
       i++; // skip closing ```
+      const codeContent = codeLines.join('\n').trim();
+      const blockNodes = parseSameLineWizardBlock(codeContent) ?? parseLooseWizardBlock(codeContent);
+      if (blockNodes) {
+        content.push(...blockNodes);
+        continue;
+      }
       content.push({
         type: 'codeBlock',
         attrs: language ? { language } : {},
         content: codeLines.length > 0
-          ? [{ type: 'text', text: codeLines.join('\n') }]
+          ? [{ type: 'text', text: codeContent }]
           : undefined,
       });
       continue;
@@ -512,8 +522,41 @@ function createInlineProseBlock(rawBlockType: string, inlinePayload: string): Ti
   };
 }
 
+function splitMalformedProseBlockContent(blockContent: string): { primaryContent: string; remainder: string } {
+  const lines = blockContent.split('\n');
+  const remainderIndex = lines.findIndex((line, index) => {
+    if (index === 0) return false;
+    return /^\s*(#{1,6}\s+|:::\w+|---+\s*$|\*\*\*+\s*$)/.test(line);
+  });
+
+  if (remainderIndex === -1) {
+    return { primaryContent: blockContent, remainder: '' };
+  }
+
+  return {
+    primaryContent: lines.slice(0, remainderIndex).join('\n').trim(),
+    remainder: lines.slice(remainderIndex).join('\n').trim(),
+  };
+}
+
+function parseLooseWizardBlock(text: string): TipTapNode[] | null {
+  const match = text.trim().match(/^:::(\w+)\s+([\s\S]+)$/);
+  if (!match) return null;
+
+  const rawBlockType = match[1];
+  const payload = match[2].trim();
+  if (!payload) return [];
+
+  if (isInlineProseBlock(rawBlockType, payload)) {
+    return [createInlineProseBlock(rawBlockType, payload)];
+  }
+
+  const structuredBlockNode = parseStructuredBlockNode(rawBlockType, payload);
+  return structuredBlockNode ? [structuredBlockNode] : parseInlineContent(payload);
+}
+
 function parseSameLineWizardBlock(text: string): TipTapNode[] | null {
-  const match = text.trim().match(/^:::(\w+)\s+([\s\S]*?)\s*:::\s*$/);
+  const match = text.trim().match(/^(?:#{1,6}\s+[^:]+?\s+)?:::(\w+)\s+([\s\S]*?)\s*:::\s*$/);
   if (!match) return null;
 
   const rawBlockType = match[1];

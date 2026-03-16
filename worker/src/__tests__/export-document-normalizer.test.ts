@@ -187,6 +187,216 @@ describe('normalizeExportDocuments', () => {
     });
   });
 
+  it('upgrades ordered roster entries and supporting bullets into npc profile cards', () => {
+    const documents = normalizeExportDocuments([
+      {
+        title: 'Chapter 1: The Town',
+        sortOrder: 0,
+        kind: 'chapter',
+        content: doc([
+          {
+            type: 'orderedList',
+            content: [{
+              type: 'listItem',
+              content: [{
+                type: 'paragraph',
+                content: [
+                  { type: 'text', text: 'Elder Marnie', marks: [{ type: 'bold' }] },
+                  { type: 'text', text: ':' },
+                ],
+              }],
+            }],
+          },
+          {
+            type: 'bulletList',
+            content: [
+              {
+                type: 'listItem',
+                content: [{
+                  type: 'paragraph',
+                  content: [{ type: 'text', text: 'The wise yet anxious elder, her face lined with worry.' }],
+                }],
+              },
+              {
+                type: 'listItem',
+                content: [{
+                  type: 'paragraph',
+                  content: [{ type: 'text', text: 'Goal: Seeks to protect the townsfolk from the mine’s curse.' }],
+                }],
+              },
+              {
+                type: 'listItem',
+                content: [{
+                  type: 'paragraph',
+                  content: [{ type: 'text', text: 'What she knows: The elder knows legends about the Gravel Guardian.' }],
+                }],
+              },
+              {
+                type: 'listItem',
+                content: [{
+                  type: 'paragraph',
+                  content: [{ type: 'text', text: 'Leverage: If approached with empathy, she may reveal critical information.' }],
+                }],
+              },
+              {
+                type: 'listItem',
+                content: [{
+                  type: 'paragraph',
+                  content: [{ type: 'text', text: 'Likely Reaction: Marnie will express her fears outright.' }],
+                }],
+              },
+            ],
+          },
+        ]),
+      },
+    ], 'The Blackglass Mine');
+
+    const nodes = documents[0].content?.content ?? [];
+    expect(nodes).toHaveLength(1);
+    expect(nodes[0]).toMatchObject({
+      type: 'npcProfile',
+      attrs: {
+        name: 'Elder Marnie',
+        goal: 'Seeks to protect the townsfolk from the mine’s curse.',
+        whatTheyKnow: 'The elder knows legends about the Gravel Guardian.',
+        leverage: 'If approached with empathy, she may reveal critical information.',
+        likelyReaction: 'Marnie will express her fears outright.',
+      },
+    });
+  });
+
+  it('repairs heading-prefixed block bleed-through paragraphs into real block nodes', () => {
+    const documents = normalizeExportDocuments([
+      {
+        title: 'Chapter 2: The Mine',
+        sortOrder: 1,
+        kind: 'chapter',
+        content: doc([
+          {
+            type: 'paragraph',
+            content: [{
+              type: 'text',
+              text: '#### Handout :::handout {"title":"Caution: Blackglass Mine","style":"letter","content":"Beware the mine."} :::',
+            }],
+          },
+          {
+            type: 'paragraph',
+            content: [{
+              type: 'text',
+              text: '#### Read Aloud :::readAloud The mine entrance exhales a grave-cold breath. :::',
+            }],
+          },
+        ]),
+      },
+    ], 'The Blackglass Mine');
+
+    const nodes = documents[0].content?.content ?? [];
+    expect(nodes).toHaveLength(2);
+    expect(nodes[0]).toMatchObject({
+      type: 'handout',
+      attrs: {
+        title: 'Caution: Blackglass Mine',
+        style: 'letter',
+      },
+    });
+    expect(nodes[1]).toMatchObject({
+      type: 'readAloudBox',
+    });
+  });
+
+  it('splits malformed sidebar callouts that swallowed later headings and utility blocks', () => {
+    const documents = normalizeExportDocuments([
+      {
+        title: 'Chapter 2: The Mine',
+        sortOrder: 1,
+        kind: 'chapter',
+        content: doc([
+          {
+            type: 'heading',
+            attrs: { level: 4 },
+            content: [{ type: 'text', text: 'DM Tips' }],
+          },
+          {
+            type: 'sidebarCallout',
+            attrs: { title: 'DM Tips', calloutType: 'info' },
+            content: [
+              {
+                type: 'paragraph',
+                content: [{ type: 'text', text: 'Keep the pressure on as the party crosses the threshold.' }],
+              },
+              {
+                type: 'paragraph',
+                content: [{
+                  type: 'text',
+                  text: '#### Handout :::handout {"title":"Caution: Blackglass Mine","style":"letter","content":"Beware the mine."} :::',
+                }],
+              },
+              {
+                type: 'paragraph',
+                content: [{ type: 'text', text: '### Strange Occurrences' }],
+              },
+              {
+                type: 'paragraph',
+                content: [{ type: 'text', text: '#### Read Aloud :::readAloud The mine entrance exhales a grave-cold breath. :::' }],
+              },
+            ],
+          },
+        ]),
+      },
+    ], 'The Blackglass Mine');
+
+    const nodes = documents[0].content?.content ?? [];
+    expect(nodes.map((node) => node.type)).toEqual([
+      'sidebarCallout',
+      'handout',
+      'heading',
+      'readAloudBox',
+    ]);
+    expect(nodes[0]).toMatchObject({
+      type: 'sidebarCallout',
+      attrs: { title: 'DM Tips', calloutType: 'info' },
+    });
+    expect(nodes[1]).toMatchObject({
+      type: 'handout',
+      attrs: { title: 'Caution: Blackglass Mine', style: 'letter' },
+    });
+    expect(nodes[2]).toMatchObject({
+      type: 'heading',
+      attrs: { level: 3 },
+    });
+  });
+
+  it('repairs raw structured wizard blocks leaked inside code blocks', () => {
+    const documents = normalizeExportDocuments([
+      {
+        title: 'Chapter 4: Showdown',
+        sortOrder: 3,
+        kind: 'chapter',
+        content: doc([
+          {
+            type: 'codeBlock',
+            attrs: { language: 'json' },
+            content: [{
+              type: 'text',
+              text: ':::statBlock\n{"name":"Gravel Guardian","armorClass":15,"hitPoints":85}\n',
+            }],
+          },
+        ]),
+      },
+    ], 'The Blackglass Mine');
+
+    const nodes = documents[0].content?.content ?? [];
+    expect(nodes).toHaveLength(1);
+    expect(nodes[0]).toMatchObject({
+      type: 'statBlock',
+      attrs: {
+        name: 'Gravel Guardian',
+        ac: 15,
+        hp: 85,
+      },
+    });
+  });
+
   it('drops empty utility tables and their orphaned scaffolding', () => {
     const documents = normalizeExportDocuments([
       {
@@ -448,6 +658,44 @@ describe('normalizeExportDocuments', () => {
 
     expect(documents[0].content?.content).toEqual([
       { type: 'titlePage', attrs: { title: 'The Blackglass Mine', subtitle: '', author: '' } },
+    ]);
+  });
+
+  it('attaches a short stat-block lead-in paragraph to the following stat block', () => {
+    const documents = normalizeExportDocuments([
+      {
+        title: 'Chapter 2: Into the Blackglass Mine',
+        sortOrder: 2,
+        kind: 'chapter',
+        content: doc([
+          {
+            type: 'paragraph',
+            content: [{ type: 'text', text: 'The phantoms have the following stats:' }],
+          },
+          {
+            type: 'statBlock',
+            attrs: {
+              name: 'Phantom Apparition',
+              ac: 13,
+              hp: 10,
+              speed: '0 ft., fly 40 ft. (hover)',
+            },
+          },
+        ]),
+      },
+    ], 'The Blackglass Mine');
+
+    expect(documents[0].content?.content).toEqual([
+      {
+        type: 'statBlock',
+        attrs: expect.objectContaining({
+          name: 'Phantom Apparition',
+          ac: 13,
+          hp: 10,
+          speed: '0 ft., fly 40 ft. (hover)',
+          leadInText: 'The phantoms have the following stats:',
+        }),
+      },
     ]);
   });
 });

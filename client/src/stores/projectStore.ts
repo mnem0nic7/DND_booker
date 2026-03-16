@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import axios from 'axios';
-import type { DocumentContent, ProjectDocument } from '@dnd-booker/shared';
+import type { DocumentContent, LayoutPlan, ProjectDocument } from '@dnd-booker/shared';
 import api from '../lib/api';
 
 export interface Project {
@@ -53,6 +53,7 @@ interface ProjectState {
   fetchDocuments: (projectId: string) => Promise<void>;
   loadDocument: (projectId: string, docId: string) => Promise<void>;
   updateDocumentContent: (content: DocumentContent) => void;
+  updateDocumentLayoutPlan: (layoutPlan: LayoutPlan) => Promise<void>;
   clearActiveDocument: () => Promise<void>;
 }
 
@@ -424,6 +425,36 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         set({ isSaving: false, saveError: classifySaveError(err) });
       }
     }, 1000);
+  },
+
+  updateDocumentLayoutPlan: async (layoutPlan) => {
+    const doc = get().activeDocument;
+    const project = get().currentProject;
+    if (!doc || !project) return;
+
+    set((state) => ({
+      activeDocument: state.activeDocument ? { ...state.activeDocument, layoutPlan } : state.activeDocument,
+      documents: state.documents.map((item) => item.id === doc.id ? { ...item, layoutPlan } : item),
+      isSaving: true,
+      saveError: null,
+    }));
+
+    try {
+      const { data } = await api.put(`/projects/${project.id}/documents/${doc.id}/layout`, layoutPlan);
+      set((state) => ({
+        activeDocument: state.activeDocument?.id === data.id ? data : state.activeDocument,
+        documents: state.documents.map((item) => item.id === data.id ? { ...item, layoutPlan: data.layoutPlan } : item),
+        isSaving: false,
+      }));
+    } catch (err) {
+      set((state) => ({
+        activeDocument: state.activeDocument?.id === doc.id ? { ...state.activeDocument, layoutPlan: doc.layoutPlan } : state.activeDocument,
+        documents: state.documents.map((item) => item.id === doc.id ? { ...item, layoutPlan: doc.layoutPlan } : item),
+        isSaving: false,
+        saveError: classifySaveError(err),
+      }));
+      throw err;
+    }
   },
 
   clearActiveDocument: async () => {

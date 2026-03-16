@@ -39,6 +39,7 @@ export type ArtifactType =
   | 'continuity_report'
   | 'preflight_report'
   | 'publication_polish_report'
+  | 'layout_plan'
   | 'export_review'
   | 'assembly_manifest';
 
@@ -69,6 +70,7 @@ export const ARTIFACT_CATEGORY_MAP: Record<ArtifactType, ArtifactCategory> = {
   continuity_report: 'evaluation',
   preflight_report: 'evaluation',
   publication_polish_report: 'evaluation',
+  layout_plan: 'assembly',
   export_review: 'evaluation',
   assembly_manifest: 'assembly',
 };

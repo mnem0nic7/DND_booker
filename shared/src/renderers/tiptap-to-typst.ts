@@ -129,6 +129,38 @@ function renderChildren(nodes?: TipTapNode[]): string {
   return nodes.map((node) => renderTypstNodeImpl(node)).join('');
 }
 
+function renderDocumentChildren(nodes?: TipTapNode[]): string {
+  if (!nodes || nodes.length === 0) return '';
+
+  let rendered = '';
+  for (let index = 0; index < nodes.length; index += 1) {
+    const node = nodes[index];
+    const sectionNodes = collectSmallKeepTogetherSection(nodes, index);
+    const nextNode = nodes[index + 1];
+
+    if (sectionNodes) {
+      rendered += `#block(width: 100%, breakable: false)[\n`;
+      rendered += sectionNodes.map((sectionNode) => renderTypstNodeImpl(sectionNode)).join('');
+      rendered += `]\n\n`;
+      index += sectionNodes.length - 1;
+      continue;
+    }
+
+    if (isKeepTogetherHeading(node) && nextNode && isKeepTogetherFollower(nextNode)) {
+      rendered += `#block(width: 100%, breakable: false)[\n`;
+      rendered += renderTypstNodeImpl(node);
+      rendered += renderTypstNodeImpl(nextNode);
+      rendered += `]\n\n`;
+      index += 1;
+      continue;
+    }
+
+    rendered += renderTypstNodeImpl(node);
+  }
+
+  return rendered;
+}
+
 /**
  * Render inline children and strip trailing newlines.
  * Useful when injecting content inside Typst function arguments like #block[...].
@@ -293,7 +325,7 @@ function renderTypstNodeImpl(node: TipTapNode): string {
 
     // ── Document root ──
     case 'doc':
-      return renderChildren(node.content);
+      return renderDocumentChildren(node.content);
 
     // ── Unknown node type — render children if present ──
     default:
@@ -301,10 +333,51 @@ function renderTypstNodeImpl(node: TipTapNode): string {
   }
 }
 
+function isKeepTogetherHeading(node: TipTapNode): boolean {
+  return node.type === 'heading' && Number(node.attrs?.level ?? 0) === 4;
+}
+
+function isKeepTogetherFollower(node: TipTapNode): boolean {
+  return [
+    'paragraph',
+    'bulletList',
+    'orderedList',
+    'readAloudBox',
+    'sidebarCallout',
+    'handout',
+    'randomTable',
+    'encounterTable',
+    'npcProfile',
+    'statBlock',
+  ].includes(node.type);
+}
+
+function collectSmallKeepTogetherSection(nodes: TipTapNode[], startIndex: number): TipTapNode[] | null {
+  const startNode = nodes[startIndex];
+  if (startNode.type !== 'heading' || Number(startNode.attrs?.level ?? 0) !== 3) {
+    return null;
+  }
+
+  let endIndex = startIndex + 1;
+  while (endIndex < nodes.length) {
+    const node = nodes[endIndex];
+    if (node.type === 'heading' && Number(node.attrs?.level ?? 0) <= 3) {
+      break;
+    }
+    endIndex += 1;
+  }
+
+  const sectionNodes = nodes.slice(startIndex, endIndex);
+  if (sectionNodes.length > 8) return null;
+  if (!sectionNodes.some((node) => isKeepTogetherFollower(node))) return null;
+  return sectionNodes;
+}
+
 // ── D&D Block Renderers ──
 
 function renderStatBlock(attrs: Record<string, unknown>): string {
   const normalized = normalizeStatBlockAttrs(attrs);
+  const leadInText = escapeTypst(String(normalized.leadInText || '').trim());
   const name = escapeTypst(String(normalized.name || ''));
   const size = escapeTypst(String(normalized.size || ''));
   const type = escapeTypst(String(normalized.type || ''));
@@ -319,6 +392,12 @@ function renderStatBlock(attrs: Record<string, unknown>): string {
   const abilityLabels = ['STR', 'DEX', 'CON', 'INT', 'WIS', 'CHA'];
 
   let t = '';
+  if (leadInText) {
+    t += `#block(width: 100%, breakable: false)[\n`;
+    t += `  ${leadInText}\n`;
+    t += `  #v(6pt)\n`;
+  }
+
   t += `#block(width: 100%, fill: theme-stat-block-bg, stroke: (top: 4pt + theme-stat-block-border, bottom: 4pt + theme-stat-block-border), inset: 12pt, breakable: false)[\n`;
   t += `  #set text(font: stat-font)\n`;
 
@@ -420,12 +499,15 @@ function renderStatBlock(attrs: Record<string, unknown>): string {
   }
 
   t += `]\n\n`;
+  if (leadInText) {
+    t += `]\n\n`;
+  }
   return t;
 }
 
 function renderReadAloudBox(attrs: Record<string, unknown>, content?: TipTapNode[]): string {
   let t = '';
-  t += `#block(width: 100%, fill: theme-read-aloud-bg, stroke: 1pt + theme-read-aloud-border, inset: 12pt)[\n`;
+  t += `#block(width: 100%, fill: theme-read-aloud-bg, stroke: 1pt + theme-read-aloud-border, inset: 12pt, breakable: false)[\n`;
   t += `  #set text(font: stat-font)\n`;
   t += `  ${renderInlineChildren(content)}\n`;
   t += `]\n\n`;
@@ -436,7 +518,7 @@ function renderSidebarCallout(attrs: Record<string, unknown>, content?: TipTapNo
   const title = escapeTypst(String(attrs.title || 'Note'));
 
   let t = '';
-  t += `#block(width: 100%, fill: theme-sidebar-bg, stroke: 1pt + theme-primary, inset: 12pt)[\n`;
+  t += `#block(width: 100%, fill: theme-sidebar-bg, stroke: 1pt + theme-primary, inset: 12pt, breakable: false)[\n`;
   t += `  #set text(font: stat-font)\n`;
   t += `  #text(font: heading-font, weight: "bold", size: 12pt)[${title}]\n`;
   t += `  ${renderInlineChildren(content)}\n`;
@@ -560,6 +642,10 @@ function renderNpcProfile(attrs: Record<string, unknown>): string {
   const ideals = String(normalized.ideals || '');
   const bonds = String(normalized.bonds || '');
   const flaws = String(normalized.flaws || '');
+  const goal = String(normalized.goal || '');
+  const whatTheyKnow = String(normalized.whatTheyKnow || '');
+  const leverage = String(normalized.leverage || '');
+  const likelyReaction = String(normalized.likelyReaction || '');
   const portraitUrl = String(normalized.portraitUrl || '');
 
   let t = '';
@@ -583,6 +669,19 @@ function renderNpcProfile(attrs: Record<string, unknown>): string {
 
   if (description) {
     t += `  ${escapeTypst(description)}\n\n`;
+  }
+
+  if (goal) {
+    t += `  *Goal.* ${escapeTypst(goal)}\n\n`;
+  }
+  if (whatTheyKnow) {
+    t += `  *What They Know.* ${escapeTypst(whatTheyKnow)}\n\n`;
+  }
+  if (leverage) {
+    t += `  *Leverage.* ${escapeTypst(leverage)}\n\n`;
+  }
+  if (likelyReaction) {
+    t += `  *Likely Reaction.* ${escapeTypst(likelyReaction)}\n\n`;
   }
 
   // Personality section

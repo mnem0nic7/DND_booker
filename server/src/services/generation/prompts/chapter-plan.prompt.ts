@@ -58,10 +58,13 @@ Rules:
 - Every non-transition section MUST include scenePurpose, playerObjective, decisionPoint, and consequenceSummary
 - Every non-transition section MUST include at least two reusable DM utility blocks in blocksNeeded
 - Narrative sections should include readAloud plus dmTips and usually handout
-- Encounter sections MUST include encounterTable, statBlock, and dmTips for tactics, triggers, and aftermath
-- Exploration sections MUST include randomTable or handout, and should usually include both
-- Social sections MUST include npcProfile and dmTips
+- Encounter sections MUST include encounterTable, statBlock, and dmTips for setup, terrain, tactics, rewards, and aftermath
+- Exploration sections MUST include randomTable, encounterTable, or handout, and should usually include at least two of them
+- Social sections MUST include npcProfile and dmTips, and should usually open with a short read-aloud setup
 - Across the chapter, aim for at least one reference-heavy block (statBlock, encounterTable, npcProfile, magicItem, spellCard, randomTable, handout) in every non-transition section
+- Encounter sections should plan a single runnable encounter packet: trigger, opposition, terrain, tactics, consequences, and payoff all need a home in the draft
+- Social sections should plan for NPC leverage: what the NPC wants, what they know, what persuades them, and how they react under pressure
+- Exploration sections that include random encounters must make those encounters runnable. Random table entries should not be nouns only; they should capture the immediate situation, active threat or opportunity, and clue, reward, or consequence
 - entityReferences must use slugs from the campaign bible
 - readAloudCount: 1-2 per narrative section, 1 per encounter
 - dmTipCount: 1-2 per chapter
@@ -83,6 +86,7 @@ export function buildChapterPlanUserPrompt(
     `Summary: ${chapter.summary}`,
     '',
     'Planning priority: make this chapter table-ready for a DM. Prefer scene goals, choices, consequences, checks, hazards, rewards, and reusable utility blocks over long prose summary.',
+    'If you plan random encounters, make each one runnable: situation, threat or opportunity, and payoff must all be visible in the plan and draft.',
     '',
     'Sections from outline:',
     ...chapter.sections.map(s =>

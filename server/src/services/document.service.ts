@@ -1,6 +1,7 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '../config/database.js';
 import { ensureProjectDocuments } from './project-document-bootstrap.service.js';
+import { resolveDocumentLayout } from './layout-plan.service.js';
 
 /**
  * List all documents for a project (excluding large content/outline fields).
@@ -41,9 +42,52 @@ export async function updateDocumentContent(
   });
   if (!doc || doc.project.userId !== userId) return null;
 
+  const resolvedLayout = resolveDocumentLayout({
+    content,
+    layoutPlan: doc.layoutPlan,
+    kind: doc.kind,
+    title: doc.title,
+  });
+
   return prisma.projectDocument.update({
     where: { id: documentId },
-    data: { content, status: 'edited' },
+    data: {
+      content: resolvedLayout.content as unknown as Prisma.InputJsonValue,
+      layoutPlan: resolvedLayout.layoutPlan as unknown as Prisma.InputJsonValue,
+      status: 'edited',
+    },
+  });
+}
+
+/**
+ * Update a document's persisted layout plan while keeping content canonical.
+ * Returns null if the document doesn't exist or the user doesn't own the project.
+ */
+export async function updateDocumentLayout(
+  documentId: string,
+  userId: string,
+  layoutPlan: Prisma.InputJsonValue,
+) {
+  const doc = await prisma.projectDocument.findUnique({
+    where: { id: documentId },
+    include: { project: true },
+  });
+  if (!doc || doc.project.userId !== userId) return null;
+
+  const resolvedLayout = resolveDocumentLayout({
+    content: doc.content,
+    layoutPlan,
+    kind: doc.kind,
+    title: doc.title,
+  });
+
+  return prisma.projectDocument.update({
+    where: { id: documentId },
+    data: {
+      content: resolvedLayout.content as unknown as Prisma.InputJsonValue,
+      layoutPlan: resolvedLayout.layoutPlan as unknown as Prisma.InputJsonValue,
+      status: 'edited',
+    },
   });
 }
 
@@ -123,6 +167,7 @@ export async function reorderDocuments(
       slug: true,
       sortOrder: true,
       targetPageCount: true,
+      layoutPlan: true,
       status: true,
       sourceArtifactId: true,
       createdAt: true,

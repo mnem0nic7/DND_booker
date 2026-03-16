@@ -1,12 +1,15 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Editor } from '@tiptap/react';
-import { tiptapToHtml } from '@dnd-booker/shared';
-import type { DocumentContent } from '@dnd-booker/shared';
+import { renderContentWithLayoutPlan } from '@dnd-booker/shared';
+import type { DocumentContent, LayoutPlan } from '@dnd-booker/shared';
 import { PreviewRenderer } from './PreviewRenderer';
 
 interface PreviewPanelProps {
   editor: Editor | null;
   theme: string;
+  layoutPlan?: LayoutPlan | null;
+  documentKind?: string | null;
+  documentTitle?: string | null;
 }
 
 type ZoomLevel = 50 | 75 | 100;
@@ -21,7 +24,13 @@ const PAGE_WIDTH = 816;
  * with the selected theme applied. Uses the shared tiptapToHtml renderer
  * so custom D&D blocks (stat blocks, spell cards, etc.) render fully.
  */
-export function PreviewPanel({ editor, theme }: PreviewPanelProps) {
+export function PreviewPanel({
+  editor,
+  theme,
+  layoutPlan = null,
+  documentKind = null,
+  documentTitle = null,
+}: PreviewPanelProps) {
   const [zoom, setZoom] = useState<ZoomLevel>(75);
   const [html, setHtml] = useState('');
   const [containerWidth, setContainerWidth] = useState(0);
@@ -30,9 +39,18 @@ export function PreviewPanel({ editor, theme }: PreviewPanelProps) {
   const updateHtml = useCallback(() => {
     if (editor) {
       const json = editor.getJSON() as DocumentContent;
-      setHtml(tiptapToHtml(json));
+      const rendered = renderContentWithLayoutPlan({
+        content: json,
+        layoutPlan,
+        preset: 'editor_preview',
+        options: {
+          documentKind,
+          documentTitle,
+        },
+      });
+      setHtml(rendered.html);
     }
-  }, [editor]);
+  }, [documentKind, documentTitle, editor, layoutPlan]);
 
   // Subscribe to editor updates for real-time preview
   useEffect(() => {

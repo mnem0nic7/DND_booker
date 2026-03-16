@@ -595,9 +595,9 @@ Atom blocks and their attrs:
 - statBlock: name, type, alignment, ac, hp, speed, str, dex, con, int, wis, cha, skills, senses, languages, cr, traits (JSON string), actions (JSON string)
 - encounterTable: environment (string), crRange (string), entries (JSON string array: [{"weight":1,"description":"1d4 shadows","cr":"1/2"},{"weight":2,"description":"1 specter","cr":"1"},...])
 - magicItem: name, rarity, type, description, attunement
-- npcProfile: name, race, class, description, personalityTraits, ideals, bonds, flaws, portraitUrl, imagePrompt
+- npcProfile: name, race, class, description, goal, whatTheyKnow, leverage, likelyReaction, personalityTraits, ideals, bonds, flaws, portraitUrl, imagePrompt
 - spellCard: name, level (number), school, castingTime, range, components, duration, description, higherLevels
-- randomTable: title (string), dieType (string), entries (JSON string: [{"roll":"1","result":"..."},{"roll":"2","result":"..."},...])
+- randomTable: title (string), dieType (string), entries (JSON string: [{"roll":"1","result":"A runnable random encounter or discovery with situation, threat or opportunity, and payoff"},{"roll":"2","result":"..."},...])
 - fullBleedImage: src (string), caption (string), position ("full"|"half"|"quarter")
 - readAloud: variant ("light"|"dark"), content stored as child text (use "replace" only for readAloud)
 - dmTips: content stored as child text (use "replace" only for dmTips)
@@ -804,6 +804,10 @@ const BLOCK_SCHEMAS: Record<string, { description: string; schema: string }> = {
   "race": "string — e.g. Human, Elf, Dwarf, Tiefling",
   "class": "string — e.g. Fighter, Wizard, Commoner, Noble",
   "description": "string — physical description and background",
+  "goal": "string — what the NPC wants right now",
+  "whatTheyKnow": "string — table-usable facts or secrets the NPC can reveal",
+  "leverage": "string — what shifts the NPC's stance, bargain, or cooperation",
+  "likelyReaction": "string — how the NPC responds to pressure, kindness, or threats",
   "personalityTraits": "string — 1-2 personality traits",
   "ideals": "string — what drives the NPC",
   "bonds": "string — connections and loyalties",
@@ -815,7 +819,7 @@ const BLOCK_SCHEMAS: Record<string, { description: string; schema: string }> = {
     schema: `{
   "title": "string — table title",
   "dieType": "string — d4/d6/d8/d10/d12/d20/d100",
-  "entries": "JSON string of array [{roll: string, result: string}] — one entry per die face"
+  "entries": "JSON string of array [{roll: string, result: string}] — every result must be runnable at the table, including the immediate situation, threat or opportunity, and clue, reward, or consequence"
 }`,
   },
   encounterTable: {

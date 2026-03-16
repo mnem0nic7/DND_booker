@@ -13,6 +13,7 @@ import {
 } from '@dnd-booker/shared';
 import type { ExportJob as PrismaExportJob } from '@prisma/client';
 import { prisma } from '../config/database.js';
+import { resolveDocumentLayout } from './layout-plan.service.js';
 
 const FIXABLE_CODES = new Set<ExportReviewCode>([
   'EXPORT_EMPTY_ENCOUNTER_TABLE',
@@ -26,6 +27,7 @@ type FixableReviewCode = typeof FIXABLE_CODES extends Set<infer T> ? T : never;
 type ProjectDocumentRecord = {
   id: string;
   title: string;
+  layoutPlan?: unknown;
   content: DocumentContent | null;
 };
 
@@ -292,6 +294,7 @@ export async function applySafeExportReviewFixes(
     select: {
       id: true,
       title: true,
+      layoutPlan: true,
       content: true,
     },
   });
@@ -312,10 +315,17 @@ export async function applySafeExportReviewFixes(
 
       if (!result.changed) continue;
 
+      const resolvedLayout = resolveDocumentLayout({
+        content: result.content,
+        layoutPlan: document.layoutPlan ?? null,
+        title: document.title,
+      });
+
       await tx.projectDocument.update({
         where: { id: document.id },
         data: {
-          content: result.content as unknown as Prisma.InputJsonValue,
+          content: resolvedLayout.content as unknown as Prisma.InputJsonValue,
+          layoutPlan: resolvedLayout.layoutPlan as unknown as Prisma.InputJsonValue,
           status: 'edited',
         },
       });

@@ -261,6 +261,7 @@ export function renderNode(node: TipTapNode): string {
 
 function renderStatBlock(attrs: Record<string, unknown>): string {
   const normalized = normalizeStatBlockAttrs(attrs);
+  const leadInText = escapeHtml(String(normalized.leadInText || '').trim());
   const name = escapeHtml(String(normalized.name || ''));
   const size = escapeHtml(String(normalized.size || ''));
   const type = escapeHtml(String(normalized.type || ''));
@@ -274,7 +275,12 @@ function renderStatBlock(attrs: Record<string, unknown>): string {
   const abilityNames = ['str', 'dex', 'con', 'int', 'wis', 'cha'] as const;
   const abilityLabels = ['STR', 'DEX', 'CON', 'INT', 'WIS', 'CHA'];
 
-  let html = `<div class="stat-block">`;
+  let html = '';
+  if (leadInText) {
+    html += `<div class="stat-block-with-lead-in"><p class="stat-block__lead-in">${leadInText}</p>`;
+  }
+
+  html += `<div class="stat-block">`;
 
   // Header
   html += `<h2 class="stat-block__name">${name}</h2>`;
@@ -366,6 +372,9 @@ function renderStatBlock(attrs: Record<string, unknown>): string {
   }
 
   html += `</div>`;
+  if (leadInText) {
+    html += `</div>`;
+  }
   return html;
 }
 
@@ -504,6 +513,10 @@ function renderNpcProfile(attrs: Record<string, unknown>): string {
   const ideals = String(normalized.ideals || '');
   const bonds = String(normalized.bonds || '');
   const flaws = String(normalized.flaws || '');
+  const goal = String(normalized.goal || '');
+  const whatTheyKnow = String(normalized.whatTheyKnow || '');
+  const leverage = String(normalized.leverage || '');
+  const likelyReaction = String(normalized.likelyReaction || '');
   const portraitUrl = String(normalized.portraitUrl || '');
 
   let html = `<div class="npc-profile">`;
@@ -527,6 +540,18 @@ function renderNpcProfile(attrs: Record<string, unknown>): string {
   }
 
   html += `<div class="npc-profile__personality">`;
+  if (goal) {
+    html += `<div class="npc-profile__trait"><span class="npc-profile__trait-label">Goal.</span> ${escapeHtml(goal)}</div>`;
+  }
+  if (whatTheyKnow) {
+    html += `<div class="npc-profile__trait"><span class="npc-profile__trait-label">What They Know.</span> ${escapeHtml(whatTheyKnow)}</div>`;
+  }
+  if (leverage) {
+    html += `<div class="npc-profile__trait"><span class="npc-profile__trait-label">Leverage.</span> ${escapeHtml(leverage)}</div>`;
+  }
+  if (likelyReaction) {
+    html += `<div class="npc-profile__trait"><span class="npc-profile__trait-label">Likely Reaction.</span> ${escapeHtml(likelyReaction)}</div>`;
+  }
   if (personalityTraits) {
     html += `<div class="npc-profile__trait"><span class="npc-profile__trait-label">Personality Traits.</span> ${escapeHtml(personalityTraits)}</div>`;
   }

@@ -1,7 +1,7 @@
 FROM node:20-alpine
 
-# Pandoc for ePub generation (Chromium no longer needed — PDF uses Typst NAPI)
-RUN apk add --no-cache pandoc poppler-utils su-exec
+# Pandoc for ePub generation, Poppler for review, and Chromium for canonical HTML PDF export.
+RUN apk add --no-cache pandoc poppler-utils su-exec chromium nss freetype harfbuzz ttf-freefont
 
 WORKDIR /app
 COPY package*.json ./

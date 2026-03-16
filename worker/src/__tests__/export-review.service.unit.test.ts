@@ -210,6 +210,174 @@ Page size: 612 x 792 pts (letter)
     expect(review.metrics.utilityCoverage[0].referenceBlockCount).toBe(3);
   });
 
+  it('flags short-book TOCs, weak hero placement, split packets, and page whitespace/layout imbalance', () => {
+    const pages = parseBboxLayoutXhtml(`
+<doc>
+  <page width="612.000000" height="792.000000">
+    <flow>
+      <block xMin="54.000000" yMin="60.000000" xMax="250.000000" yMax="120.000000">
+        <line xMin="54.000000" yMin="60.000000" xMax="188.000000" yMax="80.000000">
+          <word xMin="54.000000" yMin="60.000000" xMax="188.000000" yMax="80.000000">Table of Contents</word>
+        </line>
+      </block>
+    </flow>
+  </page>
+  <page width="612.000000" height="792.000000">
+    <flow>
+      <block xMin="54.000000" yMin="90.000000" xMax="170.000000" yMax="150.000000">
+        <line xMin="54.000000" yMin="90.000000" xMax="170.000000" yMax="110.000000">
+          <word xMin="54.000000" yMin="90.000000" xMax="170.000000" yMax="110.000000">Sparse left column</word>
+        </line>
+        <line xMin="54.000000" yMin="120.000000" xMax="170.000000" yMax="140.000000">
+          <word xMin="54.000000" yMin="120.000000" xMax="170.000000" yMax="140.000000">Still sparse</word>
+        </line>
+      </block>
+      <block xMin="360.000000" yMin="90.000000" xMax="520.000000" yMax="420.000000">
+        <line xMin="360.000000" yMin="90.000000" xMax="520.000000" yMax="110.000000">
+          <word xMin="360.000000" yMin="90.000000" xMax="520.000000" yMax="110.000000">Dense right column</word>
+        </line>
+        <line xMin="360.000000" yMin="200.000000" xMax="520.000000" yMax="220.000000">
+          <word xMin="360.000000" yMin="200.000000" xMax="520.000000" yMax="220.000000">More text</word>
+        </line>
+        <line xMin="360.000000" yMin="300.000000" xMax="520.000000" yMax="320.000000">
+          <word xMin="360.000000" yMin="300.000000" xMax="520.000000" yMax="320.000000">More text</word>
+        </line>
+        <line xMin="360.000000" yMin="400.000000" xMax="520.000000" yMax="420.000000">
+          <word xMin="360.000000" yMin="400.000000" xMax="520.000000" yMax="420.000000">More text</word>
+        </line>
+      </block>
+    </flow>
+  </page>
+</doc>
+`);
+
+    const review = analyzePdfExportLayout({
+      documents: [
+        {
+          title: 'Front Matter',
+          kind: 'front_matter',
+          content: {
+            type: 'doc',
+            content: [{ type: 'tableOfContents', attrs: { title: 'Contents' } }],
+          },
+        },
+        {
+          title: 'Into the Mine',
+          kind: 'chapter',
+          content: {
+            type: 'doc',
+            content: [
+              { type: 'chapterHeader', attrs: { title: 'Into the Mine', backgroundImage: '/uploads/bg.png' } },
+              { type: 'statBlock', attrs: { name: 'Phantom Apparition', ac: 13, hp: 10 } },
+            ],
+          },
+          layoutPlan: {
+            version: 1,
+            sectionRecipe: 'chapter_hero_split',
+            columnBalanceTarget: 'balanced',
+            blocks: [
+              {
+                nodeId: 'chapter-header',
+                presentationOrder: 0,
+                span: 'column',
+                placement: 'inline',
+                groupId: null,
+                keepTogether: true,
+                allowWrapBelow: false,
+              },
+              {
+                nodeId: 'stat-block',
+                presentationOrder: 1,
+                span: 'column',
+                placement: 'inline',
+                groupId: null,
+                keepTogether: true,
+                allowWrapBelow: false,
+              },
+            ],
+          },
+        },
+      ],
+      pages,
+      pageCount: 2,
+      pageWidthPts: 612,
+      pageHeightPts: 792,
+    });
+
+    const codes = review.findings.map((finding) => finding.code);
+    expect(codes).toContain('EXPORT_OVERLONG_TOC_FOR_SHORT_BOOK');
+    expect(codes).toContain('EXPORT_WEAK_HERO_PLACEMENT');
+    expect(codes).toContain('EXPORT_SPLIT_SCENE_PACKET');
+    expect(codes).toContain('EXPORT_UNBALANCED_COLUMNS');
+  });
+
+  it('flags thin random encounter tables that are not runnable enough for a DM', () => {
+    const review = analyzePdfExportLayout({
+      documents: [
+        {
+          title: 'Chapter 2: Into the Mine',
+          kind: 'chapter',
+          content: {
+            type: 'doc',
+            content: [
+              {
+                type: 'randomTable',
+                attrs: {
+                  title: 'Mine Encounters',
+                  dieType: 'd6',
+                  entries: JSON.stringify([
+                    { roll: '1-2', result: '2d4 shadows' },
+                    { roll: '3-4', result: 'A miner spirit' },
+                    { roll: '5-6', result: 'Collapsed tunnel' },
+                  ]),
+                },
+              },
+            ],
+          },
+        },
+      ],
+      pages: [],
+      pageCount: 1,
+      pageWidthPts: 612,
+      pageHeightPts: 792,
+    });
+
+    expect(review.findings.map((finding) => finding.code)).toContain('EXPORT_THIN_RANDOM_TABLE');
+  });
+
+  it('does not flag detailed random encounter tables that include operational detail', () => {
+    const review = analyzePdfExportLayout({
+      documents: [
+        {
+          title: 'Chapter 2: Into the Mine',
+          kind: 'chapter',
+          content: {
+            type: 'doc',
+            content: [
+              {
+                type: 'randomTable',
+                attrs: {
+                  title: 'Mine Encounters',
+                  dieType: 'd6',
+                  entries: JSON.stringify([
+                    { roll: '1-2', result: 'A sobbing miner spirit warns the party about unstable beams; a DC 12 Insight check reveals the safest route and grants advantage on the next hazard check.' },
+                    { roll: '3-4', result: 'Two shadows peel off the cavern wall and stalk the rear guard; if driven off, they leave behind a blackglass shard worth 15 gp.' },
+                  ]),
+                },
+              },
+            ],
+          },
+        },
+      ],
+      pages: [],
+      pageCount: 1,
+      pageWidthPts: 612,
+      pageHeightPts: 792,
+    });
+
+    expect(review.findings.map((finding) => finding.code)).not.toContain('EXPORT_THIN_RANDOM_TABLE');
+  });
+
   it('flags suspicious but non-placeholder stat blocks for manual review', () => {
     const review = analyzePdfExportLayout({
       documents: [
@@ -406,6 +574,7 @@ Page size: 612 x 792 pts (letter)
       'shrink_h1_headings',
       'dedicated_chapter_openers',
       'dedicated_end_page',
+      'refresh_layout_plan',
     ]);
   });
 

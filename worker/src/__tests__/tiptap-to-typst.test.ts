@@ -248,6 +248,38 @@ describe('TipTap-to-Typst Renderer', () => {
       expect(result).toContain('= Title');
       expect(result).toContain('Body text.');
     });
+
+    it('keeps level-4 utility headings with their following block content', () => {
+      const result = tiptapToTypst(node({
+        type: 'doc',
+        content: [
+          { type: 'heading', attrs: { level: 4 }, content: [{ type: 'text', text: 'DM Tips' }] },
+          { type: 'sidebarCallout', attrs: { title: 'DM Tips', calloutType: 'info' }, content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Keep the scene easy to scan.' }] }] },
+        ],
+      }));
+
+      expect(result).toContain('#block(width: 100%, breakable: false)[');
+      expect(result).toContain('DM Tips');
+      expect(result).toContain('Keep the scene easy to scan.');
+    });
+
+    it('keeps compact level-3 subsections together when they form a small packet', () => {
+      const result = tiptapToTypst(node({
+        type: 'doc',
+        content: [
+          { type: 'heading', attrs: { level: 3 }, content: [{ type: 'text', text: 'Encounter Details' }] },
+          { type: 'heading', attrs: { level: 4 }, content: [{ type: 'text', text: 'Tactics' }] },
+          { type: 'bulletList', content: [{ type: 'listItem', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Flank from the shadows.' }] }] }] },
+          { type: 'heading', attrs: { level: 4 }, content: [{ type: 'text', text: 'Consequences' }] },
+          { type: 'bulletList', content: [{ type: 'listItem', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Reveal a clue on success.' }] }] }] },
+        ],
+      }));
+
+      expect(result).toContain('#block(width: 100%, breakable: false)[');
+      expect(result).toContain('Encounter Details');
+      expect(result).toContain('Flank from the shadows.');
+      expect(result).toContain('Reveal a clue on success.');
+    });
   });
 
   // ── D&D Blocks ──
@@ -331,6 +363,24 @@ describe('TipTap-to-Typst Renderer', () => {
       expect(result).toContain('15 (+2)');
       expect(result).toContain('*Incorporeal Movement.*');
     });
+
+    it('should render a stat-block lead-in inside the same unbreakable wrapper', () => {
+      const result = renderTypstNode(node({
+        type: 'statBlock',
+        attrs: {
+          name: 'Phantom Apparition',
+          ac: 13,
+          hp: 10,
+          speed: '0 ft., fly 40 ft. (hover)',
+          leadInText: 'The phantoms have the following stats:',
+        },
+      }));
+
+      expect(result).toContain('The phantoms have the following stats:');
+      expect(result).toContain('#v(6pt)');
+      expect(result).toContain('Phantom Apparition');
+      expect(result.match(/breakable: false/g)?.length).toBeGreaterThanOrEqual(2);
+    });
   });
 
   describe('readAloudBox', () => {
@@ -340,6 +390,7 @@ describe('TipTap-to-Typst Renderer', () => {
         attrs: { style: 'parchment' },
         content: [{ type: 'paragraph', content: [{ type: 'text', text: 'You enter a dark room.' }] }],
       }));
+      expect(result).toContain('breakable: false');
       expect(result).toContain('theme-read-aloud-bg');
       expect(result).toContain('theme-read-aloud-border');
       expect(result).toContain('You enter a dark room.');
@@ -353,6 +404,7 @@ describe('TipTap-to-Typst Renderer', () => {
         attrs: { title: 'DM Tip', calloutType: 'info' },
         content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Be creative!' }] }],
       }));
+      expect(result).toContain('breakable: false');
       expect(result).toContain('theme-sidebar-bg');
       expect(result).toContain('DM Tip');
       expect(result).toContain('Be creative!');
@@ -490,12 +542,20 @@ describe('TipTap-to-Typst Renderer', () => {
           race: 'Elf',
           class: 'Wizard',
           description: 'A wise sage.',
+          goal: 'Keep the forbidden ritual hidden.',
+          whatTheyKnow: 'The mine entrance only opens after moonrise.',
+          leverage: 'She relaxes if the party offers proof of discretion.',
+          likelyReaction: 'She deflects at first, then offers guarded help.',
           personalityTraits: 'Curious and quiet',
         },
       }));
       expect(result).toContain('Elara');
       expect(result).toContain('Elf');
       expect(result).toContain('Wizard');
+      expect(result).toContain('*Goal.*');
+      expect(result).toContain('*What They Know.*');
+      expect(result).toContain('*Leverage.*');
+      expect(result).toContain('*Likely Reaction.*');
       expect(result).toContain('*Personality Traits.*');
     });
 

@@ -227,10 +227,12 @@ function normalizeBlocks(
     case 'exploration':
       normalized.add('readAloud');
       normalized.add('randomTable');
+      normalized.add('encounterTable');
       normalized.add('handout');
       normalized.add('dmTips');
       break;
     case 'social':
+      normalized.add('readAloud');
       normalized.add('npcProfile');
       normalized.add('dmTips');
       break;

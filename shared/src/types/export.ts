@@ -9,8 +9,14 @@ export type ExportReviewCode =
   | 'EXPORT_CHAPTER_OPENER_LOW'
   | 'EXPORT_SECTION_TITLE_WRAP'
   | 'EXPORT_LAST_PAGE_UNDERFILLED'
+  | 'EXPORT_UNUSED_PAGE_REGION'
+  | 'EXPORT_WEAK_HERO_PLACEMENT'
+  | 'EXPORT_SPLIT_SCENE_PACKET'
+  | 'EXPORT_UNBALANCED_COLUMNS'
+  | 'EXPORT_OVERLONG_TOC_FOR_SHORT_BOOK'
   | 'EXPORT_EMPTY_ENCOUNTER_TABLE'
   | 'EXPORT_EMPTY_RANDOM_TABLE'
+  | 'EXPORT_THIN_RANDOM_TABLE'
   | 'EXPORT_PLACEHOLDER_STAT_BLOCK'
   | 'EXPORT_SUSPICIOUS_STAT_BLOCK'
   | 'EXPORT_OVERSIZED_DISPLAY_HEADING'
@@ -19,7 +25,8 @@ export type ExportReviewCode =
 export type ExportReviewAutoFix =
   | 'shrink_h1_headings'
   | 'dedicated_end_page'
-  | 'dedicated_chapter_openers';
+  | 'dedicated_chapter_openers'
+  | 'refresh_layout_plan';
 export type ExportReviewSafeFixAction =
   | 'remove_empty_encounter_tables'
   | 'remove_empty_random_tables'

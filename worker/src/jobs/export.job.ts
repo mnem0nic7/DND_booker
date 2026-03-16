@@ -4,12 +4,13 @@ import type {
   DocumentKind,
   ExportReview,
   ExportReviewAutoFix,
+  LayoutPlan,
 } from '@dnd-booker/shared';
+import { resolveLayoutPlan } from '@dnd-booker/shared';
 import { prisma } from '../config/database.js';
 import { assembleHtml } from '../renderers/html-assembler.js';
-import { assembleTypst } from '../renderers/typst-assembler.js';
 import { normalizeExportDocuments } from '../renderers/export-document-normalizer.js';
-import { generateTypstPdf } from '../generators/typst.generator.js';
+import { generateHtmlPdf } from '../generators/html-pdf.generator.js';
 import { generateEpub } from '../generators/epub.generator.js';
 import {
   buildUnavailableExportReview,
@@ -84,7 +85,13 @@ export function rewriteUploadUrlsInValue(value: unknown): unknown {
 }
 
 export function rewriteUploadUrlsInDocs(
-  docs: Array<{ title: string; content: DocumentContent | null; sortOrder: number; kind?: DocumentKind | null }>,
+  docs: Array<{
+    title: string;
+    content: DocumentContent | null;
+    sortOrder: number;
+    kind?: DocumentKind | null;
+    layoutPlan?: LayoutPlan | null;
+  }>,
 ) {
   return docs.map((doc) => ({
     ...doc,
@@ -152,7 +159,7 @@ export async function processExportJob(job: Job<ExportJobData>): Promise<void> {
     const projectDocuments = await prisma.projectDocument.findMany({
       where: { projectId: exportJob.projectId },
       orderBy: { sortOrder: 'asc' },
-      select: { title: true, content: true, sortOrder: true, kind: true },
+      select: { title: true, content: true, sortOrder: true, kind: true, layoutPlan: true },
     });
 
     const rawDocs = projectDocuments.length > 0
@@ -161,6 +168,7 @@ export async function processExportJob(job: Job<ExportJobData>): Promise<void> {
           content: doc.content as DocumentContent | null,
           sortOrder: doc.sortOrder,
           kind: doc.kind as DocumentKind,
+          layoutPlan: doc.layoutPlan as LayoutPlan | null,
         }))
       : [{
           title: exportJob.project.title,
@@ -258,11 +266,10 @@ export async function processExportJob(job: Job<ExportJobData>): Promise<void> {
         documents: docs,
         theme,
         projectTitle: exportTitle,
+        pagePreset: 'epub',
       });
       const serverBaseUrl = process.env.SERVER_BASE_URL || 'http://localhost:4000';
-      const resolvedHtml = html.replace(/(?:src|href)="(\/uploads\/[^"]+)"/g, (_match, p1) => {
-        return `src="${serverBaseUrl}${p1}"`;
-      });
+      const resolvedHtml = rewritePublicAssetUrls(html, serverBaseUrl);
       buffer = await generateEpub(resolvedHtml, exportJob.project.title);
     } else {
       throw new Error(`Unsupported export format: ${format}`);
@@ -316,7 +323,13 @@ export async function processExportJob(job: Job<ExportJobData>): Promise<void> {
 
 async function renderPdfVariant(input: {
   filepath: string;
-  docs: Array<{ title: string; content: DocumentContent | null; sortOrder: number; kind?: DocumentKind | null }>;
+  docs: Array<{
+    title: string;
+    content: DocumentContent | null;
+    sortOrder: number;
+    kind?: DocumentKind | null;
+    layoutPlan?: LayoutPlan | null;
+  }>;
   theme: string;
   projectTitle: string;
   projectType?: string | null;
@@ -324,48 +337,97 @@ async function renderPdfVariant(input: {
   autoFixes?: ExportReviewAutoFix[];
 }): Promise<PdfRenderResult> {
   const { filepath, docs, theme, projectTitle, projectType = null, printReady, autoFixes = [] } = input;
-  const assetsDir = path.resolve(process.cwd(), 'assets');
-  const fontsDir = path.join(assetsDir, 'fonts');
-  const outputDir = path.dirname(filepath);
-  const typstWorkspace = await createTypstWorkspace(outputDir);
-  const rewrittenDocs = rewriteUploadUrlsInDocs(docs);
+  const renderDocs = autoFixes.includes('refresh_layout_plan')
+    ? docs.map((doc) => ({ ...doc, layoutPlan: null }))
+    : docs;
+  const html = assembleHtml({
+    documents: renderDocs,
+    theme,
+    projectTitle,
+    pagePreset: printReady ? 'print_pdf' : 'standard_pdf',
+  });
+  const resolvedHtml = await rewriteUploadUrlsToEmbeddedDataUrls(html);
+  const buffer = await generateHtmlPdf({
+    html: resolvedHtml,
+    title: projectTitle,
+  });
+  await fs.writeFile(filepath, buffer);
 
   try {
-    const typstSource = assembleTypst({
-      documents: rewrittenDocs,
-      theme,
-      projectTitle,
-      projectType,
-      printReady,
-      exportPolish: {
-        h1SizePt: autoFixes.includes('shrink_h1_headings') ? 21 : undefined,
-        endCapMode: autoFixes.includes('dedicated_end_page') ? 'full_page' : 'inline',
-        chapterOpenerMode: autoFixes.includes('dedicated_chapter_openers') ? 'dedicated_page' : 'inline',
-      },
-    });
-
-    const buffer = await generateTypstPdf(typstSource, [fontsDir], typstWorkspace);
-    await fs.writeFile(filepath, buffer);
-
-    try {
-      const review = await reviewPdfExport(
-        filepath,
-        docs.map((doc) => ({
-          title: doc.title,
-          kind: doc.kind ?? null,
-          content: doc.content,
-        }))
-      );
-      return { buffer, review };
-    } catch (reviewError) {
-      const message = reviewError instanceof Error ? reviewError.message : String(reviewError);
-      console.error(`[export.job] Export review failed for ${path.basename(filepath)}:`, message);
-      return {
-        buffer,
-        review: buildUnavailableExportReview(`Export review failed: ${message}`),
-      };
-    }
-  } finally {
-    await fs.rm(typstWorkspace, { recursive: true, force: true });
+    const reviewedDocs = renderDocs.map((doc) => ({
+      title: doc.title,
+      kind: doc.kind ?? null,
+      content: doc.content,
+      layoutPlan: doc.content
+        ? resolveLayoutPlan(doc.content, doc.layoutPlan ?? null, {
+            documentKind: doc.kind ?? null,
+            documentTitle: doc.title,
+          }).layoutPlan
+        : doc.layoutPlan ?? null,
+    }));
+    const review = await reviewPdfExport(
+      filepath,
+      reviewedDocs,
+    );
+    return { buffer, review };
+  } catch (reviewError) {
+    const message = reviewError instanceof Error ? reviewError.message : String(reviewError);
+    console.error(`[export.job] Export review failed for ${path.basename(filepath)}:`, message);
+    return {
+      buffer,
+      review: buildUnavailableExportReview(`Export review failed: ${message}`),
+    };
   }
+}
+
+function rewritePublicAssetUrls(html: string, baseUrl: string): string {
+  return html
+    .replace(/(src|href)="(\/uploads\/[^"]+)"/g, (_match, attribute, relativePath) => {
+      return `${attribute}="${baseUrl}${relativePath}"`;
+    })
+    .replace(/url\((['"]?)(\/uploads\/[^'")]+)\1\)/g, (_match, quote, relativePath) => {
+      const nextQuote = quote || '"';
+      return `url(${nextQuote}${baseUrl}${relativePath}${nextQuote})`;
+    });
+}
+
+function getAssetMimeType(filename: string): string {
+  const extension = path.extname(filename).toLowerCase();
+  switch (extension) {
+    case '.jpg':
+    case '.jpeg':
+      return 'image/jpeg';
+    case '.gif':
+      return 'image/gif';
+    case '.webp':
+      return 'image/webp';
+    case '.png':
+    default:
+      return 'image/png';
+  }
+}
+
+async function rewriteUploadUrlsToEmbeddedDataUrls(html: string): Promise<string> {
+  const uploadsRoot = getAssetStorageDir();
+  const matches = html.match(/\/uploads\/[^"'()\s]+/g);
+  if (!matches || matches.length === 0) return html;
+
+  let nextHtml = html;
+  const uniquePaths = [...new Set(matches)];
+  for (const relativePath of uniquePaths) {
+    const parsed = parseProjectAssetUrl(relativePath);
+    if (!parsed) continue;
+
+    const absolutePath = path.join(uploadsRoot, parsed.projectId, parsed.filename);
+    try {
+      const fileBuffer = await fs.readFile(absolutePath);
+      const mimeType = getAssetMimeType(parsed.filename);
+      const dataUrl = `data:${mimeType};base64,${fileBuffer.toString('base64')}`;
+      nextHtml = nextHtml.split(relativePath).join(dataUrl);
+    } catch (error) {
+      console.warn(`[export.job] Failed to inline asset ${relativePath}:`, error);
+    }
+  }
+
+  return nextHtml;
 }

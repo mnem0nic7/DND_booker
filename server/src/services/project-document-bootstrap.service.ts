@@ -1,6 +1,7 @@
 import { Prisma } from '@prisma/client';
 import type { DocumentContent, DocumentKind } from '@dnd-booker/shared';
 import { prisma } from '../config/database.js';
+import { resolveDocumentLayout } from './layout-plan.service.js';
 
 const BLANK_DOC: DocumentContent = { type: 'doc', content: [{ type: 'paragraph' }] };
 const FRONT_MATTER_BLOCK_TITLES: Record<string, string> = {
@@ -236,6 +237,12 @@ async function materializeProjectDocuments(
   );
 
   for (const doc of docs) {
+    const resolvedLayout = resolveDocumentLayout({
+      content: doc.content,
+      kind: doc.kind,
+      title: doc.title,
+    });
+
     await tx.projectDocument.create({
       data: {
         projectId: project.id,
@@ -246,7 +253,8 @@ async function materializeProjectDocuments(
         sortOrder: doc.sortOrder,
         targetPageCount: null,
         outlineJson: Prisma.JsonNull,
-        content: doc.content as unknown as Prisma.InputJsonValue,
+        layoutPlan: resolvedLayout.layoutPlan as unknown as Prisma.InputJsonValue,
+        content: resolvedLayout.content as unknown as Prisma.InputJsonValue,
         status: doc.status,
         sourceArtifactId: null,
       },
@@ -411,6 +419,7 @@ const documentListSelect = {
   slug: true,
   sortOrder: true,
   targetPageCount: true,
+  layoutPlan: true,
   status: true,
   sourceArtifactId: true,
   createdAt: true,

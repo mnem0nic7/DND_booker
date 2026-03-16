@@ -95,10 +95,12 @@ function normalizeExportContent(
     .filter((node): node is DocumentContent => node != null);
 
   const repairedMarkdownBleedThrough = repairMarkdownBleedThrough(nodes);
-  const withoutPlaceholderScaffold = stripPlaceholderAdventureScaffold(repairedMarkdownBleedThrough);
+  const withNpcCards = upgradeNpcRosterLists(repairedMarkdownBleedThrough);
+  const withoutPlaceholderScaffold = stripPlaceholderAdventureScaffold(withNpcCards);
   const withoutDuplicateChapterHeadings = stripDuplicateChapterHeadings(withoutPlaceholderScaffold);
   const withoutOrphanedUtilityScaffold = stripOrphanedUtilityScaffold(withoutDuplicateChapterHeadings);
-  const withoutRedundantBreaks = stripRedundantStructuralPageBreaks(withoutOrphanedUtilityScaffold);
+  const withAttachedStatBlockLeadIns = attachStatBlockLeadIns(withoutOrphanedUtilityScaffold);
+  const withoutRedundantBreaks = stripRedundantStructuralPageBreaks(withAttachedStatBlockLeadIns);
   const withoutShortFormToc = stripShortFormTableOfContents(withoutRedundantBreaks, options);
   const withoutEmptyParagraphs = stripEmptyParagraphs(withoutShortFormToc);
 
@@ -255,7 +257,7 @@ function parseBleedThroughBlock(
   text: string,
 ): { rawBlockType: string; normalizedBlockType: string; blockText: string } | null {
   const trimmed = text.trim();
-  const sameLineMatch = trimmed.match(/^:::(\w+)\s+([\s\S]*?)\s*:::\s*$/);
+  const sameLineMatch = trimmed.match(/^(?:#{1,6}\s+[^:]+?\s+)?:::(\w+)\s+([\s\S]*?)\s*:::\s*$/);
   if (sameLineMatch) {
     return {
       rawBlockType: sameLineMatch[1],
@@ -264,7 +266,7 @@ function parseBleedThroughBlock(
     };
   }
 
-  const inlineMatch = trimmed.match(/^:::(\w+)\s+([\s\S]+)$/);
+  const inlineMatch = trimmed.match(/^(?:#{1,6}\s+[^:]+?\s+)?:::(\w+)\s+([\s\S]+)$/);
   if (!inlineMatch) return null;
 
   return {
@@ -358,7 +360,20 @@ function readSingleParagraphListItemText(node: DocumentContent): string | null {
 }
 
 function repairMarkdownBleedThroughText(text: string): DocumentContent[] | null {
-  const headingMatch = text.match(/^(#{1,6})\s+(.+)$/);
+  const block = parseBleedThroughBlock(text);
+  if (block) {
+    return repairStructuredBleedThroughBlock(
+      block.rawBlockType,
+      block.normalizedBlockType,
+      block.blockText,
+    );
+  }
+
+  if (/^\s*(---+|\*\*\*+)\s*$/.test(text)) {
+    return [{ type: 'horizontalRule' }];
+  }
+
+  const headingMatch = text.match(/^\s*(#{1,6})\s+(.+)$/);
   if (headingMatch) {
     return [{
       type: 'heading',
@@ -367,14 +382,7 @@ function repairMarkdownBleedThroughText(text: string): DocumentContent[] | null 
     }];
   }
 
-  const block = parseBleedThroughBlock(text);
-  if (!block) return null;
-
-  return repairStructuredBleedThroughBlock(
-    block.rawBlockType,
-    block.normalizedBlockType,
-    block.blockText,
-  );
+  return null;
 }
 
 function normalizeHeadingNode(node: DocumentContent): DocumentContent {
@@ -429,7 +437,17 @@ function stripOrphanedUtilityScaffold(nodes: DocumentContent[]): DocumentContent
 
     if (isOrphanedUtilityHeading(node)) {
       const nextMeaningful = findNextMeaningfulNode(nodes, index + 1);
+      if (isDuplicateUtilityHeading(node, nextMeaningful)) {
+        continue;
+      }
       if (!isReferencedUtilityNode(nextMeaningful, node)) {
+        continue;
+      }
+    }
+
+    if (node.type === 'heading') {
+      const nextMeaningful = findNextMeaningfulNode(nodes, index + 1);
+      if (isDuplicateUtilityHeading(node, nextMeaningful)) {
         continue;
       }
     }
@@ -466,9 +484,150 @@ function repairMarkdownBleedThroughNode(node: DocumentContent): DocumentContent[
   if (node.type === 'bulletList' || node.type === 'orderedList') {
     return repairListBleedThrough(node) ?? [node];
   }
-  if (node.type !== 'paragraph') return [node];
+  if (node.type === 'codeBlock') {
+    return repairMarkdownBleedThroughText(readInlineText(node)) ?? [node];
+  }
+  if (node.type === 'paragraph') {
+    return repairMarkdownBleedThroughText(readInlineText(node)) ?? [node];
+  }
 
-  return repairMarkdownBleedThroughText(readInlineText(node)) ?? [node];
+  const repairedChildren = node.content?.flatMap((child) => repairMarkdownBleedThroughNode(child));
+  if (!repairedChildren) return [node];
+
+  if (node.type === 'sidebarCallout' || node.type === 'readAloudBox') {
+    return splitMalformedProseContainer(node, repairedChildren);
+  }
+
+  return [{
+    ...node,
+    content: repairedChildren,
+  }];
+}
+
+function upgradeNpcRosterLists(nodes: DocumentContent[]): DocumentContent[] {
+  const result: DocumentContent[] = [];
+
+  for (let index = 0; index < nodes.length; index += 1) {
+    const node = nodes[index];
+    const nextNode = nodes[index + 1];
+    const npcName = extractNpcRosterName(node);
+    const npcProfile = npcName && nextNode ? buildNpcProfileFromRosterPair(npcName, nextNode) : null;
+
+    if (npcProfile) {
+      result.push(npcProfile);
+      index += 1;
+      continue;
+    }
+
+    result.push(node);
+  }
+
+  return result;
+}
+
+function extractNpcRosterName(node: DocumentContent): string | null {
+  if (node.type !== 'orderedList') return null;
+  const items = node.content ?? [];
+  if (items.length !== 1) return null;
+  const text = readSingleParagraphListItemText(items[0]);
+  if (!text) return null;
+  const normalized = normalizeText(text).replace(/:\s*$/, '');
+  return normalized || null;
+}
+
+function buildNpcProfileFromRosterPair(name: string, node: DocumentContent): DocumentContent | null {
+  if (node.type !== 'bulletList') return null;
+
+  let description = '';
+  let goal = '';
+  let whatTheyKnow = '';
+  let leverage = '';
+  let likelyReaction = '';
+
+  for (const item of node.content ?? []) {
+    const text = normalizeText(readSingleParagraphListItemText(item));
+    if (!text) continue;
+
+    const descriptionMatch = text.match(/^([^:]+)$/);
+    const goalMatch = text.match(/^Goal:\s*(.+)$/i);
+    const knowledgeMatch = text.match(/^What (?:she|he|they) knows:\s*(.+)$/i);
+    const leverageMatch = text.match(/^Leverage:\s*(.+)$/i);
+    const reactionMatch = text.match(/^Likely Reaction:\s*(.+)$/i);
+
+    if (!description && descriptionMatch && !text.includes(':')) {
+      description = descriptionMatch[1];
+      continue;
+    }
+    if (goalMatch) {
+      goal = goalMatch[1];
+      continue;
+    }
+    if (knowledgeMatch) {
+      whatTheyKnow = knowledgeMatch[1];
+      continue;
+    }
+    if (leverageMatch) {
+      leverage = leverageMatch[1];
+      continue;
+    }
+    if (reactionMatch) {
+      likelyReaction = reactionMatch[1];
+    }
+  }
+
+  const populatedFields = [description, goal, whatTheyKnow, leverage, likelyReaction].filter(Boolean).length;
+  if (populatedFields < 3) return null;
+
+  return {
+    type: 'npcProfile',
+    attrs: normalizeNpcProfileAttrs({
+      name,
+      description,
+      goal,
+      whatTheyKnow,
+      leverage,
+      likelyReaction,
+    }),
+  };
+}
+
+function splitMalformedProseContainer(
+  node: DocumentContent,
+  repairedChildren: DocumentContent[],
+): DocumentContent[] {
+  const safeChildren: DocumentContent[] = [];
+  let splitIndex = repairedChildren.length;
+
+  for (let index = 0; index < repairedChildren.length; index += 1) {
+    const child = repairedChildren[index];
+    if (isValidProseContainerChild(child)) {
+      safeChildren.push(child);
+      continue;
+    }
+    splitIndex = index;
+    break;
+  }
+
+  if (splitIndex === repairedChildren.length) {
+    return [{
+      ...node,
+      content: repairedChildren,
+    }];
+  }
+
+  const remainder = repairedChildren.slice(splitIndex);
+  if (safeChildren.length === 0) {
+    return remainder;
+  }
+
+  return [{
+    ...node,
+    content: safeChildren,
+  }, ...remainder];
+}
+
+function isValidProseContainerChild(node: DocumentContent): boolean {
+  return node.type === 'paragraph' || node.type === 'bulletList' || node.type === 'orderedList';
 }
 
 function stripRedundantStructuralPageBreaks(nodes: DocumentContent[]): DocumentContent[] {
@@ -493,6 +652,40 @@ function stripRedundantStructuralPageBreaks(nodes: DocumentContent[]): DocumentC
       SELF_PAGINATING_NODE_TYPES.has(nextMeaningful.type) &&
       (previousMeaningful == null || SELF_PAGINATING_NODE_TYPES.has(previousMeaningful.type))
     ) {
+      continue;
+    }
+
+    result.push(node);
+  }
+
+  return result;
+}
+
+function attachStatBlockLeadIns(nodes: DocumentContent[]): DocumentContent[] {
+  const result: DocumentContent[] = [];
+
+  for (let index = 0; index < nodes.length; index += 1) {
+    const node = nodes[index];
+    const nextMeaningful = findNextMeaningfulNode(nodes, index + 1);
+
+    if (
+      node.type === 'paragraph'
+      && nextMeaningful?.type === 'statBlock'
+      && isStatBlockLeadInParagraph(node)
+    ) {
+      const statBlockIndex = findNextMeaningfulIndex(nodes, index + 1);
+      const statBlock = nodes[statBlockIndex];
+      const leadInText = readInlineText(node).trim();
+
+      result.push({
+        ...statBlock,
+        attrs: {
+          ...(statBlock.attrs ?? {}),
+          leadInText,
+        },
+      });
+
+      index = statBlockIndex;
       continue;
     }
 
@@ -549,6 +742,19 @@ function findNextMeaningfulNode(nodes: DocumentContent[], startIndex: number): D
 
 function isStructuralBreak(node: DocumentContent | null | undefined): boolean {
   return node?.type === 'pageBreak' || node?.type === 'columnBreak';
+}
+
+function isStatBlockLeadInParagraph(node: DocumentContent | undefined): boolean {
+  if (node?.type !== 'paragraph') return false;
+  const text = readInlineText(node).trim();
+  if (!text || text.length > 140) return false;
+
+  return (
+    /following stats:?$/i.test(text)
+    || /the following stat block:?$/i.test(text)
+    || /see stat block (?:below|above)[:.]?$/i.test(text)
+    || /has the following statistics:?$/i.test(text)
+  );
 }
 
 function isPlaceholderAdventureHeading(node: DocumentContent | undefined): boolean {
@@ -635,6 +841,23 @@ function isReferencedUtilityNode(node: DocumentContent | null, referenceNode: Do
     || referenceNode.type === 'heading'
   ) {
     return node.type === 'encounterTable' || node.type === 'randomTable';
+  }
+
+  return false;
+}
+
+function isDuplicateUtilityHeading(node: DocumentContent, nextNode: DocumentContent | null): boolean {
+  if (node.type !== 'heading' || !nextNode) return false;
+
+  const text = readInlineText(node).toLowerCase();
+  if (text === 'dm tips') {
+    return nextNode.type === 'sidebarCallout';
+  }
+  if (text === 'read aloud') {
+    return nextNode.type === 'readAloudBox';
+  }
+  if (text === 'handout') {
+    return nextNode.type === 'handout';
   }
 
   return false;

@@ -286,10 +286,10 @@ describe('Chapter Plan Service — executeChapterPlanGeneration', () => {
     );
 
     expect(result.plan.sections[0].blocksNeeded).toEqual(
-      expect.arrayContaining(['readAloud', 'randomTable', 'handout', 'dmTips']),
+      expect.arrayContaining(['readAloud', 'randomTable', 'encounterTable', 'handout', 'dmTips']),
     );
     expect(result.plan.sections[1].blocksNeeded).toEqual(
-      expect.arrayContaining(['npcProfile', 'dmTips']),
+      expect.arrayContaining(['readAloud', 'npcProfile', 'dmTips']),
     );
   });
 

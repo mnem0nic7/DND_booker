@@ -8,6 +8,7 @@ import { getAiSettings, getDecryptedApiKey } from '../ai-settings.service.js';
 import { generateAiImage } from '../ai-image.service.js';
 import { createAsset } from '../asset.service.js';
 import { generateTextWithTimeout } from './model-timeouts.js';
+import { resolveDocumentLayout } from '../layout-plan.service.js';
 
 type ImageCapableBlockType =
   | 'titlePage'
@@ -552,12 +553,27 @@ async function ensureArtDirectionReadyDocuments(input: {
   title: string;
   kind?: DocumentKind | null;
   sortOrder: number;
+  layoutPlan?: unknown;
   content: DocumentContent | null;
 }>> {
   let documents = [...input.documents];
   const chapterLikeCount = documents.filter((doc) => doc.kind === 'chapter' || doc.kind === 'appendix').length;
 
   if (!documents.some((doc) => doc.kind === 'front_matter')) {
+    const frontMatterContent: DocumentContent = {
+      type: 'doc',
+      content: [
+        { type: 'titlePage', attrs: { title: input.projectTitle, coverImageUrl: '', imagePrompt: '' } },
+        ...(shouldAutoInsertFrontMatterToc(input.projectType, chapterLikeCount)
+          ? [{ type: 'tableOfContents', attrs: { title: 'Table of Contents', depth: 1 } }]
+          : []),
+      ],
+    };
+    const resolvedLayout = resolveDocumentLayout({
+      content: frontMatterContent,
+      kind: 'front_matter',
+      title: 'Front Matter',
+    });
     const frontMatterDoc = await prisma.projectDocument.create({
       data: {
         projectId: input.projectId,
@@ -569,17 +585,10 @@ async function ensureArtDirectionReadyDocuments(input: {
         targetPageCount: null,
         status: 'draft',
         sourceArtifactId: null,
-        content: {
-          type: 'doc',
-          content: [
-            { type: 'titlePage', attrs: { title: input.projectTitle, coverImageUrl: '', imagePrompt: '' } },
-            ...(shouldAutoInsertFrontMatterToc(input.projectType, chapterLikeCount)
-              ? [{ type: 'tableOfContents', attrs: { title: 'Table of Contents', depth: 1 } }]
-              : []),
-          ],
-        } as any,
+        layoutPlan: resolvedLayout.layoutPlan as any,
+        content: resolvedLayout.content as any,
       },
-      select: { id: true, slug: true, title: true, kind: true, sortOrder: true, content: true },
+      select: { id: true, slug: true, title: true, kind: true, sortOrder: true, layoutPlan: true, content: true },
     });
 
     documents = [frontMatterDoc as typeof documents[number], ...documents];
@@ -596,9 +605,18 @@ async function ensureArtDirectionReadyDocuments(input: {
 
     const changed = JSON.stringify(nextContent) !== JSON.stringify(document.content);
     if (changed) {
+      const resolvedLayout = resolveDocumentLayout({
+        content: nextContent,
+        layoutPlan: (document as { layoutPlan?: unknown }).layoutPlan ?? null,
+        kind: document.kind,
+        title: document.title,
+      });
       await prisma.projectDocument.update({
         where: { id: document.id },
-        data: { content: nextContent as any },
+        data: {
+          content: resolvedLayout.content as any,
+          layoutPlan: resolvedLayout.layoutPlan as any,
+        },
       });
     }
 
@@ -913,7 +931,7 @@ export async function executeArtDirectionPass(
     prisma.projectDocument.findMany({
       where: { projectId: run.projectId, runId: run.id },
       orderBy: { sortOrder: 'asc' },
-      select: { id: true, slug: true, title: true, kind: true, sortOrder: true, content: true },
+      select: { id: true, slug: true, title: true, kind: true, sortOrder: true, layoutPlan: true, content: true },
     }),
   ]);
 
@@ -1025,12 +1043,22 @@ export async function executeArtDirectionPass(
   );
 
   await Promise.all(
-    fullyUpdatedDocuments.map((document) =>
-      prisma.projectDocument.update({
+    fullyUpdatedDocuments.map((document) => {
+      const existing = artReadyDocuments.find((candidate) => candidate.id === document.id);
+      const resolvedLayout = resolveDocumentLayout({
+        content: document.content,
+        layoutPlan: (existing as { layoutPlan?: unknown } | undefined)?.layoutPlan ?? null,
+        kind: existing?.kind ?? null,
+        title: existing?.title ?? null,
+      });
+      return prisma.projectDocument.update({
         where: { id: document.id },
-        data: { content: document.content as any },
-      }),
-    ),
+        data: {
+          content: resolvedLayout.content as any,
+          layoutPlan: resolvedLayout.layoutPlan as any,
+        },
+      });
+    }),
   );
 
   const artifact = await prisma.generatedArtifact.create({

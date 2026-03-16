@@ -2,6 +2,7 @@ import { Prisma } from '@prisma/client';
 import type { DocumentContent } from '@dnd-booker/shared';
 import { prisma } from '../config/database.js';
 import { splitProjectContentIntoDocuments } from './project-document-bootstrap.service.js';
+import { resolveDocumentLayout } from './layout-plan.service.js';
 
 const BLANK_DOC: DocumentContent = { type: 'doc', content: [{ type: 'paragraph' }] };
 
@@ -130,6 +131,12 @@ export async function saveCanonicalProjectContent(
     await tx.projectDocument.deleteMany({ where: { projectId } });
 
     for (const document of splitDocuments) {
+      const resolvedLayout = resolveDocumentLayout({
+        content: document.content,
+        kind: document.kind,
+        title: document.title,
+      });
+
       await tx.projectDocument.create({
         data: {
           projectId,
@@ -140,7 +147,8 @@ export async function saveCanonicalProjectContent(
           sortOrder: document.sortOrder,
           targetPageCount: null,
           outlineJson: Prisma.JsonNull,
-          content: document.content as unknown as Prisma.InputJsonValue,
+          layoutPlan: resolvedLayout.layoutPlan as unknown as Prisma.InputJsonValue,
+          content: resolvedLayout.content as unknown as Prisma.InputJsonValue,
           status: document.status,
           sourceArtifactId: null,
         },

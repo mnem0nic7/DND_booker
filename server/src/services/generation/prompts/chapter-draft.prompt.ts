@@ -31,9 +31,13 @@ Content rules:
 - Include encounter details where the plan specifies encounter sections
 - Treat this as DM-facing adventure copy, not fiction. Most paragraphs should help run the table.
 - Every section should make clear: what is happening, what the players can do, what checks or tactics matter, and what changes next.
-- Social sections should surface leverage, asks, tells, and likely reactions.
+- Social sections should surface leverage, asks, tells, likely reactions, and what the NPC knows or will reveal.
 - Exploration sections should surface clues, hazards, discoveries, and consequences.
 - Encounter sections should surface terrain, enemy tactics, triggers, rewards, and aftermath.
+- Every encounter section should read like a runnable encounter packet: setup, trigger, terrain, opposition, tactics, payoff, and consequences must be easy to scan.
+- If you emit a :::randomTable block, every entry must be runnable. Each result should tell the DM the immediate situation, the active threat or opportunity, and the clue, reward, or consequence. Do not write bare results like "2d4 shadows" or "A miner spirit".
+- NPC profiles must include actionable table data: goal, what they know, leverage, and likely reaction, not just personality color.
+- If a scene introduces multiple named townsfolk, witnesses, or informants, emit each one as a separate :::npcProfile block instead of a numbered list with prose bullets.
 - Use the planned utility blocks as real block markers. Do not replace them with plain prose summaries.
 - If a section includes route choices, discoveries, loot, tactics, or consequence summaries, prefer bullets, tables, handouts, or callouts over dense exposition.
 - Keep connective prose lean. Avoid long atmospheric passages unless they are boxed read-aloud text.
@@ -71,6 +75,18 @@ export function buildChapterDraftUserPrompt(
 
   parts.push('', '## Sections to Write');
   for (const section of plan.sections) {
+    const sectionNotes: string[] = [];
+    if (section.contentType === 'encounter') {
+      sectionNotes.push('Encounter packet: keep setup, terrain, enemy tactics, reward, and aftermath easy to scan.');
+    }
+    if (section.blocksNeeded.includes('randomTable')) {
+      sectionNotes.push('Random encounter table entries must each include situation, threat or opportunity, and payoff.');
+    }
+    if (section.blocksNeeded.includes('npcProfile')) {
+      sectionNotes.push('NPC profiles must include goal, what they know, leverage, and likely reaction.');
+      sectionNotes.push('If multiple named townsfolk appear, give each one a separate npcProfile card.');
+    }
+
     parts.push(
       `### ${section.title} (${section.contentType}, ~${section.targetWords} words)`,
       `Outline: ${section.outline}`,
@@ -81,6 +97,7 @@ export function buildChapterDraftUserPrompt(
       `Key beats: ${section.keyBeats.join('; ')}`,
       `Blocks needed: ${section.blocksNeeded.join(', ') || 'none'}`,
       `Entity references: ${section.entityReferences.join(', ') || 'none'}`,
+      ...(sectionNotes.length > 0 ? [`Section notes: ${sectionNotes.join(' ')}`] : []),
       '',
     );
   }
@@ -124,6 +141,7 @@ export function buildChapterDraftUserPrompt(
     `Difficulty progression: ${plan.difficultyProgression}`,
     'Prioritize reusable DM utility. If a point can be delivered with a stat block, table, NPC profile, handout, or short callout, use the block instead of extra exposition.',
     'Every non-transition section should visibly contain at least two DM-usable utilities such as a boxed read-aloud, tactical callout, encounter table, NPC card, random table, or handout.',
+    'Random encounter tables must be GM-runnable without guessing. Make each result specific enough to run immediately.',
   );
 
   return parts.join('\n');

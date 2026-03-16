@@ -1,3 +1,5 @@
+import type { LayoutPlan } from './layout-plan.js';
+
 export type DocumentKind = 'front_matter' | 'chapter' | 'appendix' | 'back_matter';
 
 export interface ProjectDocument {
@@ -10,6 +12,7 @@ export interface ProjectDocument {
   sortOrder: number;
   targetPageCount: number | null;
   outlineJson: unknown | null;
+  layoutPlan: LayoutPlan | null;
   content: unknown;
   status: string;
   sourceArtifactId: string | null;

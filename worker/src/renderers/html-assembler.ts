@@ -4,14 +4,27 @@
  * stylesheet, Google Fonts, and all rendered document content.
  */
 
-import { DocumentContent, extractTocEntriesFromDocuments } from '@dnd-booker/shared';
-import { tiptapToHtml } from './tiptap-to-html.js';
+import {
+  DocumentContent,
+  LayoutPlan,
+  PagePreset,
+  extractTocEntriesFromDocuments,
+  getCanonicalLayoutCss,
+  renderContentWithLayoutPlan,
+} from '@dnd-booker/shared';
 import { escapeHtml } from './utils.js';
 
 export interface AssembleOptions {
-  documents: Array<{ title: string; content: DocumentContent | null; sortOrder: number }>;
+  documents: Array<{
+    title: string;
+    content: DocumentContent | null;
+    sortOrder: number;
+    kind?: string | null;
+    layoutPlan?: LayoutPlan | null;
+  }>;
   theme: string;
   projectTitle: string;
+  pagePreset?: PagePreset;
 }
 
 /** Map theme name to CSS custom property overrides.
@@ -275,7 +288,7 @@ function buildTocEntriesHtml(entries: Array<{ level: number; prefix: string; tit
  * Assemble a complete HTML document from project documents, theme, and title.
  */
 export function assembleHtml(options: AssembleOptions): string {
-  const { documents, theme, projectTitle } = options;
+  const { documents, theme, projectTitle, pagePreset = 'standard_pdf' } = options;
 
   // Sort documents by sortOrder
   const sorted = [...documents].sort((a, b) => a.sortOrder - b.sortOrder);
@@ -283,11 +296,23 @@ export function assembleHtml(options: AssembleOptions): string {
   // Extract chapter headers and headings for TOC population
   const tocEntries = extractTocEntriesFromDocuments(sorted);
 
-  // Render each document's TipTap JSON to HTML
+  // Render each document's canonical layout HTML
   const documentHtmlParts = sorted.map((doc) => {
-    const contentHtml = doc.content ? tiptapToHtml(doc.content) : '';
-    return `<section class="document" data-title="${escapeHtml(doc.title)}">
-      ${contentHtml}
+    const rendered = doc.content
+      ? renderContentWithLayoutPlan({
+          content: doc.content,
+          layoutPlan: doc.layoutPlan ?? null,
+          preset: pagePreset,
+          options: {
+            documentKind: doc.kind ?? null,
+            documentTitle: doc.title,
+          },
+        })
+      : null;
+    return `<section class="document" data-title="${escapeHtml(doc.title)}" data-kind="${escapeHtml(String(doc.kind ?? ''))}">
+      <div class="ProseMirror">
+        ${rendered?.html ?? ''}
+      </div>
     </section>`;
   });
 
@@ -305,6 +330,9 @@ export function assembleHtml(options: AssembleOptions): string {
   }
 
   const themeVars = getThemeVariables(theme);
+  const pageMargin = pagePreset === 'print_pdf'
+    ? '0.875in 0.75in 0.875in 0.75in'
+    : '0.75in';
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -320,6 +348,8 @@ export function assembleHtml(options: AssembleOptions): string {
     :root {
       ${themeVars}
     }
+
+    ${getCanonicalLayoutCss()}
 
     /* Base styles */
     *, *::before, *::after {
@@ -349,6 +379,17 @@ export function assembleHtml(options: AssembleOptions): string {
     img {
       max-width: 100%;
       height: auto;
+    }
+
+    .document .ProseMirror {
+      display: block;
+    }
+
+    .document + .document[data-kind="chapter"],
+    .document + .document[data-kind="appendix"],
+    .document + .document[data-kind="back_matter"] {
+      break-before: page;
+      page-break-before: always;
     }
 
     table {
@@ -1209,7 +1250,7 @@ export function assembleHtml(options: AssembleOptions): string {
 
       @page {
         size: letter;
-        margin: 0.75in;
+        margin: ${pageMargin};
       }
 
       .page-break {

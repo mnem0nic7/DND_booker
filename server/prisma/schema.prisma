@@ -587,6 +587,7 @@ model ProjectDocument {
   sortOrder        Int          @map("sort_order")
   targetPageCount  Int?         @map("target_page_count")
   outlineJson      Json?        @map("outline_json")
+  layoutPlan       Json?        @map("layout_json")
   content          Json         @default("{}")
   status           String       @default("draft")
   sourceArtifactId String?      @map("source_artifact_id")

@@ -2,6 +2,7 @@ import type { ChapterOutline, AssemblyDocumentSpec } from '@dnd-booker/shared';
 import { prisma } from '../../config/database.js';
 import { publishGenerationEvent } from './pubsub.service.js';
 import { resolveOutlineArtifact } from './outline-artifact.service.js';
+import { resolveDocumentLayout } from '../layout-plan.service.js';
 
 export interface AssemblyResult {
   manifestId: string;
@@ -139,6 +140,11 @@ export async function assembleDocuments(
     const artifact = acceptedByKey.get(draftKey);
 
     const content = artifact?.tiptapContent ?? artifact?.jsonContent ?? {};
+    const resolvedLayout = resolveDocumentLayout({
+      content,
+      kind: spec.kind,
+      title: spec.title,
+    });
 
     const doc = await prisma.projectDocument.create({
       data: {
@@ -150,7 +156,8 @@ export async function assembleDocuments(
         sortOrder: spec.sortOrder,
         targetPageCount: spec.targetPageCount ?? null,
         outlineJson: artifact?.jsonContent as any ?? null,
-        content: content as any,
+        layoutPlan: resolvedLayout.layoutPlan as any,
+        content: resolvedLayout.content as any,
         status: 'draft',
         sourceArtifactId: artifact?.id ?? null,
       },

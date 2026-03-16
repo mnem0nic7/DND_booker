@@ -6,10 +6,12 @@ import type {
   ExportReviewAutoFix,
   ExportReview,
   ExportReviewFinding,
+  LayoutPlan,
   ExportSectionReviewMetric,
   ExportUtilityReviewMetric,
 } from '@dnd-booker/shared';
 import {
+  assessRandomTableEntries,
   assessStatBlockAttrs,
   normalizeChapterHeaderTitle,
   normalizeEncounterEntries,
@@ -53,6 +55,7 @@ interface ReviewableDocument {
   title: string;
   kind?: DocumentKind | null;
   content?: DocumentContent | null;
+  layoutPlan?: LayoutPlan | null;
 }
 
 interface PdfWord {
@@ -267,6 +270,24 @@ export function analyzePdfExportLayout(input: {
   }
 
   const lastPageFillRatio = computeLastPageFillRatio(pages.at(-1) ?? null);
+  const sectionStartPages = new Set(sectionStarts.map((metric) => metric.page).filter((page): page is number => page !== null));
+  findings.push(...analyzePageLayout(pages, sectionStartPages));
+
+  if (
+    pageCount <= 10 &&
+    documents.some((document) => documentContainsNodeType(document.content ?? null, 'tableOfContents'))
+  ) {
+    findings.push({
+      code: 'EXPORT_OVERLONG_TOC_FOR_SHORT_BOOK',
+      severity: 'warning',
+      page: 2,
+      message: 'A short one-shot still includes a table of contents that is likely wasting front-matter space.',
+      details: {
+        pageCount,
+      },
+    });
+  }
+
   const lastDocument = documents.at(-1);
   if (
     lastPageFillRatio !== null &&
@@ -327,6 +348,19 @@ export function planExportAutoFixes(review: ExportReview): ExportReviewAutoFix[]
 
   if (codes.has('EXPORT_LAST_PAGE_UNDERFILLED')) {
     fixes.push('dedicated_end_page');
+  }
+
+  if (
+    codes.has('EXPORT_SECTION_TITLE_WRAP')
+    || codes.has('EXPORT_CHAPTER_OPENER_LOW')
+    || codes.has('EXPORT_LAST_PAGE_UNDERFILLED')
+    || codes.has('EXPORT_UNUSED_PAGE_REGION')
+    || codes.has('EXPORT_WEAK_HERO_PLACEMENT')
+    || codes.has('EXPORT_SPLIT_SCENE_PACKET')
+    || codes.has('EXPORT_UNBALANCED_COLUMNS')
+    || codes.has('EXPORT_OVERLONG_TOC_FOR_SHORT_BOOK')
+  ) {
+    fixes.push('refresh_layout_plan');
   }
 
   return fixes;
@@ -548,10 +582,22 @@ function findingPenalty(code: ExportReviewFinding['code']): number {
       return 10;
     case 'EXPORT_LAST_PAGE_UNDERFILLED':
       return 12;
+    case 'EXPORT_UNUSED_PAGE_REGION':
+      return 14;
+    case 'EXPORT_WEAK_HERO_PLACEMENT':
+      return 12;
+    case 'EXPORT_SPLIT_SCENE_PACKET':
+      return 12;
+    case 'EXPORT_UNBALANCED_COLUMNS':
+      return 10;
+    case 'EXPORT_OVERLONG_TOC_FOR_SHORT_BOOK':
+      return 10;
     case 'EXPORT_EMPTY_ENCOUNTER_TABLE':
       return 22;
     case 'EXPORT_EMPTY_RANDOM_TABLE':
       return 18;
+    case 'EXPORT_THIN_RANDOM_TABLE':
+      return 14;
     case 'EXPORT_PLACEHOLDER_STAT_BLOCK':
       return 24;
     case 'EXPORT_SUSPICIOUS_STAT_BLOCK':
@@ -581,6 +627,7 @@ function analyzeDocumentUtility(document: ReviewableDocument): {
     : inspection.utilityWeight / (inspection.utilityWeight + inspection.proseParagraphCount);
 
   const findings = [...inspection.findings];
+  findings.push(...analyzeDocumentLayout(document));
   if (
     (document.kind === 'chapter' || document.kind === 'appendix')
     && inspection.proseParagraphCount >= 4
@@ -614,6 +661,40 @@ function analyzeDocumentUtility(document: ReviewableDocument): {
     },
     findings,
   };
+}
+
+function analyzeDocumentLayout(document: ReviewableDocument): ExportReviewFinding[] {
+  const findings: ExportReviewFinding[] = [];
+  const content = document.content ?? null;
+  const layoutPlan = document.layoutPlan ?? null;
+
+  if (hasHeroCandidate(content) && !hasStrongHeroPlacement(layoutPlan)) {
+    findings.push({
+      code: 'EXPORT_WEAK_HERO_PLACEMENT',
+      severity: 'warning',
+      page: null,
+      message: `"${document.title}" has hero-worthy artwork or opener content that is not using a full-width hero placement.`,
+      details: {
+        title: document.title,
+        kind: document.kind ?? null,
+      },
+    });
+  }
+
+  if (hasEncounterPacketContent(content) && !hasEncounterPacketGrouping(layoutPlan)) {
+    findings.push({
+      code: 'EXPORT_SPLIT_SCENE_PACKET',
+      severity: 'warning',
+      page: null,
+      message: `"${document.title}" has encounter packet content that is not grouped tightly enough for reliable page layout.`,
+      details: {
+        title: document.title,
+        kind: document.kind ?? null,
+      },
+    });
+  }
+
+  return findings;
 }
 
 function inspectDocumentContent(content: DocumentContent | null, documentTitle: string): {
@@ -673,6 +754,23 @@ function inspectDocumentContent(content: DocumentContent | null, documentTitle: 
             blockType: nodeType,
           },
         });
+      } else if (nodeType === 'randomTable') {
+        const assessment = assessRandomTableEntries(node.attrs?.entries ?? node.attrs?.results);
+        if (assessment.isThin) {
+          findings.push({
+            code: 'EXPORT_THIN_RANDOM_TABLE',
+            severity: 'warning',
+            page: null,
+            message: `"${documentTitle}" includes a random encounter table that is too thin to run confidently at the table.`,
+            details: {
+              title: documentTitle,
+              blockType: nodeType,
+              thinEntryCount: assessment.thinEntryCount,
+              averageWordCount: Math.round(assessment.averageWordCount * 10) / 10,
+              entryCount: assessment.normalizedEntries.length,
+            },
+          });
+        }
       }
 
       if (nodeType === 'statBlock') {
@@ -753,6 +851,112 @@ function inspectDocumentContent(content: DocumentContent | null, documentTitle: 
     utilityWeight,
     findings,
   };
+}
+
+function analyzePageLayout(pages: PdfPage[], sectionStartPages: Set<number>): ExportReviewFinding[] {
+  const findings: ExportReviewFinding[] = [];
+
+  for (let index = 0; index < pages.length; index += 1) {
+    const pageNumber = index + 1;
+    const page = pages[index];
+    if (!page) continue;
+
+    const fillRatio = computeLastPageFillRatio(page);
+    if (
+      fillRatio !== null &&
+      fillRatio < 0.58 &&
+      pageNumber > 1 &&
+      pageNumber < pages.length &&
+      !sectionStartPages.has(pageNumber) &&
+      !sectionStartPages.has(pageNumber + 1)
+    ) {
+      findings.push({
+        code: 'EXPORT_UNUSED_PAGE_REGION',
+        severity: 'warning',
+        page: pageNumber,
+        message: `Page ${pageNumber} leaves a large unused region that should be reclaimed by layout.`,
+        details: {
+          fillRatio: roundRatio(fillRatio),
+        },
+      });
+    }
+
+    const balance = measureColumnBalance(page);
+    if (balance !== null && balance.deltaRatio > 0.18) {
+      findings.push({
+        code: 'EXPORT_UNBALANCED_COLUMNS',
+        severity: 'warning',
+        page: pageNumber,
+        message: `Page ${pageNumber} has noticeably unbalanced columns.`,
+        details: {
+          deltaRatio: roundRatio(balance.deltaRatio),
+          leftBottomRatio: roundRatio(balance.leftBottomRatio),
+          rightBottomRatio: roundRatio(balance.rightBottomRatio),
+        },
+      });
+    }
+  }
+
+  return findings;
+}
+
+function measureColumnBalance(page: PdfPage): {
+  deltaRatio: number;
+  leftBottomRatio: number;
+  rightBottomRatio: number;
+} | null {
+  if (!page.width || !page.height) return null;
+  const midpoint = page.width / 2;
+  const threshold = page.width * 0.08;
+
+  const left = page.lines.filter((line) => line.xMax <= midpoint + threshold);
+  const right = page.lines.filter((line) => line.xMin >= midpoint - threshold);
+  if (left.length < 2 || right.length < 2) return null;
+
+  const leftBottom = Math.max(...left.map((line) => line.yMax));
+  const rightBottom = Math.max(...right.map((line) => line.yMax));
+
+  return {
+    deltaRatio: Math.abs(leftBottom - rightBottom) / page.height,
+    leftBottomRatio: leftBottom / page.height,
+    rightBottomRatio: rightBottom / page.height,
+  };
+}
+
+function documentContainsNodeType(content: DocumentContent | null, nodeType: string): boolean {
+  if (!content) return false;
+  if (content.type === nodeType) return true;
+  return (content.content ?? []).some((child) => documentContainsNodeType(child, nodeType));
+}
+
+function hasHeroCandidate(content: DocumentContent | null): boolean {
+  return documentContainsNodeType(content, 'chapterHeader')
+    || documentContainsNodeType(content, 'fullBleedImage')
+    || documentContainsNodeType(content, 'mapBlock')
+    || documentContainsNodeType(content, 'handout');
+}
+
+function hasEncounterPacketContent(content: DocumentContent | null): boolean {
+  return documentContainsNodeType(content, 'statBlock')
+    || documentContainsNodeType(content, 'encounterTable')
+    || documentContainsNodeType(content, 'randomTable');
+}
+
+function hasStrongHeroPlacement(layoutPlan: LayoutPlan | null): boolean {
+  const blocks = Array.isArray(layoutPlan?.blocks) ? layoutPlan.blocks : [];
+  return Boolean(
+    blocks.some((block) => block.span === 'both_columns' && (
+      block.placement === 'hero_top'
+      || block.presentationOrder === 0
+    )),
+  );
+}
+
+function hasEncounterPacketGrouping(layoutPlan: LayoutPlan | null): boolean {
+  const blocks = Array.isArray(layoutPlan?.blocks) ? layoutPlan.blocks : [];
+  return Boolean(
+    blocks.some((block) => block.groupId?.startsWith('encounter-packet')),
+  );
 }
 
 function hasParagraphText(node: DocumentContent): boolean {
