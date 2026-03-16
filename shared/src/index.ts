@@ -20,6 +20,8 @@ export * from './types/normalized-input.js';
 export * from './types/assembly-manifest.js';
 export * from './types/project-document.js';
 export * from './types/generation-events.js';
+export * from './types/agent-run.js';
+export * from './types/agent-events.js';
 export * from './types/chapter-outline.js';
 export * from './types/chapter-plan.js';
 export * from './types/reference-artifacts.js';

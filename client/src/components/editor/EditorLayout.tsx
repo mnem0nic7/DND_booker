@@ -17,6 +17,7 @@ import { useAiStore } from '../../stores/aiStore';
 import { AiSettingsModal } from '../ai/AiSettingsModal';
 import { AiChatPanel } from '../ai/AiChatPanel';
 import { AutonomousGenerationDialog } from '../ai/AutonomousGenerationDialog';
+import { AutonomousAgentDialog } from '../ai/AutonomousAgentDialog';
 
 type PageSize = 'letter' | 'a4' | 'a5';
 
@@ -44,6 +45,7 @@ export function EditorLayout({
   const [showPreview, setShowPreview] = useState(false);
   const [showAiChat, setShowAiChat] = useState(false);
   const [showGenerationDialog, setShowGenerationDialog] = useState(false);
+  const [showAgentDialog, setShowAgentDialog] = useState(false);
   const [showAssetGallery, setShowAssetGallery] = useState(false);
   const currentTheme = useThemeStore((s) => s.currentTheme);
   const openExportDialog = useExportStore((s) => s.openDialog);
@@ -202,6 +204,17 @@ export function EditorLayout({
             Generate Content
           </button>
           <button
+            onClick={() => setShowAgentDialog(true)}
+            title="Autonomous creative director"
+            aria-label="Autonomous creative director"
+            className="px-3 py-1.5 text-sm text-gray-600 hover:text-amber-700 hover:bg-amber-50 transition-colors rounded mr-1 flex items-center gap-1"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 3l1.8 5.53h5.81l-4.7 3.42 1.8 5.53L12 14.06l-4.71 3.42 1.8-5.53-4.7-3.42h5.81L12 3z" />
+            </svg>
+            Creative Director
+          </button>
+          <button
             onClick={() => setShowAiChat((v) => !v)}
             title={showAiChat ? 'Hide AI assistant' : 'Show AI assistant'}
             aria-label={showAiChat ? 'Hide AI assistant' : 'Show AI assistant'}
@@ -328,6 +341,11 @@ export function EditorLayout({
         projectId={projectId}
         isOpen={showGenerationDialog}
         onClose={() => setShowGenerationDialog(false)}
+      />
+      <AutonomousAgentDialog
+        projectId={projectId}
+        isOpen={showAgentDialog}
+        onClose={() => setShowAgentDialog(false)}
       />
       <AiSettingsModal />
     </div>

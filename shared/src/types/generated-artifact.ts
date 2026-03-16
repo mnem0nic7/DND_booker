@@ -13,6 +13,9 @@ export type ArtifactStatus =
 export type ArtifactCategory = 'planning' | 'reference' | 'written' | 'evaluation' | 'assembly';
 
 export type ArtifactType =
+  | 'design_profile'
+  | 'checkpoint_comparison'
+  | 'agent_run_report'
   | 'project_profile'
   | 'campaign_bible'
   | 'chapter_outline'
@@ -44,6 +47,9 @@ export type ArtifactType =
   | 'assembly_manifest';
 
 export const ARTIFACT_CATEGORY_MAP: Record<ArtifactType, ArtifactCategory> = {
+  design_profile: 'planning',
+  checkpoint_comparison: 'evaluation',
+  agent_run_report: 'evaluation',
   project_profile: 'planning',
   campaign_bible: 'planning',
   chapter_outline: 'planning',

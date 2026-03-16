@@ -42,6 +42,33 @@ enum TaskStatus {
   cancelled
 }
 
+enum AgentRunMode {
+  background_producer
+  persistent_editor
+}
+
+enum AgentRunStatus {
+  queued
+  seeding
+  observing
+  planning
+  acting
+  evaluating
+  checkpointing
+  completed
+  failed
+  paused
+  cancelled
+}
+
+enum AgentActionStatus {
+  queued
+  running
+  completed
+  failed
+  skipped
+}
+
 enum ArtifactStatus {
   queued
   generating
@@ -90,6 +117,7 @@ model User {
   memoryItems     AiMemoryItem[]
   taskPlans       AiTaskPlan[]
   generationRuns  GenerationRun[]
+  agentRuns       AgentRun[]
 
   @@map("users")
 }
@@ -131,6 +159,8 @@ model Project {
   taskPlans       AiTaskPlan[]
   contentChunks   ContentChunk[]
   generationRuns  GenerationRun[]
+  agentRuns       AgentRun[]
+  agentCheckpoints AgentCheckpoint[]
   campaignBibles  CampaignBible[]
   canonEntities   CanonEntity[]
   artifacts       GeneratedArtifact[]
@@ -376,11 +406,129 @@ model GenerationRun {
   artifacts       GeneratedArtifact[]
   canonEntities   CanonEntity[]
   manifests       AssemblyManifest[]
+  linkedAgentRuns AgentRun[]        @relation("LinkedGenerationRun")
 
   @@index([projectId])
   @@index([userId])
   @@index([status])
   @@map("generation_runs")
+}
+
+model AgentRun {
+  id                   String         @id @default(uuid())
+  projectId            String         @map("project_id")
+  userId               String         @map("user_id")
+  linkedGenerationRunId String?       @map("linked_generation_run_id")
+  mode                 AgentRunMode
+  status               AgentRunStatus @default(queued)
+  currentStage         String?        @map("current_stage")
+  progressPercent      Int            @default(0) @map("progress_percent")
+  goalJson             Json           @map("goal_json")
+  budgetJson           Json           @map("budget_json")
+  critiqueBacklogJson  Json           @default("[]") @map("critique_backlog_json")
+  latestScorecardJson  Json?          @map("latest_scorecard_json")
+  designProfileJson    Json?          @map("design_profile_json")
+  bestCheckpointId     String?        @map("best_checkpoint_id")
+  latestCheckpointId   String?        @map("latest_checkpoint_id")
+  currentStrategy      String?        @map("current_strategy")
+  cycleCount           Int            @default(0) @map("cycle_count")
+  exportCount          Int            @default(0) @map("export_count")
+  noImprovementStreak  Int            @default(0) @map("no_improvement_streak")
+  failureReason        String?        @map("failure_reason")
+  createdAt            DateTime       @default(now()) @map("created_at")
+  updatedAt            DateTime       @updatedAt @map("updated_at")
+  startedAt            DateTime?      @map("started_at")
+  completedAt          DateTime?      @map("completed_at")
+
+  project              Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user                 User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  linkedGenerationRun  GenerationRun? @relation("LinkedGenerationRun", fields: [linkedGenerationRunId], references: [id], onDelete: SetNull)
+  checkpoints          AgentCheckpoint[]
+  actions              AgentAction[]
+  observations         AgentObservation[]
+  decisions            AgentDecision[]
+
+  @@index([projectId])
+  @@index([userId])
+  @@index([status])
+  @@map("agent_runs")
+}
+
+model AgentCheckpoint {
+  id                   String    @id @default(uuid())
+  runId                String    @map("run_id")
+  projectId            String    @map("project_id")
+  label                String
+  summary              String?
+  cycleIndex           Int       @default(0) @map("cycle_index")
+  isBest               Boolean   @default(false) @map("is_best")
+  scorecardJson        Json?     @map("scorecard_json")
+  projectSnapshotJson  Json      @map("project_snapshot_json")
+  documentsSnapshotJson Json     @map("documents_snapshot_json")
+  assetsSnapshotJson   Json      @map("assets_snapshot_json")
+  createdAt            DateTime  @default(now()) @map("created_at")
+
+  run                  AgentRun  @relation(fields: [runId], references: [id], onDelete: Cascade)
+  project              Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([runId])
+  @@index([projectId])
+  @@index([runId, createdAt])
+  @@map("agent_checkpoints")
+}
+
+model AgentAction {
+  id              String            @id @default(uuid())
+  runId           String            @map("run_id")
+  cycleIndex      Int               @default(0) @map("cycle_index")
+  actionType      String            @map("action_type")
+  status          AgentActionStatus @default(queued)
+  rationale       String?
+  inputJson       Json?             @map("input_json")
+  resultJson      Json?             @map("result_json")
+  scoreDelta      Float?            @map("score_delta")
+  startedAt       DateTime?         @map("started_at")
+  completedAt     DateTime?         @map("completed_at")
+  createdAt       DateTime          @default(now()) @map("created_at")
+
+  run             AgentRun          @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@index([runId])
+  @@index([runId, cycleIndex])
+  @@map("agent_actions")
+}
+
+model AgentObservation {
+  id              String    @id @default(uuid())
+  runId           String    @map("run_id")
+  cycleIndex      Int       @default(0) @map("cycle_index")
+  observationType String    @map("observation_type")
+  summary         String
+  payloadJson     Json?     @map("payload_json")
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  run             AgentRun  @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@index([runId])
+  @@index([runId, cycleIndex])
+  @@map("agent_observations")
+}
+
+model AgentDecision {
+  id               String    @id @default(uuid())
+  runId            String    @map("run_id")
+  cycleIndex       Int       @default(0) @map("cycle_index")
+  decisionType     String    @map("decision_type")
+  chosenActionType String?   @map("chosen_action_type")
+  rationale        String
+  payloadJson      Json?     @map("payload_json")
+  createdAt        DateTime  @default(now()) @map("created_at")
+
+  run              AgentRun  @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@index([runId])
+  @@index([runId, cycleIndex])
+  @@map("agent_decisions")
 }
 
 model GenerationTask {
