@@ -17,7 +17,11 @@ interface GenerateImageOptions {
   quality?: string;
 }
 
-const DEFAULT_IMAGE_TIMEOUT_MS = 180_000;
+const DEFAULT_IMAGE_TIMEOUT_MS = 90_000;
+
+function buildImageTimeoutError(timeoutMs: number): Error {
+  return new Error(`Image generation timed out after ${Math.round(timeoutMs / 1000)}s`);
+}
 
 export function stripImageTextRenderingInstructions(value: string): string {
   return value
@@ -53,6 +57,41 @@ function resolveImageTimeoutMs(): number {
   return DEFAULT_IMAGE_TIMEOUT_MS;
 }
 
+function isAbortLikeImageError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  return error.name === 'AbortError'
+    || error.name === 'TimeoutError'
+    || /aborted|timeout/i.test(error.message);
+}
+
+async function withHardImageTimeout<T>(
+  timeoutMs: number,
+  task: (signal: AbortSignal) => Promise<T>,
+): Promise<T> {
+  const controller = new AbortController();
+
+  return await new Promise<T>((resolve, reject) => {
+    const timeoutHandle = setTimeout(() => {
+      controller.abort();
+      reject(buildImageTimeoutError(timeoutMs));
+    }, timeoutMs);
+
+    task(controller.signal)
+      .then((value) => {
+        clearTimeout(timeoutHandle);
+        resolve(value);
+      })
+      .catch((error) => {
+        clearTimeout(timeoutHandle);
+        if (isAbortLikeImageError(error)) {
+          reject(buildImageTimeoutError(timeoutMs));
+          return;
+        }
+        reject(error);
+      });
+  });
+}
+
 export async function generateAiImage(
   apiKey: string,
   options: GenerateImageOptions,
@@ -75,25 +114,16 @@ export async function generateAiImage(
   }
 
   const timeoutMs = resolveImageTimeoutMs();
-  let image;
-  try {
-    ({ image } = await generateImage({
+  const image = await withHardImageTimeout(timeoutMs, async (signal) => {
+    const result = await generateImage({
       model: openai.image(model),
       prompt: sanitizedPrompt,
       size: size as `${number}x${number}`,
       ...(Object.keys(providerOptions).length > 0 ? { providerOptions } : {}),
-      abortSignal: AbortSignal.timeout(timeoutMs),
-    }));
-  } catch (error) {
-    if (error instanceof Error && (
-      error.name === 'AbortError'
-      || error.name === 'TimeoutError'
-      || /aborted|timeout/i.test(error.message)
-    )) {
-      throw new Error(`Image generation timed out after ${Math.round(timeoutMs / 1000)}s`);
-    }
-    throw error;
-  }
+      abortSignal: signal,
+    });
+    return result.image;
+  });
 
   return {
     base64: image.base64,
