@@ -1,7 +1,8 @@
 import type { DocumentContent, DocumentKind } from '@dnd-booker/shared';
 import {
-  normalizeEncounterEntries,
+  hasEncounterTableContent,
   normalizeChapterHeaderTitle,
+  normalizeEncounterTableAttrs,
   normalizeNpcProfileAttrs,
   normalizeStatBlockAttrs,
   resolveRandomTableEntries,
@@ -60,6 +61,8 @@ const SELF_PAGINATING_NODE_TYPES = new Set([
   'backCover',
 ]);
 
+const MAX_RANDOM_TABLE_ENTRIES_PER_EXPORT_BLOCK = 10;
+
 export function normalizeExportDocuments<T extends ExportDocument>(
   documents: T[],
   projectTitle: string,
@@ -95,11 +98,14 @@ function normalizeExportContent(
     .filter((node): node is DocumentContent => node != null);
 
   const repairedMarkdownBleedThrough = repairMarkdownBleedThrough(nodes);
-  const withNpcCards = upgradeNpcRosterLists(repairedMarkdownBleedThrough);
+  const withoutControlMarkers = stripControlMarkerParagraphs(repairedMarkdownBleedThrough);
+  const withNpcCards = upgradeNpcRosterLists(withoutControlMarkers);
   const withoutPlaceholderScaffold = stripPlaceholderAdventureScaffold(withNpcCards);
   const withoutDuplicateChapterHeadings = stripDuplicateChapterHeadings(withoutPlaceholderScaffold);
-  const withoutOrphanedUtilityScaffold = stripOrphanedUtilityScaffold(withoutDuplicateChapterHeadings);
-  const withAttachedStatBlockLeadIns = attachStatBlockLeadIns(withoutOrphanedUtilityScaffold);
+  const withCompactPrepChecklist = collapsePrepChecklistSection(withoutDuplicateChapterHeadings);
+  const withoutOrphanedUtilityScaffold = stripOrphanedUtilityScaffold(withCompactPrepChecklist);
+  const withSplitRandomTables = splitOversizedRandomTables(withoutOrphanedUtilityScaffold);
+  const withAttachedStatBlockLeadIns = attachStatBlockLeadIns(withSplitRandomTables);
   const withoutRedundantBreaks = stripRedundantStructuralPageBreaks(withAttachedStatBlockLeadIns);
   const withoutShortFormToc = stripShortFormTableOfContents(withoutRedundantBreaks, options);
   const withoutEmptyParagraphs = stripEmptyParagraphs(withoutShortFormToc);
@@ -191,10 +197,8 @@ function normalizeCreditsPageNode(node: DocumentContent): DocumentContent | null
 }
 
 function normalizeEncounterTableNode(node: DocumentContent): DocumentContent | null {
-  const attrs = { ...(node.attrs ?? {}) };
-  const entries = normalizeEncounterEntries(attrs.entries);
-  if (entries.length === 0) return null;
-  attrs.entries = JSON.stringify(entries);
+  const attrs = normalizeEncounterTableAttrs(node.attrs ?? {});
+  if (!hasEncounterTableContent(attrs)) return null;
   return {
     ...node,
     attrs,
@@ -211,6 +215,40 @@ function normalizeRandomTableNode(node: DocumentContent): DocumentContent | null
     ...node,
     attrs,
   };
+}
+
+function splitOversizedRandomTables(nodes: DocumentContent[]): DocumentContent[] {
+  return nodes.flatMap((node, index) => {
+    if (node.type !== 'randomTable') return [node];
+
+    const attrs = { ...(node.attrs ?? {}) };
+    const entries = resolveRandomTableEntries(attrs);
+    if (entries.length <= MAX_RANDOM_TABLE_ENTRIES_PER_EXPORT_BLOCK) {
+      return [node];
+    }
+
+    const baseTitle = normalizeText(attrs.title) || 'Random Table';
+    const baseNodeId = normalizeText(attrs.nodeId) || `randomtable-export-${index + 1}`;
+    const chunks = chunkEntries(entries, MAX_RANDOM_TABLE_ENTRIES_PER_EXPORT_BLOCK);
+
+    return chunks.map((chunk, chunkIndex) => ({
+      ...node,
+      attrs: {
+        ...attrs,
+        nodeId: chunkIndex === 0 ? baseNodeId : `${baseNodeId}-part-${chunkIndex + 1}`,
+        title: chunkIndex === 0 ? baseTitle : `${baseTitle} (cont.)`,
+        entries: JSON.stringify(chunk),
+      },
+    }));
+  });
+}
+
+function chunkEntries<T>(entries: T[], chunkSize: number): T[][] {
+  const chunks: T[][] = [];
+  for (let index = 0; index < entries.length; index += chunkSize) {
+    chunks.push(entries.slice(index, index + chunkSize));
+  }
+  return chunks;
 }
 
 function normalizeStatBlockNode(node: DocumentContent): DocumentContent {
@@ -360,6 +398,11 @@ function readSingleParagraphListItemText(node: DocumentContent): string | null {
 }
 
 function repairMarkdownBleedThroughText(text: string): DocumentContent[] | null {
+  const repairedTable = parseInlineMarkdownTable(text);
+  if (repairedTable) {
+    return [repairedTable];
+  }
+
   const block = parseBleedThroughBlock(text);
   if (block) {
     return repairStructuredBleedThroughBlock(
@@ -383,6 +426,117 @@ function repairMarkdownBleedThroughText(text: string): DocumentContent[] | null 
   }
 
   return null;
+}
+
+function parseInlineMarkdownTable(text: string): DocumentContent | null {
+  const trimmed = normalizeText(text).replace(/\u00a0/g, ' ');
+  if (!trimmed.startsWith('|') || (trimmed.match(/\|/g)?.length ?? 0) < 8) return null;
+
+  const lines = trimmed
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  if (lines.length >= 2 && lines.every((line) => line.startsWith('|') && line.endsWith('|'))) {
+    const lineParsed = parseMarkdownTableLines(lines);
+    if (lineParsed) return lineParsed;
+  }
+
+  const cells = trimmed
+    .split('|')
+    .map((cell) => normalizeText(cell))
+    .filter(Boolean);
+
+  if (cells.length < 6) return null;
+
+  const separatorIndex = findCollapsedMarkdownSeparatorIndex(cells);
+  if (separatorIndex <= 0) return null;
+
+  const headers = cells.slice(0, separatorIndex);
+  if (headers.length < 2) return null;
+
+  const rowTokens = cells.slice(separatorIndex + headers.length);
+  if (rowTokens.length < headers.length) return null;
+
+  const firstRow = rowTokens.slice(0, headers.length - 1);
+  const lastCell = rowTokens
+    .slice(headers.length - 1)
+    .join(' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!lastCell) return null;
+
+  return buildTableNode(headers, [[...firstRow, lastCell]]);
+}
+
+function findCollapsedMarkdownSeparatorIndex(cells: string[]): number {
+  for (let index = 1; index < cells.length; index += 1) {
+    const candidateHeaderCount = index;
+    if (candidateHeaderCount < 2) continue;
+    const separatorCells = cells.slice(index, index + candidateHeaderCount);
+    if (separatorCells.length !== candidateHeaderCount) continue;
+    if (separatorCells.every((cell) => /^:?-{3,}:?$/.test(cell))) {
+      return index;
+    }
+  }
+  return -1;
+}
+
+function parseMarkdownTableLines(lines: string[]): DocumentContent | null {
+  if (lines.length < 3) return null;
+
+  const parseRow = (row: string): string[] =>
+    row.split('|').slice(1, -1).map((cell) => normalizeText(cell));
+
+  const headerCells = parseRow(lines[0]).filter(Boolean);
+  const separatorCells = parseRow(lines[1]);
+  if (headerCells.length < 2 || headerCells.length !== separatorCells.length) return null;
+  if (!separatorCells.every((cell) => /^:?-{3,}:?$/.test(cell))) return null;
+
+  const dataRows = lines
+    .slice(2)
+    .map(parseRow)
+    .filter((row) => row.some(Boolean))
+    .map((row) => {
+      if (row.length === headerCells.length) return row;
+      if (row.length < headerCells.length) return [];
+      return [
+        ...row.slice(0, headerCells.length - 1),
+        row.slice(headerCells.length - 1).join(' ').replace(/\s+/g, ' ').trim(),
+      ];
+    })
+    .filter((row) => row.length === headerCells.length);
+
+  if (dataRows.length === 0) return null;
+  return buildTableNode(headerCells, dataRows);
+}
+
+function buildTableNode(headers: string[], rows: string[][]): DocumentContent {
+  return {
+    type: 'table',
+    content: [
+      {
+        type: 'tableRow',
+        content: headers.map((header) => ({
+          type: 'tableHeader',
+          content: [{
+            type: 'paragraph',
+            content: [{ type: 'text', text: header }],
+          }],
+        })),
+      },
+      ...rows.map((row) => ({
+        type: 'tableRow',
+        content: row.map((cell) => ({
+          type: 'tableCell',
+          content: [{
+            type: 'paragraph',
+            content: [{ type: 'text', text: cell }],
+          }],
+        })),
+      })),
+    ],
+  };
 }
 
 function normalizeHeadingNode(node: DocumentContent): DocumentContent {
@@ -471,6 +625,36 @@ function stripDuplicateChapterHeadings(nodes: DocumentContent[]): DocumentConten
     if (!isDuplicateChapterHeading(node, nextNode)) continue;
 
     index += 1;
+  }
+
+  return result;
+}
+
+function stripControlMarkerParagraphs(nodes: DocumentContent[]): DocumentContent[] {
+  return nodes.filter((node) => !isControlMarkerParagraph(node));
+}
+
+function collapsePrepChecklistSection(nodes: DocumentContent[]): DocumentContent[] {
+  const result: DocumentContent[] = [];
+
+  for (let index = 0; index < nodes.length; index += 1) {
+    const node = nodes[index];
+    const nextNode = nodes[index + 1];
+
+    if (isPrepChecklistHeading(node) && (nextNode?.type === 'bulletList' || nextNode?.type === 'orderedList')) {
+      result.push({
+        type: 'sidebarCallout',
+        attrs: {
+          title: 'Prep Checklist',
+          calloutType: 'info',
+        },
+        content: [nextNode],
+      });
+      index += 1;
+      continue;
+    }
+
+    result.push(node);
   }
 
   return result;
@@ -785,6 +969,18 @@ function isDuplicateChapterHeading(
 
 function isEmptyParagraph(node: DocumentContent): boolean {
   return node.type === 'paragraph' && readInlineText(node).trim().length === 0;
+}
+
+function isControlMarkerParagraph(node: DocumentContent): boolean {
+  if (node.type !== 'paragraph') return false;
+  const text = readInlineText(node).trim();
+  return /^:[a-z][\w-]*$/i.test(text);
+}
+
+function isPrepChecklistHeading(node: DocumentContent): boolean {
+  if (node.type !== 'heading') return false;
+  const text = readInlineText(node).trim().toLowerCase();
+  return text === 'prep checklist';
 }
 
 function getTopLevelNodes(content: DocumentContent): DocumentContent[] {

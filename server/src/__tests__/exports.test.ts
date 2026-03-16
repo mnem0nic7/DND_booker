@@ -428,6 +428,145 @@ describe('Export Routes', () => {
         await prisma.exportJob.delete({ where: { id: reviewedJob.id } });
       }
     });
+
+    it('should refresh layout plans for layout-only findings and queue a replacement export', async () => {
+      const user = await prisma.user.findUniqueOrThrow({ where: { email: TEST_USER.email } });
+      const doc = await prisma.projectDocument.create({
+        data: {
+          projectId,
+          kind: 'chapter',
+          title: 'Chapter 2: Layout Trouble',
+          slug: `layout-trouble-${Date.now()}`,
+          sortOrder: 100,
+          content: {
+            type: 'doc',
+            content: [
+              {
+                type: 'chapterHeader',
+                attrs: {
+                  chapterNumber: 'Chapter 2',
+                  title: 'Layout Trouble',
+                  backgroundImage: '/uploads/layout-trouble.png',
+                },
+              },
+              {
+                type: 'paragraph',
+                content: [
+                  {
+                    type: 'text',
+                    text: 'This scene needs a better layout plan so the hero art and encounter packet can stay together.',
+                  },
+                ],
+              },
+              {
+                type: 'statBlock',
+                attrs: {
+                  name: 'Layout Shade',
+                  ac: 13,
+                  hp: 18,
+                  speed: '30 ft.',
+                },
+              },
+            ],
+          },
+          layoutPlan: {
+            version: 1,
+            sectionRecipe: 'utility_table_spread',
+            columnBalanceTarget: 'left_heavy',
+            blocks: [],
+          },
+        },
+      });
+
+      const reviewedJob = await prisma.exportJob.create({
+        data: {
+          projectId,
+          userId: user.id,
+          format: 'pdf',
+          status: 'completed',
+          progress: 100,
+          outputUrl: '/output/reviewed-layout-only.pdf',
+          reviewJson: {
+            status: 'needs_attention',
+            score: 51,
+            generatedAt: new Date().toISOString(),
+            summary: 'Export review found 2 layout issues.',
+            passCount: 1,
+            appliedFixes: [],
+            findings: [
+              {
+                code: 'EXPORT_UNUSED_PAGE_REGION',
+                severity: 'warning',
+                page: 5,
+                message: '"Chapter 2: Layout Trouble" leaves a large unused region on page 5.',
+                details: { pageIndex: 4 },
+              },
+              {
+                code: 'EXPORT_SPLIT_SCENE_PACKET',
+                severity: 'warning',
+                page: 6,
+                message: '"Chapter 2: Layout Trouble" splits an encounter packet across layout regions.',
+                details: { groupId: 'encounter-packet-1' },
+              },
+            ],
+            metrics: {
+              pageCount: 6,
+              pageWidthPts: 612,
+              pageHeightPts: 792,
+              lastPageFillRatio: 0.54,
+              sectionStarts: [
+                {
+                  title: doc.title,
+                  kind: 'chapter',
+                  page: 5,
+                  topRatio: 0,
+                  lineCount: 1,
+                  hyphenated: false,
+                },
+              ],
+              utilityCoverage: [],
+            },
+          },
+          completedAt: new Date(),
+        },
+      });
+
+      try {
+        const res = await request(app)
+          .post(`/api/export-jobs/${reviewedJob.id}/fix`)
+          .set('Authorization', `Bearer ${accessToken}`);
+
+        expect(res.status).toBe(201);
+        expect(res.body.status).toBe('started');
+        expect(res.body.appliedFixCount).toBe(2);
+        expect(res.body.documentsUpdated).toBe(1);
+        expect(res.body.exportJob).toBeTruthy();
+        expect(res.body.exportJob.status).toBe('queued');
+        expect(res.body.changes).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({
+              code: 'EXPORT_UNUSED_PAGE_REGION',
+              action: 'refresh_layout_plan',
+              title: doc.title,
+              count: 1,
+            }),
+            expect.objectContaining({
+              code: 'EXPORT_SPLIT_SCENE_PACKET',
+              action: 'refresh_layout_plan',
+              title: doc.title,
+              count: 1,
+            }),
+          ]),
+        );
+
+        const updatedDoc = await prisma.projectDocument.findUniqueOrThrow({ where: { id: doc.id } });
+        expect(updatedDoc.layoutPlan).toBeTruthy();
+        expect((updatedDoc.layoutPlan as { sectionRecipe?: string }).sectionRecipe).not.toBe('utility_table_spread');
+      } finally {
+        await prisma.exportJob.deleteMany({ where: { projectId, userId: user.id, outputUrl: '/output/reviewed-layout-only.pdf' } });
+        await prisma.projectDocument.delete({ where: { id: doc.id } });
+      }
+    });
   });
 
   describe('GET /api/export-jobs/:id/download', () => {

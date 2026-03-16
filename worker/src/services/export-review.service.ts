@@ -14,8 +14,8 @@ import type {
 import {
   assessRandomTableEntries,
   assessStatBlockAttrs,
+  hasEncounterTableContent,
   normalizeChapterHeaderTitle,
-  normalizeEncounterEntries,
   resolveRandomTableEntries,
 } from '@dnd-booker/shared';
 
@@ -893,7 +893,7 @@ function inspectDocumentContent(content: DocumentContent | null, documentTitle: 
       utilityWeight += nodeWeight;
       if (REFERENCE_BLOCK_TYPES.has(nodeType)) referenceBlockCount += 1;
 
-      if (nodeType === 'encounterTable' && normalizeEncounterEntries(node.attrs?.entries).length === 0) {
+      if (nodeType === 'encounterTable' && !hasEncounterTableContent(node.attrs ?? {})) {
         findings.push({
           code: 'EXPORT_EMPTY_ENCOUNTER_TABLE',
           severity: 'error',
@@ -1179,7 +1179,10 @@ function hasEncounterPacketGrouping(layoutPlan: LayoutPlan | null, pageModel: Pa
   if (pageModel) {
     const unitPages = new Map<string, Set<number>>();
     for (const fragment of pageModel.fragments) {
-      if (!fragment.groupId?.startsWith('encounter-packet')) continue;
+      if (
+        !fragment.groupId?.startsWith('encounter-packet')
+        && !fragment.groupId?.startsWith('utility-table')
+      ) continue;
       const entry = unitPages.get(fragment.unitId) ?? new Set<number>();
       entry.add(fragment.pageIndex);
       unitPages.set(fragment.unitId, entry);
@@ -1190,7 +1193,10 @@ function hasEncounterPacketGrouping(layoutPlan: LayoutPlan | null, pageModel: Pa
   }
   const blocks = Array.isArray(layoutPlan?.blocks) ? layoutPlan.blocks : [];
   return Boolean(
-    blocks.some((block) => block.groupId?.startsWith('encounter-packet')),
+    blocks.some((block) => (
+      block.groupId?.startsWith('encounter-packet')
+      || block.groupId?.startsWith('utility-table')
+    )),
   );
 }
 

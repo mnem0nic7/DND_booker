@@ -10,6 +10,12 @@ export interface NormalizedEncounterEntry {
   cr: string;
 }
 
+export interface NormalizedEncounterCreature {
+  name: string;
+  quantity: number;
+  challengeRating: string;
+}
+
 export interface NormalizedRandomTableEntry {
   roll: string;
   result: string;
@@ -61,6 +67,76 @@ function normalizeNumber(value: unknown): number | undefined {
   if (value === null || value === undefined || value === '') return undefined;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function normalizeCount(value: unknown): number | undefined {
+  if (typeof value === 'string') {
+    const match = value.match(/-?\d+/);
+    if (match) {
+      const parsed = Number(match[0]);
+      return Number.isFinite(parsed) ? parsed : undefined;
+    }
+  }
+
+  return normalizeNumber(value);
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function formatLabelKey(key: string): string {
+  return key
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .replace(/[_-]+/g, ' ')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
+export function normalizeStructuredText(value: unknown): string {
+  if (value === null || value === undefined) return '';
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    return trimmed === '[object Object]' ? '' : trimmed;
+  }
+
+  if (Array.isArray(value)) {
+    return value
+      .map((entry) => normalizeStructuredText(entry))
+      .filter(Boolean)
+      .join(', ');
+  }
+
+  if (isPlainObject(value)) {
+    return Object.entries(value)
+      .map(([key, entryValue]) => {
+        const normalizedValue = normalizeStructuredText(entryValue);
+        if (!normalizedValue) return '';
+        return `${formatLabelKey(key)} ${normalizedValue}`.trim();
+      })
+      .filter(Boolean)
+      .join(', ');
+  }
+
+  return String(value).trim();
+}
+
+function normalizeSpeedText(value: unknown): string {
+  const normalized = normalizeStructuredText(value).replace(/\s+/g, ' ').trim();
+  if (!normalized) return '';
+
+  if (
+    /^0\s*ft\.?\s*[,;]\s*/i.test(normalized)
+    && /\b(fly|hover|swim|climb|burrow)\b/i.test(normalized)
+  ) {
+    return normalized.replace(/^0\s*ft\.?\s*[,;]\s*/i, '');
+  }
+
+  return normalized;
 }
 
 interface NameDescLike {
@@ -226,9 +302,113 @@ export function normalizeRandomTableEntries(value: unknown): NormalizedRandomTab
     ).trim();
 
     if (!roll || !result) return [];
+    if (/^\d+(?:\s*[-–]\s*\d+)?$/.test(roll) && /^\d+(?:\s*[-–]\s*\d+)?$/.test(result) && roll === result) {
+      return [];
+    }
 
     return [{ roll, result }];
   });
+}
+
+export function normalizeEncounterCreatures(value: unknown): NormalizedEncounterCreature[] {
+  let parsed: unknown;
+  if (typeof value === 'string') {
+    try {
+      parsed = JSON.parse(value);
+    } catch {
+      return [];
+    }
+  } else {
+    parsed = value;
+  }
+
+  if (!Array.isArray(parsed)) return [];
+
+  return parsed.flatMap((entry) => {
+    if (!isPlainObject(entry)) return [];
+
+    const name = normalizeStructuredText(entry.name ?? entry.creature ?? entry.monster).trim();
+    const quantity = normalizeCount(entry.quantity ?? entry.count) ?? 1;
+    const challengeRating = normalizeStructuredText(
+      entry.challengeRating ?? entry.cr ?? entry.challenge,
+    ).trim();
+
+    if (!name) return [];
+
+    return [{
+      name,
+      quantity: Math.max(1, Math.floor(quantity)),
+      challengeRating,
+    }];
+  });
+}
+
+export function normalizeEncounterTableAttrs(attrs: Record<string, unknown>): Record<string, unknown> {
+  const normalized: Record<string, unknown> = { ...attrs };
+
+  const title = normalizeStructuredText(pickFirst(normalized, ['title', 'name'])).trim();
+  if (title) {
+    normalized.title = title;
+    normalized.name = title;
+  }
+
+  const entries = normalizeEncounterEntries(normalized.entries);
+  if (entries.length > 0) {
+    normalized.entries = JSON.stringify(entries);
+  } else {
+    delete normalized.entries;
+  }
+
+  const creatures = normalizeEncounterCreatures(normalized.creatures);
+  if (creatures.length > 0) {
+    normalized.creatures = JSON.stringify(creatures);
+  } else {
+    delete normalized.creatures;
+  }
+
+  const shortTextAliases: Array<[string, string[]]> = [
+    ['environment', ['environment']],
+    ['crRange', ['crRange']],
+    ['difficulty', ['difficulty']],
+    ['encounterType', ['encounterType', 'type']],
+  ];
+
+  for (const [target, aliases] of shortTextAliases) {
+    const value = normalizeStructuredText(pickFirst(normalized, aliases)).trim();
+    if (value) normalized[target] = value;
+  }
+
+  const longTextAliases: Array<[string, string[]]> = [
+    ['description', ['description', 'summary']],
+    ['objective', ['objective', 'goal']],
+    ['opposition', ['opposition', 'enemies']],
+    ['terrain', ['terrain']],
+    ['setup', ['setup']],
+    ['tactics', ['tactics']],
+    ['rewards', ['rewards', 'treasure']],
+    ['payoff', ['payoff']],
+    ['aftermath', ['aftermath', 'outcome', 'consequences']],
+    ['notes', ['notes']],
+  ];
+
+  for (const [target, aliases] of longTextAliases) {
+    const value = normalizeStructuredText(pickFirst(normalized, aliases)).trim();
+    if (value) normalized[target] = value;
+  }
+
+  return normalized;
+}
+
+export function hasEncounterTableContent(attrs: Record<string, unknown>): boolean {
+  const normalized = normalizeEncounterTableAttrs(attrs);
+  return (
+    normalizeEncounterEntries(normalized.entries).length > 0
+    || normalizeEncounterCreatures(normalized.creatures).length > 0
+    || ['description', 'objective', 'opposition', 'terrain', 'setup', 'tactics', 'rewards', 'payoff', 'aftermath', 'notes'].some((key) => {
+      const value = normalizeStructuredText(normalized[key]).trim();
+      return value.length > 0;
+    })
+  );
 }
 
 function hasOperationalEncounterDetail(text: string): boolean {
@@ -274,6 +454,19 @@ export function assessRandomTableEntries(value: unknown): RandomTableUsabilityAs
 
 export function normalizeStatBlockAttrs(attrs: Record<string, unknown>): Record<string, unknown> {
   const normalized: Record<string, unknown> = { ...attrs };
+  const abilitySource = pickFirst(normalized, ['abilities', 'abilityScores']);
+  let parsedAbilitySource: Record<string, unknown> | null = null;
+
+  if (typeof abilitySource === 'string') {
+    try {
+      const parsed = JSON.parse(abilitySource) as unknown;
+      if (isPlainObject(parsed)) parsedAbilitySource = parsed;
+    } catch {
+      parsedAbilitySource = null;
+    }
+  } else if (isPlainObject(abilitySource)) {
+    parsedAbilitySource = abilitySource;
+  }
 
   const numberAliases: Array<[string, string[]]> = [
     ['ac', ['ac', 'armorClass']],
@@ -287,7 +480,10 @@ export function normalizeStatBlockAttrs(attrs: Record<string, unknown>): Record<
   ];
 
   for (const [target, aliases] of numberAliases) {
-    const value = normalizeNumber(pickFirst(normalized, aliases));
+    const value = normalizeNumber(
+      pickFirst(normalized, aliases)
+      ?? pickFirst(parsedAbilitySource ?? {}, aliases),
+    );
     if (value !== undefined) normalized[target] = value;
   }
 
@@ -295,19 +491,26 @@ export function normalizeStatBlockAttrs(attrs: Record<string, unknown>): Record<
     ['acType', ['acType', 'armorType']],
     ['hitDice', ['hitDice']],
     ['speed', ['speed', 'movement', 'movementSpeed', 'speedText']],
-    ['cr', ['cr', 'challengeRating']],
+    ['cr', ['cr', 'challengeRating', 'challenge']],
     ['xp', ['xp', 'experience']],
-    ['savingThrows', ['savingThrows', 'savingThrowsText']],
+    ['savingThrows', ['savingThrows', 'savingThrowsText', 'saves']],
+    ['skills', ['skills']],
     ['damageResistances', ['damageResistances', 'resistances']],
     ['damageImmunities', ['damageImmunities', 'immunities']],
     ['conditionImmunities', ['conditionImmunities']],
     ['senses', ['senses']],
     ['languages', ['languages']],
+    ['legendaryDescription', ['legendaryDescription']],
+    ['leadInText', ['leadInText']],
   ];
 
   for (const [target, aliases] of stringAliases) {
-    const value = normalizeString(pickFirst(normalized, aliases)).trim();
+    const rawValue = pickFirst(normalized, aliases);
+    const value = target === 'speed'
+      ? normalizeSpeedText(rawValue)
+      : normalizeStructuredText(rawValue).trim();
     if (value) normalized[target] = value;
+    else delete normalized[target];
   }
 
   const arrayAliases: Array<[string, string[]]> = [

@@ -127,6 +127,49 @@ describe('normalizeExportDocuments', () => {
     });
   });
 
+  it('splits oversized random tables into continuation blocks for export packing', () => {
+    const entries = Array.from({ length: 20 }, (_, index) => ({
+      roll: String(index + 1),
+      result: `Outcome ${index + 1}`,
+    }));
+
+    const documents = normalizeExportDocuments([
+      {
+        title: 'Chapter 2: The Mine',
+        sortOrder: 2,
+        kind: 'chapter',
+        content: doc([
+          {
+            type: 'randomTable',
+            attrs: {
+              nodeId: 'randomtable-main',
+              title: 'Chilling Discoveries',
+              dieType: 'd20',
+              entries: JSON.stringify(entries),
+            },
+          },
+        ]),
+      },
+    ], 'Goblin Caper');
+
+    const nodes = documents[0].content?.content ?? [];
+    expect(nodes).toHaveLength(2);
+    expect(nodes[0]).toMatchObject({
+      type: 'randomTable',
+      attrs: {
+        nodeId: 'randomtable-main',
+        title: 'Chilling Discoveries',
+      },
+    });
+    expect(nodes[1]).toMatchObject({
+      type: 'randomTable',
+      attrs: {
+        nodeId: 'randomtable-main-part-2',
+        title: 'Chilling Discoveries (cont.)',
+      },
+    });
+  });
+
   it('repairs structured block bleed-through leaked inside bullet lists', () => {
     const documents = normalizeExportDocuments([
       {
@@ -692,9 +735,182 @@ describe('normalizeExportDocuments', () => {
           name: 'Phantom Apparition',
           ac: 13,
           hp: 10,
-          speed: '0 ft., fly 40 ft. (hover)',
+          speed: 'fly 40 ft. (hover)',
           leadInText: 'The phantoms have the following stats:',
         }),
+      },
+    ]);
+  });
+
+  it('removes numeric placeholder random tables that are not runnable', () => {
+    const documents = normalizeExportDocuments([
+      {
+        title: 'Chapter 2: The Mine',
+        sortOrder: 2,
+        kind: 'chapter',
+        content: doc([
+          {
+            type: 'randomTable',
+            attrs: {
+              title: 'Echoes in the Dark',
+              dieType: 'd6',
+              entries: JSON.stringify([
+                { roll: '1', result: '1' },
+                { roll: '2', result: '2' },
+              ]),
+            },
+          },
+        ]),
+      },
+    ], 'The Blackglass Mine');
+
+    expect(documents).toHaveLength(0);
+  });
+
+  it('preserves detail-style encounter packets without weighted table rows', () => {
+    const documents = normalizeExportDocuments([
+      {
+        title: 'Chapter 2: The Mine',
+        sortOrder: 2,
+        kind: 'chapter',
+        content: doc([
+          {
+            type: 'encounterTable',
+            attrs: {
+              name: 'Shadows of the Mine',
+              creatures: JSON.stringify([{ name: 'Shadow', quantity: 3, challengeRating: '1/2' }]),
+              setup: 'The shadows rise from broken lanterns.',
+              tactics: 'They phase through cover and harry the back line.',
+              rewards: 'A blackglass gem worth 15 gp.',
+            },
+          },
+        ]),
+      },
+    ], 'The Blackglass Mine');
+
+    expect(documents[0].content?.content).toEqual([
+      {
+        type: 'encounterTable',
+        attrs: expect.objectContaining({
+          name: 'Shadows of the Mine',
+          title: 'Shadows of the Mine',
+          setup: 'The shadows rise from broken lanterns.',
+          tactics: 'They phase through cover and harry the back line.',
+          rewards: 'A blackglass gem worth 15 gp.',
+        }),
+      },
+    ]);
+  });
+
+  it('strips raw control-marker paragraphs and collapses prep checklists into a callout', () => {
+    const documents = normalizeExportDocuments([
+      {
+        title: 'Front Matter',
+        sortOrder: 0,
+        kind: 'front_matter',
+        content: doc([
+          { type: 'heading', attrs: { level: 3 }, content: [{ type: 'text', text: 'Prep Checklist' }] },
+          {
+            type: 'bulletList',
+            content: [{
+              type: 'listItem',
+              content: [{
+                type: 'paragraph',
+                content: [{ type: 'text', text: 'Review the chapter flow.' }],
+              }],
+            }],
+          },
+          {
+            type: 'paragraph',
+            content: [{ type: 'text', text: ':lookAtEncounters' }],
+          },
+        ]),
+      },
+    ], 'The Blackglass Mine');
+
+    expect(documents[0].content?.content).toEqual([
+      {
+        type: 'sidebarCallout',
+        attrs: {
+          title: 'Prep Checklist',
+          calloutType: 'info',
+        },
+        content: [{
+          type: 'bulletList',
+          content: [{
+            type: 'listItem',
+            content: [{
+              type: 'paragraph',
+              content: [{ type: 'text', text: 'Review the chapter flow.' }],
+            }],
+          }],
+        }],
+      },
+    ]);
+  });
+
+  it('repairs collapsed markdown pipe tables into real table nodes during export cleanup', () => {
+    const documents = normalizeExportDocuments([
+      {
+        title: 'Chapter 2: The Mine',
+        sortOrder: 2,
+        kind: 'chapter',
+        content: doc([
+          {
+            type: 'paragraph',
+            content: [
+              { type: 'text', text: '| Creature | Challenge Rating | Details | |-------------------|----------------------|--------------------------------------| | Cave Troll | 5 | The troll attacks any who intrude. | Terrain: Rocky ground. | Tactics: Ambush from shadow. | Aftermath: 10d6 GP worth of ore. |' },
+            ],
+          },
+        ]),
+      },
+    ], 'The Blackglass Mine');
+
+    expect(documents[0].content?.content).toEqual([
+      {
+        type: 'table',
+        content: [
+          {
+            type: 'tableRow',
+            content: [
+              {
+                type: 'tableHeader',
+                content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Creature' }] }],
+              },
+              {
+                type: 'tableHeader',
+                content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Challenge Rating' }] }],
+              },
+              {
+                type: 'tableHeader',
+                content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Details' }] }],
+              },
+            ],
+          },
+          {
+            type: 'tableRow',
+            content: [
+              {
+                type: 'tableCell',
+                content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Cave Troll' }] }],
+              },
+              {
+                type: 'tableCell',
+                content: [{ type: 'paragraph', content: [{ type: 'text', text: '5' }] }],
+              },
+              {
+                type: 'tableCell',
+                content: [{
+                  type: 'paragraph',
+                  content: [{
+                    type: 'text',
+                    text: 'The troll attacks any who intrude. Terrain: Rocky ground. Tactics: Ambush from shadow. Aftermath: 10d6 GP worth of ore.',
+                  }],
+                }],
+              },
+            ],
+          },
+        ],
       },
     ]);
   });

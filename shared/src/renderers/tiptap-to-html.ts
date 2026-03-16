@@ -9,7 +9,9 @@ import type { DocumentContent } from '../types/document';
 import {
   escapeHtml,
   normalizeChapterHeaderTitle,
+  normalizeEncounterCreatures,
   normalizeEncounterEntries,
+  normalizeEncounterTableAttrs,
   normalizeNpcProfileAttrs,
   normalizeStatBlockAttrs,
   resolveRandomTableEntries,
@@ -571,35 +573,96 @@ function renderNpcProfile(attrs: Record<string, unknown>): string {
 }
 
 function renderEncounterTable(attrs: Record<string, unknown>): string {
-  const environment = escapeHtml(String(attrs.environment || ''));
-  const crRange = escapeHtml(String(attrs.crRange || ''));
-  const entries = normalizeEncounterEntries(attrs.entries);
-  if (entries.length === 0) return '';
+  const normalized = normalizeEncounterTableAttrs(attrs);
+  const environment = escapeHtml(String(normalized.environment || ''));
+  const title = escapeHtml(String(normalized.title || normalized.name || environment || 'Encounter Details'));
+  const crRange = escapeHtml(String(normalized.crRange || ''));
+  const difficulty = escapeHtml(String(normalized.difficulty || ''));
+  const encounterType = escapeHtml(String(normalized.encounterType || ''));
+  const description = escapeHtml(String(normalized.description || ''));
+  const objective = escapeHtml(String(normalized.objective || ''));
+  const opposition = escapeHtml(String(normalized.opposition || ''));
+  const terrain = escapeHtml(String(normalized.terrain || ''));
+  const setup = escapeHtml(String(normalized.setup || ''));
+  const tactics = escapeHtml(String(normalized.tactics || ''));
+  const rewards = escapeHtml(String(normalized.rewards || ''));
+  const payoff = escapeHtml(String(normalized.payoff || ''));
+  const aftermath = escapeHtml(String(normalized.aftermath || ''));
+  const notes = escapeHtml(String(normalized.notes || ''));
+  const entries = normalizeEncounterEntries(normalized.entries);
+  const creatures = normalizeEncounterCreatures(normalized.creatures);
+
+  if (
+    entries.length === 0
+    && creatures.length === 0
+    && !description
+    && !objective
+    && !opposition
+    && !terrain
+    && !setup
+    && !tactics
+    && !rewards
+    && !payoff
+    && !aftermath
+    && !notes
+  ) {
+    return '';
+  }
 
   let html = `<div class="encounter-table">`;
   html += `<div class="encounter-table__header">`;
-  html += `<h2 class="encounter-table__title">${environment} Encounters</h2>`;
-  html += `<div class="encounter-table__cr-range">CR Range: ${crRange}</div>`;
+  html += `<h2 class="encounter-table__title">${title}</h2>`;
+
+  const metaParts = [environment, difficulty, encounterType, crRange ? `CR ${crRange}` : ''].filter(Boolean);
+  if (metaParts.length > 0) {
+    html += `<div class="encounter-table__cr-range">${metaParts.join(' · ')}</div>`;
+  }
   html += `</div>`;
 
-  const totalWeight = entries.reduce((s, e) => s + e.weight, 0);
-  html += `<table class="encounter-table__table">`;
-  html += `<thead><tr><th class="encounter-table__th">d${totalWeight}</th><th class="encounter-table__th">Encounter</th><th class="encounter-table__th">CR</th></tr></thead>`;
-  html += `<tbody>`;
+  if (entries.length > 0) {
+    const totalWeight = entries.reduce((s, e) => s + e.weight, 0);
+    html += `<table class="encounter-table__table">`;
+    html += `<thead><tr><th class="encounter-table__th">d${totalWeight}</th><th class="encounter-table__th">Encounter</th><th class="encounter-table__th">CR</th></tr></thead>`;
+    html += `<tbody>`;
 
-  let running = 0;
-  for (const entry of entries) {
-    const from = running + 1;
-    running += entry.weight;
-    const to = running;
-    const rangeLabel = from === to ? `${from}` : `${from}\u2013${to}`;
-    html += `<tr class="encounter-table__row">`;
-    html += `<td class="encounter-table__td encounter-table__td--weight">${rangeLabel}</td>`;
-    html += `<td class="encounter-table__td">${escapeHtml(entry.description)}</td>`;
-    html += `<td class="encounter-table__td encounter-table__td--cr">${escapeHtml(entry.cr)}</td>`;
-    html += `</tr>`;
+    let running = 0;
+    for (const entry of entries) {
+      const from = running + 1;
+      running += entry.weight;
+      const to = running;
+      const rangeLabel = from === to ? `${from}` : `${from}\u2013${to}`;
+      html += `<tr class="encounter-table__row">`;
+      html += `<td class="encounter-table__td encounter-table__td--weight">${rangeLabel}</td>`;
+      html += `<td class="encounter-table__td">${escapeHtml(entry.description)}</td>`;
+      html += `<td class="encounter-table__td encounter-table__td--cr">${escapeHtml(entry.cr)}</td>`;
+      html += `</tr>`;
+    }
+    html += `</tbody></table>`;
   }
-  html += `</tbody></table>`;
+
+  const detailRows: string[] = [];
+  if (description) detailRows.push(`<div class="encounter-table__detail"><span class="encounter-table__detail-label">Overview.</span> ${description}</div>`);
+  if (creatures.length > 0) {
+    detailRows.push(
+      `<div class="encounter-table__detail"><span class="encounter-table__detail-label">Enemies.</span> ${creatures
+        .map((creature) => `${creature.quantity}x ${escapeHtml(creature.name)}${creature.challengeRating ? ` (CR ${escapeHtml(creature.challengeRating)})` : ''}`)
+        .join('; ')}</div>`,
+    );
+  }
+  if (opposition) detailRows.push(`<div class="encounter-table__detail"><span class="encounter-table__detail-label">Opposition.</span> ${opposition}</div>`);
+  if (objective) detailRows.push(`<div class="encounter-table__detail"><span class="encounter-table__detail-label">Objective.</span> ${objective}</div>`);
+  if (terrain) detailRows.push(`<div class="encounter-table__detail"><span class="encounter-table__detail-label">Terrain.</span> ${terrain}</div>`);
+  if (setup) detailRows.push(`<div class="encounter-table__detail"><span class="encounter-table__detail-label">Setup.</span> ${setup}</div>`);
+  if (tactics) detailRows.push(`<div class="encounter-table__detail"><span class="encounter-table__detail-label">Tactics.</span> ${tactics}</div>`);
+  if (rewards) detailRows.push(`<div class="encounter-table__detail"><span class="encounter-table__detail-label">Rewards.</span> ${rewards}</div>`);
+  if (payoff) detailRows.push(`<div class="encounter-table__detail"><span class="encounter-table__detail-label">Payoff.</span> ${payoff}</div>`);
+  if (aftermath) detailRows.push(`<div class="encounter-table__detail"><span class="encounter-table__detail-label">Aftermath.</span> ${aftermath}</div>`);
+  if (notes) detailRows.push(`<div class="encounter-table__detail"><span class="encounter-table__detail-label">Notes.</span> ${notes}</div>`);
+
+  if (detailRows.length > 0) {
+    html += `<div class="encounter-table__details">${detailRows.join('')}</div>`;
+  }
+
   html += `</div>`;
   return html;
 }

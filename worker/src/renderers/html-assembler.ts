@@ -4,6 +4,8 @@
  * stylesheet, Google Fonts, and all rendered document content.
  */
 
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import {
   DocumentContent,
   LayoutPlan,
@@ -29,6 +31,35 @@ export interface AssembleOptions {
   projectTitle: string;
   pagePreset?: PagePreset;
   renderMode?: 'paged' | 'flow';
+}
+
+function resolveTextureValue(theme: string): string {
+  const textureByTheme: Record<string, string | null> = {
+    'classic-parchment': 'parchment-classic.jpg',
+    'gilded-folio': 'parchment-dmguild.jpg',
+    'dmguild': 'parchment-dmguild.jpg',
+    'dark-tome': 'parchment-dark.jpg',
+    'clean-modern': null,
+    'fey-wild': 'parchment-fey.jpg',
+    'infernal': 'parchment-infernal.jpg',
+  };
+
+  const fileName = textureByTheme[theme] ?? textureByTheme['classic-parchment'];
+  if (!fileName) return 'none';
+
+  const texturePath = path.resolve(process.cwd(), 'assets', 'textures', fileName);
+  return `url("${pathToFileURL(texturePath).toString()}")`;
+}
+
+function getSharedThemeLayoutVariables(theme: string): string {
+  const lightTheme = !['dark-tome', 'infernal'].includes(theme);
+  return `
+      --page-texture: ${resolveTextureValue(theme)};
+      --column-rule-color: ${lightTheme ? 'rgba(88, 24, 13, 0.12)' : 'rgba(232, 213, 196, 0.14)'};
+      --footer-color: ${lightTheme ? 'rgba(88, 24, 13, 0.72)' : 'rgba(232, 213, 196, 0.72)'};
+      --paragraph-indent: 1em;
+      --divider-gradient: linear-gradient(to right, transparent, var(--color-divider) 16%, var(--color-divider) 84%, transparent);
+  `;
 }
 
 /** Map theme name to CSS custom property overrides.
@@ -266,7 +297,7 @@ function getThemeVariables(theme: string): string {
     `,
   };
 
-  return themes[theme] || themes['classic-parchment'];
+  return `${themes[theme] || themes['classic-parchment']}\n${getSharedThemeLayoutVariables(theme)}`;
 }
 
 /**
@@ -384,19 +415,121 @@ export function assembleHtml(options: AssembleOptions): string {
       padding: 0;
       font-family: var(--font-body);
       color: var(--color-text);
-      background: var(--page-bg);
-      line-height: 1.6;
+      background: #3d4656;
+      line-height: 1.45;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    #content {
+      padding: ${renderMode === 'paged' ? '0' : '0.5rem 0'};
+    }
+
+    .page-canvas {
+      --page-width: 816px;
+      --page-height: 1056px;
+      --page-padding: ${pagePreset === 'print_pdf' ? '60px' : '68px'};
+      --content-height: calc(var(--page-height) - (var(--page-padding) * 2));
+      --page-content-height: calc(var(--content-height) - 48px);
+      --margin-reserve: 48px;
+
+      width: var(--page-width);
+      height: var(--page-height);
+      min-height: var(--page-height);
+      margin: 0 auto;
+      padding: var(--page-padding);
+      box-sizing: border-box;
+      background-color: var(--page-bg);
+      background-image:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(121, 84, 33, 0.04) 40%, rgba(0, 0, 0, 0.04)),
+        radial-gradient(circle at top left, rgba(255, 255, 255, 0.22), transparent 32%),
+        radial-gradient(circle at bottom right, rgba(88, 24, 13, 0.09), transparent 36%),
+        linear-gradient(90deg, rgba(78, 41, 10, 0.07), transparent 5%, transparent 95%, rgba(78, 41, 10, 0.07)),
+        var(--page-texture);
+      background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%, var(--page-width) var(--page-height);
+      background-repeat: repeat-y;
+      background-position: top center;
+      background-blend-mode: normal, screen, multiply, multiply, normal;
+      position: relative;
+      color: var(--text-color);
+      font-family: var(--body-font);
+      font-size: 8.95pt;
+      font-feature-settings: 'kern' 1, 'liga' 1;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      overflow: hidden;
+      border: 1px solid rgba(71, 42, 15, 0.2);
+      box-shadow:
+        0 18px 40px rgba(0, 0, 0, 0.28),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+    }
+
+    .page-canvas .ProseMirror {
+      min-height: var(--page-content-height);
+      color: inherit;
     }
 
     h1, h2, h3, h4, h5, h6 {
       font-family: var(--font-heading);
       color: var(--color-heading);
-      margin-top: 1em;
-      margin-bottom: 0.5em;
+      margin-top: 0.9em;
+      margin-bottom: 0.35em;
     }
 
     p {
-      margin: 0.5em 0;
+      margin: 0.28em 0;
+      text-align: justify;
+      text-indent: var(--paragraph-indent, 1em);
+      line-height: 1.3;
+      widows: 2;
+      orphans: 2;
+    }
+
+    p:first-child,
+    h1 + p,
+    h2 + p,
+    h3 + p,
+    h4 + p {
+      text-indent: 0;
+    }
+
+    h1 {
+      font-size: 16pt;
+      margin-top: 1.35em;
+      margin-bottom: 0.45em;
+    }
+
+    h2 {
+      font-size: 13pt;
+      margin-top: 1.1em;
+      margin-bottom: 0.35em;
+    }
+
+    h3 {
+      font-size: 11pt;
+      margin-top: 0.95em;
+      margin-bottom: 0.3em;
+    }
+
+    h4 {
+      font-size: 10pt;
+      margin-top: 0.75em;
+      margin-bottom: 0.2em;
+      font-weight: bold;
+    }
+
+    .page-footer {
+      position: absolute;
+      bottom: 24px;
+      left: var(--page-padding);
+      right: var(--page-padding);
+      font-size: 0.65rem;
+      color: var(--footer-color, rgba(0, 0, 0, 0.45));
+      display: flex;
+      justify-content: space-between;
+      font-family: var(--body-font);
+      pointer-events: none;
+      user-select: none;
     }
 
     img {
@@ -467,8 +600,8 @@ export function assembleHtml(options: AssembleOptions): string {
 
     ul, ol {
       padding-left: 1.5em;
-      margin: 0.5em 0;
-      line-height: 1.5;
+      margin: 0.35em 0;
+      line-height: 1.35;
     }
 
     ul { list-style-type: disc; }
@@ -477,7 +610,7 @@ export function assembleHtml(options: AssembleOptions): string {
     ul ul ul { list-style-type: square; }
 
     li {
-      margin-bottom: 0.2em;
+      margin-bottom: 0.12em;
     }
 
     li p {
@@ -509,8 +642,8 @@ export function assembleHtml(options: AssembleOptions): string {
     .stat-block {
       background: var(--stat-block-bg);
       border: 2px solid var(--stat-block-border);
-      padding: 1rem;
-      margin: 1rem 0;
+      padding: 0.85rem;
+      margin: 0.7rem 0;
       page-break-inside: avoid;
     }
 
@@ -581,8 +714,8 @@ export function assembleHtml(options: AssembleOptions): string {
 
     /* Read Aloud Box */
     .read-aloud-box {
-      padding: 1rem;
-      margin: 1rem 0;
+      padding: 0.8rem;
+      margin: 0.65rem 0;
       border-left: 4px solid var(--read-aloud-border);
       background: var(--read-aloud-bg);
       page-break-inside: avoid;
@@ -608,8 +741,8 @@ export function assembleHtml(options: AssembleOptions): string {
 
     /* Sidebar Callout */
     .sidebar-callout {
-      padding: 1rem;
-      margin: 1rem 0;
+      padding: 0.8rem;
+      margin: 0.65rem 0;
       background: var(--callout-bg);
       border: 1px solid var(--color-accent);
       border-radius: 4px;
@@ -638,22 +771,22 @@ export function assembleHtml(options: AssembleOptions): string {
     /* Chapter Header */
     .chapter-header {
       text-align: center;
-      padding: 3rem 2rem;
-      margin: 2rem 0;
-      page-break-before: always;
+      padding: 2.4rem 1.5rem 1.6rem;
+      margin: 0;
     }
 
     .chapter-header__number {
       font-family: var(--font-heading);
-      font-size: 0.9rem;
+      font-size: 0.88rem;
       text-transform: uppercase;
-      letter-spacing: 0.1em;
+      letter-spacing: 0.04em;
       color: var(--color-primary);
+      white-space: nowrap;
     }
 
     .chapter-header__title {
-      font-size: 2rem;
-      margin: 0.5rem 0;
+      font-size: 1.7rem;
+      margin: 0.35rem 0;
     }
 
     .chapter-header__underline {
@@ -666,14 +799,15 @@ export function assembleHtml(options: AssembleOptions): string {
     .chapter-header__subtitle {
       font-style: italic;
       color: var(--color-primary);
+      margin-top: 0.35rem;
     }
 
     /* Spell Card */
     .spell-card {
       background: var(--stat-block-bg);
       border: 2px solid var(--spell-card-accent);
-      padding: 1rem;
-      margin: 1rem 0;
+      padding: 0.85rem;
+      margin: 0.7rem 0;
       page-break-inside: avoid;
     }
 
@@ -724,8 +858,8 @@ export function assembleHtml(options: AssembleOptions): string {
       background: var(--stat-block-bg);
       border: 2px solid var(--magic-item-accent);
       border-top: 4px solid var(--magic-item-accent);
-      padding: 1rem;
-      margin: 1rem 0;
+      padding: 0.85rem;
+      margin: 0.7rem 0;
       page-break-inside: avoid;
     }
 
@@ -758,7 +892,7 @@ export function assembleHtml(options: AssembleOptions): string {
 
     /* Random Table */
     .random-table {
-      margin: 1rem 0;
+      margin: 0.7rem 0;
       page-break-inside: avoid;
     }
 
@@ -789,8 +923,8 @@ export function assembleHtml(options: AssembleOptions): string {
     .npc-profile {
       background: var(--stat-block-bg);
       border: 2px solid var(--color-primary);
-      padding: 1rem;
-      margin: 1rem 0;
+      padding: 0.85rem;
+      margin: 0.7rem 0;
       page-break-inside: avoid;
     }
 
@@ -859,7 +993,7 @@ export function assembleHtml(options: AssembleOptions): string {
 
     /* Encounter Table */
     .encounter-table {
-      margin: 1rem 0;
+      margin: 0.7rem 0;
       page-break-inside: avoid;
     }
 
@@ -879,12 +1013,29 @@ export function assembleHtml(options: AssembleOptions): string {
       font-style: italic;
     }
 
+    .encounter-table__details {
+      margin-top: 0.55rem;
+      display: grid;
+      gap: 0.28rem;
+    }
+
+    .encounter-table__detail {
+      font-size: 0.82rem;
+      line-height: 1.35;
+    }
+
+    .encounter-table__detail-label {
+      font-weight: bold;
+      color: var(--color-primary);
+      font-style: italic;
+    }
+
     /* Class Feature */
     .class-feature {
       background: var(--stat-block-bg);
       border: 2px solid var(--class-feature-accent);
-      padding: 1rem;
-      margin: 1rem 0;
+      padding: 0.85rem;
+      margin: 0.7rem 0;
       page-break-inside: avoid;
     }
 
@@ -913,8 +1064,8 @@ export function assembleHtml(options: AssembleOptions): string {
     .race-block {
       background: var(--stat-block-bg);
       border: 2px solid var(--color-primary);
-      padding: 1rem;
-      margin: 1rem 0;
+      padding: 0.85rem;
+      margin: 0.7rem 0;
       page-break-inside: avoid;
     }
 
@@ -1105,39 +1256,39 @@ export function assembleHtml(options: AssembleOptions): string {
     /* Title Page */
     .title-page {
       text-align: center;
-      padding: 4rem 2rem;
-      page-break-after: always;
+      padding: 1.4rem 1rem 1rem;
     }
 
     .title-page__content {
       display: flex;
       flex-direction: column;
       align-items: center;
-      min-height: 80vh;
+      min-height: calc(var(--content-height) - 96px);
       justify-content: center;
     }
 
     .title-page__cover-image img {
-      max-width: 80%;
-      max-height: 40vh;
-      margin-bottom: 2rem;
+      max-width: 94%;
+      max-height: 440px;
+      margin-bottom: 0.95rem;
+      box-shadow: 0 10px 26px rgba(0, 0, 0, 0.24);
     }
 
     .title-page__title {
-      font-size: 2.5rem;
-      margin-bottom: 0.5rem;
+      font-size: 2.35rem;
+      margin-bottom: 0.28rem;
     }
 
     .title-page__subtitle {
-      font-size: 1.2rem;
+      font-size: 1.05rem;
       font-style: italic;
-      margin-bottom: 1rem;
+      margin-bottom: 0.75rem;
     }
 
     .title-page__ornament {
-      font-size: 1.5rem;
+      font-size: 1.35rem;
       color: var(--color-primary);
-      margin: 1rem 0;
+      margin: 0.7rem 0;
     }
 
     .title-page__author {
@@ -1147,8 +1298,7 @@ export function assembleHtml(options: AssembleOptions): string {
 
     /* Table of Contents */
     .table-of-contents {
-      page-break-after: always;
-      padding: 2rem;
+      padding: 1.5rem 1rem;
     }
 
     .table-of-contents__heading {
@@ -1186,8 +1336,7 @@ export function assembleHtml(options: AssembleOptions): string {
 
     /* Credits Page */
     .credits-page {
-      page-break-before: always;
-      padding: 2rem;
+      padding: 1.5rem 1rem;
     }
 
     .credits-page__heading {
@@ -1221,8 +1370,7 @@ export function assembleHtml(options: AssembleOptions): string {
 
     /* Back Cover */
     .back-cover {
-      page-break-before: always;
-      padding: 3rem 2rem;
+      padding: 2rem 1.5rem;
       text-align: center;
     }
 
@@ -1262,7 +1410,7 @@ export function assembleHtml(options: AssembleOptions): string {
 
     /* Document sections */
     .document {
-      margin-bottom: 1rem;
+      margin-bottom: 0;
     }
 
     /* Print styles */
@@ -1283,6 +1431,18 @@ export function assembleHtml(options: AssembleOptions): string {
 
       .column-break {
         break-before: column;
+      }
+
+      .layout-page-stack {
+        gap: 0 !important;
+      }
+
+      .layout-page {
+        margin: 0 auto !important;
+      }
+
+      .page-canvas {
+        box-shadow: none;
       }
 
       .stat-block,

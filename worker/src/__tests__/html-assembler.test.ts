@@ -13,6 +13,7 @@ describe('HTML Assembler', () => {
       expect(html).toContain('<!DOCTYPE html>');
       expect(html).toContain('<title>My Campaign</title>');
       expect(html).toContain('--color-primary: #58180d');
+      expect(html).toContain('--page-texture: url("file://');
     });
 
     it('should escape project title in HTML', () => {
@@ -50,6 +51,31 @@ describe('HTML Assembler', () => {
       const firstIdx = html.indexOf('First Content');
       const secondIdx = html.indexOf('Second Content');
       expect(firstIdx).toBeLessThan(secondIdx);
+    });
+
+    it('should not keep legacy forced page breaks on structural blocks in paged mode', () => {
+      const html = assembleHtml({
+        documents: [],
+        theme: 'classic-parchment',
+        projectTitle: 'My Campaign',
+      });
+
+      expect(html).not.toMatch(/\.chapter-header\s*\{[^}]*page-break-before:/s);
+      expect(html).not.toMatch(/\.title-page\s*\{[^}]*page-break-after:/s);
+      expect(html).not.toMatch(/\.table-of-contents\s*\{[^}]*page-break-after:/s);
+      expect(html).not.toMatch(/\.credits-page\s*\{[^}]*page-break-before:/s);
+      expect(html).not.toMatch(/\.back-cover\s*\{[^}]*page-break-before:/s);
+    });
+
+    it('collapses page stack gaps in print so paged exports do not emit spacer pages', () => {
+      const html = assembleHtml({
+        documents: [],
+        theme: 'classic-parchment',
+        projectTitle: 'My Campaign',
+      });
+
+      expect(html).toContain('.layout-page-stack');
+      expect(html).toContain('gap: 0 !important;');
     });
   });
 

@@ -1,4 +1,5 @@
 import type { DocumentContent } from './types/document.js';
+import { resolveRandomTableEntries } from './renderers/utils.js';
 import type {
   LayoutColumnBalanceTarget,
   LayoutFlowFragment,
@@ -77,6 +78,27 @@ const PACKET_NODE_TYPES = new Set([
   'bulletList',
   'orderedList',
 ]);
+const HEADING_ATTACHMENT_NODE_TYPES = new Set([
+  'paragraph',
+  'bulletList',
+  'orderedList',
+  'readAloudBox',
+  'sidebarCallout',
+  'handout',
+  'mapBlock',
+]);
+const LOCAL_UTILITY_ANCHOR_TYPES = new Set([
+  'randomTable',
+  'encounterTable',
+]);
+const LOCAL_UTILITY_SUPPORT_TYPES = new Set([
+  'heading',
+  'paragraph',
+  'bulletList',
+  'orderedList',
+  'readAloudBox',
+  'sidebarCallout',
+]);
 
 interface PagePresetMetrics {
   pageWidthPx: number;
@@ -87,6 +109,10 @@ interface PagePresetMetrics {
   columnCount: number;
   columnGapPx: number;
 }
+
+const COLUMN_FLOW_UNIT_GAP_PX = 10;
+const FULL_WIDTH_UNIT_GAP_PX = 12;
+const HERO_UNIT_GAP_PX = 16;
 
 function stableStringify(value: unknown): string {
   if (value === null || typeof value !== 'object') {
@@ -157,6 +183,12 @@ function isShortLeadIn(node: DocumentContent | undefined): boolean {
   return Boolean(node) && node?.type === 'paragraph' && textLength(node) > 0 && textLength(node) <= 140;
 }
 
+function isWideRandomTable(node: DocumentContent | undefined): boolean {
+  return Boolean(node)
+    && node?.type === 'randomTable'
+    && resolveRandomTableEntries(node.attrs ?? {}).length >= 8;
+}
+
 function detectRecipe(blocks: DocumentContent[], options: ResolveLayoutPlanOptions): LayoutRecipe | null {
   if (options.preferRecipe && VALID_LAYOUT_RECIPES.has(options.preferRecipe)) {
     return options.preferRecipe;
@@ -204,6 +236,9 @@ function createDefaultBlockPlan(
   } else if (block.type === 'tableOfContents' || block.type === 'creditsPage') {
     span = 'both_columns';
     keepTogether = true;
+  } else if (isWideRandomTable(block)) {
+    span = 'both_columns';
+    keepTogether = true;
   } else if (sectionRecipe === 'chapter_hero_split' && sourceIndex === 0 && HERO_NODE_TYPES.has(block.type)) {
     span = 'both_columns';
     placement = 'hero_top';
@@ -246,6 +281,133 @@ function createDefaultBlockPlan(
     keepTogether,
     allowWrapBelow,
   };
+}
+
+function applyNpcRosterGrouping(
+  blocks: DocumentContent[],
+  layoutBlocks: LayoutPlanBlock[],
+): void {
+  let rosterIndex = 1;
+
+  for (let index = 0; index < blocks.length; index += 1) {
+    if (blocks[index]?.type !== 'npcProfile' || layoutBlocks[index]?.groupId) continue;
+
+    let end = index;
+    while (blocks[end + 1]?.type === 'npcProfile' && !layoutBlocks[end + 1]?.groupId) {
+      end += 1;
+    }
+
+    if (end === index) continue;
+
+    const groupId = `npc-roster-${rosterIndex}`;
+    rosterIndex += 1;
+    for (let cursor = index; cursor <= end; cursor += 1) {
+      layoutBlocks[cursor].groupId = groupId;
+      layoutBlocks[cursor].keepTogether = true;
+    }
+    index = end;
+  }
+}
+
+function isShortSupportBlock(node: DocumentContent | undefined): boolean {
+  if (!node) return false;
+  if (node.type === 'paragraph') return textLength(node) > 0 && textLength(node) <= 260;
+  return node.type === 'bulletList' || node.type === 'orderedList';
+}
+
+function applyHeadingAttachmentGrouping(
+  blocks: DocumentContent[],
+  layoutBlocks: LayoutPlanBlock[],
+): void {
+  let groupIndex = 1;
+
+  for (let index = 0; index < blocks.length - 1; index += 1) {
+    const heading = blocks[index];
+    const next = blocks[index + 1];
+    if (heading?.type !== 'heading' || layoutBlocks[index]?.groupId) continue;
+    if (!next || layoutBlocks[index + 1]?.groupId) continue;
+    if (LOCAL_UTILITY_ANCHOR_TYPES.has(next.type)) continue;
+    if (!HEADING_ATTACHMENT_NODE_TYPES.has(next.type)) continue;
+
+    const members = [index, index + 1];
+    const maybeThird = blocks[index + 2];
+    if (
+      next.type === 'paragraph'
+      && maybeThird
+      && !layoutBlocks[index + 2]?.groupId
+      && (maybeThird.type === 'bulletList' || maybeThird.type === 'orderedList')
+    ) {
+      members.push(index + 2);
+    }
+
+    const groupId = `section-packet-${groupIndex}`;
+    groupIndex += 1;
+    for (const memberIndex of members) {
+      layoutBlocks[memberIndex].groupId = groupId;
+      layoutBlocks[memberIndex].keepTogether = true;
+    }
+    index = members[members.length - 1] - 1;
+  }
+}
+
+function applyLocalUtilityPacketGrouping(
+  blocks: DocumentContent[],
+  layoutBlocks: LayoutPlanBlock[],
+): void {
+  let groupIndex = 1;
+
+  for (let index = 0; index < blocks.length; index += 1) {
+    const block = blocks[index];
+    if (!LOCAL_UTILITY_ANCHOR_TYPES.has(block?.type ?? '') || layoutBlocks[index]?.groupId) continue;
+
+    const members = [index];
+    let start = index;
+
+    const previous = blocks[index - 1];
+    if (
+      previous
+      && !layoutBlocks[index - 1]?.groupId
+      && LOCAL_UTILITY_SUPPORT_TYPES.has(previous.type)
+      && (previous.type === 'heading' || isShortSupportBlock(previous))
+    ) {
+      start = index - 1;
+      members.unshift(index - 1);
+      const beforePrevious = blocks[index - 2];
+      if (
+        previous.type !== 'heading'
+        && beforePrevious?.type === 'heading'
+        && !layoutBlocks[index - 2]?.groupId
+      ) {
+        start = index - 2;
+        members.unshift(index - 2);
+      }
+    }
+
+    const next = blocks[index + 1];
+    if (
+      next
+      && !layoutBlocks[index + 1]?.groupId
+      && (
+        (next.type === 'paragraph' && textLength(next) <= 220)
+        || next.type === 'sidebarCallout'
+        || next.type === 'readAloudBox'
+      )
+    ) {
+      members.push(index + 1);
+    }
+
+    if (members.length <= 1) continue;
+
+    const groupId = `utility-table-${groupIndex}`;
+    groupIndex += 1;
+    for (const memberIndex of members) {
+      layoutBlocks[memberIndex].groupId = groupId;
+      layoutBlocks[memberIndex].keepTogether = true;
+    }
+    layoutBlocks[index].placement = 'side_panel';
+    layoutBlocks[index].keepTogether = true;
+    index = Math.max(index, start);
+  }
 }
 
 function normalizeBlockPlan(
@@ -367,6 +529,12 @@ export function buildDefaultLayoutPlan(
       heroBlock.keepTogether = true;
       heroBlock.allowWrapBelow = true;
     }
+  }
+
+  applyNpcRosterGrouping(blocks, layoutBlocks);
+  if (sectionRecipe !== 'intro_split_spread') {
+    applyHeadingAttachmentGrouping(blocks, layoutBlocks);
+    applyLocalUtilityPacketGrouping(blocks, layoutBlocks);
   }
 
   return {
@@ -495,18 +663,20 @@ export function recommendLayoutPlan(
 function getPagePresetMetrics(
   preset: PagePreset,
   options: ResolveLayoutPlanOptions = {},
+  sectionRecipe: LayoutRecipe | null = null,
 ): PagePresetMetrics {
-  const isSingleColumnDocument = options.documentKind === 'front_matter' || options.documentKind === 'back_matter';
+  const isSingleColumnDocument = options.documentKind === 'back_matter'
+    || (options.documentKind === 'front_matter' && sectionRecipe !== 'intro_split_spread');
 
   if (preset === 'print_pdf') {
     return {
       pageWidthPx: 816,
       pageHeightPx: 1056,
-      pagePaddingX: 72,
-      pagePaddingY: 84,
+      pagePaddingX: 60,
+      pagePaddingY: 60,
       footerReservePx: 48,
       columnCount: isSingleColumnDocument ? 1 : 2,
-      columnGapPx: 32,
+      columnGapPx: 22,
     };
   }
 
@@ -522,14 +692,26 @@ function getPagePresetMetrics(
     };
   }
 
+  if (preset === 'editor_preview') {
+    return {
+      pageWidthPx: 816,
+      pageHeightPx: 1056,
+      pagePaddingX: 72,
+      pagePaddingY: 72,
+      footerReservePx: 48,
+      columnCount: isSingleColumnDocument ? 1 : 2,
+      columnGapPx: 22,
+    };
+  }
+
   return {
     pageWidthPx: 816,
     pageHeightPx: 1056,
-    pagePaddingX: 72,
-    pagePaddingY: 72,
+    pagePaddingX: 68,
+    pagePaddingY: 68,
     footerReservePx: 48,
     columnCount: isSingleColumnDocument ? 1 : 2,
-    columnGapPx: 32,
+    columnGapPx: 22,
   };
 }
 
@@ -545,15 +727,11 @@ function buildLayoutFlowUnits(fragments: LayoutFlowFragment[]): LayoutFlowUnit[]
 
   for (const fragment of fragments) {
     const shouldGroup = Boolean(fragment.groupId);
-    if (
-      shouldGroup
-      && currentUnit
-      && currentUnit.groupId === fragment.groupId
-      && currentUnit.placement === fragment.placement
-      && currentUnit.span === fragment.span
-    ) {
+    if (shouldGroup && currentUnit && currentUnit.groupId === fragment.groupId) {
       currentUnit.fragmentNodeIds.push(fragment.nodeId);
       currentUnit.fragmentIndexes.push(fragment.sourceIndex);
+      currentUnit.keepTogether = currentUnit.keepTogether || fragment.keepTogether;
+      currentUnit.allowWrapBelow = currentUnit.allowWrapBelow || fragment.allowWrapBelow;
       continue;
     }
 
@@ -762,6 +940,14 @@ function assignUnitToPage(args: {
   }
 }
 
+function shouldUseFullWidthRegion(unit: LayoutFlowUnit): boolean {
+  if (unit.span === 'both_columns') return true;
+  if (!unit.groupId) return false;
+  return unit.groupId.startsWith('npc-roster')
+    || unit.groupId.startsWith('encounter-packet')
+    || unit.groupId.startsWith('utility-table');
+}
+
 function chooseColumn(
   leftHeight: number,
   rightHeight: number,
@@ -783,7 +969,7 @@ export function compileMeasuredPageModel(
   measurements: MeasuredLayoutUnitMetric[] | null | undefined,
   options: ResolveLayoutPlanOptions = {},
 ): PageModel {
-  const presetMetrics = getPagePresetMetrics(flow.preset, options);
+  const presetMetrics = getPagePresetMetrics(flow.preset, options, flow.sectionRecipe);
   const contentWidth = Math.max(1, presetMetrics.pageWidthPx - (presetMetrics.pagePaddingX * 2));
   const contentHeight = Math.max(
     1,
@@ -812,7 +998,7 @@ export function compileMeasuredPageModel(
         height,
         documentTitle: options.documentTitle,
       });
-      cursorY += height + 24;
+      cursorY += height + FULL_WIDTH_UNIT_GAP_PX;
     }
     page.fillRatio = 1;
     page.columnMetrics = {
@@ -886,16 +1072,41 @@ export function compileMeasuredPageModel(
       continue;
     }
 
-    if (unit.isHero || unit.span === 'both_columns' || unit.groupId !== null) {
-      const nextY = Math.max(leftHeight, rightHeight, reservedTop);
-      if (nextY > 0 && nextY + height > contentHeight) {
-        startNewPage();
-      } else if (!unit.isHero && (leftHeight > reservedTop || rightHeight > reservedTop)) {
+    if (unit.isHero) {
+      if (currentPage.fragments.length > 0) {
         startNewPage();
       }
 
       const y = Math.max(leftHeight, rightHeight, reservedTop);
-      const region = unit.isHero ? 'hero' : 'full_width';
+      assignUnitToPage({
+        page: currentPage,
+        flow,
+        unit,
+        pageIndex: currentPage.index,
+        columnIndex: null,
+        region: 'hero',
+        x: 0,
+        y,
+        width: contentWidth,
+        height,
+        documentTitle: options.documentTitle,
+      });
+
+      const nextHeight = y + height + HERO_UNIT_GAP_PX;
+      reservedTop = nextHeight;
+      leftHeight = nextHeight;
+      rightHeight = nextHeight;
+      continue;
+    }
+
+    if (shouldUseFullWidthRegion(unit)) {
+      const nextY = Math.max(leftHeight, rightHeight, reservedTop);
+      if (nextY > 0 && nextY + height > contentHeight) {
+        startNewPage();
+      }
+
+      const y = Math.max(leftHeight, rightHeight, reservedTop);
+      const region = 'full_width';
       assignUnitToPage({
         page: currentPage,
         flow,
@@ -910,15 +1121,9 @@ export function compileMeasuredPageModel(
         documentTitle: options.documentTitle,
       });
 
-      const nextHeight = y + height + 24;
-      if (unit.isHero) {
-        reservedTop = nextHeight;
-        leftHeight = nextHeight;
-        rightHeight = nextHeight;
-      } else {
-        leftHeight = nextHeight;
-        rightHeight = nextHeight;
-      }
+      const nextHeight = y + height + FULL_WIDTH_UNIT_GAP_PX;
+      leftHeight = nextHeight;
+      rightHeight = nextHeight;
       continue;
     }
 
@@ -957,9 +1162,9 @@ export function compileMeasuredPageModel(
     });
 
     if (columnIndex === 1) {
-      leftHeight = y + height + 20;
+      leftHeight = y + height + COLUMN_FLOW_UNIT_GAP_PX;
     } else {
-      rightHeight = y + height + 20;
+      rightHeight = y + height + COLUMN_FLOW_UNIT_GAP_PX;
     }
   }
 

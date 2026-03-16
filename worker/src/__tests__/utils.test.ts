@@ -2,8 +2,11 @@ import { describe, it, expect } from 'vitest';
 import {
   assessRandomTableEntries,
   escapeHtml,
+  hasEncounterTableContent,
   normalizeChapterHeaderTitle,
+  normalizeEncounterCreatures,
   normalizeNpcProfileAttrs,
+  normalizeStatBlockAttrs,
   safeCssUrl,
   safeUrl,
 } from '../renderers/utils.js';
@@ -156,6 +159,53 @@ describe('Worker Renderer Utils', () => {
     });
   });
 
+  describe('normalizeEncounterCreatures', () => {
+    it('normalizes creature lists from structured attrs', () => {
+      const normalized = normalizeEncounterCreatures(JSON.stringify([
+        { name: 'Shadow', quantity: 3, challengeRating: '1/2' },
+      ]));
+
+      expect(normalized).toEqual([
+        { name: 'Shadow', quantity: 3, challengeRating: '1/2' },
+      ]);
+    });
+  });
+
+  describe('hasEncounterTableContent', () => {
+    it('accepts detail-style encounter packets without weighted entries', () => {
+      expect(hasEncounterTableContent({
+        name: 'Shadows of the Mine',
+        creatures: JSON.stringify([{ name: 'Shadow', quantity: 3, challengeRating: '1/2' }]),
+        setup: 'The shadows rise from the broken lanterns.',
+        tactics: 'They phase through cover and focus the weakest target.',
+      })).toBe(true);
+    });
+  });
+
+  describe('normalizeStatBlockAttrs', () => {
+    it('recovers ability scores from a structured abilities object and strips broken saves text', () => {
+      const normalized = normalizeStatBlockAttrs({
+        name: 'Shadow',
+        abilities: JSON.stringify({
+          strength: 14,
+          dexterity: 15,
+          constitution: 10,
+          intelligence: 6,
+          wisdom: 12,
+          charisma: 15,
+        }),
+        speed: '0 ft., fly 40 ft. (hover)',
+        savingThrows: '[object Object]',
+      });
+
+      expect(normalized.str).toBe(14);
+      expect(normalized.dex).toBe(15);
+      expect(normalized.int).toBe(6);
+      expect(normalized.speed).toBe('fly 40 ft. (hover)');
+      expect(normalized.savingThrows).toBeUndefined();
+    });
+  });
+
   describe('normalizeNpcProfileAttrs', () => {
     it('normalizes actionable social fields when present', () => {
       const normalized = normalizeNpcProfileAttrs({
@@ -278,6 +328,25 @@ describe('renderNode — stat block compatibility', () => {
     expect(html).toContain('1 (-5)');
     expect(html).toContain('15 (+2)');
     expect(html).toContain('Incorporeal Movement');
+  });
+
+  it('should render detail-style encounter tables without weighted entries', () => {
+    const html = renderNode({
+      type: 'encounterTable',
+      attrs: {
+        name: 'Shadows of the Mine',
+        difficulty: 'medium',
+        creatures: JSON.stringify([{ name: 'Shadow', quantity: 3, challengeRating: '1/2' }]),
+        setup: 'The shadows rise from the lantern glow.',
+        tactics: 'They phase through the cavern walls.',
+        rewards: 'A shard of blackglass worth 15 gp.',
+      },
+    } as any);
+
+    expect(html).toContain('Shadows of the Mine');
+    expect(html).toContain('3x Shadow');
+    expect(html).toContain('The shadows rise from the lantern glow.');
+    expect(html).toContain('A shard of blackglass worth 15 gp.');
   });
 });
 

@@ -5,8 +5,13 @@
 export {
   assessRandomTableEntries,
   escapeHtml,
+  hasEncounterTableContent,
   normalizeChapterHeaderTitle,
+  normalizeEncounterCreatures,
+  normalizeEncounterTableAttrs,
   normalizeNpcProfileAttrs,
+  normalizeStatBlockAttrs,
+  normalizeStructuredText,
   safeUrl,
   safeCssUrl,
 } from '@dnd-booker/shared';

@@ -31,7 +31,8 @@ export type ExportReviewSafeFixAction =
   | 'remove_empty_encounter_tables'
   | 'remove_empty_random_tables'
   | 'remove_placeholder_stat_blocks'
-  | 'demote_oversized_display_headings';
+  | 'demote_oversized_display_headings'
+  | 'refresh_layout_plan';
 
 export interface ExportReviewFinding {
   code: ExportReviewCode;

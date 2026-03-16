@@ -452,6 +452,119 @@ Page size: 612 x 792 pts (letter)
     expect(review.findings.map((finding) => finding.code)).toContain('EXPORT_THIN_RANDOM_TABLE');
   });
 
+  it('does not flag split scene packets when utility-table grouping is present', () => {
+    const review = analyzePdfExportLayout({
+      documents: [
+        {
+          title: 'Chapter 2: Into the Mine',
+          kind: 'chapter',
+          content: {
+            type: 'doc',
+            content: [
+              {
+                type: 'randomTable',
+                attrs: {
+                  title: 'Mine Encounters',
+                  dieType: 'd6',
+                  entries: JSON.stringify([
+                    { roll: '1-2', result: 'Mine creepers strike from the dark.' },
+                    { roll: '3-4', result: 'A cursed cache tempts the party.' },
+                  ]),
+                },
+              },
+            ],
+          },
+          layoutPlan: {
+            version: 1,
+            sectionRecipe: 'chapter_hero_split',
+            columnBalanceTarget: 'balanced',
+            blocks: [
+              {
+                nodeId: 'mine-table',
+                presentationOrder: 0,
+                span: 'column',
+                placement: 'side_panel',
+                groupId: 'utility-table-1',
+                keepTogether: true,
+                allowWrapBelow: false,
+              },
+            ],
+          },
+          pageModel: {
+            preset: 'standard_pdf',
+            flow: { preset: 'standard_pdf', sectionRecipe: 'chapter_hero_split', columnBalanceTarget: 'balanced', fragments: [], units: [] },
+            pages: [{
+              index: 1,
+              preset: 'standard_pdf',
+              recipe: 'chapter_hero_split',
+              fragments: [
+                {
+                  nodeId: 'mine-table',
+                  sourceIndex: 0,
+                  presentationOrder: 0,
+                  span: 'column',
+                  placement: 'side_panel',
+                  groupId: 'utility-table-1',
+                  keepTogether: true,
+                  allowWrapBelow: false,
+                  nodeType: 'randomTable',
+                  content: {
+                    type: 'randomTable',
+                    attrs: { title: 'Mine Encounters', dieType: 'd6', entries: '[]' },
+                  },
+                  unitId: 'group:utility-table-1',
+                  pageIndex: 1,
+                  columnIndex: 0,
+                  region: 'column_left',
+                  bounds: { x: 0, y: 120, width: 320, height: 320 },
+                  isHero: false,
+                  isOpener: false,
+                },
+              ],
+              contentHeightPx: 864,
+              fillRatio: 0.72,
+              columnMetrics: { leftFillRatio: 0.72, rightFillRatio: 0.61, deltaRatio: 0.11 },
+              nodeIds: ['mine-table'],
+              documentIds: ['Chapter 2: Into the Mine'],
+              openerDocumentId: null,
+            }],
+            fragments: [
+              {
+                nodeId: 'mine-table',
+                sourceIndex: 0,
+                presentationOrder: 0,
+                span: 'column',
+                placement: 'side_panel',
+                groupId: 'utility-table-1',
+                keepTogether: true,
+                allowWrapBelow: false,
+                nodeType: 'randomTable',
+                content: {
+                  type: 'randomTable',
+                  attrs: { title: 'Mine Encounters', dieType: 'd6', entries: '[]' },
+                },
+                unitId: 'group:utility-table-1',
+                pageIndex: 1,
+                columnIndex: 0,
+                region: 'column_left',
+                bounds: { x: 0, y: 120, width: 320, height: 320 },
+                isHero: false,
+                isOpener: false,
+              },
+            ],
+            metrics: { fragmentCount: 1, heroFragmentCount: 0, groupedFragmentCount: 1, keepTogetherCount: 1, pageCount: 1 },
+          },
+        },
+      ],
+      pages: [],
+      pageCount: 1,
+      pageWidthPts: 612,
+      pageHeightPts: 792,
+    });
+
+    expect(review.findings.map((finding) => finding.code)).not.toContain('EXPORT_SPLIT_SCENE_PACKET');
+  });
+
   it('does not flag detailed random encounter tables that include operational detail', () => {
     const review = analyzePdfExportLayout({
       documents: [

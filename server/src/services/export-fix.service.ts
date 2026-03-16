@@ -5,28 +5,43 @@ import type {
   ExportReviewCode,
   ExportReviewFixChange,
   ExportReviewFixResult,
+  LayoutPlan,
 } from '@dnd-booker/shared';
 import {
   assessStatBlockAttrs,
-  normalizeEncounterEntries,
+  hasEncounterTableContent,
+  recommendLayoutPlan,
   resolveRandomTableEntries,
 } from '@dnd-booker/shared';
 import type { ExportJob as PrismaExportJob } from '@prisma/client';
 import { prisma } from '../config/database.js';
 import { resolveDocumentLayout } from './layout-plan.service.js';
 
-const FIXABLE_CODES = new Set<ExportReviewCode>([
+const CONTENT_FIXABLE_CODES = new Set<ExportReviewCode>([
   'EXPORT_EMPTY_ENCOUNTER_TABLE',
   'EXPORT_EMPTY_RANDOM_TABLE',
   'EXPORT_PLACEHOLDER_STAT_BLOCK',
   'EXPORT_OVERSIZED_DISPLAY_HEADING',
 ]);
 
-type FixableReviewCode = typeof FIXABLE_CODES extends Set<infer T> ? T : never;
+const LAYOUT_REFRESH_CODES = new Set<ExportReviewCode>([
+  'EXPORT_CHAPTER_OPENER_LOW',
+  'EXPORT_SECTION_TITLE_WRAP',
+  'EXPORT_LAST_PAGE_UNDERFILLED',
+  'EXPORT_UNUSED_PAGE_REGION',
+  'EXPORT_WEAK_HERO_PLACEMENT',
+  'EXPORT_SPLIT_SCENE_PACKET',
+  'EXPORT_UNBALANCED_COLUMNS',
+  'EXPORT_OVERLONG_TOC_FOR_SHORT_BOOK',
+]);
+
+type ContentFixableReviewCode = typeof CONTENT_FIXABLE_CODES extends Set<infer T> ? T : never;
+type LayoutRefreshReviewCode = typeof LAYOUT_REFRESH_CODES extends Set<infer T> ? T : never;
 
 type ProjectDocumentRecord = {
   id: string;
   title: string;
+  kind?: string | null;
   layoutPlan?: unknown;
   content: DocumentContent | null;
 };
@@ -54,13 +69,35 @@ function mergeFixCounters(target: AppliedFixCounter, source: AppliedFixCounter) 
   target.oversizedHeadingsDemoted += source.oversizedHeadingsDemoted;
 }
 
-function getFindingTitle(finding: ExportReview['findings'][number]): string | null {
+function getFindingTitle(
+  finding: ExportReview['findings'][number],
+  review: ExportReview,
+): string | null {
   const detailsTitle = finding.details && typeof finding.details === 'object'
     ? (finding.details as Record<string, unknown>).title
     : null;
-  return typeof detailsTitle === 'string' && detailsTitle.trim().length > 0
-    ? detailsTitle.trim()
-    : null;
+  if (typeof detailsTitle === 'string' && detailsTitle.trim().length > 0) {
+    return detailsTitle.trim();
+  }
+
+  if (typeof finding.page !== 'number' || !Number.isFinite(finding.page)) {
+    return null;
+  }
+
+  const sectionStarts = [...(review.metrics.sectionStarts ?? [])]
+    .filter((section) => typeof section.title === 'string' && section.title.trim().length > 0 && typeof section.page === 'number')
+    .sort((left, right) => (left.page ?? Number.MAX_SAFE_INTEGER) - (right.page ?? Number.MAX_SAFE_INTEGER));
+
+  let matchedTitle: string | null = null;
+  for (const section of sectionStarts) {
+    if ((section.page ?? Number.MAX_SAFE_INTEGER) <= finding.page) {
+      matchedTitle = section.title.trim();
+      continue;
+    }
+    break;
+  }
+
+  return matchedTitle;
 }
 
 function isPlaceholderStatBlock(node: DocumentContent): boolean {
@@ -101,14 +138,14 @@ function ensureDocContent(content: DocumentContent | null): DocumentContent {
 
 function transformNode(
   node: DocumentContent,
-  enabledCodes: Set<FixableReviewCode>,
+  enabledCodes: Set<ContentFixableReviewCode>,
 ): { node: DocumentContent | null; fixes: AppliedFixCounter } {
   const fixes = emptyFixCounter();
 
   if (
     enabledCodes.has('EXPORT_EMPTY_ENCOUNTER_TABLE')
     && node.type === 'encounterTable'
-    && normalizeEncounterEntries(node.attrs?.entries).length === 0
+    && !hasEncounterTableContent(node.attrs ?? {})
   ) {
     fixes.encounterTablesRemoved += 1;
     return { node: null, fixes };
@@ -170,7 +207,7 @@ function transformNode(
 
 function applySafeFixesToDocument(
   document: ProjectDocumentRecord,
-  codes: Set<FixableReviewCode>,
+  codes: Set<ContentFixableReviewCode>,
 ): { content: DocumentContent; fixes: AppliedFixCounter; changed: boolean } {
   const baseContent = ensureDocContent(document.content);
   const transformed = transformNode(baseContent, codes);
@@ -230,6 +267,22 @@ function buildFixChanges(title: string, fixes: AppliedFixCounter): ExportReviewF
   return changes;
 }
 
+function buildLayoutRefreshChanges(
+  title: string,
+  codes: Set<LayoutRefreshReviewCode>,
+): ExportReviewFixChange[] {
+  return Array.from(codes).sort().map((code) => ({
+    code,
+    action: 'refresh_layout_plan' as const,
+    title,
+    count: 1,
+  }));
+}
+
+function layoutPlanChanged(previous: unknown, next: LayoutPlan): boolean {
+  return JSON.stringify(previous ?? null) !== JSON.stringify(next);
+}
+
 type RawExportJob = PrismaExportJob & {
   reviewJson: ExportReview | null;
 };
@@ -252,27 +305,35 @@ export async function applySafeExportReviewFixes(
     };
   }
 
-  const findingsByTitle = new Map<string, Set<FixableReviewCode>>();
+  const contentFindingsByTitle = new Map<string, Set<ContentFixableReviewCode>>();
+  const layoutFindingsByTitle = new Map<string, Set<LayoutRefreshReviewCode>>();
   let unsupportedFindingCount = 0;
 
   for (const finding of review.findings) {
-    if (!FIXABLE_CODES.has(finding.code)) {
-      unsupportedFindingCount += 1;
-      continue;
-    }
-
-    const title = getFindingTitle(finding);
+    const title = getFindingTitle(finding, review);
     if (!title) {
       unsupportedFindingCount += 1;
       continue;
     }
 
-    const existing = findingsByTitle.get(title) ?? new Set<FixableReviewCode>();
-    existing.add(finding.code as FixableReviewCode);
-    findingsByTitle.set(title, existing);
+    if (CONTENT_FIXABLE_CODES.has(finding.code)) {
+      const existing = contentFindingsByTitle.get(title) ?? new Set<ContentFixableReviewCode>();
+      existing.add(finding.code as ContentFixableReviewCode);
+      contentFindingsByTitle.set(title, existing);
+      continue;
+    }
+
+    if (LAYOUT_REFRESH_CODES.has(finding.code)) {
+      const existing = layoutFindingsByTitle.get(title) ?? new Set<LayoutRefreshReviewCode>();
+      existing.add(finding.code as LayoutRefreshReviewCode);
+      layoutFindingsByTitle.set(title, existing);
+      continue;
+    }
+
+    unsupportedFindingCount += 1;
   }
 
-  if (findingsByTitle.size === 0) {
+  if (contentFindingsByTitle.size === 0 && layoutFindingsByTitle.size === 0) {
     return {
       status: 'no_fixes',
       summary: unsupportedFindingCount > 0
@@ -294,6 +355,7 @@ export async function applySafeExportReviewFixes(
     select: {
       id: true,
       title: true,
+      kind: true,
       layoutPlan: true,
       content: true,
     },
@@ -304,34 +366,69 @@ export async function applySafeExportReviewFixes(
 
   await prisma.$transaction(async (tx) => {
     for (const document of documents) {
-      const codes = findingsByTitle.get(document.title);
-      if (!codes) continue;
+      const contentCodes = contentFindingsByTitle.get(document.title) ?? null;
+      const layoutCodes = layoutFindingsByTitle.get(document.title) ?? null;
+      if (!contentCodes && !layoutCodes) continue;
 
-      const result = applySafeFixesToDocument({
-        id: document.id,
-        title: document.title,
-        content: document.content as DocumentContent | null,
-      }, codes);
+      const baseContent = document.content as DocumentContent | null;
+      let nextContent = ensureDocContent(baseContent);
+      let nextLayoutPlan = document.layoutPlan as LayoutPlan | null;
+      let contentChanged = false;
+      let nextFixes = emptyFixCounter();
 
-      if (!result.changed) continue;
+      if (contentCodes) {
+        const safeResult = applySafeFixesToDocument({
+          id: document.id,
+          title: document.title,
+          kind: document.kind,
+          content: baseContent,
+          layoutPlan: document.layoutPlan ?? null,
+        }, contentCodes);
+        nextContent = safeResult.content;
+        nextFixes = safeResult.fixes;
+        contentChanged = safeResult.changed;
+      }
 
       const resolvedLayout = resolveDocumentLayout({
-        content: result.content,
-        layoutPlan: document.layoutPlan ?? null,
+        content: nextContent,
+        layoutPlan: nextLayoutPlan,
+        kind: document.kind,
         title: document.title,
       });
+      nextContent = resolvedLayout.content;
+      nextLayoutPlan = resolvedLayout.layoutPlan;
+
+      let layoutChanged = layoutPlanChanged(document.layoutPlan, nextLayoutPlan)
+        || JSON.stringify(baseContent) !== JSON.stringify(nextContent);
+
+      if (layoutCodes) {
+        const recommendedLayout = recommendLayoutPlan(nextContent, nextLayoutPlan, {
+          documentKind: document.kind ?? null,
+          documentTitle: document.title,
+          reviewCodes: Array.from(layoutCodes),
+        });
+        if (layoutPlanChanged(nextLayoutPlan, recommendedLayout)) {
+          nextLayoutPlan = recommendedLayout;
+          layoutChanged = true;
+        }
+      }
+
+      if (!contentChanged && !layoutChanged) continue;
 
       await tx.projectDocument.update({
         where: { id: document.id },
         data: {
-          content: resolvedLayout.content as unknown as Prisma.InputJsonValue,
-          layoutPlan: resolvedLayout.layoutPlan as unknown as Prisma.InputJsonValue,
+          content: nextContent as unknown as Prisma.InputJsonValue,
+          layoutPlan: nextLayoutPlan as unknown as Prisma.InputJsonValue,
           status: 'edited',
         },
       });
 
       documentsUpdated += 1;
-      changes.push(...buildFixChanges(document.title, result.fixes));
+      changes.push(...buildFixChanges(document.title, nextFixes));
+      if (layoutCodes && layoutChanged) {
+        changes.push(...buildLayoutRefreshChanges(document.title, layoutCodes));
+      }
     }
   });
 
@@ -356,8 +453,8 @@ export async function applySafeExportReviewFixes(
   return {
     status: 'started',
     summary: unsupportedFindingCount > 0
-      ? `Applied ${appliedFixCount} safe fix${appliedFixCount === 1 ? '' : 'es'} across ${documentsUpdated} document${documentsUpdated === 1 ? '' : 's'}. ${unsupportedFindingCount} issue${unsupportedFindingCount === 1 ? '' : 's'} still need manual revision.`
-      : `Applied ${appliedFixCount} safe fix${appliedFixCount === 1 ? '' : 'es'} across ${documentsUpdated} document${documentsUpdated === 1 ? '' : 's'}.`,
+      ? `Applied ${appliedFixCount} automatic fix${appliedFixCount === 1 ? '' : 'es'} across ${documentsUpdated} document${documentsUpdated === 1 ? '' : 's'}. ${unsupportedFindingCount} issue${unsupportedFindingCount === 1 ? '' : 's'} still need manual revision.`
+      : `Applied ${appliedFixCount} automatic fix${appliedFixCount === 1 ? '' : 'es'} across ${documentsUpdated} document${documentsUpdated === 1 ? '' : 's'}.`,
     appliedFixCount,
     documentsUpdated,
     changes,

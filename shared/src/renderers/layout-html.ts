@@ -27,6 +27,7 @@ function renderGroup(groupId: string, fragments: Array<LayoutFlowFragment | Page
   const isNpcGrid = recipe === 'npc_roster_grid' || (nodeTypes.size === 1 && nodeTypes.has('npcProfile'));
   const isEncounterPacket = recipe === 'encounter_packet_spread' || nodeTypes.has('statBlock') || nodeTypes.has('encounterTable');
   const isUtilityPacket = recipe === 'utility_table_spread' || nodeTypes.has('mapBlock') || nodeTypes.has('randomTable') || nodeTypes.has('handout');
+  const hasWideRandomTable = fragments.some((fragment) => fragment.nodeType === 'randomTable' && fragment.span === 'both_columns');
   const dataAttr = unitId ? ` data-layout-unit-id="${unitId}"` : '';
 
   if (isNpcGrid) {
@@ -36,6 +37,11 @@ function renderGroup(groupId: string, fragments: Array<LayoutFlowFragment | Page
   }
 
   if (isEncounterPacket || isUtilityPacket) {
+    if (hasWideRandomTable) {
+      return `<div class="layout-group layout-group-stack"${dataAttr} data-group-id="${groupId}">
+        ${fragments.map((fragment) => renderFragment(fragment)).join('\n')}
+      </div>`;
+    }
     const sidePanel = fragments.filter((fragment) => fragment.placement === 'side_panel');
     const mainFlow = fragments.filter((fragment) => fragment.placement !== 'side_panel');
     return `<div class="layout-group layout-group-packet"${dataAttr} data-group-id="${groupId}">
@@ -168,7 +174,7 @@ export function getCanonicalLayoutCss(): string {
   return `
     .layout-flow-root {
       column-count: var(--layout-column-count, 2);
-      column-gap: var(--layout-column-gap, 32px);
+      column-gap: var(--layout-column-gap, 22px);
       column-rule: var(--layout-column-rule, 1px solid rgba(0, 0, 0, 0.06));
       min-height: inherit;
       display: block;
@@ -180,15 +186,21 @@ export function getCanonicalLayoutCss(): string {
       column-rule: none;
     }
 
+    .layout-flow-root[data-layout-recipe="intro_split_spread"][data-document-kind="front_matter"] {
+      column-count: 2;
+      column-gap: var(--layout-column-gap, 22px);
+      column-rule: var(--layout-column-rule, 1px solid rgba(0, 0, 0, 0.06));
+    }
+
     .layout-page-stack {
       display: flex;
       flex-direction: column;
-      gap: 2rem;
+      gap: 0.85rem;
     }
 
     .layout-page {
-      page-break-after: always;
-      break-after: page;
+      page-break-after: auto;
+      break-after: auto;
     }
 
     .layout-page:last-child {
@@ -196,21 +208,26 @@ export function getCanonicalLayoutCss(): string {
       break-after: auto;
     }
 
+    .layout-page + .layout-page {
+      page-break-before: always;
+      break-before: page;
+    }
+
     .layout-page__body {
       display: flex;
       flex-direction: column;
-      min-height: var(--content-height, 912px);
+      min-height: var(--page-content-height, calc(var(--content-height, 912px) - 48px));
     }
 
     .layout-page__hero,
     .layout-page__full-width {
-      margin-bottom: 1rem;
+      margin-bottom: 0.55rem;
     }
 
     .layout-page__columns {
       display: grid;
       grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-      gap: var(--layout-column-gap, 32px);
+      gap: var(--layout-column-gap, 22px);
       align-items: start;
       min-height: 0;
       flex: 1;
@@ -224,13 +241,13 @@ export function getCanonicalLayoutCss(): string {
       min-width: 0;
       display: flex;
       flex-direction: column;
-      gap: 0.9rem;
+      gap: 0.4rem;
     }
 
     .layout-unit,
     .layout-fragment,
     .layout-group {
-      margin-bottom: 0.9rem;
+      margin-bottom: 0.4rem;
     }
 
     .layout-flow-root > .layout-unit,
@@ -262,14 +279,14 @@ export function getCanonicalLayoutCss(): string {
     .layout-group-npc-grid {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 1rem;
+      gap: 0.8rem;
       align-items: start;
     }
 
     .layout-group-packet {
       display: grid;
       grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
-      gap: 1rem;
+      gap: 0.8rem;
       align-items: start;
       break-inside: avoid;
       page-break-inside: avoid;
