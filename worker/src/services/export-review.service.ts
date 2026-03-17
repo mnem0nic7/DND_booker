@@ -96,6 +96,20 @@ interface SectionMatch {
   hyphenated: boolean;
 }
 
+interface MeasuredReviewPage {
+  page: number;
+  fillRatio: number;
+  isOpener: boolean;
+  isFullPageInsert: boolean;
+  bottomPanelFillRatio: number;
+  leftFillRatio: number | null;
+  rightFillRatio: number | null;
+  deltaRatio: number | null;
+  contentHeightPx: number;
+  title: string | null;
+  fragments: PageModel['pages'][number]['fragments'];
+}
+
 export async function reviewPdfExport(
   filepath: string,
   documents: ReviewableDocument[]
@@ -104,7 +118,7 @@ export async function reviewPdfExport(
   const pdfInfo = parsePdfInfoOutput(pdfInfoOutput);
 
   if (documents.some((document) => document.pageModel && document.pageModel.pages.length > 0)) {
-    return analyzePdfExportLayoutFromPageModels({
+    return reviewMeasuredExportLayout({
       documents,
       pageCount: pdfInfo.pageCount,
       pageWidthPts: pdfInfo.pageWidthPts,
@@ -121,6 +135,20 @@ export async function reviewPdfExport(
     pageCount: pdfInfo.pageCount || pages.length,
     pageWidthPts: pdfInfo.pageWidthPts ?? pages[0]?.width ?? null,
     pageHeightPts: pdfInfo.pageHeightPts ?? pages[0]?.height ?? null,
+  });
+}
+
+export function reviewMeasuredExportLayout(input: {
+  documents: ReviewableDocument[];
+  pageCount?: number | null;
+  pageWidthPts?: number | null;
+  pageHeightPts?: number | null;
+}): ExportReview {
+  return analyzePdfExportLayoutFromPageModels({
+    documents: input.documents,
+    pageCount: input.pageCount ?? 0,
+    pageWidthPts: input.pageWidthPts ?? null,
+    pageHeightPts: input.pageHeightPts ?? null,
   });
 }
 
@@ -359,15 +387,7 @@ function analyzePdfExportLayoutFromPageModels(input: {
   const findings: ExportReviewFinding[] = [];
   const sectionStarts: ExportSectionReviewMetric[] = [];
   const utilityCoverage: ExportUtilityReviewMetric[] = [];
-  const globalPages: Array<{
-    page: number;
-    fillRatio: number;
-    isOpener: boolean;
-    isFullPageInsert: boolean;
-    leftFillRatio: number | null;
-    rightFillRatio: number | null;
-    deltaRatio: number | null;
-  }> = [];
+  const globalPages: MeasuredReviewPage[] = [];
   let pageOffset = 0;
 
   for (const document of documents) {
@@ -383,9 +403,13 @@ function analyzePdfExportLayoutFromPageModels(input: {
           fillRatio: page.fillRatio,
           isOpener: Boolean(page.openerDocumentId),
           isFullPageInsert: page.fragments.some((fragment) => fragment.region === 'full_page'),
+          bottomPanelFillRatio: computeBottomPanelFillRatio(page),
           leftFillRatio: page.columnMetrics.leftFillRatio,
           rightFillRatio: page.columnMetrics.rightFillRatio,
           deltaRatio: page.columnMetrics.deltaRatio,
+          contentHeightPx: page.contentHeightPx,
+          title: document.title,
+          fragments: page.fragments,
         });
       }
     }
@@ -517,9 +541,13 @@ export function planExportAutoFixes(review: ExportReview): ExportReviewAutoFix[]
     || codes.has('EXPORT_CHAPTER_OPENER_LOW')
     || codes.has('EXPORT_LAST_PAGE_UNDERFILLED')
     || codes.has('EXPORT_UNUSED_PAGE_REGION')
+    || codes.has('EXPORT_MISSED_ART_OPPORTUNITY')
     || codes.has('EXPORT_WEAK_HERO_PLACEMENT')
     || codes.has('EXPORT_SPLIT_SCENE_PACKET')
     || codes.has('EXPORT_UNBALANCED_COLUMNS')
+    || codes.has('EXPORT_MARGIN_COLLISION')
+    || codes.has('EXPORT_FOOTER_COLLISION')
+    || codes.has('EXPORT_ORPHAN_TAIL_PARAGRAPH')
     || codes.has('EXPORT_OVERLONG_TOC_FOR_SHORT_BOOK')
   ) {
     fixes.push('refresh_layout_plan');
@@ -746,12 +774,20 @@ function findingPenalty(code: ExportReviewFinding['code']): number {
       return 12;
     case 'EXPORT_UNUSED_PAGE_REGION':
       return 14;
+    case 'EXPORT_MISSED_ART_OPPORTUNITY':
+      return 10;
     case 'EXPORT_WEAK_HERO_PLACEMENT':
       return 12;
     case 'EXPORT_SPLIT_SCENE_PACKET':
       return 12;
     case 'EXPORT_UNBALANCED_COLUMNS':
       return 10;
+    case 'EXPORT_MARGIN_COLLISION':
+      return 12;
+    case 'EXPORT_FOOTER_COLLISION':
+      return 18;
+    case 'EXPORT_ORPHAN_TAIL_PARAGRAPH':
+      return 12;
     case 'EXPORT_OVERLONG_TOC_FOR_SHORT_BOOK':
       return 10;
     case 'EXPORT_EMPTY_ENCOUNTER_TABLE':
@@ -1063,27 +1099,76 @@ function analyzePageLayout(pages: PdfPage[], sectionStartPages: Set<number>): Ex
   return findings;
 }
 
-function analyzeMeasuredPageLayout(pages: Array<{
-  page: number;
-  fillRatio: number;
-  isOpener: boolean;
-  isFullPageInsert: boolean;
-  leftFillRatio: number | null;
-  rightFillRatio: number | null;
-  deltaRatio: number | null;
-}>): ExportReviewFinding[] {
+function analyzeMeasuredPageLayout(pages: MeasuredReviewPage[]): ExportReviewFinding[] {
   const findings: ExportReviewFinding[] = [];
 
   for (let index = 0; index < pages.length; index += 1) {
     const page = pages[index];
     if (!page) continue;
     const isInterior = page.page > 1 && page.page < pages.length;
+    const units = collectMeasuredPageUnits(page);
+    const overflow = measureMeasuredPageOverflow(page, units);
+    const whitespace = measureMeasuredPageWhitespace(page, units);
+    const isTitlePageOpener = page.isOpener
+      && units.length === 1
+      && units[0]?.nodeTypes.length === 1
+      && units[0]?.nodeTypes[0] === 'titlePage';
+
+    if (!isTitlePageOpener && overflow.footerCollision) {
+      findings.push({
+        code: 'EXPORT_FOOTER_COLLISION',
+        severity: 'warning',
+        page: page.page,
+        message: `Page ${page.page} has content entering the footer reserve and is at risk of clipping.`,
+        details: {
+          title: page.title,
+          contentHeightPx: page.contentHeightPx,
+          bottomPx: Math.round(overflow.maxBottom),
+          unitId: overflow.unitId,
+          nodeTypes: overflow.nodeTypes,
+        },
+      });
+    } else if (!isTitlePageOpener && overflow.marginCollision) {
+      findings.push({
+        code: 'EXPORT_MARGIN_COLLISION',
+        severity: 'warning',
+        page: page.page,
+        message: `Page ${page.page} packs content too tightly against the bottom margin.`,
+        details: {
+          title: page.title,
+          contentHeightPx: page.contentHeightPx,
+          bottomPx: Math.round(overflow.maxBottom),
+          unitId: overflow.unitId,
+          nodeTypes: overflow.nodeTypes,
+        },
+      });
+    }
+
+    const orphanTail = detectOrphanTailUnit(page, units);
+    if (orphanTail) {
+      findings.push({
+        code: 'EXPORT_ORPHAN_TAIL_PARAGRAPH',
+        severity: 'warning',
+        page: page.page,
+        message: `Page ${page.page} starts with a short orphaned tail paragraph or support packet that should be pulled back.`,
+        details: {
+          title: page.title,
+          unitId: orphanTail.unitId,
+          nodeTypes: orphanTail.nodeTypes,
+          textLength: orphanTail.textLength,
+          fillRatio: roundRatio(page.fillRatio),
+        },
+      });
+    }
 
     if (
       isInterior
       && !page.isOpener
       && !page.isFullPageInsert
-      && page.fillRatio < 0.58
+      && (
+        page.fillRatio < 0.58
+        || (page.fillRatio < 0.72 && whitespace.bottomGapRatio > 0.18)
+      )
     ) {
       findings.push({
         code: 'EXPORT_UNUSED_PAGE_REGION',
@@ -1091,7 +1176,9 @@ function analyzeMeasuredPageLayout(pages: Array<{
         page: page.page,
         message: `Page ${page.page} leaves a large unused region that should be reclaimed by layout.`,
         details: {
+          title: page.title,
           fillRatio: roundRatio(page.fillRatio),
+          bottomGapRatio: roundRatio(whitespace.bottomGapRatio),
         },
       });
     }
@@ -1100,6 +1187,7 @@ function analyzeMeasuredPageLayout(pages: Array<{
       !page.isOpener
       && page.deltaRatio !== null
       && page.deltaRatio > 0.18
+      && page.bottomPanelFillRatio < 0.12
       && page.leftFillRatio !== null
       && page.rightFillRatio !== null
     ) {
@@ -1109,15 +1197,182 @@ function analyzeMeasuredPageLayout(pages: Array<{
         page: page.page,
         message: `Page ${page.page} has noticeably unbalanced columns.`,
         details: {
+          title: page.title,
           deltaRatio: roundRatio(page.deltaRatio),
           leftBottomRatio: roundRatio(page.leftFillRatio),
           rightBottomRatio: roundRatio(page.rightFillRatio),
         },
       });
     }
+
+    if (shouldFlagMissedArtOpportunity(page, units, isInterior, whitespace)) {
+      findings.push({
+        code: 'EXPORT_MISSED_ART_OPPORTUNITY',
+        severity: 'warning',
+        page: page.page,
+        message: `Page ${page.page} has reclaimable blank space that should be balanced with spot art or a stronger utility band.`,
+        details: {
+          title: page.title,
+          fillRatio: roundRatio(page.fillRatio),
+          bottomGapRatio: roundRatio(whitespace.bottomGapRatio),
+          deltaRatio: page.deltaRatio === null ? null : roundRatio(page.deltaRatio),
+          suggestedPlacement: (page.deltaRatio ?? 0) > 0.18 ? 'column' : 'bottom_panel',
+        },
+      });
+    }
   }
 
   return findings;
+}
+
+function collectMeasuredPageUnits(page: MeasuredReviewPage): Array<{
+  unitId: string;
+  top: number;
+  bottom: number;
+  textLength: number;
+  hasArt: boolean;
+  nodeTypes: string[];
+  placements: string[];
+  fragments: PageModel['pages'][number]['fragments'];
+}> {
+  const byUnit = new Map<string, PageModel['pages'][number]['fragments']>();
+  for (const fragment of page.fragments) {
+    const entry = byUnit.get(fragment.unitId) ?? [];
+    entry.push(fragment);
+    byUnit.set(fragment.unitId, entry);
+  }
+
+  return [...byUnit.entries()]
+    .map(([unitId, fragments]) => {
+      const top = Math.min(...fragments.map((fragment) => fragment.bounds.y));
+      const bottom = Math.max(...fragments.map((fragment) => fragment.bounds.y + fragment.bounds.height));
+      const textLength = fragments.reduce((total, fragment) => total + readNodeText(fragment.content).trim().length, 0);
+      const nodeTypes = [...new Set(fragments.map((fragment) => fragment.nodeType))];
+      const placements = [...new Set(fragments.map((fragment) => fragment.placement))];
+      const hasArt = fragments.some((fragment) =>
+        fragment.nodeType === 'fullBleedImage' || fragment.nodeType === 'mapBlock' || fragment.nodeType === 'handout',
+      );
+
+      return {
+        unitId,
+        top,
+        bottom,
+        textLength,
+        hasArt,
+        nodeTypes,
+        placements,
+        fragments,
+      };
+    })
+    .sort((left, right) => left.top - right.top || left.bottom - right.bottom);
+}
+
+function measureMeasuredPageOverflow(
+  page: MeasuredReviewPage,
+  units: ReturnType<typeof collectMeasuredPageUnits>,
+): {
+  marginCollision: boolean;
+  footerCollision: boolean;
+  maxBottom: number;
+  unitId: string | null;
+  nodeTypes: string[];
+} {
+  let marginCandidate: ReturnType<typeof collectMeasuredPageUnits>[number] | null = null;
+  let footerCandidate: ReturnType<typeof collectMeasuredPageUnits>[number] | null = null;
+
+  for (const unit of units) {
+    const isBottomPanelOnly = unit.placements.every((placement) => placement === 'bottom_panel');
+    if (unit.bottom > page.contentHeightPx + 2) {
+      if (!footerCandidate || unit.bottom > footerCandidate.bottom) footerCandidate = unit;
+      continue;
+    }
+    if (!isBottomPanelOnly && unit.bottom > page.contentHeightPx - 6) {
+      if (!marginCandidate || unit.bottom > marginCandidate.bottom) marginCandidate = unit;
+    }
+  }
+
+  const candidate = footerCandidate ?? marginCandidate;
+  return {
+    marginCollision: Boolean(!footerCandidate && marginCandidate),
+    footerCollision: Boolean(footerCandidate),
+    maxBottom: candidate?.bottom ?? 0,
+    unitId: candidate?.unitId ?? null,
+    nodeTypes: candidate?.nodeTypes ?? [],
+  };
+}
+
+function measureMeasuredPageWhitespace(
+  page: MeasuredReviewPage,
+  units: ReturnType<typeof collectMeasuredPageUnits>,
+): {
+  maxBottom: number;
+  bottomGapPx: number;
+  bottomGapRatio: number;
+} {
+  const maxBottom = units.reduce((currentMax, unit) => Math.max(currentMax, unit.bottom), 0);
+  const bottomGapPx = Math.max(0, page.contentHeightPx - maxBottom);
+  return {
+    maxBottom,
+    bottomGapPx,
+    bottomGapRatio: page.contentHeightPx > 0 ? bottomGapPx / page.contentHeightPx : 0,
+  };
+}
+
+function detectOrphanTailUnit(
+  page: MeasuredReviewPage,
+  units: ReturnType<typeof collectMeasuredPageUnits>,
+): ReturnType<typeof collectMeasuredPageUnits>[number] | null {
+  if (page.isOpener || page.isFullPageInsert || page.fillRatio > 0.4) return null;
+  const textUnits = units.filter((unit) => !unit.hasArt);
+  if (textUnits.length !== 1) return null;
+
+  const candidate = textUnits[0];
+  if (candidate.textLength <= 0 || candidate.textLength > 220) return null;
+  const onlySimpleTypes = candidate.nodeTypes.every((nodeType) => (
+    nodeType === 'paragraph'
+    || nodeType === 'heading'
+    || nodeType === 'bulletList'
+    || nodeType === 'orderedList'
+    || nodeType === 'readAloudBox'
+    || nodeType === 'sidebarCallout'
+  ));
+  if (!onlySimpleTypes) return null;
+
+  return candidate;
+}
+
+function shouldFlagMissedArtOpportunity(
+  page: MeasuredReviewPage,
+  units: ReturnType<typeof collectMeasuredPageUnits>,
+  isInterior: boolean,
+  whitespace: ReturnType<typeof measureMeasuredPageWhitespace>,
+): boolean {
+  if (!isInterior || page.isOpener || page.isFullPageInsert) return false;
+  const hasArt = units.some((unit) => unit.hasArt);
+  const largeBottomGap = whitespace.bottomGapRatio > 0.18;
+  if (!largeBottomGap) return false;
+
+  const isSparse = page.fillRatio < 0.82;
+  const isUnbalanced = (page.deltaRatio ?? 0) > 0.18 && page.bottomPanelFillRatio < 0.12;
+  const hasBottomPanelArt = units.some((unit) => unit.hasArt && unit.placements.includes('bottom_panel'));
+
+  if (!hasArt) return isSparse || isUnbalanced || whitespace.bottomGapRatio > 0.2;
+  if (hasBottomPanelArt && whitespace.bottomGapRatio > 0.16) return true;
+  return isSparse || isUnbalanced;
+}
+
+function computeBottomPanelFillRatio(page: PageModel['pages'][number]): number {
+  const bottomPanelHeight = page.fragments
+    .filter((fragment) => fragment.region === 'full_width' && fragment.placement === 'bottom_panel')
+    .reduce((maxHeight, fragment) => Math.max(maxHeight, fragment.bounds.y + fragment.bounds.height), 0);
+
+  if (bottomPanelHeight <= 0 || page.contentHeightPx <= 0) return 0;
+  const topEdge = page.fragments
+    .filter((fragment) => fragment.region === 'full_width' && fragment.placement === 'bottom_panel')
+    .reduce((minY, fragment) => Math.min(minY, fragment.bounds.y), Number.POSITIVE_INFINITY);
+  if (!Number.isFinite(topEdge)) return 0;
+
+  return Math.max(0, bottomPanelHeight - topEdge) / page.contentHeightPx;
 }
 
 function measureColumnBalance(page: PdfPage): {

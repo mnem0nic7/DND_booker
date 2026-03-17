@@ -39,9 +39,17 @@ function collectMeasurements(): MeasuredLayoutUnitMetric[] {
       const unitId = element.dataset.layoutUnitId;
       if (!unitId) return null;
       const rect = element.getBoundingClientRect();
+      const computed = window.getComputedStyle(element);
+      const marginTop = Number.parseFloat(computed.marginTop || '0') || 0;
+      const marginBottom = Number.parseFloat(computed.marginBottom || '0') || 0;
+      const contentHeight = Math.max(
+        rect.height,
+        element.scrollHeight,
+        element.offsetHeight,
+      );
       return {
         unitId,
-        heightPx: Math.max(1, Math.ceil(rect.height)),
+        heightPx: Math.max(1, Math.ceil(contentHeight + marginTop + marginBottom)),
       };
     })
     .filter((entry): entry is MeasuredLayoutUnitMetric => Boolean(entry));

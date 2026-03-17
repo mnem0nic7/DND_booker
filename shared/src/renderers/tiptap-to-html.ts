@@ -168,7 +168,7 @@ export function renderNode(node: TipTapNode): string {
     }
 
     case 'horizontalRule':
-      return '<hr class="ornamental-divider" />';
+      return '<hr class="section-divider" />';
 
     case 'hardBreak':
       return '<br />';
@@ -719,8 +719,10 @@ function renderFullBleedImage(attrs: Record<string, unknown>): string {
   const src = String(attrs.src || '');
   const caption = String(attrs.caption || '');
   const position = String(attrs.position || 'full');
+  const artRole = String(attrs.artRole || '').trim().replace(/[^a-zA-Z0-9_-]+/g, '-');
+  const artRoleClass = artRole ? ` full-bleed-image--art-role-${escapeHtml(artRole)}` : '';
 
-  let html = `<div class="full-bleed-image full-bleed-image--${escapeHtml(position)}">`;
+  let html = `<div class="full-bleed-image full-bleed-image--${escapeHtml(position)}${artRoleClass}">`;
   if (src) {
     html += `<img class="full-bleed-image__img" src="${safeUrl(src)}" alt="${escapeHtml(caption || 'Full bleed image')}" />`;
   }

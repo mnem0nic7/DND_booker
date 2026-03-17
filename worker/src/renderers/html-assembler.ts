@@ -430,8 +430,8 @@ export function assembleHtml(options: AssembleOptions): string {
       --page-height: 1056px;
       --page-padding: ${pagePreset === 'print_pdf' ? '56px' : '60px'};
       --content-height: calc(var(--page-height) - (var(--page-padding) * 2));
-      --page-content-height: calc(var(--content-height) - 40px);
-      --margin-reserve: 40px;
+      --page-content-height: calc(var(--content-height) - 56px);
+      --margin-reserve: 56px;
       --layout-column-gap: 18px;
 
       width: var(--page-width);
@@ -533,6 +533,25 @@ export function assembleHtml(options: AssembleOptions): string {
       user-select: none;
     }
 
+    .layout-page.page-canvas {
+      display: grid;
+      grid-template-rows: minmax(0, var(--page-content-height, calc(var(--content-height, 912px) - 56px))) auto;
+      align-content: start;
+    }
+
+    .layout-page.page-canvas .layout-page__body {
+      min-height: 0;
+      max-height: var(--page-content-height, calc(var(--content-height, 912px) - 56px));
+    }
+
+    .layout-page.page-canvas > .page-footer {
+      position: relative;
+      bottom: auto;
+      left: auto;
+      right: auto;
+      margin-top: 0.15rem;
+    }
+
     img {
       max-width: 100%;
       height: auto;
@@ -572,9 +591,16 @@ export function assembleHtml(options: AssembleOptions): string {
       background: var(--table-stripe-bg, rgba(0, 0, 0, 0.04));
     }
 
-    hr {
+    hr.section-divider {
       border: none;
       height: 2px;
+      background: var(--color-divider);
+      margin: 0.75rem 0;
+    }
+
+    hr.ornamental-divider {
+      border: none;
+      height: 4px;
       background: var(--divider-gradient, linear-gradient(to right, transparent, var(--color-divider) 15%, var(--color-divider) 85%, transparent));
       margin: 0.75rem 0;
       position: relative;
@@ -662,7 +688,10 @@ export function assembleHtml(options: AssembleOptions): string {
     }
 
     .stat-block__divider {
-      border-top-color: var(--color-divider);
+      border: 0;
+      border-top: 1px solid var(--color-divider);
+      background: none;
+      height: 0;
       margin: 0.5rem 0;
     }
 
@@ -976,7 +1005,11 @@ export function assembleHtml(options: AssembleOptions): string {
     }
 
     .npc-profile__divider {
-      border-top-color: var(--color-divider);
+      border: 0;
+      border-top: 1px solid var(--color-divider);
+      background: none;
+      height: 0;
+      margin: 0.45rem 0;
     }
 
     .npc-profile__description {
@@ -1131,6 +1164,57 @@ export function assembleHtml(options: AssembleOptions): string {
       width: 25%;
       margin-left: auto;
       margin-right: auto;
+    }
+
+    .layout-fragment.layout-placement-side_panel .full-bleed-image {
+      margin: 0.35rem 0 0.6rem;
+      text-align: right;
+    }
+
+    .layout-fragment.layout-placement-side_panel .full-bleed-image--half {
+      width: 68%;
+      margin-left: auto;
+      margin-right: 0;
+    }
+
+    .layout-fragment.layout-placement-side_panel .full-bleed-image--quarter {
+      width: 46%;
+      margin-left: auto;
+      margin-right: 0;
+    }
+
+    .layout-fragment.layout-placement-side_panel .full-bleed-image--art-role-column_fill_art,
+    .layout-fragment.layout-placement-side_panel .full-bleed-image--art-role-spot_art,
+    .layout-fragment.layout-placement-side_panel .full-bleed-image--art-role-overflow_spot_art {
+      width: 100%;
+      margin-left: 0;
+      margin-right: 0;
+      text-align: left;
+    }
+
+    .layout-fragment.layout-placement-side_panel .full-bleed-image--art-role-column_fill_art .full-bleed-image__img,
+    .layout-fragment.layout-placement-side_panel .full-bleed-image--art-role-spot_art .full-bleed-image__img,
+    .layout-fragment.layout-placement-side_panel .full-bleed-image--art-role-overflow_spot_art .full-bleed-image__img {
+      min-height: 18rem;
+      max-height: 24rem;
+      object-fit: cover;
+      object-position: center;
+    }
+
+    .layout-fragment.layout-placement-bottom_panel .full-bleed-image {
+      margin: 0.6rem 0 0.2rem;
+    }
+
+    .layout-fragment.layout-placement-bottom_panel .full-bleed-image__img {
+      min-height: 20rem;
+      max-height: 24rem;
+      object-fit: cover;
+      object-position: center;
+    }
+
+    .layout-fragment.layout-placement-bottom_panel .full-bleed-image--art-role-sparse_page_repair .full-bleed-image__img {
+      min-height: 38rem;
+      max-height: 46rem;
     }
 
     .full-bleed-image__img {

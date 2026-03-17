@@ -7,6 +7,7 @@ import {
   parseBboxLayoutXhtml,
   parsePdfInfoOutput,
   planExportAutoFixes,
+  reviewMeasuredExportLayout,
 } from '../services/export-review.service.js';
 
 describe('export-review.service', () => {
@@ -452,6 +453,330 @@ Page size: 612 x 792 pts (letter)
     expect(review.findings.map((finding) => finding.code)).toContain('EXPORT_THIN_RANDOM_TABLE');
   });
 
+  it('does not flag unbalanced columns when a substantial bottom utility band is present', () => {
+    const review = analyzePdfExportLayout({
+      documents: [
+        {
+          title: 'Front Matter',
+          kind: 'front_matter',
+          pageModel: {
+            preset: 'standard_pdf',
+            flow: { preset: 'standard_pdf', sectionRecipe: 'intro_split_spread', columnBalanceTarget: 'balanced', fragments: [], units: [] },
+            pages: [{
+              index: 1,
+              preset: 'standard_pdf',
+              recipe: 'intro_split_spread',
+              fragments: [
+                {
+                  nodeId: 'left-copy',
+                  sourceIndex: 0,
+                  presentationOrder: 0,
+                  span: 'column',
+                  placement: 'inline',
+                  groupId: null,
+                  keepTogether: false,
+                  allowWrapBelow: false,
+                  nodeType: 'paragraph',
+                  content: { type: 'paragraph', content: [{ type: 'text', text: 'Left column.' }] },
+                  unitId: 'unit:left-copy',
+                  pageIndex: 1,
+                  columnIndex: 1,
+                  region: 'column_left',
+                  bounds: { x: 0, y: 0, width: 320, height: 260 },
+                  isHero: false,
+                  isOpener: false,
+                },
+                {
+                  nodeId: 'right-copy',
+                  sourceIndex: 1,
+                  presentationOrder: 1,
+                  span: 'column',
+                  placement: 'inline',
+                  groupId: null,
+                  keepTogether: false,
+                  allowWrapBelow: false,
+                  nodeType: 'paragraph',
+                  content: { type: 'paragraph', content: [{ type: 'text', text: 'Right column.' }] },
+                  unitId: 'unit:right-copy',
+                  pageIndex: 1,
+                  columnIndex: 2,
+                  region: 'column_right',
+                  bounds: { x: 336, y: 0, width: 320, height: 420 },
+                  isHero: false,
+                  isOpener: false,
+                },
+                {
+                  nodeId: 'utility-heading',
+                  sourceIndex: 2,
+                  presentationOrder: 2,
+                  span: 'both_columns',
+                  placement: 'bottom_panel',
+                  groupId: 'intro-tail-panel-1',
+                  keepTogether: true,
+                  allowWrapBelow: false,
+                  nodeType: 'heading',
+                  content: { type: 'heading', attrs: { level: 3 }, content: [{ type: 'text', text: 'Prep Checklist' }] },
+                  unitId: 'group:intro-tail-panel-1',
+                  pageIndex: 1,
+                  columnIndex: null,
+                  region: 'full_width',
+                  bounds: { x: 0, y: 460, width: 672, height: 170 },
+                  isHero: false,
+                  isOpener: false,
+                },
+              ],
+              contentHeightPx: 864,
+              fillRatio: 0.73,
+              columnMetrics: { leftFillRatio: 0.31, rightFillRatio: 0.49, deltaRatio: 0.18 },
+              nodeIds: ['left-copy', 'right-copy', 'utility-heading'],
+              documentIds: ['Front Matter'],
+              openerDocumentId: null,
+            }],
+            fragments: [],
+            metrics: { fragmentCount: 3, heroFragmentCount: 0, groupedFragmentCount: 1, keepTogetherCount: 1, pageCount: 1 },
+          },
+        },
+      ],
+      pages: [],
+      pageCount: 1,
+      pageWidthPts: 612,
+      pageHeightPts: 792,
+    });
+
+    expect(review.findings.map((finding) => finding.code)).not.toContain('EXPORT_UNBALANCED_COLUMNS');
+  });
+
+  it('flags footer collisions, orphan tail pages, and missed art opportunities from measured geometry', () => {
+    const review = analyzePdfExportLayout({
+      documents: [
+        {
+          title: 'Chapter 2: The Mine',
+          kind: 'chapter',
+          pageModel: {
+            preset: 'standard_pdf',
+            flow: { preset: 'standard_pdf', sectionRecipe: 'chapter_hero_split', columnBalanceTarget: 'balanced', fragments: [], units: [] },
+            pages: [
+              {
+                index: 1,
+                preset: 'standard_pdf',
+                recipe: 'chapter_hero_split',
+                fragments: [
+                  {
+                    nodeId: 'chapter-header',
+                    sourceIndex: 0,
+                    presentationOrder: 0,
+                    span: 'both_columns',
+                    placement: 'hero_top',
+                    groupId: null,
+                    keepTogether: true,
+                    allowWrapBelow: true,
+                    nodeType: 'chapterHeader',
+                    content: { type: 'chapterHeader', attrs: { title: 'The Mine' } },
+                    unitId: 'unit:chapter-header',
+                    pageIndex: 1,
+                    columnIndex: null,
+                    region: 'hero',
+                    bounds: { x: 0, y: 16, width: 672, height: 220 },
+                    isHero: true,
+                    isOpener: true,
+                  },
+                ],
+                contentHeightPx: 864,
+                fillRatio: 0.72,
+                columnMetrics: { leftFillRatio: 0.72, rightFillRatio: 0.68, deltaRatio: 0.04 },
+                nodeIds: ['chapter-header'],
+                documentIds: ['Chapter 2: The Mine'],
+                openerDocumentId: 'Chapter 2: The Mine',
+              },
+              {
+                index: 2,
+                preset: 'standard_pdf',
+                recipe: 'chapter_hero_split',
+                fragments: [
+                  {
+                    nodeId: 'npc-card',
+                    sourceIndex: 1,
+                    presentationOrder: 1,
+                    span: 'column',
+                    placement: 'inline',
+                    groupId: null,
+                    keepTogether: true,
+                    allowWrapBelow: false,
+                    nodeType: 'npcProfile',
+                    content: { type: 'npcProfile', attrs: { name: 'Mayor Aldric' } },
+                    unitId: 'unit:npc-card',
+                    pageIndex: 2,
+                    columnIndex: 1,
+                    region: 'column_left',
+                    bounds: { x: 0, y: 0, width: 320, height: 876 },
+                    isHero: false,
+                    isOpener: false,
+                  },
+                ],
+                contentHeightPx: 864,
+                fillRatio: 0.82,
+                columnMetrics: { leftFillRatio: 0.82, rightFillRatio: 0.18, deltaRatio: 0.64 },
+                nodeIds: ['npc-card'],
+                documentIds: ['Chapter 2: The Mine'],
+                openerDocumentId: null,
+              },
+              {
+                index: 3,
+                preset: 'standard_pdf',
+                recipe: 'chapter_hero_split',
+                fragments: [
+                  {
+                    nodeId: 'tail-paragraph',
+                    sourceIndex: 2,
+                    presentationOrder: 2,
+                    span: 'column',
+                    placement: 'inline',
+                    groupId: null,
+                    keepTogether: false,
+                    allowWrapBelow: false,
+                    nodeType: 'paragraph',
+                    content: { type: 'paragraph', content: [{ type: 'text', text: 'A final omen lingers in the air.' }] },
+                    unitId: 'unit:tail-paragraph',
+                    pageIndex: 3,
+                    columnIndex: 1,
+                    region: 'column_left',
+                    bounds: { x: 0, y: 0, width: 320, height: 72 },
+                    isHero: false,
+                    isOpener: false,
+                  },
+                ],
+                contentHeightPx: 864,
+                fillRatio: 0.18,
+                columnMetrics: { leftFillRatio: 0.18, rightFillRatio: 0.02, deltaRatio: 0.16 },
+                nodeIds: ['tail-paragraph'],
+                documentIds: ['Chapter 2: The Mine'],
+                openerDocumentId: null,
+              },
+              {
+                index: 4,
+                preset: 'standard_pdf',
+                recipe: 'chapter_hero_split',
+                fragments: [
+                  {
+                    nodeId: 'closing-copy',
+                    sourceIndex: 3,
+                    presentationOrder: 3,
+                    span: 'column',
+                    placement: 'inline',
+                    groupId: null,
+                    keepTogether: false,
+                    allowWrapBelow: false,
+                    nodeType: 'paragraph',
+                    content: { type: 'paragraph', content: [{ type: 'text', text: 'Closing copy fills the last page well enough.' }] },
+                    unitId: 'unit:closing-copy',
+                    pageIndex: 4,
+                    columnIndex: 1,
+                    region: 'column_left',
+                    bounds: { x: 0, y: 0, width: 320, height: 280 },
+                    isHero: false,
+                    isOpener: false,
+                  },
+                ],
+                contentHeightPx: 864,
+                fillRatio: 0.58,
+                columnMetrics: { leftFillRatio: 0.58, rightFillRatio: 0.42, deltaRatio: 0.16 },
+                nodeIds: ['closing-copy'],
+                documentIds: ['Chapter 2: The Mine'],
+                openerDocumentId: null,
+              },
+            ],
+            fragments: [],
+            metrics: { fragmentCount: 4, heroFragmentCount: 1, groupedFragmentCount: 0, keepTogetherCount: 2, pageCount: 4 },
+          },
+        },
+      ],
+      pages: [],
+      pageCount: 4,
+      pageWidthPts: 612,
+      pageHeightPts: 792,
+    });
+
+    const codes = review.findings.map((finding) => finding.code);
+    expect(codes).toContain('EXPORT_FOOTER_COLLISION');
+    expect(codes).toContain('EXPORT_ORPHAN_TAIL_PARAGRAPH');
+    expect(codes).toContain('EXPORT_MISSED_ART_OPPORTUNITY');
+  });
+
+  it('does not flag a title-page opener as a margin or footer collision', () => {
+    const review = analyzePdfExportLayout({
+      documents: [
+        {
+          title: 'Front Matter',
+          kind: 'front_matter',
+          content: {
+            type: 'doc',
+            content: [
+              {
+                type: 'titlePage',
+                attrs: {
+                  title: 'The Blackglass Mine',
+                },
+              },
+            ],
+          },
+          pageModel: {
+            preset: 'standard_pdf',
+            flow: { preset: 'standard_pdf', sectionRecipe: 'intro_split_spread', columnBalanceTarget: 'balanced', fragments: [], units: [] },
+            pages: [
+              {
+                index: 1,
+                preset: 'standard_pdf',
+                recipe: 'intro_split_spread',
+                fragments: [
+                  {
+                    nodeId: 'title-page',
+                    sourceIndex: 0,
+                    presentationOrder: 0,
+                    span: 'both_columns',
+                    placement: 'inline',
+                    groupId: null,
+                    keepTogether: true,
+                    allowWrapBelow: false,
+                    nodeType: 'titlePage',
+                    content: {
+                      type: 'titlePage',
+                      attrs: {
+                        title: 'The Blackglass Mine',
+                      },
+                    },
+                    unitId: 'unit:title-page',
+                    pageIndex: 1,
+                    columnIndex: null,
+                    region: 'full_width',
+                    bounds: { x: 0, y: 0, width: 696, height: 880 },
+                    isHero: false,
+                    isOpener: true,
+                  },
+                ],
+                contentHeightPx: 880,
+                fillRatio: 1,
+                columnMetrics: { leftFillRatio: 1, rightFillRatio: null, deltaRatio: null },
+                nodeIds: ['title-page'],
+                documentIds: ['Front Matter'],
+                openerDocumentId: 'Front Matter',
+              },
+            ],
+            fragments: [],
+            metrics: { fragmentCount: 1, heroFragmentCount: 0, groupedFragmentCount: 0, keepTogetherCount: 1, pageCount: 1 },
+          },
+        },
+      ],
+      pages: [],
+      pageCount: 1,
+      pageWidthPts: 612,
+      pageHeightPts: 792,
+    });
+
+    const codes = review.findings.map((finding) => finding.code);
+    expect(codes).not.toContain('EXPORT_MARGIN_COLLISION');
+    expect(codes).not.toContain('EXPORT_FOOTER_COLLISION');
+  });
+
   it('does not flag split scene packets when utility-table grouping is present', () => {
     const review = analyzePdfExportLayout({
       documents: [
@@ -823,6 +1148,247 @@ Page size: 612 x 792 pts (letter)
 
     expect(isBetterExportReview(improved, baseline)).toBe(true);
     expect(isBetterExportReview(baseline, improved)).toBe(false);
+  });
+
+  it('flags missed art opportunities on measured pages with large trailing blank space', () => {
+    const review = reviewMeasuredExportLayout({
+      documents: [
+        {
+          title: 'Front Matter',
+          kind: 'front_matter',
+          pageModel: {
+            preset: 'standard_pdf',
+            flow: { preset: 'standard_pdf', sectionRecipe: 'intro_split_spread', columnBalanceTarget: 'balanced', fragments: [], units: [] },
+            pages: [
+              {
+                index: 1,
+                preset: 'standard_pdf',
+                recipe: 'intro_split_spread',
+                fragments: [
+                  {
+                    nodeId: 'title-page',
+                    sourceIndex: 0,
+                    presentationOrder: 0,
+                    span: 'full_page',
+                    placement: 'full_page_insert',
+                    groupId: null,
+                    keepTogether: true,
+                    allowWrapBelow: false,
+                    nodeType: 'titlePage',
+                    content: { type: 'titlePage', attrs: { title: 'The Blackglass Mine' } },
+                    unitId: 'unit:title-page',
+                    pageIndex: 1,
+                    columnIndex: null,
+                    region: 'full_page',
+                    bounds: { x: 0, y: 0, width: 530, height: 900 },
+                    isHero: false,
+                    isOpener: true,
+                  },
+                ],
+                contentHeightPx: 900,
+                fillRatio: 1,
+                columnMetrics: { leftFillRatio: 1, rightFillRatio: 1, deltaRatio: 0 },
+                nodeIds: ['title-page'],
+                documentIds: ['Front Matter'],
+                openerDocumentId: 'Front Matter',
+              },
+              {
+                index: 2,
+                preset: 'standard_pdf',
+                recipe: 'intro_split_spread',
+                fragments: [
+                  {
+                    nodeId: 'heading-1',
+                    sourceIndex: 0,
+                    presentationOrder: 0,
+                    span: 'column',
+                    placement: 'inline',
+                    groupId: null,
+                    keepTogether: true,
+                    allowWrapBelow: false,
+                    nodeType: 'heading',
+                    content: { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'DM Brief' }] },
+                    unitId: 'unit:heading-1',
+                    pageIndex: 2,
+                    columnIndex: 1,
+                    region: 'column_left',
+                    bounds: { x: 0, y: 0, width: 250, height: 120 },
+                    isHero: false,
+                    isOpener: false,
+                  },
+                  {
+                    nodeId: 'paragraph-1',
+                    sourceIndex: 1,
+                    presentationOrder: 1,
+                    span: 'column',
+                    placement: 'inline',
+                    groupId: null,
+                    keepTogether: false,
+                    allowWrapBelow: false,
+                    nodeType: 'paragraph',
+                    content: { type: 'paragraph', content: [{ type: 'text', text: 'Setup copy for the Dungeon Master.' }] },
+                    unitId: 'unit:paragraph-1',
+                    pageIndex: 2,
+                    columnIndex: 2,
+                    region: 'column_right',
+                    bounds: { x: 280, y: 0, width: 250, height: 340 },
+                    isHero: false,
+                    isOpener: false,
+                  },
+                ],
+                contentHeightPx: 900,
+                fillRatio: 0.79,
+                columnMetrics: { leftFillRatio: 0.68, rightFillRatio: 0.79, deltaRatio: 0.11 },
+                nodeIds: ['heading-1', 'paragraph-1'],
+                documentIds: ['Front Matter'],
+                openerDocumentId: null,
+              },
+            ],
+            fragments: [],
+            metrics: { fragmentCount: 3, heroFragmentCount: 0, groupedFragmentCount: 0, keepTogetherCount: 2, pageCount: 2 },
+          },
+        },
+        {
+          title: 'Chapter 1',
+          kind: 'chapter',
+          pageModel: {
+            preset: 'standard_pdf',
+            flow: { preset: 'standard_pdf', sectionRecipe: 'chapter_hero_split', columnBalanceTarget: 'balanced', fragments: [], units: [] },
+            pages: [{
+              index: 1,
+              preset: 'standard_pdf',
+              recipe: 'chapter_hero_split',
+              fragments: [],
+              contentHeightPx: 900,
+              fillRatio: 1,
+              columnMetrics: { leftFillRatio: 1, rightFillRatio: 1, deltaRatio: 0 },
+              nodeIds: [],
+              documentIds: ['Chapter 1'],
+              openerDocumentId: 'Chapter 1',
+            }],
+            fragments: [],
+            metrics: { fragmentCount: 0, heroFragmentCount: 0, groupedFragmentCount: 0, keepTogetherCount: 0, pageCount: 1 },
+          },
+        },
+      ],
+    });
+
+    expect(review.findings.map((finding) => finding.code)).toContain('EXPORT_MISSED_ART_OPPORTUNITY');
+  });
+
+  it('flags unused page regions when a sparse page still leaves a large bottom gap below existing art', () => {
+    const review = reviewMeasuredExportLayout({
+      documents: [
+        {
+          title: 'Chapter 1',
+          kind: 'chapter',
+          pageModel: {
+            preset: 'standard_pdf',
+            flow: { preset: 'standard_pdf', sectionRecipe: 'chapter_hero_split', columnBalanceTarget: 'balanced', fragments: [], units: [] },
+            pages: [{
+              index: 1,
+              preset: 'standard_pdf',
+              recipe: 'chapter_hero_split',
+              fragments: [],
+              contentHeightPx: 900,
+              fillRatio: 1,
+              columnMetrics: { leftFillRatio: 1, rightFillRatio: 1, deltaRatio: 0 },
+              nodeIds: [],
+              documentIds: ['Chapter 1'],
+              openerDocumentId: 'Chapter 1',
+            }],
+            fragments: [],
+            metrics: { fragmentCount: 0, heroFragmentCount: 0, groupedFragmentCount: 0, keepTogetherCount: 0, pageCount: 1 },
+          },
+        },
+        {
+          title: 'Chapter 2',
+          kind: 'chapter',
+          pageModel: {
+            preset: 'standard_pdf',
+            flow: { preset: 'standard_pdf', sectionRecipe: 'chapter_hero_split', columnBalanceTarget: 'balanced', fragments: [], units: [] },
+            pages: [{
+              index: 1,
+              preset: 'standard_pdf',
+              recipe: 'chapter_hero_split',
+              fragments: [
+                {
+                  nodeId: 'paragraph-2',
+                  sourceIndex: 0,
+                  presentationOrder: 0,
+                  span: 'column',
+                  placement: 'inline',
+                  groupId: null,
+                  keepTogether: false,
+                  allowWrapBelow: false,
+                  nodeType: 'paragraph',
+                  content: { type: 'paragraph', content: [{ type: 'text', text: 'Closing scene text.' }] },
+                  unitId: 'unit:paragraph-2',
+                  pageIndex: 1,
+                  columnIndex: 1,
+                  region: 'column_left',
+                  bounds: { x: 0, y: 0, width: 250, height: 120 },
+                  isHero: false,
+                  isOpener: false,
+                },
+                {
+                  nodeId: 'art-1',
+                  sourceIndex: 1,
+                  presentationOrder: 1,
+                  span: 'both_columns',
+                  placement: 'bottom_panel',
+                  groupId: null,
+                  keepTogether: true,
+                  allowWrapBelow: false,
+                  nodeType: 'fullBleedImage',
+                  content: { type: 'fullBleedImage', attrs: { src: '/uploads/repair.png', artRole: 'sparse_page_repair' } },
+                  unitId: 'unit:art-1',
+                  pageIndex: 1,
+                  columnIndex: null,
+                  region: 'full_width',
+                  bounds: { x: 0, y: 180, width: 530, height: 360 },
+                  isHero: false,
+                  isOpener: false,
+                },
+              ],
+              contentHeightPx: 900,
+              fillRatio: 0.7,
+              columnMetrics: { leftFillRatio: 0.7, rightFillRatio: 0.58, deltaRatio: 0.12 },
+              nodeIds: ['paragraph-2', 'art-1'],
+              documentIds: ['Chapter 2'],
+              openerDocumentId: null,
+            }],
+            fragments: [],
+            metrics: { fragmentCount: 2, heroFragmentCount: 0, groupedFragmentCount: 0, keepTogetherCount: 1, pageCount: 1 },
+          },
+        },
+        {
+          title: 'Chapter 3',
+          kind: 'chapter',
+          pageModel: {
+            preset: 'standard_pdf',
+            flow: { preset: 'standard_pdf', sectionRecipe: 'chapter_hero_split', columnBalanceTarget: 'balanced', fragments: [], units: [] },
+            pages: [{
+              index: 1,
+              preset: 'standard_pdf',
+              recipe: 'chapter_hero_split',
+              fragments: [],
+              contentHeightPx: 900,
+              fillRatio: 1,
+              columnMetrics: { leftFillRatio: 1, rightFillRatio: 1, deltaRatio: 0 },
+              nodeIds: [],
+              documentIds: ['Chapter 3'],
+              openerDocumentId: 'Chapter 3',
+            }],
+            fragments: [],
+            metrics: { fragmentCount: 0, heroFragmentCount: 0, groupedFragmentCount: 0, keepTogetherCount: 0, pageCount: 1 },
+          },
+        },
+      ],
+    });
+
+    expect(review.findings.map((finding) => finding.code)).toContain('EXPORT_UNUSED_PAGE_REGION');
+    expect(review.findings.map((finding) => finding.code)).toContain('EXPORT_MISSED_ART_OPPORTUNITY');
   });
 
   it('finalizes review metadata after a second export pass', () => {

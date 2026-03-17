@@ -48,7 +48,14 @@
   color: #58180D;
 }
 
-[data-theme="gilded-folio"] .editor-themed-content hr {
+[data-theme="gilded-folio"] .editor-themed-content hr.section-divider {
+  border: none;
+  height: 2px;
+  background: #9C2B1B;
+  margin: 1.2rem 0;
+}
+
+[data-theme="gilded-folio"] .editor-themed-content hr.ornamental-divider {
   border: none;
   height: 4px;
   background: linear-gradient(
@@ -62,7 +69,7 @@
   position: relative;
 }
 
-[data-theme="gilded-folio"] .editor-themed-content hr::after {
+[data-theme="gilded-folio"] .editor-themed-content hr.ornamental-divider::after {
   content: '';
   position: absolute;
   top: 6px;
@@ -73,12 +80,19 @@
   opacity: 0.5;
 }
 
-[data-theme="gilded-folio"] .page-canvas .ProseMirror hr {
+[data-theme="gilded-folio"] .page-canvas .ProseMirror hr.section-divider {
+  border: none;
+  height: 2px;
+  background: #9C2B1B;
+  margin: 1.2rem 0;
+}
+
+[data-theme="gilded-folio"] .page-canvas .ProseMirror hr.ornamental-divider {
   height: 4px;
   background: linear-gradient(to right, transparent, #9C2B1B 15%, #9C2B1B 85%, transparent);
 }
 
-[data-theme="gilded-folio"] .page-canvas .ProseMirror hr::after {
+[data-theme="gilded-folio"] .page-canvas .ProseMirror hr.ornamental-divider::after {
   content: '';
   position: absolute;
   top: 6px;

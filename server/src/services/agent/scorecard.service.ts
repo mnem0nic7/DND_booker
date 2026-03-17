@@ -28,9 +28,13 @@ function findingPriority(finding: ExportReviewFinding): number {
       case 'EXPORT_LOW_UTILITY_DENSITY':
         return 10;
       case 'EXPORT_UNUSED_PAGE_REGION':
+      case 'EXPORT_MISSED_ART_OPPORTUNITY':
       case 'EXPORT_WEAK_HERO_PLACEMENT':
       case 'EXPORT_SPLIT_SCENE_PACKET':
       case 'EXPORT_UNBALANCED_COLUMNS':
+      case 'EXPORT_MARGIN_COLLISION':
+      case 'EXPORT_FOOTER_COLLISION':
+      case 'EXPORT_ORPHAN_TAIL_PARAGRAPH':
       case 'EXPORT_OVERLONG_TOC_FOR_SHORT_BOOK':
         return 8;
       default:
@@ -64,7 +68,10 @@ export function buildScorecardFromExportReview(
 ): { scorecard: AgentScorecard; backlog: CritiqueBacklogItem[] } {
   const warningFindingCount = review.findings.filter((finding) => finding.severity === 'warning').length;
   const blockingFindingCount = review.findings.filter((finding) => finding.severity === 'error').length;
-  const sparsePageCount = review.findings.filter((finding) => finding.code === 'EXPORT_UNUSED_PAGE_REGION').length;
+  const sparsePageCount = review.findings.filter((finding) => (
+    finding.code === 'EXPORT_UNUSED_PAGE_REGION'
+    || finding.code === 'EXPORT_MISSED_ART_OPPORTUNITY'
+  )).length;
   const thinRandomTableCount = review.findings.filter((finding) => finding.code === 'EXPORT_THIN_RANDOM_TABLE').length;
   const lowUtilityDensityCount = review.findings.filter((finding) => finding.code === 'EXPORT_LOW_UTILITY_DENSITY').length;
   const suspiciousStatBlockCount = review.findings.filter((finding) => finding.code === 'EXPORT_SUSPICIOUS_STAT_BLOCK' || finding.code === 'EXPORT_PLACEHOLDER_STAT_BLOCK').length;

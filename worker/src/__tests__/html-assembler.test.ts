@@ -77,6 +77,124 @@ describe('HTML Assembler', () => {
       expect(html).toContain('.layout-page-stack');
       expect(html).toContain('gap: 0 !important;');
     });
+
+    it('applies sparse-page repair art styling hooks to export HTML', () => {
+      const html = assembleHtml({
+        documents: [
+          {
+            title: 'Chapter 1',
+            sortOrder: 1,
+            kind: 'chapter',
+            content: {
+              type: 'doc',
+              content: [
+                {
+                  type: 'fullBleedImage',
+                  attrs: {
+                    src: '/uploads/project/sparse-repair.png',
+                    caption: '',
+                    position: 'full',
+                    artRole: 'sparse_page_repair',
+                    layoutPlacementHint: 'bottom_panel',
+                    layoutSpanHint: 'both_columns',
+                  },
+                },
+              ],
+            },
+          },
+        ],
+        theme: 'gilded-folio',
+        projectTitle: 'Test',
+      });
+
+      expect(html).toContain('full-bleed-image--art-role-sparse_page_repair');
+      expect(html).toContain('.full-bleed-image--art-role-sparse_page_repair .full-bleed-image__img');
+      expect(html).toContain('min-height: 28rem;');
+    });
+
+    it('renders column-fill spot art at full column width in export HTML', () => {
+      const html = assembleHtml({
+        documents: [
+          {
+            title: 'Chapter 2',
+            sortOrder: 1,
+            kind: 'chapter',
+            content: {
+              type: 'doc',
+              content: [
+                {
+                  type: 'fullBleedImage',
+                  attrs: {
+                    src: '/uploads/project/column-fill.png',
+                    caption: '',
+                    position: 'full',
+                    artRole: 'column_fill_art',
+                    layoutPlacementHint: 'side_panel',
+                    layoutSpanHint: 'column',
+                  },
+                },
+              ],
+            },
+          },
+        ],
+        theme: 'gilded-folio',
+        projectTitle: 'Test',
+      });
+
+      expect(html).toContain('full-bleed-image--art-role-column_fill_art');
+      expect(html).toContain('.layout-fragment.layout-placement-side_panel .full-bleed-image--art-role-column_fill_art');
+      expect(html).toContain('width: 100%;');
+    });
+
+    it('collapses packet groups to a single track when no side-panel fragments exist', () => {
+      const html = assembleHtml({
+        documents: [
+          {
+            title: 'Chapter 2',
+            sortOrder: 1,
+            kind: 'chapter',
+            content: {
+              type: 'doc',
+              content: [
+                {
+                  type: 'statBlock',
+                  attrs: {
+                    nodeId: 'ghostly-miner',
+                    name: 'Ghostly Miner',
+                    size: 'Medium',
+                    type: 'Undead',
+                    armorClass: '11',
+                    hitPoints: '45',
+                    speed: 'fly 30 ft. (hover)',
+                  },
+                },
+              ],
+            },
+            layoutPlan: {
+              version: 1,
+              sectionRecipe: 'encounter_packet_spread',
+              columnBalanceTarget: 'balanced',
+              blocks: [
+                {
+                  nodeId: 'ghostly-miner',
+                  presentationOrder: 0,
+                  span: 'both_columns',
+                  placement: 'inline',
+                  groupId: 'encounter-packet-1',
+                  keepTogether: true,
+                  allowWrapBelow: false,
+                },
+              ],
+            },
+          },
+        ],
+        theme: 'gilded-folio',
+        projectTitle: 'Test',
+      });
+
+      expect(html).toContain('layout-group-packet--single');
+      expect(html).toContain('.layout-group-packet--single');
+    });
   });
 
   describe('Table of Contents auto-generation', () => {

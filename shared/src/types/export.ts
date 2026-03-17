@@ -10,9 +10,13 @@ export type ExportReviewCode =
   | 'EXPORT_SECTION_TITLE_WRAP'
   | 'EXPORT_LAST_PAGE_UNDERFILLED'
   | 'EXPORT_UNUSED_PAGE_REGION'
+  | 'EXPORT_MISSED_ART_OPPORTUNITY'
   | 'EXPORT_WEAK_HERO_PLACEMENT'
   | 'EXPORT_SPLIT_SCENE_PACKET'
   | 'EXPORT_UNBALANCED_COLUMNS'
+  | 'EXPORT_MARGIN_COLLISION'
+  | 'EXPORT_FOOTER_COLLISION'
+  | 'EXPORT_ORPHAN_TAIL_PARAGRAPH'
   | 'EXPORT_OVERLONG_TOC_FOR_SHORT_BOOK'
   | 'EXPORT_EMPTY_ENCOUNTER_TABLE'
   | 'EXPORT_EMPTY_RANDOM_TABLE'
@@ -32,6 +36,7 @@ export type ExportReviewSafeFixAction =
   | 'remove_empty_random_tables'
   | 'remove_placeholder_stat_blocks'
   | 'demote_oversized_display_headings'
+  | 'generate_spot_art'
   | 'refresh_layout_plan';
 
 export interface ExportReviewFinding {

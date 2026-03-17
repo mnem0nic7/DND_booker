@@ -16,6 +16,7 @@ import {
 import type { ExportJob as PrismaExportJob } from '@prisma/client';
 import { prisma } from '../config/database.js';
 import { resolveDocumentLayout } from './layout-plan.service.js';
+import { materializeSparsePageArt, realizeSparsePageArt } from './layout-art.service.js';
 
 const CONTENT_FIXABLE_CODES = new Set<ExportReviewCode>([
   'EXPORT_EMPTY_ENCOUNTER_TABLE',
@@ -29,10 +30,22 @@ const LAYOUT_REFRESH_CODES = new Set<ExportReviewCode>([
   'EXPORT_SECTION_TITLE_WRAP',
   'EXPORT_LAST_PAGE_UNDERFILLED',
   'EXPORT_UNUSED_PAGE_REGION',
+  'EXPORT_MISSED_ART_OPPORTUNITY',
   'EXPORT_WEAK_HERO_PLACEMENT',
   'EXPORT_SPLIT_SCENE_PACKET',
   'EXPORT_UNBALANCED_COLUMNS',
+  'EXPORT_MARGIN_COLLISION',
+  'EXPORT_FOOTER_COLLISION',
+  'EXPORT_ORPHAN_TAIL_PARAGRAPH',
   'EXPORT_OVERLONG_TOC_FOR_SHORT_BOOK',
+]);
+
+const ART_DRIVEN_LAYOUT_CODES = new Set<LayoutRefreshReviewCode>([
+  'EXPORT_LAST_PAGE_UNDERFILLED',
+  'EXPORT_UNUSED_PAGE_REGION',
+  'EXPORT_MISSED_ART_OPPORTUNITY',
+  'EXPORT_UNBALANCED_COLUMNS',
+  'EXPORT_SPLIT_SCENE_PACKET',
 ]);
 
 type ContentFixableReviewCode = typeof CONTENT_FIXABLE_CODES extends Set<infer T> ? T : never;
@@ -279,6 +292,23 @@ function buildLayoutRefreshChanges(
   }));
 }
 
+function buildSpotArtChanges(
+  title: string,
+  codes: Set<LayoutRefreshReviewCode>,
+  count: number,
+): ExportReviewFixChange[] {
+  if (count <= 0) return [];
+  const drivingCodes = Array.from(codes).filter((code) => ART_DRIVEN_LAYOUT_CODES.has(code)).sort();
+  if (drivingCodes.length === 0) return [];
+
+  return [{
+    code: drivingCodes[0],
+    action: 'generate_spot_art',
+    title,
+    count,
+  }];
+}
+
 function layoutPlanChanged(previous: unknown, next: LayoutPlan): boolean {
   return JSON.stringify(previous ?? null) !== JSON.stringify(next);
 }
@@ -364,70 +394,124 @@ export async function applySafeExportReviewFixes(
   const changes: ExportReviewFixChange[] = [];
   let documentsUpdated = 0;
 
-  await prisma.$transaction(async (tx) => {
-    for (const document of documents) {
-      const contentCodes = contentFindingsByTitle.get(document.title) ?? null;
-      const layoutCodes = layoutFindingsByTitle.get(document.title) ?? null;
-      if (!contentCodes && !layoutCodes) continue;
+  const pendingUpdates: Array<{
+    id: string;
+    title: string;
+    nextContent: DocumentContent;
+    nextLayoutPlan: LayoutPlan | null;
+    nextFixes: AppliedFixCounter;
+    layoutCodes: Set<LayoutRefreshReviewCode> | null;
+    contentChanged: boolean;
+    layoutChanged: boolean;
+    generatedSpotArtCount: number;
+  }> = [];
 
-      const baseContent = document.content as DocumentContent | null;
-      let nextContent = ensureDocContent(baseContent);
-      let nextLayoutPlan = document.layoutPlan as LayoutPlan | null;
-      let contentChanged = false;
-      let nextFixes = emptyFixCounter();
+  for (const document of documents) {
+    const contentCodes = contentFindingsByTitle.get(document.title) ?? null;
+    const layoutCodes = layoutFindingsByTitle.get(document.title) ?? null;
+    if (!contentCodes && !layoutCodes) continue;
 
-      if (contentCodes) {
-        const safeResult = applySafeFixesToDocument({
-          id: document.id,
-          title: document.title,
-          kind: document.kind,
-          content: baseContent,
-          layoutPlan: document.layoutPlan ?? null,
-        }, contentCodes);
-        nextContent = safeResult.content;
-        nextFixes = safeResult.fixes;
-        contentChanged = safeResult.changed;
-      }
+    const baseContent = document.content as DocumentContent | null;
+    let nextContent = ensureDocContent(baseContent);
+    let nextLayoutPlan = document.layoutPlan as LayoutPlan | null;
+    let contentChanged = false;
+    let nextFixes = emptyFixCounter();
+    let generatedSpotArtCount = 0;
 
-      const resolvedLayout = resolveDocumentLayout({
+    if (contentCodes) {
+      const safeResult = applySafeFixesToDocument({
+        id: document.id,
+        title: document.title,
+        kind: document.kind,
+        content: baseContent,
+        layoutPlan: document.layoutPlan ?? null,
+      }, contentCodes);
+      nextContent = safeResult.content;
+      nextFixes = safeResult.fixes;
+      contentChanged = safeResult.changed;
+    }
+
+    if (layoutCodes && Array.from(layoutCodes).some((code) => ART_DRIVEN_LAYOUT_CODES.has(code))) {
+      const artAugmented = materializeSparsePageArt({
         content: nextContent,
-        layoutPlan: nextLayoutPlan,
         kind: document.kind,
         title: document.title,
+        reviewCodes: Array.from(layoutCodes),
       });
-      nextContent = resolvedLayout.content;
-      nextLayoutPlan = resolvedLayout.layoutPlan;
-
-      let layoutChanged = layoutPlanChanged(document.layoutPlan, nextLayoutPlan)
-        || JSON.stringify(baseContent) !== JSON.stringify(nextContent);
-
-      if (layoutCodes) {
-        const recommendedLayout = recommendLayoutPlan(nextContent, nextLayoutPlan, {
-          documentKind: document.kind ?? null,
-          documentTitle: document.title,
-          reviewCodes: Array.from(layoutCodes),
+      if (artAugmented.changed) {
+        nextContent = artAugmented.content;
+        contentChanged = true;
+        const realizedArt = await realizeSparsePageArt({
+          projectId: exportJob.projectId,
+          userId: exportJob.userId,
+          content: artAugmented.content,
+          insertedNodeIds: artAugmented.insertedNodeIds,
         });
-        if (layoutPlanChanged(nextLayoutPlan, recommendedLayout)) {
-          nextLayoutPlan = recommendedLayout;
-          layoutChanged = true;
+
+        if (realizedArt.changed) {
+          nextContent = realizedArt.content;
+          generatedSpotArtCount = realizedArt.generatedCount;
         }
       }
+    }
 
-      if (!contentChanged && !layoutChanged) continue;
+    const resolvedLayout = resolveDocumentLayout({
+      content: nextContent,
+      layoutPlan: nextLayoutPlan,
+      kind: document.kind,
+      title: document.title,
+    });
+    nextContent = resolvedLayout.content;
+    nextLayoutPlan = resolvedLayout.layoutPlan;
 
+    let layoutChanged = layoutPlanChanged(document.layoutPlan, nextLayoutPlan)
+      || JSON.stringify(baseContent) !== JSON.stringify(nextContent);
+
+    if (layoutCodes) {
+      const recommendedLayout = recommendLayoutPlan(nextContent, nextLayoutPlan, {
+        documentKind: document.kind ?? null,
+        documentTitle: document.title,
+        reviewCodes: Array.from(layoutCodes),
+      });
+      if (layoutPlanChanged(nextLayoutPlan, recommendedLayout)) {
+        nextLayoutPlan = recommendedLayout;
+        layoutChanged = true;
+      }
+    }
+
+    if (!contentChanged && !layoutChanged) continue;
+
+    pendingUpdates.push({
+      id: document.id,
+      title: document.title,
+      nextContent,
+      nextLayoutPlan,
+      nextFixes,
+      layoutCodes,
+      contentChanged,
+      layoutChanged,
+      generatedSpotArtCount,
+    });
+  }
+
+  await prisma.$transaction(async (tx) => {
+    for (const update of pendingUpdates) {
       await tx.projectDocument.update({
-        where: { id: document.id },
+        where: { id: update.id },
         data: {
-          content: nextContent as unknown as Prisma.InputJsonValue,
-          layoutPlan: nextLayoutPlan as unknown as Prisma.InputJsonValue,
+          content: update.nextContent as unknown as Prisma.InputJsonValue,
+          layoutPlan: update.nextLayoutPlan as unknown as Prisma.InputJsonValue,
           status: 'edited',
         },
       });
 
       documentsUpdated += 1;
-      changes.push(...buildFixChanges(document.title, nextFixes));
-      if (layoutCodes && layoutChanged) {
-        changes.push(...buildLayoutRefreshChanges(document.title, layoutCodes));
+      changes.push(...buildFixChanges(update.title, update.nextFixes));
+      if (update.layoutCodes && update.generatedSpotArtCount > 0) {
+        changes.push(...buildSpotArtChanges(update.title, update.layoutCodes, update.generatedSpotArtCount));
+      }
+      if (update.layoutCodes && update.layoutChanged) {
+        changes.push(...buildLayoutRefreshChanges(update.title, update.layoutCodes));
       }
     }
   });

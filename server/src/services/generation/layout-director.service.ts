@@ -6,6 +6,7 @@ import {
   type LayoutRecipe,
 } from '@dnd-booker/shared';
 import { prisma } from '../../config/database.js';
+import { materializeSparsePageArt } from '../layout-art.service.js';
 
 interface LayoutDirectedDocumentSummary {
   documentId: string;
@@ -60,15 +61,78 @@ export async function executeLayoutDirectorPass(run: { id: string; projectId: st
     const content = asDocumentContent(document.content);
     if (!content) continue;
 
-    const normalizedContent = ensureStableNodeIds(content);
-    const layoutPlan = recommendLayoutPlan(normalizedContent, document.layoutPlan as any, {
+    let normalizedContent = ensureStableNodeIds(content);
+    let layoutPlan = recommendLayoutPlan(normalizedContent, document.layoutPlan as any, {
       documentKind: document.kind,
       documentTitle: document.title,
     });
-    const pageModel = compilePageModel(normalizedContent, layoutPlan, 'standard_pdf', {
+    let pageModel = compilePageModel(normalizedContent, layoutPlan, 'standard_pdf', {
       documentKind: document.kind,
       documentTitle: document.title,
     });
+
+    const baselineArt = materializeSparsePageArt({
+      content: normalizedContent,
+      kind: document.kind,
+      title: document.title,
+    });
+    if (baselineArt.changed) {
+      normalizedContent = baselineArt.content;
+      layoutPlan = recommendLayoutPlan(normalizedContent, layoutPlan, {
+        documentKind: document.kind,
+        documentTitle: document.title,
+      });
+      pageModel = compilePageModel(normalizedContent, layoutPlan, 'standard_pdf', {
+        documentKind: document.kind,
+        documentTitle: document.title,
+      });
+    }
+
+    const hasSparseEstimatedPage = pageModel.pages.some((page) => {
+      const isOpener = page.fragments.some((fragment) => (
+        fragment.isOpener || fragment.isHero || fragment.nodeType === 'chapterHeader'
+      ));
+      const isLastPage = page.index === pageModel.pages.length;
+      if (isOpener) return false;
+      if (isLastPage) return page.fillRatio < 0.42;
+      return page.fillRatio < 0.58;
+    });
+
+    const hasSeverelyUnbalancedPage = pageModel.pages.some((page) => {
+      const isOpener = page.fragments.some((fragment) => (
+        fragment.isOpener || fragment.isHero || fragment.nodeType === 'chapterHeader'
+      ));
+      if (isOpener) return false;
+      return (page.columnMetrics.deltaRatio ?? 0) >= 0.28;
+    });
+
+    if (hasSparseEstimatedPage || hasSeverelyUnbalancedPage) {
+      const augmented = materializeSparsePageArt({
+        content: normalizedContent,
+        kind: document.kind,
+        title: document.title,
+        reviewCodes: [
+          ...(hasSparseEstimatedPage ? ['EXPORT_UNUSED_PAGE_REGION'] : []),
+          ...(hasSeverelyUnbalancedPage ? ['EXPORT_UNBALANCED_COLUMNS'] : []),
+        ],
+      });
+
+      if (augmented.changed) {
+        normalizedContent = augmented.content;
+        layoutPlan = recommendLayoutPlan(normalizedContent, layoutPlan, {
+          documentKind: document.kind,
+          documentTitle: document.title,
+          reviewCodes: [
+            ...(hasSparseEstimatedPage ? ['EXPORT_UNUSED_PAGE_REGION'] : []),
+            ...(hasSeverelyUnbalancedPage ? ['EXPORT_UNBALANCED_COLUMNS'] : []),
+          ],
+        });
+        pageModel = compilePageModel(normalizedContent, layoutPlan, 'standard_pdf', {
+          documentKind: document.kind,
+          documentTitle: document.title,
+        });
+      }
+    }
 
     if (
       JSON.stringify(normalizedContent) !== JSON.stringify(document.content)

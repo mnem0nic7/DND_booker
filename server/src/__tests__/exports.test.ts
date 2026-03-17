@@ -562,6 +562,8 @@ describe('Export Routes', () => {
         const updatedDoc = await prisma.projectDocument.findUniqueOrThrow({ where: { id: doc.id } });
         expect(updatedDoc.layoutPlan).toBeTruthy();
         expect((updatedDoc.layoutPlan as { sectionRecipe?: string }).sectionRecipe).not.toBe('utility_table_spread');
+        const contentNodes = ((updatedDoc.content as { content?: Array<{ type?: string }> })?.content ?? []);
+        expect(contentNodes.some((node) => node.type === 'fullBleedImage')).toBe(true);
       } finally {
         await prisma.exportJob.deleteMany({ where: { projectId, userId: user.id, outputUrl: '/output/reviewed-layout-only.pdf' } });
         await prisma.projectDocument.delete({ where: { id: doc.id } });

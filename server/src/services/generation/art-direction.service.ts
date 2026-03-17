@@ -26,6 +26,8 @@ interface ImageSlot {
   blockType: ImageCapableBlockType;
   nodeIndex: number;
   context: string;
+  preferredModel?: 'dall-e-3' | 'gpt-image-1';
+  preferredSize?: string;
 }
 
 interface AutomaticPlacementSeed {
@@ -88,7 +90,7 @@ const RECOMMENDED_SIZE_BY_BLOCK: Record<ImageCapableBlockType, string> = {
 const AUTO_ART_LIMIT_BY_BLOCK: Record<ImageCapableBlockType, number> = {
   titlePage: 1,
   chapterHeader: 8,
-  fullBleedImage: 4,
+  fullBleedImage: 8,
   mapBlock: 2,
   backCover: 1,
   npcProfile: 4,
@@ -326,6 +328,8 @@ export function collectImageSlots(
       const imageUrl = String(attrs[IMAGE_ATTR_BY_BLOCK[blockType]] || '').trim();
       if (imageUrl) return;
 
+      const preferredModel = String((node.attrs ?? {}).imageGenerationModel || '').trim();
+      const preferredSize = String((node.attrs ?? {}).imageGenerationSize || '').trim();
       slots.push({
         documentId: document.id,
         documentSlug: document.slug,
@@ -334,6 +338,10 @@ export function collectImageSlots(
         blockType,
         nodeIndex,
         context: buildSlotContext(nodes, nodeIndex),
+        preferredModel: preferredModel === 'dall-e-3' || preferredModel === 'gpt-image-1'
+          ? preferredModel
+          : undefined,
+        preferredSize: preferredSize || undefined,
       });
     });
   }
@@ -372,8 +380,8 @@ export function selectAutomaticArtSlots(
       nodeIndex: slot.nodeIndex,
       blockType: slot.blockType,
       context: slot.context,
-      model: RECOMMENDED_MODEL_BY_BLOCK[slot.blockType],
-      size: RECOMMENDED_SIZE_BY_BLOCK[slot.blockType],
+      model: slot.preferredModel ?? RECOMMENDED_MODEL_BY_BLOCK[slot.blockType],
+      size: slot.preferredSize ?? RECOMMENDED_SIZE_BY_BLOCK[slot.blockType],
     });
     selectedKeys.add(key);
     counts[slot.blockType] = currentCount + 1;

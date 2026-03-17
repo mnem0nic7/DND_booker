@@ -225,6 +225,25 @@
   user-select: none;
 }
 
+.layout-page.page-canvas {
+  display: grid;
+  grid-template-rows: minmax(0, var(--page-content-height, calc(var(--content-height, 912px) - 56px))) auto;
+  align-content: start;
+}
+
+.layout-page.page-canvas .layout-page__body {
+  min-height: 0;
+  max-height: var(--page-content-height, calc(var(--content-height, 912px) - 56px));
+}
+
+.layout-page.page-canvas > .page-footer {
+  position: relative;
+  bottom: auto;
+  left: auto;
+  right: auto;
+  margin-top: 0.15rem;
+}
+
 .page-canvas .ProseMirror .node-titlePage,
 .page-canvas .ProseMirror .node-creditsPage,
 .page-canvas .ProseMirror .node-backCover,
@@ -300,12 +319,20 @@
   color: var(--accent-color);
 }
 
-.page-canvas .ProseMirror hr {
+.page-canvas .ProseMirror hr.section-divider,
+.page-canvas .ProseMirror hr.ornamental-divider {
   border: none;
   height: var(--divider-height, 2px);
-  background: var(--divider-gradient);
   margin: 1.5rem 0;
   position: relative;
+}
+
+.page-canvas .ProseMirror hr.section-divider {
+  background: var(--color-divider, var(--accent-color));
+}
+
+.page-canvas .ProseMirror hr.ornamental-divider {
+  background: var(--divider-gradient);
 }
 
 /* Block-internal dividers: tighter spacing than standalone hr */
@@ -318,7 +345,22 @@
   margin: 0.35rem 0;
 }
 
-.page-canvas .ProseMirror hr::before {
+.page-canvas .ProseMirror .stat-block__divider::before,
+.page-canvas .ProseMirror .spell-card__divider::before,
+.page-canvas .ProseMirror .magic-item__divider::before,
+.page-canvas .ProseMirror .npc-profile__divider::before,
+.page-canvas .ProseMirror .race-block__divider::before,
+.page-canvas .ProseMirror .class-feature__divider::before,
+.page-canvas .ProseMirror .stat-block__divider::after,
+.page-canvas .ProseMirror .spell-card__divider::after,
+.page-canvas .ProseMirror .magic-item__divider::after,
+.page-canvas .ProseMirror .npc-profile__divider::after,
+.page-canvas .ProseMirror .race-block__divider::after,
+.page-canvas .ProseMirror .class-feature__divider::after {
+  content: none !important;
+}
+
+.page-canvas .ProseMirror hr.ornamental-divider::before {
   content: var(--divider-ornament, '');
   position: absolute;
   top: 50%;

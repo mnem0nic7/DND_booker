@@ -67,17 +67,6 @@ const ATOMIC_NODE_TYPES = new Set([
 
 const HERO_NODE_TYPES = new Set(['chapterHeader', 'fullBleedImage', 'mapBlock', 'handout']);
 const GRID_NODE_TYPES = new Set(['npcProfile']);
-const PACKET_NODE_TYPES = new Set([
-  'statBlock',
-  'encounterTable',
-  'randomTable',
-  'readAloudBox',
-  'sidebarCallout',
-  'handout',
-  'mapBlock',
-  'bulletList',
-  'orderedList',
-]);
 const HEADING_ATTACHMENT_NODE_TYPES = new Set([
   'paragraph',
   'bulletList',
@@ -173,6 +162,32 @@ function getNodeId(node: DocumentContent, fallbackIndex: number): string {
   return `block-${fallbackIndex + 1}`;
 }
 
+function readLayoutHintSpan(node: DocumentContent | undefined): LayoutSpan | null {
+  const span = typeof node?.attrs?.layoutSpanHint === 'string' ? node.attrs.layoutSpanHint.trim() : '';
+  return VALID_SPANS.has(span as LayoutSpan) ? span as LayoutSpan : null;
+}
+
+function readLayoutHintPlacement(node: DocumentContent | undefined): LayoutPlacement | null {
+  const placement = typeof node?.attrs?.layoutPlacementHint === 'string' ? node.attrs.layoutPlacementHint.trim() : '';
+  return VALID_PLACEMENTS.has(placement as LayoutPlacement) ? placement as LayoutPlacement : null;
+}
+
+function readArtRole(node: DocumentContent | undefined): string {
+  return typeof node?.attrs?.artRole === 'string' ? node.attrs.artRole.trim() : '';
+}
+
+function isGeneratedSpotArt(node: DocumentContent | undefined): boolean {
+  return Boolean(node)
+    && node?.type === 'fullBleedImage'
+    && ['spot_art', 'column_fill_art', 'sparse_page_repair', 'overflow_spot_art'].includes(readArtRole(node));
+}
+
+function isHeroCandidate(node: DocumentContent | undefined): boolean {
+  return Boolean(node)
+    && HERO_NODE_TYPES.has(node!.type)
+    && !isGeneratedSpotArt(node);
+}
+
 function textLength(node: DocumentContent | undefined): number {
   if (!node) return 0;
   if (node.type === 'text') return String(node.text ?? '').trim().length;
@@ -196,7 +211,7 @@ function detectRecipe(blocks: DocumentContent[], options: ResolveLayoutPlanOptio
 
   if (blocks.length === 0) return null;
 
-  const firstHeroCandidate = blocks.find((block) => HERO_NODE_TYPES.has(block.type));
+  const firstHeroCandidate = blocks.find((block) => isHeroCandidate(block));
   if (firstHeroCandidate) {
     return firstHeroCandidate.type === 'handout' ? 'full_page_insert' : 'chapter_hero_split';
   }
@@ -228,6 +243,8 @@ function createDefaultBlockPlan(
   let keepTogether = ATOMIC_NODE_TYPES.has(block.type);
   let groupId: string | null = null;
   let allowWrapBelow = false;
+  const hintedSpan = readLayoutHintSpan(block);
+  const hintedPlacement = readLayoutHintPlacement(block);
 
   if (block.type === 'titlePage' || block.type === 'backCover') {
     span = 'full_page';
@@ -236,10 +253,15 @@ function createDefaultBlockPlan(
   } else if (block.type === 'tableOfContents' || block.type === 'creditsPage') {
     span = 'both_columns';
     keepTogether = true;
+  } else if (block.type === 'fullBleedImage' && hintedSpan && hintedPlacement) {
+    span = hintedSpan;
+    placement = hintedPlacement;
+    keepTogether = true;
+    allowWrapBelow = hintedPlacement === 'hero_top';
   } else if (isWideRandomTable(block)) {
     span = 'both_columns';
     keepTogether = true;
-  } else if (sectionRecipe === 'chapter_hero_split' && sourceIndex === 0 && HERO_NODE_TYPES.has(block.type)) {
+  } else if (sectionRecipe === 'chapter_hero_split' && sourceIndex === 0 && isHeroCandidate(block)) {
     span = 'both_columns';
     placement = 'hero_top';
     keepTogether = true;
@@ -254,16 +276,12 @@ function createDefaultBlockPlan(
     keepTogether = true;
   }
 
-  if (sectionRecipe === 'encounter_packet_spread') {
-    const previous = blocks[sourceIndex - 1];
-    const next = blocks[sourceIndex + 1];
-    if (PACKET_NODE_TYPES.has(block.type) || isShortLeadIn(previous) && block.type === 'statBlock' || isShortLeadIn(block) && PACKET_NODE_TYPES.has(next?.type ?? '')) {
-      groupId = 'encounter-packet-1';
-      keepTogether = true;
-      if (block.type === 'statBlock' || block.type === 'encounterTable' || block.type === 'mapBlock' || block.type === 'handout') {
-        placement = 'side_panel';
-      }
-    }
+  if (
+    sectionRecipe === 'encounter_packet_spread'
+    && (block.type === 'statBlock' || block.type === 'encounterTable' || block.type === 'mapBlock' || block.type === 'handout')
+  ) {
+    keepTogether = true;
+    placement = 'side_panel';
   }
 
   if (sectionRecipe === 'utility_table_spread' && (block.type === 'mapBlock' || block.type === 'handout' || block.type === 'randomTable')) {
@@ -313,6 +331,101 @@ function isShortSupportBlock(node: DocumentContent | undefined): boolean {
   if (!node) return false;
   if (node.type === 'paragraph') return textLength(node) > 0 && textLength(node) <= 260;
   return node.type === 'bulletList' || node.type === 'orderedList';
+}
+
+function headingLevel(node: DocumentContent | undefined): number | null {
+  if (!node || node.type !== 'heading') return null;
+  const raw = node.attrs?.level;
+  const value = typeof raw === 'number' ? raw : Number(raw);
+  return Number.isFinite(value) ? value : null;
+}
+
+function containsEncounterAnchor(nodes: DocumentContent[]): boolean {
+  return nodes.some((node) =>
+    node.type === 'statBlock'
+    || node.type === 'encounterTable',
+  );
+}
+
+function isEncounterAnchor(node: DocumentContent | undefined): boolean {
+  return node?.type === 'statBlock' || node?.type === 'encounterTable';
+}
+
+function isEncounterPacketSupport(node: DocumentContent | undefined): boolean {
+  if (!node) return false;
+  return node.type === 'heading'
+    || node.type === 'paragraph'
+    || node.type === 'bulletList'
+    || node.type === 'orderedList'
+    || node.type === 'readAloudBox'
+    || node.type === 'sidebarCallout'
+    || node.type === 'fullBleedImage'
+    || node.type === 'mapBlock'
+    || node.type === 'handout';
+}
+
+function isEncounterPacketSupportForAnchor(
+  node: DocumentContent | undefined,
+  anchorType: DocumentContent['type'] | undefined,
+): boolean {
+  if (!isEncounterPacketSupport(node)) return false;
+  if (anchorType !== 'statBlock') return true;
+
+  return node?.type === 'heading'
+    || node?.type === 'paragraph'
+    || node?.type === 'readAloudBox';
+}
+
+function applyEncounterSectionGrouping(
+  blocks: DocumentContent[],
+  layoutBlocks: LayoutPlanBlock[],
+): void {
+  let groupIndex = 1;
+
+  for (let index = 0; index < blocks.length; index += 1) {
+    const anchor = blocks[index];
+    if (!isEncounterAnchor(anchor)) continue;
+    const maxBefore = anchor.type === 'statBlock' ? 3 : 6;
+    const maxAfter = anchor.type === 'statBlock' ? 1 : 3;
+
+    let start = index;
+    let beforeCount = 0;
+    while (start > 0 && beforeCount < maxBefore) {
+      const previous = blocks[start - 1];
+      if (!previous || !isEncounterPacketSupportForAnchor(previous, anchor.type)) break;
+      if (previous.type === 'heading') {
+        start -= 1;
+        break;
+      }
+      start -= 1;
+      beforeCount += 1;
+    }
+
+    let end = index;
+    let afterCount = 0;
+    while (end + 1 < blocks.length && afterCount < maxAfter) {
+      const next = blocks[end + 1];
+      if (!next || !isEncounterPacketSupportForAnchor(next, anchor.type) || next.type === 'heading') break;
+      end += 1;
+      afterCount += 1;
+    }
+
+    const sectionBlocks = blocks.slice(start, end + 1);
+    if (!containsEncounterAnchor(sectionBlocks)) {
+      continue;
+    }
+
+    const groupId = `encounter-packet-${groupIndex}`;
+    groupIndex += 1;
+
+    for (let cursor = start; cursor <= end; cursor += 1) {
+      if (blocks[cursor]?.type === 'horizontalRule') continue;
+      layoutBlocks[cursor].groupId = groupId;
+      layoutBlocks[cursor].keepTogether = true;
+    }
+
+    index = end;
+  }
 }
 
 function applyHeadingAttachmentGrouping(
@@ -410,6 +523,125 @@ function applyLocalUtilityPacketGrouping(
   }
 }
 
+function applyShortTailParagraphGrouping(
+  blocks: DocumentContent[],
+  layoutBlocks: LayoutPlanBlock[],
+): void {
+  let groupIndex = 1;
+
+  for (let index = 1; index < blocks.length; index += 1) {
+    const block = blocks[index];
+    const previous = blocks[index - 1];
+    if (!block || !previous) continue;
+    if (block.type !== 'paragraph' || textLength(block) > 180) continue;
+    if (
+      !isShortSupportBlock(previous)
+      && previous.type !== 'npcProfile'
+      && previous.type !== 'sidebarCallout'
+      && previous.type !== 'readAloudBox'
+    ) {
+      continue;
+    }
+
+    const previousPlan = layoutBlocks[index - 1];
+    const currentPlan = layoutBlocks[index];
+    if (!previousPlan || !currentPlan) continue;
+
+    const groupId = previousPlan.groupId || `tail-packet-${groupIndex++}`;
+    previousPlan.groupId = groupId;
+    previousPlan.keepTogether = true;
+    currentPlan.groupId = groupId;
+    currentPlan.keepTogether = true;
+  }
+}
+
+function applyTerminalOrphanTailGrouping(
+  blocks: DocumentContent[],
+  layoutBlocks: LayoutPlanBlock[],
+): void {
+  if (blocks.length < 2) return;
+
+  const lastIndex = blocks.length - 1;
+  const last = blocks[lastIndex];
+  const previous = blocks[lastIndex - 1];
+  if (!last || !previous) return;
+  if (last.type !== 'paragraph' || textLength(last) > 220) return;
+
+  const previousIsAttachable = previous.type === 'paragraph'
+    || previous.type === 'bulletList'
+    || previous.type === 'orderedList'
+    || previous.type === 'sidebarCallout'
+    || previous.type === 'readAloudBox'
+    || previous.type === 'npcProfile'
+    || previous.type === 'statBlock'
+    || previous.type === 'encounterTable'
+    || previous.type === 'randomTable';
+  if (!previousIsAttachable) return;
+
+  const previousPlan = layoutBlocks[lastIndex - 1];
+  const currentPlan = layoutBlocks[lastIndex];
+  if (!previousPlan || !currentPlan) return;
+
+  const groupId = previousPlan.groupId || 'terminal-tail-packet-1';
+  previousPlan.groupId = groupId;
+  previousPlan.keepTogether = true;
+  currentPlan.groupId = groupId;
+  currentPlan.keepTogether = true;
+}
+
+function applyIntroTailPanelGrouping(
+  blocks: DocumentContent[],
+  layoutBlocks: LayoutPlanBlock[],
+): void {
+  const tailSegments: number[][] = [];
+  let cursor = blocks.length - 1;
+
+  while (cursor > 0) {
+    const current = blocks[cursor];
+    if (!current) break;
+
+    let segment: number[] | null = null;
+    if (
+      (current.type === 'sidebarCallout' || current.type === 'readAloudBox')
+      && !layoutBlocks[cursor]?.groupId
+      && textLength(current) <= 520
+    ) {
+      segment = [cursor];
+    } else {
+      const heading = blocks[cursor - 1];
+      if (
+        heading
+        && heading.type === 'heading'
+        && !layoutBlocks[cursor - 1]?.groupId
+        && !layoutBlocks[cursor]?.groupId
+        && (current.type === 'bulletList' || current.type === 'orderedList')
+        && textLength(current) <= 520
+      ) {
+        segment = [cursor - 1, cursor];
+      }
+    }
+
+    if (!segment) break;
+
+    tailSegments.unshift(segment);
+    cursor = segment[0] - 1;
+
+    if (tailSegments.length >= 2) break;
+  }
+
+  if (tailSegments.length === 0) return;
+
+  const groupId = 'intro-tail-panel-1';
+  for (const segment of tailSegments) {
+    for (const memberIndex of segment) {
+      layoutBlocks[memberIndex].groupId = groupId;
+      layoutBlocks[memberIndex].keepTogether = true;
+      layoutBlocks[memberIndex].span = 'both_columns';
+      layoutBlocks[memberIndex].placement = 'bottom_panel';
+    }
+  }
+}
+
 function normalizeBlockPlan(
   block: LayoutPlanBlock,
   fallback: LayoutPlanBlock,
@@ -419,10 +651,58 @@ function normalizeBlockPlan(
     presentationOrder: Number.isFinite(block.presentationOrder) ? Number(block.presentationOrder) : fallback.presentationOrder,
     span: VALID_SPANS.has(block.span) ? block.span : fallback.span,
     placement: VALID_PLACEMENTS.has(block.placement) ? block.placement : fallback.placement,
-    groupId: typeof block.groupId === 'string' && block.groupId.trim() ? block.groupId.trim() : fallback.groupId,
+    groupId: block.groupId === null
+      ? null
+      : (typeof block.groupId === 'string' && block.groupId.trim() ? block.groupId.trim() : fallback.groupId),
     keepTogether: typeof block.keepTogether === 'boolean' ? block.keepTogether : fallback.keepTogether,
     allowWrapBelow: typeof block.allowWrapBelow === 'boolean' ? block.allowWrapBelow : fallback.allowWrapBelow,
   };
+}
+
+function sanitizeEncounterPacketGroups(
+  content: DocumentContent,
+  blocks: LayoutPlanBlock[],
+  defaultBlocksById: Map<string, LayoutPlanBlock>,
+): LayoutPlanBlock[] {
+  const topLevel = getTopLevelBlocks(content);
+  const contentByNodeId = new Map(
+    topLevel.map((block, index) => [getNodeId(block, index), block] as const),
+  );
+  const membersByGroupId = new Map<string, LayoutPlanBlock[]>();
+
+  for (const block of blocks) {
+    if (!block.groupId?.startsWith('encounter-packet-')) continue;
+    const entry = membersByGroupId.get(block.groupId) ?? [];
+    entry.push(block);
+    membersByGroupId.set(block.groupId, entry);
+  }
+
+  const staleNodeIds = new Set<string>();
+  for (const members of membersByGroupId.values()) {
+    const memberNodes = members
+      .map((member) => contentByNodeId.get(member.nodeId))
+      .filter((node): node is DocumentContent => Boolean(node));
+    const hasAnchor = containsEncounterAnchor(memberNodes);
+    const isOversized = members.length > 8;
+    const hasExplorationTable = memberNodes.some((node) => node.type === 'randomTable');
+    if (!hasAnchor || isOversized || (hasExplorationTable && members.length > 6)) {
+      for (const member of members) {
+        staleNodeIds.add(member.nodeId);
+      }
+    }
+  }
+
+  if (staleNodeIds.size === 0) return blocks;
+
+  return blocks.map((block) => {
+    if (!staleNodeIds.has(block.nodeId)) return block;
+    const fallback = defaultBlocksById.get(block.nodeId);
+    if (!fallback) return block;
+    return {
+      ...fallback,
+      presentationOrder: block.presentationOrder,
+    };
+  });
 }
 
 export function ensureStableNodeIds(content: DocumentContent): DocumentContent {
@@ -514,7 +794,7 @@ export function buildDefaultLayoutPlan(
   const layoutBlocks = blocks.map((block, index) => createDefaultBlockPlan(block, index, sectionRecipe, blocks));
 
   if (sectionRecipe === 'chapter_hero_split') {
-    const heroIndex = blocks.findIndex((block) => HERO_NODE_TYPES.has(block.type));
+    const heroIndex = blocks.findIndex((block) => isHeroCandidate(block));
     if (heroIndex >= 0) {
       for (const layoutBlock of layoutBlocks) {
         if (layoutBlock.presentationOrder < heroIndex) {
@@ -535,6 +815,13 @@ export function buildDefaultLayoutPlan(
   if (sectionRecipe !== 'intro_split_spread') {
     applyHeadingAttachmentGrouping(blocks, layoutBlocks);
     applyLocalUtilityPacketGrouping(blocks, layoutBlocks);
+    applyShortTailParagraphGrouping(blocks, layoutBlocks);
+    applyTerminalOrphanTailGrouping(blocks, layoutBlocks);
+    if (blocks.some((block) => block.type === 'statBlock' || block.type === 'encounterTable')) {
+      applyEncounterSectionGrouping(blocks, layoutBlocks);
+    }
+  } else {
+    applyIntroTailPanelGrouping(blocks, layoutBlocks);
   }
 
   return {
@@ -584,6 +871,8 @@ export function resolveLayoutPlan(
       };
     })
     .sort((left, right) => left.presentationOrder - right.presentationOrder);
+  const sanitizedOrders = sanitizeEncounterPacketGroups(normalizedContent, normalizedOrders, defaultBlocksById)
+    .sort((left, right) => left.presentationOrder - right.presentationOrder);
 
   return {
     content: normalizedContent,
@@ -595,7 +884,7 @@ export function resolveLayoutPlan(
       columnBalanceTarget: VALID_BALANCE_TARGETS.has(layoutPlan.columnBalanceTarget)
         ? layoutPlan.columnBalanceTarget
         : 'balanced',
-      blocks: normalizedOrders,
+      blocks: sanitizedOrders,
     },
     validation,
   };
@@ -609,10 +898,38 @@ export function recommendLayoutPlan(
   const normalizedContent = ensureStableNodeIds(content);
   const codes = new Set(options.reviewCodes ?? []);
   const blocks = getTopLevelBlocks(normalizedContent);
+  const blockTypeById = new Map(
+    blocks.map((block, index) => [getNodeId(block, index), block.type] as const),
+  );
+  const generatedSpotArtBlocks = [...blocks]
+    .map((block, index) => ({ block, index, nodeId: getNodeId(block, index) }))
+    .filter(({ block }) => isGeneratedSpotArt(block));
+  const sparseArtNodeId = (
+    codes.has('EXPORT_UNUSED_PAGE_REGION') || codes.has('EXPORT_LAST_PAGE_UNDERFILLED')
+  )
+    ? generatedSpotArtBlocks
+      .filter(({ block }) => readArtRole(block) === 'sparse_page_repair')
+      .map(({ nodeId }) => nodeId)
+      .at(-1) ?? null
+    : null;
+  const columnArtNodeId = (
+    codes.has('EXPORT_MISSED_ART_OPPORTUNITY')
+    || codes.has('EXPORT_UNBALANCED_COLUMNS')
+    || codes.has('EXPORT_SPLIT_SCENE_PACKET')
+    || ((codes.has('EXPORT_UNUSED_PAGE_REGION') || codes.has('EXPORT_LAST_PAGE_UNDERFILLED')) && !sparseArtNodeId)
+  )
+    ? generatedSpotArtBlocks
+      .filter(({ block }) => {
+        const role = readArtRole(block);
+        return role === 'spot_art' || role === 'column_fill_art' || role === 'overflow_spot_art';
+      })
+      .map(({ nodeId }) => nodeId)
+      .at(-1) ?? null
+    : null;
 
   let preferRecipe = options.preferRecipe ?? null;
-  if ((codes.has('EXPORT_WEAK_HERO_PLACEMENT') || codes.has('EXPORT_UNUSED_PAGE_REGION') || codes.has('EXPORT_UNBALANCED_COLUMNS'))
-    && blocks.some((block) => HERO_NODE_TYPES.has(block.type))) {
+  if ((codes.has('EXPORT_WEAK_HERO_PLACEMENT') || codes.has('EXPORT_UNUSED_PAGE_REGION') || codes.has('EXPORT_MISSED_ART_OPPORTUNITY') || codes.has('EXPORT_UNBALANCED_COLUMNS'))
+    && blocks.some((block) => isHeroCandidate(block))) {
     preferRecipe = 'chapter_hero_split';
   } else if (codes.has('EXPORT_SPLIT_SCENE_PACKET')
     && blocks.some((block) => block.type === 'statBlock' || block.type === 'encounterTable' || block.type === 'randomTable')) {
@@ -623,18 +940,56 @@ export function recommendLayoutPlan(
     ...options,
     preferRecipe,
   });
+  const shouldResetToDefault = options.documentKind === 'front_matter'
+    && (
+      codes.has('EXPORT_UNUSED_PAGE_REGION')
+      || codes.has('EXPORT_UNBALANCED_COLUMNS')
+      || codes.has('EXPORT_MISSED_ART_OPPORTUNITY')
+      || codes.has('EXPORT_MARGIN_COLLISION')
+      || codes.has('EXPORT_FOOTER_COLLISION')
+      || codes.has('EXPORT_ORPHAN_TAIL_PARAGRAPH')
+    );
   const resolved = resolveLayoutPlan(normalizedContent, currentLayoutPlan ?? defaultPlan, {
     ...options,
     preferRecipe,
   });
+  const effectiveResolved = shouldResetToDefault
+    ? resolveLayoutPlan(normalizedContent, defaultPlan, {
+        ...options,
+        preferRecipe,
+      })
+    : resolved;
 
   const nextPlan: LayoutPlan = {
-    ...resolved.layoutPlan,
+    ...effectiveResolved.layoutPlan,
     sectionRecipe: defaultPlan.sectionRecipe,
-    columnBalanceTarget: codes.has('EXPORT_UNBALANCED_COLUMNS') ? 'balanced' : resolved.layoutPlan.columnBalanceTarget,
-    blocks: resolved.layoutPlan.blocks.map((block) => {
+    columnBalanceTarget: (
+      codes.has('EXPORT_UNBALANCED_COLUMNS')
+      || codes.has('EXPORT_MARGIN_COLLISION')
+      || codes.has('EXPORT_FOOTER_COLLISION')
+      || codes.has('EXPORT_ORPHAN_TAIL_PARAGRAPH')
+    ) ? 'balanced' : effectiveResolved.layoutPlan.columnBalanceTarget,
+    blocks: effectiveResolved.layoutPlan.blocks.map((block) => {
       const fallback = defaultPlan.blocks.find((candidate) => candidate.nodeId === block.nodeId) ?? block;
-      if (codes.has('EXPORT_SPLIT_SCENE_PACKET') && fallback.groupId?.startsWith('encounter-packet')) {
+      if (
+        (codes.has('EXPORT_SPLIT_SCENE_PACKET')
+          || codes.has('EXPORT_FOOTER_COLLISION')
+          || codes.has('EXPORT_MARGIN_COLLISION'))
+        && fallback.groupId?.startsWith('encounter-packet')
+      ) {
+        const nodeType = blockTypeById.get(block.nodeId);
+        if (codes.has('EXPORT_FOOTER_COLLISION') || codes.has('EXPORT_MARGIN_COLLISION')) {
+          return {
+            ...fallback,
+            ...block,
+            groupId: null,
+            placement: (nodeType === 'statBlock' || nodeType === 'encounterTable' ? 'side_panel' : 'inline') as LayoutPlacement,
+            keepTogether: (
+              nodeType ? ATOMIC_NODE_TYPES.has(nodeType) : false
+            ) || nodeType === 'readAloudBox' || nodeType === 'sidebarCallout',
+            presentationOrder: block.presentationOrder,
+          };
+        }
         return {
           ...fallback,
           presentationOrder: block.presentationOrder,
@@ -644,6 +999,24 @@ export function recommendLayoutPlan(
         return {
           ...fallback,
           presentationOrder: 0,
+        };
+      }
+      if (sparseArtNodeId && block.nodeId === sparseArtNodeId) {
+        return {
+          ...fallback,
+          ...block,
+          span: 'both_columns' as LayoutSpan,
+          placement: 'bottom_panel' as LayoutPlacement,
+          keepTogether: true,
+        };
+      }
+      if (columnArtNodeId && block.nodeId === columnArtNodeId) {
+        return {
+          ...fallback,
+          ...block,
+          span: 'column' as LayoutSpan,
+          placement: 'side_panel' as LayoutPlacement,
+          keepTogether: true,
         };
       }
       return {
@@ -674,7 +1047,7 @@ function getPagePresetMetrics(
       pageHeightPx: 1056,
       pagePaddingX: 56,
       pagePaddingY: 56,
-      footerReservePx: 40,
+      footerReservePx: 56,
       columnCount: isSingleColumnDocument ? 1 : 2,
       columnGapPx: 18,
     };
@@ -698,7 +1071,7 @@ function getPagePresetMetrics(
       pageHeightPx: 1056,
       pagePaddingX: 60,
       pagePaddingY: 60,
-      footerReservePx: 40,
+      footerReservePx: 56,
       columnCount: isSingleColumnDocument ? 1 : 2,
       columnGapPx: 18,
     };
@@ -709,7 +1082,7 @@ function getPagePresetMetrics(
     pageHeightPx: 1056,
     pagePaddingX: 60,
     pagePaddingY: 60,
-    footerReservePx: 40,
+    footerReservePx: 56,
     columnCount: isSingleColumnDocument ? 1 : 2,
     columnGapPx: 18,
   };
@@ -801,6 +1174,25 @@ function estimateUnitHeight(unit: LayoutFlowUnit, fragments: LayoutFlowFragment[
   if (primaryTypes.has('bulletList') || primaryTypes.has('orderedList')) return 90 + Math.ceil(textChars / 120) * 16;
 
   return Math.max(52, 32 + Math.ceil(textChars / 90) * 18);
+}
+
+function getUnitLayoutReserve(unit: LayoutFlowUnit, flow: LayoutFlowModel): number {
+  const nodeTypes = getUnitNodeTypes(unit, flow);
+  if (
+    nodeTypes.has('sidebarCallout')
+    || nodeTypes.has('readAloudBox')
+    || nodeTypes.has('npcProfile')
+    || nodeTypes.has('statBlock')
+    || nodeTypes.has('encounterTable')
+  ) {
+    return 12;
+  }
+
+  if (nodeTypes.has('randomTable') || nodeTypes.has('fullBleedImage')) {
+    return 6;
+  }
+
+  return 0;
 }
 
 function unitMeasurementMap(
@@ -1033,6 +1425,7 @@ export function compileMeasuredPageModel(
     let cursorY = 0;
     for (const unit of flow.units) {
       const height = measuredHeights.get(unit.id) ?? 120;
+      const reserve = getUnitLayoutReserve(unit, flow);
       assignUnitToPage({
         page,
         flow,
@@ -1046,7 +1439,7 @@ export function compileMeasuredPageModel(
         height,
         documentTitle: options.documentTitle,
       });
-      cursorY += height + FULL_WIDTH_UNIT_GAP_PX;
+      cursorY += height + FULL_WIDTH_UNIT_GAP_PX + reserve;
     }
     page.fillRatio = 1;
     page.columnMetrics = {
@@ -1096,6 +1489,7 @@ export function compileMeasuredPageModel(
 
   for (const unit of flow.units) {
     const height = measuredHeights.get(unit.id) ?? 120;
+    const reserve = getUnitLayoutReserve(unit, flow);
 
     if (unit.span === 'full_page' || unit.placement === 'full_page_insert') {
       if (currentPage.fragments.length > 0) {
@@ -1149,7 +1543,7 @@ export function compileMeasuredPageModel(
 
     if (shouldUseFullWidthRegion(unit, flow, height, contentHeight)) {
       const nextY = Math.max(leftHeight, rightHeight, reservedTop);
-      if (nextY > 0 && nextY + height > contentHeight) {
+      if (nextY > 0 && nextY + height + reserve > contentHeight) {
         startNewPage();
       }
 
@@ -1169,7 +1563,7 @@ export function compileMeasuredPageModel(
         documentTitle: options.documentTitle,
       });
 
-      const nextHeight = y + height + FULL_WIDTH_UNIT_GAP_PX;
+      const nextHeight = y + height + FULL_WIDTH_UNIT_GAP_PX + reserve;
       leftHeight = nextHeight;
       rightHeight = nextHeight;
       continue;
@@ -1182,8 +1576,8 @@ export function compileMeasuredPageModel(
     const alternateHeight = preferredColumn === 1 ? rightHeight : leftHeight;
 
     let columnIndex: 1 | 2 = preferredColumn;
-    if (primaryHeight + height > contentHeight) {
-      if (presetMetrics.columnCount > 1 && alternateHeight + height <= contentHeight) {
+    if (primaryHeight + height + reserve > contentHeight) {
+      if (presetMetrics.columnCount > 1 && alternateHeight + height + reserve <= contentHeight) {
         columnIndex = preferredColumn === 1 ? 2 : 1;
       } else {
         startNewPage();
@@ -1210,9 +1604,9 @@ export function compileMeasuredPageModel(
     });
 
     if (columnIndex === 1) {
-      leftHeight = y + height + COLUMN_FLOW_UNIT_GAP_PX;
+      leftHeight = y + height + COLUMN_FLOW_UNIT_GAP_PX + reserve;
     } else {
-      rightHeight = y + height + COLUMN_FLOW_UNIT_GAP_PX;
+      rightHeight = y + height + COLUMN_FLOW_UNIT_GAP_PX + reserve;
     }
   }
 

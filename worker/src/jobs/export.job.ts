@@ -18,6 +18,7 @@ import {
   finalizeExportReview,
   isBetterExportReview,
   planExportAutoFixes,
+  reviewMeasuredExportLayout,
   reviewPdfExport,
 } from '../services/export-review.service.js';
 import fs from 'fs/promises';
@@ -27,6 +28,7 @@ import {
   getProjectAssetRelativePath,
   parseProjectAssetUrl,
 } from '../../../server/src/services/asset-paths.service.js';
+import { materializeSparsePageArt, realizeSparsePageArt } from '../../../server/src/services/layout-art.service.js';
 
 interface ExportJobData {
   exportJobId: string;
@@ -35,6 +37,24 @@ interface ExportJobData {
 
 interface PdfRenderResult {
   buffer: Buffer;
+  review: ExportReview;
+}
+
+interface RenderableDocument {
+  title: string;
+  content: DocumentContent | null;
+  sortOrder: number;
+  kind?: DocumentKind | null;
+  layoutPlan?: LayoutPlan | null;
+}
+
+interface MeasuredRenderableDocument extends RenderableDocument {
+  pageModel: PageModel | null;
+}
+
+interface PreflightCandidate {
+  docs: RenderableDocument[];
+  measuredDocs: MeasuredRenderableDocument[];
   review: ExportReview;
 }
 
@@ -99,6 +119,170 @@ export function rewriteUploadUrlsInDocs(
     ...doc,
     content: doc.content ? rewriteUploadUrlsInValue(doc.content) as DocumentContent : doc.content,
   }));
+}
+
+function getReviewFindingTitle(
+  finding: ExportReview['findings'][number],
+  review: ExportReview,
+): string | null {
+  const detailsTitle = finding.details && typeof finding.details === 'object'
+    ? (finding.details as Record<string, unknown>).title
+    : null;
+  if (typeof detailsTitle === 'string' && detailsTitle.trim().length > 0) {
+    return detailsTitle.trim();
+  }
+
+  if (typeof finding.page !== 'number' || !Number.isFinite(finding.page)) {
+    return null;
+  }
+
+  const sectionStarts = [...(review.metrics.sectionStarts ?? [])]
+    .filter((section) => typeof section.title === 'string' && section.title.trim().length > 0 && typeof section.page === 'number')
+    .sort((left, right) => (left.page ?? Number.MAX_SAFE_INTEGER) - (right.page ?? Number.MAX_SAFE_INTEGER));
+
+  let matchedTitle: string | null = null;
+  for (const section of sectionStarts) {
+    if ((section.page ?? Number.MAX_SAFE_INTEGER) <= finding.page) {
+      matchedTitle = section.title.trim();
+      continue;
+    }
+    break;
+  }
+
+  return matchedTitle;
+}
+
+function shouldGenerateSpotArtForCodes(codes: Set<string>): boolean {
+  return codes.has('EXPORT_UNUSED_PAGE_REGION')
+    || codes.has('EXPORT_LAST_PAGE_UNDERFILLED')
+    || codes.has('EXPORT_UNBALANCED_COLUMNS')
+    || codes.has('EXPORT_SPLIT_SCENE_PACKET')
+    || codes.has('EXPORT_MISSED_ART_OPPORTUNITY');
+}
+
+async function measureRenderableDocs(input: {
+  docs: RenderableDocument[];
+  theme: string;
+  pagePreset: 'standard_pdf' | 'print_pdf';
+}): Promise<MeasuredRenderableDocument[]> {
+  const measuredPageModels = await measureDocumentPageModels({
+    documents: input.docs,
+    theme: input.theme,
+    pagePreset: input.pagePreset,
+  });
+
+  return input.docs.map((doc, index) => ({
+    ...doc,
+    pageModel: measuredPageModels[index] ?? null,
+  }));
+}
+
+async function buildPreflightCandidate(input: {
+  docs: RenderableDocument[];
+  theme: string;
+  pagePreset: 'standard_pdf' | 'print_pdf';
+}): Promise<PreflightCandidate> {
+  const measuredDocs = await measureRenderableDocs({
+    docs: input.docs,
+    theme: input.theme,
+    pagePreset: input.pagePreset,
+  });
+  const review = reviewMeasuredExportLayout({
+    documents: measuredDocs,
+  });
+
+  return {
+    docs: input.docs,
+    measuredDocs,
+    review,
+  };
+}
+
+async function applyPreflightCorrections(input: {
+  candidate: PreflightCandidate;
+  theme: string;
+  projectId: string;
+  userId: string;
+  pagePreset: 'standard_pdf' | 'print_pdf';
+}): Promise<PreflightCandidate | null> {
+  const codesByTitle = new Map<string, Set<string>>();
+  for (const finding of input.candidate.review.findings) {
+    const title = getReviewFindingTitle(finding, input.candidate.review);
+    if (!title) continue;
+    const entry = codesByTitle.get(title) ?? new Set<string>();
+    entry.add(finding.code);
+    codesByTitle.set(title, entry);
+  }
+
+  if (codesByTitle.size === 0) return null;
+
+  let changed = false;
+  const nextDocs: RenderableDocument[] = [];
+  for (const doc of input.candidate.docs) {
+    const codes = codesByTitle.get(doc.title) ?? null;
+    if (!codes || !doc.content) {
+      nextDocs.push(doc);
+      continue;
+    }
+
+    let nextContent = doc.content;
+    let nextLayoutPlan = doc.layoutPlan ?? null;
+
+    if (shouldGenerateSpotArtForCodes(codes)) {
+      const originalContent = nextContent;
+      const artAugmented = materializeSparsePageArt({
+        content: nextContent,
+        kind: doc.kind ?? null,
+        title: doc.title,
+        reviewCodes: Array.from(codes),
+      });
+      if (artAugmented.changed) {
+        nextContent = artAugmented.content;
+        changed = true;
+
+        const realized = await realizeSparsePageArt({
+          projectId: input.projectId,
+          userId: input.userId,
+          content: nextContent,
+          insertedNodeIds: artAugmented.insertedNodeIds,
+        });
+        if (realized.changed) {
+          nextContent = realized.content;
+        } else {
+          nextContent = originalContent;
+        }
+      }
+    }
+
+    const recommendedLayout = recommendLayoutPlan(nextContent, nextLayoutPlan, {
+      documentKind: doc.kind ?? null,
+      documentTitle: doc.title,
+      reviewCodes: Array.from(codes),
+    });
+
+    if (JSON.stringify(recommendedLayout) !== JSON.stringify(nextLayoutPlan ?? null)) {
+      nextLayoutPlan = recommendedLayout;
+      changed = true;
+    }
+
+    if (JSON.stringify(nextContent) !== JSON.stringify(doc.content)) {
+      changed = true;
+    }
+
+    nextDocs.push({
+      ...doc,
+      content: nextContent,
+      layoutPlan: nextLayoutPlan,
+    });
+  }
+
+  if (!changed) return null;
+
+  return buildPreflightCandidate({
+    docs: nextDocs,
+    theme: input.theme,
+    pagePreset: input.pagePreset,
+  });
 }
 
 export async function createTypstWorkspace(baseDir: string): Promise<string> {
@@ -202,6 +386,8 @@ export async function processExportJob(job: Job<ExportJobData>): Promise<void> {
         docs,
         theme,
         projectTitle: exportTitle,
+        projectId: exportJob.projectId,
+        userId: exportJob.userId,
         projectType: exportJob.project.type,
         printReady: format === 'print_pdf',
       });
@@ -216,6 +402,8 @@ export async function processExportJob(job: Job<ExportJobData>): Promise<void> {
           docs,
           theme,
           projectTitle: exportTitle,
+          projectId: exportJob.projectId,
+          userId: exportJob.userId,
           projectType: exportJob.project.type,
           printReady: format === 'print_pdf',
           autoFixes,
@@ -326,21 +514,29 @@ export async function processExportJob(job: Job<ExportJobData>): Promise<void> {
 
 async function renderPdfVariant(input: {
   filepath: string;
-  docs: Array<{
-    title: string;
-    content: DocumentContent | null;
-    sortOrder: number;
-    kind?: DocumentKind | null;
-    layoutPlan?: LayoutPlan | null;
-  }>;
+  docs: RenderableDocument[];
   theme: string;
   projectTitle: string;
+  projectId: string;
+  userId: string;
   projectType?: string | null;
   printReady: boolean;
   autoFixes?: ExportReviewAutoFix[];
   reviewCodes?: string[];
 }): Promise<PdfRenderResult> {
-  const { filepath, docs, theme, projectTitle, projectType = null, printReady, autoFixes = [], reviewCodes = [] } = input;
+  const {
+    filepath,
+    docs,
+    theme,
+    projectTitle,
+    projectId,
+    userId,
+    projectType = null,
+    printReady,
+    autoFixes = [],
+    reviewCodes = [],
+  } = input;
+  const pagePreset = printReady ? 'print_pdf' : 'standard_pdf';
   const renderDocs = autoFixes.includes('refresh_layout_plan')
     ? docs.map((doc) => ({
         ...doc,
@@ -354,20 +550,27 @@ async function renderPdfVariant(input: {
           : doc.layoutPlan ?? null,
       }))
     : docs;
-  const measuredPageModels = await measureDocumentPageModels({
-    documents: renderDocs,
+  const baseCandidate = await buildPreflightCandidate({
+    docs: renderDocs,
     theme,
-    pagePreset: printReady ? 'print_pdf' : 'standard_pdf',
+    pagePreset,
   });
-  const measuredDocs = renderDocs.map((doc, index) => ({
-    ...doc,
-    pageModel: measuredPageModels[index] ?? null,
-  }));
+  const correctedCandidate = await applyPreflightCorrections({
+    candidate: baseCandidate,
+    theme,
+    projectId,
+    userId,
+    pagePreset,
+  });
+  const selectedCandidate = correctedCandidate && isBetterExportReview(correctedCandidate.review, baseCandidate.review)
+    ? correctedCandidate
+    : baseCandidate;
+
   const html = assembleHtml({
-    documents: measuredDocs,
+    documents: selectedCandidate.measuredDocs,
     theme,
     projectTitle,
-    pagePreset: printReady ? 'print_pdf' : 'standard_pdf',
+    pagePreset,
     renderMode: 'paged',
   });
   const resolvedHtml = await rewriteUploadUrlsToEmbeddedDataUrls(html);
@@ -378,7 +581,7 @@ async function renderPdfVariant(input: {
   await fs.writeFile(filepath, buffer);
 
   try {
-    const reviewedDocs = measuredDocs.map((doc) => ({
+    const reviewedDocs = selectedCandidate.measuredDocs.map((doc) => ({
       title: doc.title,
       kind: doc.kind ?? null,
       content: doc.content,

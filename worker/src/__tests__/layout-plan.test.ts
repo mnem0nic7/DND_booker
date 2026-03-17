@@ -3,6 +3,8 @@ import {
   compileFlowModel,
   compileMeasuredPageModel,
   compilePageModel,
+  recommendLayoutPlan,
+  resolveLayoutPlan,
   renderContentWithLayoutPlan,
   validateLayoutPlan,
   type DocumentContent,
@@ -139,6 +141,448 @@ describe('layout-plan', () => {
     expect(encounterHtml).toContain('data-node-type="statBlock"');
   });
 
+  it('keeps hinted spot art in a single column instead of widening it to both columns', () => {
+    const content: DocumentContent = {
+      type: 'doc',
+      content: [
+        {
+          type: 'chapterHeader',
+          attrs: {
+            title: 'Into the Mine',
+            chapterNumber: 'Chapter 2',
+            backgroundImage: '/uploads/project/chapter-two.png',
+          },
+        },
+        paragraph('Opening body copy for the chapter.'),
+        {
+          type: 'fullBleedImage',
+          attrs: {
+            src: '/uploads/project/spot-art.png',
+            caption: '',
+            position: 'half',
+            artRole: 'spot_art',
+            layoutPlacementHint: 'side_panel',
+            layoutSpanHint: 'column',
+          },
+        },
+        paragraph('Follow-up body copy that should flow after the in-column art.'),
+      ],
+    };
+
+    const pageModel = compilePageModel(content, null, 'standard_pdf', {
+      documentKind: 'chapter',
+      documentTitle: 'Into the Mine',
+    });
+
+    const spotFragment = pageModel.fragments.find((fragment) => (
+      fragment.nodeType === 'fullBleedImage' && fragment.pageIndex === 1
+    ));
+
+    expect(spotFragment).toBeTruthy();
+    expect(spotFragment?.span).toBe('column');
+    expect(spotFragment?.placement).toBe('side_panel');
+    expect(spotFragment?.region === 'column_left' || spotFragment?.region === 'column_right').toBe(true);
+  });
+
+  it('renders bottom-panel full-width art after the column flow in paged HTML', () => {
+    const content: DocumentContent = {
+      type: 'doc',
+      content: [
+        paragraph('Closing scene text that should appear before the sparse-page repair art.'),
+        paragraph('A second paragraph so the column flow is clearly populated before the bottom panel.'),
+        {
+          type: 'fullBleedImage',
+          attrs: {
+            src: '/uploads/project/sparse-repair.png',
+            caption: '',
+            position: 'full',
+            artRole: 'sparse_page_repair',
+            layoutPlacementHint: 'bottom_panel',
+            layoutSpanHint: 'both_columns',
+          },
+        },
+      ],
+    };
+
+    const html = renderContentWithLayoutPlan({
+      content,
+      preset: 'standard_pdf',
+      options: {
+        documentKind: 'chapter',
+        documentTitle: 'Sparse Tail',
+      },
+    }).html;
+
+    const columnsIndex = html.indexOf('layout-page__columns');
+    const bottomPanelIndex = html.indexOf('layout-page__full-width layout-page__full-width--bottom');
+    expect(columnsIndex).toBeGreaterThanOrEqual(0);
+    expect(bottomPanelIndex).toBeGreaterThan(columnsIndex);
+  });
+
+  it('reserves extra bottom space for boxed utility blocks so they do not sit on the footer', () => {
+    const content: DocumentContent = {
+      type: 'doc',
+      content: [
+        paragraph('A long appendix paragraph that should nearly fill the page without leaving enough room for the boxed callout below. '.repeat(18)),
+        {
+          type: 'sidebarCallout',
+          attrs: { title: 'DM Tips' },
+          content: [paragraph('A boxed utility block should be pushed to the next page instead of landing on the footer edge.')],
+        },
+      ],
+    };
+
+    const flow = compileFlowModel(content, null, 'standard_pdf', {
+      documentKind: 'back_matter',
+      documentTitle: 'Appendix',
+    });
+
+    const paragraphUnit = flow.flow.units.find((unit) => unit.fragmentNodeIds.some((nodeId) =>
+      flow.flow.fragments.find((fragment) => fragment.nodeId === nodeId)?.nodeType === 'paragraph',
+    ));
+    const calloutUnit = flow.flow.units.find((unit) => unit.fragmentNodeIds.some((nodeId) =>
+      flow.flow.fragments.find((fragment) => fragment.nodeId === nodeId)?.nodeType === 'sidebarCallout',
+    ));
+
+    expect(paragraphUnit).toBeTruthy();
+    expect(calloutUnit).toBeTruthy();
+
+    const pageModel = compileMeasuredPageModel(flow.flow, [
+      { unitId: paragraphUnit!.id, heightPx: 730 },
+      { unitId: calloutUnit!.id, heightPx: 140 },
+    ], {
+      documentKind: 'back_matter',
+      documentTitle: 'Appendix',
+    });
+
+    const calloutFragment = pageModel.fragments.find((fragment) => fragment.nodeType === 'sidebarCallout');
+    expect(calloutFragment?.pageIndex).toBe(2);
+  });
+
+  it('relaxes overgrown encounter packets when footer collisions are reported', () => {
+    const content: DocumentContent = {
+      type: 'doc',
+      content: [
+        { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'Confronting the Ghostly Miner' }] },
+        paragraph('An opening paragraph frames the confrontation.'),
+        {
+          type: 'readAloudBox',
+          content: [{ type: 'paragraph', content: [{ type: 'text', text: 'The ghost pleads for understanding in a wavering whisper.' }] }],
+        },
+        {
+          type: 'bulletList',
+          content: [{ type: 'listItem', content: [paragraph('Players can negotiate, threaten, or attack.')] }],
+        },
+        {
+          type: 'statBlock',
+          attrs: { name: 'Ghostly Miner', ac: 11, hp: 45, speed: '30 ft. (hover)' },
+        },
+        {
+          type: 'sidebarCallout',
+          attrs: { title: 'DM Tips' },
+          content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Play up the tragedy and unease.' }] }],
+        },
+      ],
+    };
+
+    const recommended = recommendLayoutPlan(content, null, {
+      documentKind: 'chapter',
+      documentTitle: 'Confronting the Ghostly Miner',
+      reviewCodes: ['EXPORT_FOOTER_COLLISION'],
+    });
+
+    expect(recommended.blocks.some((block) => block.groupId?.startsWith('encounter-packet'))).toBe(false);
+    const statBlock = recommended.blocks.find((block) => block.nodeId.startsWith('statblock-'));
+    expect(statBlock?.placement).toBe('side_panel');
+    expect(statBlock?.keepTogether).toBe(true);
+  });
+
+  it('promotes the trailing front-matter utility tail into a bottom panel for intro spreads', () => {
+    const content: DocumentContent = {
+      type: 'doc',
+      content: [
+        { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'DM Brief' }] },
+        paragraph('Front-matter setup copy that fills the lead columns.'),
+        {
+          type: 'bulletList',
+          content: [{ type: 'listItem', content: [paragraph('Opening summary.')] }],
+        },
+        { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'Prep Checklist' }] },
+        {
+          type: 'bulletList',
+          content: [
+            { type: 'listItem', content: [paragraph('Mark the encounter tables you plan to use.')] },
+            { type: 'listItem', content: [paragraph('Highlight one fail-forward clue per scene.')] },
+          ],
+        },
+        { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'Rewards and Scaling' }] },
+        {
+          type: 'bulletList',
+          content: [
+            { type: 'listItem', content: [paragraph('Use milestone advancement.')] },
+            { type: 'listItem', content: [paragraph('Add reinforcements if the table is cruising.')] },
+          ],
+        },
+      ],
+    };
+
+    const pageModel = compilePageModel(content, null, 'standard_pdf', {
+      documentKind: 'front_matter',
+      documentTitle: 'Front Matter',
+    });
+
+    const checklistHeading = pageModel.fragments.find((fragment) =>
+      fragment.nodeType === 'heading' && fragment.content.content?.[0]?.text === 'Prep Checklist',
+    );
+    const checklistList = pageModel.fragments.find((fragment) =>
+      fragment.nodeType === 'bulletList' && fragment.presentationOrder === (checklistHeading?.presentationOrder ?? -1) + 1,
+    );
+    const rewardsHeading = pageModel.fragments.find((fragment) =>
+      fragment.nodeType === 'heading' && fragment.content.content?.[0]?.text === 'Rewards and Scaling',
+    );
+    const rewardsList = pageModel.fragments.find((fragment) =>
+      fragment.nodeType === 'bulletList' && fragment.presentationOrder === (rewardsHeading?.presentationOrder ?? -1) + 1,
+    );
+
+    expect(checklistHeading?.placement).toBe('bottom_panel');
+    expect(checklistHeading?.span).toBe('both_columns');
+    expect(checklistList?.placement).toBe('bottom_panel');
+    expect(checklistList?.span).toBe('both_columns');
+    expect(rewardsHeading?.placement).toBe('bottom_panel');
+    expect(rewardsHeading?.span).toBe('both_columns');
+    expect(rewardsList?.placement).toBe('bottom_panel');
+    expect(rewardsList?.span).toBe('both_columns');
+
+    const html = renderContentWithLayoutPlan({
+      content,
+      preset: 'standard_pdf',
+      options: {
+        documentKind: 'front_matter',
+        documentTitle: 'Front Matter',
+      },
+    }).html;
+
+    expect(html).toContain('layout-group-utility-grid');
+  });
+
+  it('treats a trailing front-matter sidebar callout as its own bottom-band utility panel', () => {
+    const content: DocumentContent = {
+      type: 'doc',
+      content: [
+        { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'DM Brief' }] },
+        paragraph('Front-matter setup copy that fills the lead columns.'),
+        { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'Rewards and Scaling' }] },
+        {
+          type: 'bulletList',
+          content: [
+            { type: 'listItem', content: [paragraph('Use milestone advancement.')] },
+            { type: 'listItem', content: [paragraph('Add reinforcements if the table is cruising.')] },
+          ],
+        },
+        {
+          type: 'sidebarCallout',
+          attrs: { title: 'Prep Checklist' },
+          content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Mark the likely encounter table and highlight one fail-forward clue.' }] }],
+        },
+      ],
+    };
+
+    const pageModel = compilePageModel(content, null, 'standard_pdf', {
+      documentKind: 'front_matter',
+      documentTitle: 'Front Matter',
+    });
+
+    const checklist = pageModel.fragments.find((fragment) =>
+      fragment.nodeType === 'sidebarCallout' && fragment.content.attrs?.title === 'Prep Checklist',
+    );
+    expect(checklist?.placement).toBe('bottom_panel');
+    expect(checklist?.span).toBe('both_columns');
+
+    const html = renderContentWithLayoutPlan({
+      content,
+      preset: 'standard_pdf',
+      options: {
+        documentKind: 'front_matter',
+        documentTitle: 'Front Matter',
+      },
+    }).html;
+
+    expect(html).toContain('layout-group-utility-grid');
+  });
+
+  it('groups only true encounter sections by local level-3 section instead of swallowing exploration openers', () => {
+    const content: DocumentContent = {
+      type: 'doc',
+      content: [
+        {
+          type: 'chapterHeader',
+          attrs: {
+            title: 'The Mine',
+            chapterNumber: 'Chapter 2',
+            backgroundImage: '/uploads/project/chapter-two.png',
+          },
+        },
+        { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'Chapter 2: The Mine' }] },
+        { type: 'heading', attrs: { level: 3 }, content: [{ type: 'text', text: 'Exploring the Mine' }] },
+        paragraph('The party enters the mine and begins to hear the first whispers.'),
+        {
+          type: 'fullBleedImage',
+          attrs: {
+            src: '/uploads/project/mine-spot.png',
+            caption: '',
+            position: 'half',
+            artRole: 'spot_art',
+            layoutPlacementHint: 'side_panel',
+            layoutSpanHint: 'column',
+          },
+        },
+        {
+          type: 'readAloudBox',
+          content: [paragraph('The entrance gapes like a mouth beneath the hill.')],
+        },
+        { type: 'heading', attrs: { level: 3 }, content: [{ type: 'text', text: 'Confronting the Ghostly Miner' }] },
+        paragraph('The ghostly miner emerges from the tunnel wall.'),
+        {
+          type: 'statBlock',
+          attrs: { name: 'Ghostly Miner', ac: 11, hp: 45, speed: 'fly 30 ft. (hover)' },
+        },
+        {
+          type: 'sidebarCallout',
+          attrs: { title: 'DM Tips', calloutType: 'info' },
+          content: [paragraph('Play up the pity and menace in equal measure.')],
+        },
+      ],
+    };
+
+    const pageModel = compilePageModel(content, null, 'standard_pdf', {
+      documentKind: 'chapter',
+      documentTitle: 'Chapter 2: The Mine',
+    });
+
+    const groupIds = new Set(
+      pageModel.fragments
+        .map((fragment) => fragment.groupId)
+        .filter((groupId): groupId is string => Boolean(groupId && groupId.startsWith('encounter-packet-'))),
+    );
+
+    expect(groupIds.size).toBe(1);
+    const exploringImage = pageModel.fragments.find((fragment) => fragment.nodeType === 'fullBleedImage');
+    const minerStats = pageModel.fragments.find((fragment) => fragment.nodeType === 'statBlock');
+    expect(exploringImage?.groupId).not.toBe(minerStats?.groupId);
+    expect(exploringImage?.groupId ?? null).toBeNull();
+  });
+
+  it('anchors encounter packets around the actual stat block instead of swallowing earlier scene tables', () => {
+    const content: DocumentContent = {
+      type: 'doc',
+      content: [
+        {
+          type: 'chapterHeader',
+          attrs: {
+            title: 'The Mine',
+            chapterNumber: 'Chapter 2',
+          },
+        },
+        { type: 'heading', attrs: { level: 3 }, content: [{ type: 'text', text: 'Exploring the Blackglass Mine' }] },
+        paragraph('The first stretch of the mine is exploration-heavy and should stay flexible.'),
+        {
+          type: 'randomTable',
+          attrs: {
+            title: 'Mine Echoes',
+            dieType: 'd6',
+            entries: JSON.stringify([{ roll: '1', result: 'A chill passes through the lantern flame.' }]),
+          },
+        },
+        {
+          type: 'fullBleedImage',
+          attrs: {
+            src: '/uploads/project/torchbearer.png',
+            caption: '',
+            position: 'half',
+            artRole: 'spot_art',
+            layoutPlacementHint: 'side_panel',
+            layoutSpanHint: 'column',
+          },
+        },
+        { type: 'heading', attrs: { level: 4 }, content: [{ type: 'text', text: 'Confronting the Ghostly Miner' }] },
+        paragraph('The ghostly miner rises from the rock with a rusted pick in hand.'),
+        {
+          type: 'readAloudBox',
+          content: [paragraph('Help me, the spirit croaks from the stone.')],
+        },
+        {
+          type: 'statBlock',
+          attrs: { name: 'Ghostly Miner', ac: 11, hp: 45, speed: 'fly 30 ft. (hover)' },
+        },
+        {
+          type: 'sidebarCallout',
+          attrs: { title: 'DM Tips', calloutType: 'info' },
+          content: [paragraph('Play up pity first, then menace.')],
+        },
+      ],
+    };
+
+    const flow = compileFlowModel(content, null, 'standard_pdf', {
+      documentKind: 'chapter',
+      documentTitle: 'Chapter 2: The Mine',
+    });
+
+    const randomTableFragment = flow.flow.fragments.find((fragment) => fragment.nodeType === 'randomTable');
+    const statBlockFragment = flow.flow.fragments.find((fragment) => fragment.nodeType === 'statBlock');
+    const readAloudFragment = flow.flow.fragments.find((fragment) => fragment.nodeType === 'readAloudBox');
+
+    expect(randomTableFragment?.groupId ?? null).toBeNull();
+    expect(statBlockFragment?.groupId).toBeTruthy();
+    expect(readAloudFragment?.groupId).toBe(statBlockFragment?.groupId);
+  });
+
+  it('drops stale oversized encounter-packet groupings from persisted layout plans', () => {
+    const content: DocumentContent = {
+      type: 'doc',
+      content: [
+        { type: 'heading', attrs: { level: 3, nodeId: 'h1' }, content: [{ type: 'text', text: 'Exploring the Mine' }] },
+        { type: 'paragraph', attrs: { nodeId: 'p1' }, content: [{ type: 'text', text: 'Exploration copy.' }] },
+        {
+          type: 'randomTable',
+          attrs: {
+            nodeId: 'rt1',
+            title: 'Mine Echoes',
+            dieType: 'd6',
+            entries: JSON.stringify([{ roll: '1', result: 'Cold wind.' }]),
+          },
+        },
+        { type: 'heading', attrs: { level: 4, nodeId: 'h2' }, content: [{ type: 'text', text: 'Confronting the Ghostly Miner' }] },
+        { type: 'paragraph', attrs: { nodeId: 'p2' }, content: [{ type: 'text', text: 'The ghost rises from the rock.' }] },
+        { type: 'readAloudBox', attrs: { nodeId: 'ra1' }, content: [paragraph('A rasping plea echoes in the dark.')] },
+        { type: 'statBlock', attrs: { nodeId: 'sb1', name: 'Ghostly Miner', ac: 11, hp: 45 } },
+        { type: 'sidebarCallout', attrs: { nodeId: 'sc1', title: 'DM Tips' }, content: [paragraph('Play up the pity first.')] },
+      ],
+    };
+
+    const resolved = resolveLayoutPlan(content, {
+      version: 1,
+      sectionRecipe: 'chapter_hero_split',
+      columnBalanceTarget: 'balanced',
+      blocks: ['h1', 'p1', 'rt1', 'h2', 'p2', 'ra1', 'sb1', 'sc1'].map((nodeId, index) => ({
+        nodeId,
+        presentationOrder: index,
+        span: 'column' as const,
+        placement: nodeId === 'sb1' ? 'side_panel' as const : 'inline' as const,
+        groupId: 'encounter-packet-1',
+        keepTogether: true,
+        allowWrapBelow: false,
+      })),
+    }, {
+      documentKind: 'chapter',
+      documentTitle: 'Chapter 2: The Mine',
+    });
+
+    const randomTablePlan = resolved.layoutPlan.blocks.find((block) => block.nodeId === 'rt1');
+    const statBlockPlan = resolved.layoutPlan.blocks.find((block) => block.nodeId === 'sb1');
+    expect(randomTablePlan?.groupId ?? null).not.toBe('encounter-packet-1');
+    expect(statBlockPlan?.groupId).toBeTruthy();
+  });
+
   it('builds a measured multi-page model with a hero opener and balanced body flow', () => {
     const content: DocumentContent = {
       type: 'doc',
@@ -164,7 +608,7 @@ describe('layout-plan', () => {
     });
     const measurements = flow.flow.units.map((unit, index) => ({
       unitId: unit.id,
-      heightPx: index === 0 ? 260 : 520,
+      heightPx: index === 0 ? 260 : 700,
     }));
     const pageModel = compileMeasuredPageModel(flow.flow, [
       ...measurements,
@@ -267,6 +711,28 @@ describe('layout-plan', () => {
 
     expect(pageModel.pages).toHaveLength(1);
     expect(pageModel.pages[0]?.fragments.some((fragment) => fragment.groupId === 'encounter-packet-1')).toBe(true);
+  });
+
+  it('attaches a short terminal paragraph to the preceding support block to avoid orphan tail pages', () => {
+    const content: DocumentContent = {
+      type: 'doc',
+      content: [
+        {
+          type: 'sidebarCallout',
+          attrs: { title: 'Consequences', calloutType: 'info' },
+          content: [paragraph('If the party breaks the ward, the tunnels awaken around them.')],
+        },
+        paragraph('One last omen lingers in the dust.'),
+      ],
+    };
+
+    const flow = compileFlowModel(content, null, 'standard_pdf', {
+      documentKind: 'chapter',
+      documentTitle: 'Consequences',
+    });
+
+    const groupIds = flow.flow.fragments.map((fragment) => fragment.groupId).filter(Boolean);
+    expect(groupIds.every((groupId) => groupId === 'tail-packet-1' || groupId === 'terminal-tail-packet-1')).toBe(true);
   });
 
   it('groups local utility packets around random tables in chapter hero layouts', () => {
@@ -394,5 +860,29 @@ describe('layout-plan', () => {
 
     expect(pageModel.fragments.find((fragment) => fragment.nodeType === 'randomTable')?.region).toBe('full_width');
     expect(pageModel.fragments.find((fragment) => fragment.nodeType === 'randomTable')?.columnIndex).toBeNull();
+  });
+
+  it('attaches a very short trailing paragraph to the section it closes', () => {
+    const content: DocumentContent = {
+      type: 'doc',
+      content: [
+        {
+          type: 'npcProfile',
+          attrs: { name: 'Mayor Aldric', role: 'Mayor' },
+        },
+        paragraph('The rumors and suspicions provide a tantalizing glimpse into the haunted history surrounding the mine and shift the players toward deeper investigation.'),
+        paragraph('With these insights gained, they press on toward the mine.'),
+      ],
+    };
+
+    const flow = compileFlowModel(content, null, 'standard_pdf', {
+      documentKind: 'chapter',
+      documentTitle: 'Chapter 1: The Town',
+    });
+
+    const narrativeParagraphs = flow.flow.fragments.filter((fragment) => fragment.nodeType === 'paragraph');
+    expect(narrativeParagraphs).toHaveLength(2);
+    expect(narrativeParagraphs[0]?.groupId).toBeTruthy();
+    expect(narrativeParagraphs[1]?.groupId).toBe(narrativeParagraphs[0]?.groupId);
   });
 });

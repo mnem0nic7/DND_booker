@@ -30,6 +30,31 @@ function renderGroup(groupId: string, fragments: Array<LayoutFlowFragment | Page
   const hasWideRandomTable = fragments.some((fragment) => fragment.nodeType === 'randomTable' && fragment.span === 'both_columns');
   const dataAttr = unitId ? ` data-layout-unit-id="${unitId}"` : '';
 
+  if (groupId.startsWith('intro-tail-panel')) {
+    const pairs: Array<Array<LayoutFlowFragment | PageModelFragment>> = [];
+    let currentPair: Array<LayoutFlowFragment | PageModelFragment> = [];
+
+    for (const fragment of fragments) {
+      const startsNewPanel = currentPair.length > 0 && (
+        fragment.nodeType === 'heading'
+        || fragment.nodeType === 'sidebarCallout'
+        || fragment.nodeType === 'readAloudBox'
+      );
+      if (startsNewPanel) {
+        pairs.push(currentPair);
+        currentPair = [];
+      }
+      currentPair.push(fragment);
+    }
+    if (currentPair.length > 0) pairs.push(currentPair);
+
+    if (pairs.length > 1) {
+      return `<div class="layout-group layout-group-utility-grid"${dataAttr} data-group-id="${groupId}">
+        ${pairs.map((pair) => `<div class="layout-group-utility-grid__panel">${pair.map((fragment) => renderFragment(fragment)).join('\n')}</div>`).join('\n')}
+      </div>`;
+    }
+  }
+
   if (isNpcGrid) {
     return `<div class="layout-group layout-group-npc-grid"${dataAttr} data-group-id="${groupId}">
       ${fragments.map((fragment) => renderFragment(fragment)).join('\n')}
@@ -44,6 +69,12 @@ function renderGroup(groupId: string, fragments: Array<LayoutFlowFragment | Page
     }
     const sidePanel = fragments.filter((fragment) => fragment.placement === 'side_panel');
     const mainFlow = fragments.filter((fragment) => fragment.placement !== 'side_panel');
+    if (sidePanel.length === 0 || mainFlow.length === 0) {
+      const visibleFragments = sidePanel.length > 0 ? sidePanel : mainFlow;
+      return `<div class="layout-group layout-group-packet layout-group-packet--single"${dataAttr} data-group-id="${groupId}">
+        <div class="layout-group-packet__main">${visibleFragments.map((fragment) => renderFragment(fragment)).join('\n')}</div>
+      </div>`;
+    }
     return `<div class="layout-group layout-group-packet"${dataAttr} data-group-id="${groupId}">
       <div class="layout-group-packet__side">${sidePanel.map((fragment) => renderFragment(fragment)).join('\n')}</div>
       <div class="layout-group-packet__main">${mainFlow.map((fragment) => renderFragment(fragment)).join('\n')}</div>
@@ -147,7 +178,14 @@ function renderPagedHtml(pageModel: PageModel, footerTitle: string | null | unde
   return `<div class="layout-page-stack" data-layout-recipe="${pageModel.pages[0]?.recipe ?? ''}">
     ${pageModel.pages.map((page) => {
       const heroFragments = page.fragments.filter((fragment) => fragment.region === 'hero');
-      const fullWidthFragments = page.fragments.filter((fragment) => fragment.region === 'full_width' || fragment.region === 'full_page');
+      const topFullWidthFragments = page.fragments.filter((fragment) => (
+        (fragment.region === 'full_width' || fragment.region === 'full_page')
+        && fragment.placement !== 'bottom_panel'
+      ));
+      const bottomPanelFragments = page.fragments.filter((fragment) => (
+        fragment.region === 'full_width'
+        && fragment.placement === 'bottom_panel'
+      ));
       const leftFragments = page.fragments.filter((fragment) => fragment.region === 'column_left');
       const rightFragments = page.fragments.filter((fragment) => fragment.region === 'column_right');
       const isSingleColumn = rightFragments.length === 0;
@@ -155,11 +193,12 @@ function renderPagedHtml(pageModel: PageModel, footerTitle: string | null | unde
       return `<section class="layout-page page-canvas" data-page-index="${page.index}" data-layout-recipe="${page.recipe ?? ''}">
         <div class="layout-page__body ProseMirror">
           ${heroFragments.length > 0 ? `<div class="layout-page__hero">${renderRegionUnits(pageModel, heroFragments)}</div>` : ''}
-          ${fullWidthFragments.length > 0 ? `<div class="layout-page__full-width">${renderRegionUnits(pageModel, fullWidthFragments)}</div>` : ''}
+          ${topFullWidthFragments.length > 0 ? `<div class="layout-page__full-width">${renderRegionUnits(pageModel, topFullWidthFragments)}</div>` : ''}
           <div class="layout-page__columns${isSingleColumn ? ' layout-page__columns--single' : ''}">
             <div class="layout-page__column layout-page__column--left">${renderRegionUnits(pageModel, leftFragments)}</div>
             ${isSingleColumn ? '' : `<div class="layout-page__column layout-page__column--right">${renderRegionUnits(pageModel, rightFragments)}</div>`}
           </div>
+          ${bottomPanelFragments.length > 0 ? `<div class="layout-page__full-width layout-page__full-width--bottom">${renderRegionUnits(pageModel, bottomPanelFragments)}</div>` : ''}
         </div>
         <div class="page-footer">
           <span>${footerTitle ?? ''}</span>
@@ -283,6 +322,17 @@ export function getCanonicalLayoutCss(): string {
       align-items: start;
     }
 
+    .layout-group-utility-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 1rem 1.25rem;
+      align-items: start;
+    }
+
+    .layout-group-utility-grid__panel {
+      min-width: 0;
+    }
+
     .layout-group-packet {
       display: grid;
       grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
@@ -290,6 +340,10 @@ export function getCanonicalLayoutCss(): string {
       align-items: start;
       break-inside: avoid;
       page-break-inside: avoid;
+    }
+
+    .layout-group-packet--single {
+      grid-template-columns: minmax(0, 1fr);
     }
 
     .layout-group-packet__side,
