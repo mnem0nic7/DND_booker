@@ -6,10 +6,15 @@ import { resolveDocumentLayout } from '../layout-plan.service.js';
 import { resolveAgentModelForUser } from './model-resolution.service.js';
 
 interface UtilityPacketContent {
+  sceneSetupParagraphs: string[];
   summaryTitle: string;
   summaryParagraphs: string[];
+  clueTitle: string;
+  clueBullets: string[];
   signalsAndStakes: string[];
   escalationSteps: string[];
+  consequenceTitle: string;
+  consequenceBullets: string[];
   pressureTitle: string;
   pressureParagraphs: string[];
 }
@@ -43,6 +48,16 @@ function sidebarCallout(
       title,
       calloutType,
     },
+    content: paragraphs
+      .map((entry) => entry.trim())
+      .filter(Boolean)
+      .map((entry) => paragraph(entry)),
+  };
+}
+
+function readAloudBox(paragraphs: string[]): DocumentContent {
+  return {
+    type: 'readAloudBox',
     content: paragraphs
       .map((entry) => entry.trim())
       .filter(Boolean)
@@ -126,10 +141,21 @@ function sanitizeLines(value: unknown, minimum = 0): string[] {
 
 export function buildFallbackUtilityPacket(documentTitle: string): UtilityPacketContent {
   return {
+    sceneSetupParagraphs: [
+      `Open ${documentTitle} by naming the strongest sensory detail in the scene, the first sign that trouble is active, and the easiest clue or reaction the party can seize immediately.`,
+      'If the table hesitates, push the scene forward with a visible cost: a worsening omen, a nervous witness, a hostile move, or a clue that becomes harder to claim.',
+    ],
     summaryTitle: 'DM Running Summary',
     summaryParagraphs: [
-      `Run ${documentTitle} as a pressure scene with one clear clue, one immediate problem, and one visible consequence if the party hesitates.`,
-      'Keep the chapter moving in short beats: surface a lead, force a choice, and let the world react quickly enough that the table never has to hunt for the next useful move.',
+      `Run ${documentTitle} as a pressure scene with one clear clue, one immediate problem, and one visible consequence if the party hesitates or chooses the wrong lead first.`,
+      'Keep the chapter moving in short beats: surface a lead, force a choice, pay off the result quickly, and show how the world reacts so the DM never has to invent the next useful move from nothing.',
+    ],
+    clueTitle: 'Clues, Leverage, and Payoffs',
+    clueBullets: [
+      'Name the first clue the party can notice without a perfect roll and what extra detail a stronger success reveals.',
+      'Tie at least one clue to a person, object, omen, or environmental feature the DM can point to at the table.',
+      'Give the scene one leverage point or bargaining chip the party can use if they negotiate instead of forcing the issue.',
+      'Show the immediate payoff for decisive action: cleaner information, tactical advantage, a grateful NPC, or safer progress.',
     ],
     signalsAndStakes: [
       'State what the party notices first and who or what pushes on them immediately.',
@@ -142,6 +168,13 @@ export function buildFallbackUtilityPacket(documentTitle: string): UtilityPacket
       'If attention splits, let one lead advance while another opportunity closes or becomes riskier.',
       'On failure or delay, move the opposition forward openly and show the consequence instead of stalling progress.',
     ],
+    consequenceTitle: 'Payoffs and Fallout',
+    consequenceBullets: [
+      'Show what the party gains right away if they press the strongest lead first: cleaner evidence, a grateful ally, safer access, or a tactical edge.',
+      'Name one setback that lands immediately on failure or delay so the DM can escalate without stalling.',
+      'Tie at least one outcome to a later chapter beat so success or failure changes future play instead of vanishing.',
+      'End with a concrete next move the party can pursue as soon as this scene resolves.',
+    ],
     pressureTitle: 'Pressure and Consequences',
     pressureParagraphs: [
       'Fail forward instead of dead-ending the scene. A missed check should reveal partial truth, increase danger, or spend a resource while still moving play onward.',
@@ -152,9 +185,12 @@ export function buildFallbackUtilityPacket(documentTitle: string): UtilityPacket
 
 function buildPacketBlocks(packet: UtilityPacketContent): DocumentContent[] {
   return [
+    readAloudBox(packet.sceneSetupParagraphs),
     sidebarCallout(packet.summaryTitle, 'info', packet.summaryParagraphs),
+    sidebarCallout(packet.clueTitle, 'lore', packet.clueBullets),
     bulletList(packet.signalsAndStakes),
     orderedList(packet.escalationSteps),
+    sidebarCallout(packet.consequenceTitle, 'info', packet.consequenceBullets),
     sidebarCallout(packet.pressureTitle, 'warning', packet.pressureParagraphs),
   ];
 }
@@ -180,12 +216,15 @@ async function generateUtilityPacketWithModel(input: {
     input.documentSample || '(no sample available)',
     '',
     'Return JSON with this exact shape:',
-    '{"summaryTitle":"DM Running Summary","summaryParagraphs":["...","..."],"signalsAndStakes":["...","...","...","..."],"escalationSteps":["...","...","..."],"pressureTitle":"Pressure and Consequences","pressureParagraphs":["...","..."]}',
+    '{"sceneSetupParagraphs":["...","..."],"summaryTitle":"DM Running Summary","summaryParagraphs":["...","..."],"clueTitle":"Clues, Leverage, and Payoffs","clueBullets":["...","...","...","..."],"signalsAndStakes":["...","...","...","..."],"escalationSteps":["...","...","..."],"consequenceTitle":"Payoffs and Fallout","consequenceBullets":["...","...","...","..."],"pressureTitle":"Pressure and Consequences","pressureParagraphs":["...","..."]}',
     '',
     'Rules:',
+    '- sceneSetupParagraphs: exactly 2 boxed read-aloud style paragraphs for the DM to paraphrase or read',
     '- summaryParagraphs: exactly 2 concise DM-facing paragraphs',
+    '- clueBullets: exactly 4 concrete bullets covering clues, leverage, or payoffs',
     '- signalsAndStakes: 4 to 5 bullets',
     '- escalationSteps: exactly 3 numbered steps',
+    '- consequenceBullets: exactly 4 concrete bullets covering payoff, fallout, or next-step consequences',
     '- pressureParagraphs: exactly 2 concise DM-facing paragraphs',
     '- Keep each line table-usable and concrete',
   ].join('\n');
@@ -199,12 +238,21 @@ async function generateUtilityPacketWithModel(input: {
 
   const parsed = parseJsonResponse(text) as Record<string, unknown>;
   const packet: UtilityPacketContent = {
+    sceneSetupParagraphs: sanitizeLines(parsed.sceneSetupParagraphs, 2).slice(0, 2),
     summaryTitle: typeof parsed.summaryTitle === 'string' && parsed.summaryTitle.trim()
       ? parsed.summaryTitle.trim()
       : 'DM Running Summary',
     summaryParagraphs: sanitizeLines(parsed.summaryParagraphs, 2).slice(0, 2),
+    clueTitle: typeof parsed.clueTitle === 'string' && parsed.clueTitle.trim()
+      ? parsed.clueTitle.trim()
+      : 'Clues, Leverage, and Payoffs',
+    clueBullets: sanitizeLines(parsed.clueBullets, 4).slice(0, 4),
     signalsAndStakes: sanitizeLines(parsed.signalsAndStakes, 4).slice(0, 5),
     escalationSteps: sanitizeLines(parsed.escalationSteps, 3).slice(0, 3),
+    consequenceTitle: typeof parsed.consequenceTitle === 'string' && parsed.consequenceTitle.trim()
+      ? parsed.consequenceTitle.trim()
+      : 'Payoffs and Fallout',
+    consequenceBullets: sanitizeLines(parsed.consequenceBullets, 4).slice(0, 4),
     pressureTitle: typeof parsed.pressureTitle === 'string' && parsed.pressureTitle.trim()
       ? parsed.pressureTitle.trim()
       : 'Pressure and Consequences',
@@ -212,9 +260,12 @@ async function generateUtilityPacketWithModel(input: {
   };
 
   if (
-    packet.summaryParagraphs.length < 2
+    packet.sceneSetupParagraphs.length < 2
+    || packet.clueBullets.length < 4
+    || packet.summaryParagraphs.length < 2
     || packet.signalsAndStakes.length < 4
     || packet.escalationSteps.length < 3
+    || packet.consequenceBullets.length < 4
     || packet.pressureParagraphs.length < 2
   ) {
     return null;

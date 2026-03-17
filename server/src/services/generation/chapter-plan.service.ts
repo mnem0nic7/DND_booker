@@ -34,11 +34,11 @@ const ACTIONABLE_SUPPORT_BLOCKS = new Set<ChapterPlanBlockType>([
 ]);
 
 const TARGET_WORD_RANGES: Record<SectionSpec['contentType'], { min: number; max: number }> = {
-  narrative: { min: 600, max: 1200 },
-  encounter: { min: 800, max: 1500 },
-  exploration: { min: 600, max: 1000 },
-  social: { min: 400, max: 800 },
-  transition: { min: 200, max: 400 },
+  narrative: { min: 1000, max: 1600 },
+  encounter: { min: 1200, max: 1800 },
+  exploration: { min: 1000, max: 1500 },
+  social: { min: 800, max: 1200 },
+  transition: { min: 300, max: 550 },
 };
 
 const SectionSpecSchema = z.object({
@@ -177,7 +177,10 @@ function normalizeSectionSpec(
 ): ChapterPlan['sections'][number] {
   const targetRange = TARGET_WORD_RANGES[section.contentType];
   const keyBeats = uniqueStrings(section.keyBeats).filter(Boolean);
-  const blocksNeeded = normalizeBlocks(section.blocksNeeded, section.contentType);
+  const blocksNeeded = ensureMinimumUtilityBlocks(
+    normalizeBlocks(section.blocksNeeded, section.contentType),
+    section.contentType,
+  );
   const normalizedTitle = cleanText(section.title) || outlineSection?.title || 'Scene';
   const lowerTitle = normalizedTitle.toLowerCase();
   const summarySeed = cleanText(outlineSection?.summary) || cleanText(section.outline);
@@ -195,7 +198,12 @@ function normalizeSectionSpec(
       || inferDecisionPoint(section.contentType, normalizedTitle),
     consequenceSummary: cleanText(section.consequenceSummary)
       || inferConsequenceSummary(section.contentType, normalizedTitle),
-    keyBeats: keyBeats.length > 0 ? keyBeats : fallbackKeyBeats(normalizedTitle, summarySeed),
+    keyBeats: ensureDetailedKeyBeats(
+      keyBeats.length > 0 ? keyBeats : fallbackKeyBeats(section.contentType, normalizedTitle, summarySeed),
+      section.contentType,
+      normalizedTitle,
+      summarySeed,
+    ),
     entityReferences: uniqueStrings(section.entityReferences),
     blocksNeeded,
   };
@@ -241,6 +249,24 @@ function normalizeBlocks(
   }
 
   return Array.from(normalized);
+}
+
+function ensureMinimumUtilityBlocks(
+  blocks: ChapterPlanBlockType[],
+  contentType: SectionSpec['contentType'],
+): ChapterPlanBlockType[] {
+  if (contentType === 'transition') return blocks;
+
+  const normalized = [...blocks];
+  const minimumBlocks = minimumUtilityBlockCount(contentType);
+  const fallbackOrder = utilityFallbackOrder(contentType);
+
+  for (const block of fallbackOrder) {
+    if (normalized.length >= minimumBlocks) break;
+    if (!normalized.includes(block)) normalized.push(block);
+  }
+
+  return normalized;
 }
 
 function ensureReferenceHeavyCoverage(sections: ChapterPlan['sections']): void {
@@ -303,6 +329,34 @@ function ensureSupportCoverage(sections: ChapterPlan['sections']): void {
   }
 }
 
+function minimumUtilityBlockCount(contentType: SectionSpec['contentType']): number {
+  switch (contentType) {
+    case 'encounter':
+    case 'exploration':
+      return 4;
+    case 'social':
+    case 'narrative':
+      return 3;
+    case 'transition':
+      return 0;
+  }
+}
+
+function utilityFallbackOrder(contentType: SectionSpec['contentType']): ChapterPlanBlockType[] {
+  switch (contentType) {
+    case 'encounter':
+      return ['readAloud', 'encounterTable', 'statBlock', 'dmTips', 'handout'];
+    case 'exploration':
+      return ['readAloud', 'randomTable', 'encounterTable', 'handout', 'dmTips'];
+    case 'social':
+      return ['readAloud', 'npcProfile', 'dmTips', 'handout'];
+    case 'narrative':
+      return ['readAloud', 'dmTips', 'handout', 'randomTable'];
+    case 'transition':
+      return [];
+  }
+}
+
 function normalizeBlockName(value: string): ChapterPlanBlockType | null {
   const trimmed = cleanText(value);
   const compact = trimmed.replace(/\s+/g, '');
@@ -335,12 +389,80 @@ function normalizeBlockName(value: string): ChapterPlanBlockType | null {
   }
 }
 
-function fallbackKeyBeats(title: string, summarySeed: string): string[] {
+function fallbackKeyBeats(
+  contentType: SectionSpec['contentType'],
+  title: string,
+  summarySeed: string,
+): string[] {
+  const beats: string[] = [];
   if (summarySeed) {
-    return [summarySeed];
+    beats.push(summarySeed);
   }
 
-  return [`Resolve the core beats of ${title}.`];
+  switch (contentType) {
+    case 'encounter':
+      beats.push(
+        `Establish the trigger, battlefield pressure, and first enemy move in ${title}.`,
+        `Show what tactical choice, environmental edge, or immediate cost defines ${title}.`,
+        `Resolve the payoff and aftermath of ${title} so the next scene changes meaningfully.`,
+      );
+      break;
+    case 'exploration':
+      beats.push(
+        `Present a concrete route, hazard, or investigative angle in ${title}.`,
+        `Surface a clue, discovery, or reward the DM can point to during ${title}.`,
+        `Show what changes if the party delays, fails, or presses deeper during ${title}.`,
+      );
+      break;
+    case 'social':
+      beats.push(
+        `Establish what the NPC or faction wants right now in ${title}.`,
+        `Reveal one useful truth and one withheld truth or pressure point in ${title}.`,
+        `Show how attitude, leverage, or consequences shift once the party pushes ${title}.`,
+      );
+      break;
+    case 'transition':
+      beats.push(
+        `Reposition the party and clarify the next immediate objective in ${title}.`,
+      );
+      break;
+    case 'narrative':
+      beats.push(
+        `Show the first sensory impression and immediate pressure in ${title}.`,
+        `Give the DM a clue, reveal, or actionable lead inside ${title}.`,
+        `End ${title} with a clear consequence, escalation, or choice that pushes the chapter forward.`,
+      );
+      break;
+  }
+
+  return uniqueStrings(beats).filter(Boolean);
+}
+
+function ensureDetailedKeyBeats(
+  keyBeats: string[],
+  contentType: SectionSpec['contentType'],
+  title: string,
+  summarySeed: string,
+): string[] {
+  const supplemented = [...keyBeats];
+  for (const fallback of fallbackKeyBeats(contentType, title, summarySeed)) {
+    if (supplemented.length >= minimumKeyBeatCount(contentType)) break;
+    if (!supplemented.includes(fallback)) supplemented.push(fallback);
+  }
+  return supplemented.slice(0, Math.max(minimumKeyBeatCount(contentType), supplemented.length));
+}
+
+function minimumKeyBeatCount(contentType: SectionSpec['contentType']): number {
+  switch (contentType) {
+    case 'transition':
+      return 2;
+    case 'social':
+      return 4;
+    case 'narrative':
+    case 'encounter':
+    case 'exploration':
+      return 5;
+  }
 }
 
 function inferPlayerObjective(

@@ -169,6 +169,56 @@ describe('materializeSparsePageArt', () => {
     expect(inserted[0]?.attrs?.layoutPlacementHint).toBe('side_panel');
   });
 
+  it('anchors late-section column-fill repair near the section opener instead of the trailing paragraph tail', () => {
+    const result = materializeSparsePageArt({
+      kind: 'chapter',
+      title: 'Chapter 1: The Town',
+      reviewCodes: ['EXPORT_MISSED_ART_OPPORTUNITY'],
+      content: {
+        type: 'doc',
+        content: [
+          {
+            type: 'heading',
+            attrs: { level: 2 },
+            content: [{ type: 'text', text: 'Meeting the Mayor' }],
+          },
+          {
+            type: 'paragraph',
+            content: [{ type: 'text', text: 'Mayor Aldric briefs the party on the danger in the town.' }],
+          },
+          {
+            type: 'heading',
+            attrs: { level: 2 },
+            content: [{ type: 'text', text: 'Gossip and Whispers' }],
+          },
+          {
+            type: 'paragraph',
+            content: [{ type: 'text', text: 'The party works the tavern crowd and hears several conflicting rumors about the mine.' }],
+          },
+          {
+            type: 'readAloudBox',
+            content: [
+              {
+                type: 'paragraph',
+                content: [{ type: 'text', text: 'The tavern falls quiet as a miner mutters about lights in the shaft.' }],
+              },
+            ],
+          },
+          {
+            type: 'paragraph',
+            content: [{ type: 'text', text: 'Closing notes that would otherwise push the repair art too late in the scene.' }],
+          },
+        ],
+      },
+    });
+
+    const nodes = result.content.content ?? [];
+    const insertedIndex = nodes.findIndex((node) => node.type === 'fullBleedImage');
+    expect(insertedIndex).toBe(5);
+    expect(nodes[insertedIndex]?.attrs?.artRole).toBe('column_fill_art');
+    expect(String(nodes[insertedIndex]?.attrs?.imagePrompt || '')).toContain('Gossip and Whispers');
+  });
+
   it('dedupes repeated sparse-page repair art on later review passes', () => {
     const result = materializeSparsePageArt({
       kind: 'chapter',
@@ -354,9 +404,67 @@ describe('materializeSparsePageArt', () => {
     expect(repaired?.attrs?.artRole).toBe('column_fill_art');
     expect(repaired?.attrs?.layoutSpanHint).toBe('column');
     expect(repaired?.attrs?.layoutPlacementHint).toBe('side_panel');
-    expect(repaired?.attrs?.position).toBe('full');
-    expect(repaired?.attrs?.src).toBe('');
-    expect(repaired?.attrs?.imageAssetId).toBe('');
+    expect(repaired?.attrs?.position).toBe('half');
+    expect(repaired?.attrs?.src).toBe('/uploads/repair-wide.png');
+    expect(repaired?.attrs?.imageAssetId).toBe('repair-asset');
+  });
+
+  it('retunes existing sparse repair art into column recovery art when a sparse page still misses an art opportunity', () => {
+    const result = materializeSparsePageArt({
+      kind: 'chapter',
+      title: 'Chapter 1: The Town',
+      reviewCodes: ['EXPORT_UNUSED_PAGE_REGION', 'EXPORT_MISSED_ART_OPPORTUNITY'],
+      content: {
+        type: 'doc',
+        content: [
+          {
+            type: 'chapterHeader',
+            attrs: {
+              title: 'The Town',
+              chapterNumber: 'Chapter 1',
+              backgroundImage: '/uploads/chapter-1.png',
+            },
+          },
+          {
+            type: 'fullBleedImage',
+            attrs: {
+              nodeId: 'spot-art-1',
+              artRole: 'spot_art',
+              src: '/uploads/spot-art.png',
+              position: 'half',
+              layoutSpanHint: 'column',
+              layoutPlacementHint: 'side_panel',
+            },
+          },
+          {
+            type: 'paragraph',
+            content: [{ type: 'text', text: 'A sparse tail scene still needs stronger visual balance.' }],
+          },
+          {
+            type: 'fullBleedImage',
+            attrs: {
+              nodeId: 'repair-1',
+              artRole: 'sparse_page_repair',
+              src: '/uploads/repair-wide.png',
+              imageAssetId: 'repair-asset',
+              position: 'full',
+              layoutSpanHint: 'both_columns',
+              layoutPlacementHint: 'bottom_panel',
+            },
+          },
+        ],
+      },
+    });
+
+    expect(result.changed).toBe(true);
+    expect(result.insertedNodeIds).toContain('repair-1');
+    const repaired = (result.content.content ?? []).find((node) => node?.attrs?.nodeId === 'repair-1');
+    expect(repaired?.attrs?.artRole).toBe('column_fill_art');
+    expect(repaired?.attrs?.layoutSpanHint).toBe('column');
+    expect(repaired?.attrs?.layoutPlacementHint).toBe('side_panel');
+    expect(repaired?.attrs?.position).toBe('half');
+    expect(repaired?.attrs?.src).toBe('/uploads/repair-wide.png');
+    expect(repaired?.attrs?.imageAssetId).toBe('repair-asset');
   });
 
   it('retunes existing overflow art back into a sparse repair panel for pure sparse pages', () => {
@@ -413,7 +521,7 @@ describe('materializeSparsePageArt', () => {
     expect(repaired?.attrs?.layoutSpanHint).toBe('both_columns');
     expect(repaired?.attrs?.layoutPlacementHint).toBe('bottom_panel');
     expect(repaired?.attrs?.position).toBe('full');
-    expect(repaired?.attrs?.src).toBe('');
-    expect(repaired?.attrs?.imageAssetId).toBe('');
+    expect(repaired?.attrs?.src).toBe('/uploads/overflow-art.png');
+    expect(repaired?.attrs?.imageAssetId).toBe('overflow-asset');
   });
 });

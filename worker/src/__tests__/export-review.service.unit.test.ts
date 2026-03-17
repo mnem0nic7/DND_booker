@@ -9,6 +9,7 @@ import {
   planExportAutoFixes,
   reviewMeasuredExportLayout,
 } from '../services/export-review.service.js';
+import type { PageModel } from '@dnd-booker/shared';
 
 describe('export-review.service', () => {
   it('parses pdfinfo output', () => {
@@ -267,6 +268,152 @@ Page size: 612 x 792 pts (letter)
 
     expect(review.metrics.sectionStarts[0].page).toBe(2);
     expect(review.findings.map((finding) => finding.code)).not.toContain('EXPORT_CHAPTER_OPENER_LOW');
+  });
+
+  it('flags a visually airy interior page with no art as a missed art opportunity before export', () => {
+    const pageModel: PageModel = {
+      preset: 'standard_pdf',
+      flow: {
+        preset: 'standard_pdf',
+        sectionRecipe: 'chapter_hero_split',
+        columnBalanceTarget: 'balanced',
+        fragments: [],
+        units: [],
+      },
+      pages: [
+        {
+          index: 1,
+          preset: 'standard_pdf',
+          recipe: 'chapter_hero_split',
+          fragments: [],
+          contentHeightPx: 864,
+          fillRatio: 0.88,
+          columnMetrics: { leftFillRatio: 0.88, rightFillRatio: 0.84, deltaRatio: 0.04 },
+          nodeIds: [],
+          documentIds: ['Chapter 1: The Town'],
+          openerDocumentId: 'Chapter 1: The Town',
+        },
+        {
+          index: 2,
+          preset: 'standard_pdf',
+          recipe: 'chapter_hero_split',
+          fragments: [
+            {
+              nodeId: 'intro-a',
+              sourceIndex: 0,
+              presentationOrder: 0,
+              span: 'column',
+              placement: 'inline',
+              groupId: null,
+              keepTogether: false,
+              allowWrapBelow: false,
+              nodeType: 'paragraph',
+              content: { type: 'paragraph', content: [{ type: 'text', text: 'Short opener text.' }] },
+              unitId: 'unit:intro-a',
+              pageIndex: 2,
+              columnIndex: 1,
+              region: 'column_left',
+              bounds: { x: 0, y: 0, width: 320, height: 120 },
+              isHero: false,
+              isOpener: false,
+            },
+            {
+              nodeId: 'intro-b',
+              sourceIndex: 1,
+              presentationOrder: 1,
+              span: 'column',
+              placement: 'inline',
+              groupId: null,
+              keepTogether: false,
+              allowWrapBelow: false,
+              nodeType: 'bulletList',
+              content: { type: 'bulletList', content: [] },
+              unitId: 'unit:intro-b',
+              pageIndex: 2,
+              columnIndex: 2,
+              region: 'column_right',
+              bounds: { x: 340, y: 0, width: 320, height: 170 },
+              isHero: false,
+              isOpener: false,
+            },
+          ],
+          contentHeightPx: 864,
+          fillRatio: 0.73,
+          columnMetrics: { leftFillRatio: 0.5, rightFillRatio: 0.55, deltaRatio: 0.05 },
+          nodeIds: ['intro-a', 'intro-b'],
+          documentIds: ['Chapter 1: The Town'],
+          openerDocumentId: null,
+        },
+        {
+          index: 3,
+          preset: 'standard_pdf',
+          recipe: 'chapter_hero_split',
+          fragments: [],
+          contentHeightPx: 864,
+          fillRatio: 0.64,
+          columnMetrics: { leftFillRatio: 0.64, rightFillRatio: 0.58, deltaRatio: 0.06 },
+          nodeIds: [],
+          documentIds: ['Chapter 1: The Town'],
+          openerDocumentId: null,
+        },
+      ],
+      fragments: [
+        {
+          nodeId: 'intro-a',
+          sourceIndex: 0,
+          presentationOrder: 0,
+          span: 'column',
+          placement: 'inline',
+          groupId: null,
+          keepTogether: false,
+          allowWrapBelow: false,
+          nodeType: 'paragraph',
+          content: { type: 'paragraph', content: [{ type: 'text', text: 'Short opener text.' }] },
+          unitId: 'unit:intro-a',
+          pageIndex: 2,
+          columnIndex: 1,
+          region: 'column_left',
+          bounds: { x: 0, y: 0, width: 320, height: 120 },
+          isHero: false,
+          isOpener: false,
+        },
+        {
+          nodeId: 'intro-b',
+          sourceIndex: 1,
+          presentationOrder: 1,
+          span: 'column',
+          placement: 'inline',
+          groupId: null,
+          keepTogether: false,
+          allowWrapBelow: false,
+          nodeType: 'bulletList',
+          content: { type: 'bulletList', content: [] },
+          unitId: 'unit:intro-b',
+          pageIndex: 2,
+          columnIndex: 2,
+          region: 'column_right',
+          bounds: { x: 340, y: 0, width: 320, height: 170 },
+          isHero: false,
+          isOpener: false,
+        },
+      ],
+      metrics: {
+        fragmentCount: 2,
+        heroFragmentCount: 0,
+        groupedFragmentCount: 0,
+        keepTogetherCount: 0,
+        pageCount: 3,
+      },
+    };
+
+    const review = reviewMeasuredExportLayout({
+      documents: [
+        { title: 'Chapter 1: The Town', kind: 'chapter', pageModel },
+      ],
+      pageCount: 3,
+    });
+
+    expect(review.findings.map((finding) => finding.code)).toContain('EXPORT_MISSED_ART_OPPORTUNITY');
   });
 
   it('flags broken utility blocks directly from exported document content', () => {
@@ -544,6 +691,116 @@ Page size: 612 x 792 pts (letter)
     });
 
     expect(review.findings.map((finding) => finding.code)).not.toContain('EXPORT_UNBALANCED_COLUMNS');
+  });
+
+  it('does not flag visually acceptable near-full pages or substantial bottom-panel art recovery as sparse failures', () => {
+    const review = analyzePdfExportLayout({
+      documents: [
+        {
+          title: 'Chapter 1: The Town',
+          kind: 'chapter',
+          pageModel: {
+            preset: 'standard_pdf',
+            flow: { preset: 'standard_pdf', sectionRecipe: 'chapter_hero_split', columnBalanceTarget: 'balanced', fragments: [], units: [] },
+            pages: [
+              {
+                index: 1,
+                preset: 'standard_pdf',
+                recipe: 'chapter_hero_split',
+                fragments: [
+                  {
+                    nodeId: 'scene-copy',
+                    sourceIndex: 0,
+                    presentationOrder: 0,
+                    span: 'column',
+                    placement: 'inline',
+                    groupId: null,
+                    keepTogether: false,
+                    allowWrapBelow: false,
+                    nodeType: 'paragraph',
+                    content: { type: 'paragraph', content: [{ type: 'text', text: 'Town scene copy.' }] },
+                    unitId: 'unit:scene-copy',
+                    pageIndex: 1,
+                    columnIndex: 1,
+                    region: 'column_left',
+                    bounds: { x: 0, y: 0, width: 320, height: 608 },
+                    isHero: false,
+                    isOpener: false,
+                  },
+                ],
+                contentHeightPx: 864,
+                fillRatio: 0.705,
+                columnMetrics: { leftFillRatio: 0.705, rightFillRatio: 0.687, deltaRatio: 0.018 },
+                nodeIds: ['scene-copy'],
+                documentIds: ['Chapter 1: The Town'],
+                openerDocumentId: null,
+              },
+              {
+                index: 2,
+                preset: 'standard_pdf',
+                recipe: 'chapter_hero_split',
+                fragments: [
+                  {
+                    nodeId: 'closing-copy',
+                    sourceIndex: 1,
+                    presentationOrder: 1,
+                    span: 'column',
+                    placement: 'inline',
+                    groupId: null,
+                    keepTogether: false,
+                    allowWrapBelow: false,
+                    nodeType: 'paragraph',
+                    content: { type: 'paragraph', content: [{ type: 'text', text: 'Closing rumors and a final uneasy reflection.' }] },
+                    unitId: 'unit:closing-copy',
+                    pageIndex: 2,
+                    columnIndex: 1,
+                    region: 'column_left',
+                    bounds: { x: 0, y: 0, width: 320, height: 220 },
+                    isHero: false,
+                    isOpener: false,
+                  },
+                  {
+                    nodeId: 'repair-art',
+                    sourceIndex: 2,
+                    presentationOrder: 2,
+                    span: 'both_columns',
+                    placement: 'bottom_panel',
+                    groupId: null,
+                    keepTogether: true,
+                    allowWrapBelow: false,
+                    nodeType: 'fullBleedImage',
+                    content: { type: 'fullBleedImage', attrs: { artRole: 'sparse_page_repair', src: '/uploads/repair.png' } },
+                    unitId: 'unit:repair-art',
+                    pageIndex: 2,
+                    columnIndex: null,
+                    region: 'full_width',
+                    bounds: { x: 0, y: 250, width: 672, height: 350 },
+                    isHero: false,
+                    isOpener: false,
+                  },
+                ],
+                contentHeightPx: 864,
+                fillRatio: 0.695,
+                columnMetrics: { leftFillRatio: 0.695, rightFillRatio: 0.52, deltaRatio: 0.175 },
+                nodeIds: ['closing-copy', 'repair-art'],
+                documentIds: ['Chapter 1: The Town'],
+                openerDocumentId: null,
+              },
+            ],
+            fragments: [],
+            metrics: { fragmentCount: 3, heroFragmentCount: 0, groupedFragmentCount: 0, keepTogetherCount: 1, pageCount: 2 },
+          },
+        },
+      ],
+      pages: [],
+      pageCount: 2,
+      pageWidthPts: 612,
+      pageHeightPts: 792,
+    });
+
+    const codes = review.findings.map((finding) => finding.code);
+    expect(codes).not.toContain('EXPORT_UNUSED_PAGE_REGION');
+    expect(codes).not.toContain('EXPORT_MISSED_ART_OPPORTUNITY');
   });
 
   it('flags footer collisions, orphan tail pages, and missed art opportunities from measured geometry', () => {
@@ -1346,14 +1603,14 @@ Page size: 612 x 792 pts (letter)
                   pageIndex: 1,
                   columnIndex: null,
                   region: 'full_width',
-                  bounds: { x: 0, y: 180, width: 530, height: 360 },
+                  bounds: { x: 0, y: 220, width: 530, height: 220 },
                   isHero: false,
                   isOpener: false,
                 },
               ],
               contentHeightPx: 900,
-              fillRatio: 0.7,
-              columnMetrics: { leftFillRatio: 0.7, rightFillRatio: 0.58, deltaRatio: 0.12 },
+              fillRatio: 0.6,
+              columnMetrics: { leftFillRatio: 0.6, rightFillRatio: 0.48, deltaRatio: 0.12 },
               nodeIds: ['paragraph-2', 'art-1'],
               documentIds: ['Chapter 2'],
               openerDocumentId: null,

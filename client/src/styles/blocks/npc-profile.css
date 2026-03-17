@@ -1,7 +1,7 @@
 .npc-profile {
   font-family: var(--body-font);
   background: var(--stat-block-bg);
-  padding: 0.95rem;
+  padding: 0.95rem 0.95rem 1.2rem;
   border: 1px solid var(--accent-color);
   box-shadow: 0 0 0.2rem rgba(88, 24, 13, 0.18);
   max-width: 420px;
@@ -86,7 +86,7 @@
   font-size: 0.875em;
   line-height: 1.4;
   color: var(--text-color);
-  margin-bottom: 0.35rem;
+  margin-bottom: 0.42rem;
 }
 
 .npc-profile__trait-label {

@@ -363,6 +363,7 @@ describe('layout-plan', () => {
     }).html;
 
     expect(html).toContain('layout-group-utility-grid');
+    expect(html).toContain('layout-group-utility-grid--band');
   });
 
   it('treats a trailing front-matter sidebar callout as its own bottom-band utility panel', () => {
@@ -407,7 +408,7 @@ describe('layout-plan', () => {
       },
     }).html;
 
-    expect(html).toContain('layout-group-utility-grid');
+    expect(html).toContain('layout-group-utility-grid--band');
   });
 
   it('groups only true encounter sections by local level-3 section instead of swallowing exploration openers', () => {

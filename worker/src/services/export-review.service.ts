@@ -24,7 +24,7 @@ const execFile = promisify(execFileCallback);
 const CHAPTER_OPENER_TOP_RATIO_THRESHOLD = 0.25;
 const LAST_PAGE_FILL_RATIO_THRESHOLD = 0.45;
 const HEADING_LINE_HEIGHT_THRESHOLD = 14;
-const UTILITY_DENSITY_THRESHOLD = 0.14;
+const UTILITY_DENSITY_THRESHOLD = 0.18;
 
 const UTILITY_BLOCK_WEIGHTS: Record<string, number> = {
   readAloudBox: 0.5,
@@ -823,19 +823,26 @@ function analyzeDocumentUtility(document: ReviewableDocument): {
   const utilityDensity = inspection.utilityWeight <= 0
     ? 0
     : inspection.utilityWeight / (inspection.utilityWeight + inspection.proseParagraphCount);
+  const isStructurallyThin = (
+    (document.kind === 'chapter' || document.kind === 'appendix')
+    && (
+      (inspection.proseParagraphCount >= 6 && inspection.utilityBlockCount < 4)
+      || (inspection.proseParagraphCount >= 5 && inspection.referenceBlockCount === 0)
+    )
+  );
 
   const findings = [...inspection.findings];
   findings.push(...analyzeDocumentLayout(document));
   if (
     (document.kind === 'chapter' || document.kind === 'appendix')
     && inspection.proseParagraphCount >= 4
-    && utilityDensity < UTILITY_DENSITY_THRESHOLD
+    && (utilityDensity < UTILITY_DENSITY_THRESHOLD || isStructurallyThin)
   ) {
     findings.push({
       code: 'EXPORT_LOW_UTILITY_DENSITY',
       severity: 'warning',
       page: null,
-      message: `"${document.title}" is prose-heavy and under-indexed for table use.`,
+      message: `"${document.title}" is prose-heavy or under-detailed for table use.`,
       details: {
         title: document.title,
         kind: document.kind ?? null,
@@ -844,6 +851,7 @@ function analyzeDocumentUtility(document: ReviewableDocument): {
         referenceBlockCount: inspection.referenceBlockCount,
         utilityDensity: roundRatio(utilityDensity),
         threshold: UTILITY_DENSITY_THRESHOLD,
+        structurallyThin: isStructurallyThin,
       },
     });
   }
@@ -1109,6 +1117,7 @@ function analyzeMeasuredPageLayout(pages: MeasuredReviewPage[]): ExportReviewFin
     const units = collectMeasuredPageUnits(page);
     const overflow = measureMeasuredPageOverflow(page, units);
     const whitespace = measureMeasuredPageWhitespace(page, units);
+    const hasSubstantialArtRecovery = hasSubstantialArtUnit(page, units);
     const isTitlePageOpener = page.isOpener
       && units.length === 1
       && units[0]?.nodeTypes.length === 1
@@ -1167,7 +1176,12 @@ function analyzeMeasuredPageLayout(pages: MeasuredReviewPage[]): ExportReviewFin
       && !page.isFullPageInsert
       && (
         page.fillRatio < 0.58
-        || (page.fillRatio < 0.72 && whitespace.bottomGapRatio > 0.18)
+        || (
+          page.fillRatio < 0.7
+          && whitespace.bottomGapRatio > 0.24
+          && page.bottomPanelFillRatio < 0.28
+          && !hasSubstantialArtRecovery
+        )
       )
     ) {
       findings.push({
@@ -1205,7 +1219,7 @@ function analyzeMeasuredPageLayout(pages: MeasuredReviewPage[]): ExportReviewFin
       });
     }
 
-    if (shouldFlagMissedArtOpportunity(page, units, isInterior, whitespace)) {
+    if (shouldFlagMissedArtOpportunity(page, units, isInterior, whitespace, hasSubstantialArtRecovery)) {
       findings.push({
         code: 'EXPORT_MISSED_ART_OPPORTUNITY',
         severity: 'warning',
@@ -1346,19 +1360,40 @@ function shouldFlagMissedArtOpportunity(
   units: ReturnType<typeof collectMeasuredPageUnits>,
   isInterior: boolean,
   whitespace: ReturnType<typeof measureMeasuredPageWhitespace>,
+  hasSubstantialArtRecovery: boolean,
 ): boolean {
   if (!isInterior || page.isOpener || page.isFullPageInsert) return false;
   const hasArt = units.some((unit) => unit.hasArt);
   const largeBottomGap = whitespace.bottomGapRatio > 0.18;
   if (!largeBottomGap) return false;
+  if (hasSubstantialArtRecovery && page.fillRatio >= 0.68 && whitespace.bottomGapRatio <= 0.34) return false;
 
-  const isSparse = page.fillRatio < 0.82;
+  const isSparse = page.fillRatio < 0.7;
   const isUnbalanced = (page.deltaRatio ?? 0) > 0.18 && page.bottomPanelFillRatio < 0.12;
   const hasBottomPanelArt = units.some((unit) => unit.hasArt && unit.placements.includes('bottom_panel'));
 
-  if (!hasArt) return isSparse || isUnbalanced || whitespace.bottomGapRatio > 0.2;
-  if (hasBottomPanelArt && whitespace.bottomGapRatio > 0.16) return true;
+  if (!hasArt) {
+    return isSparse
+      || isUnbalanced
+      || whitespace.bottomGapRatio > 0.32
+      || (page.fillRatio < 0.78 && whitespace.bottomGapRatio > 0.22);
+  }
+  if (hasBottomPanelArt) {
+    if (page.bottomPanelFillRatio >= 0.26 && page.fillRatio >= 0.64) return false;
+    return page.fillRatio < 0.62 || whitespace.bottomGapRatio > 0.34 || isUnbalanced;
+  }
   return isSparse || isUnbalanced;
+}
+
+function hasSubstantialArtUnit(
+  page: MeasuredReviewPage,
+  units: ReturnType<typeof collectMeasuredPageUnits>,
+): boolean {
+  return units.some((unit) => {
+    if (!unit.hasArt) return false;
+    const heightRatio = page.contentHeightPx > 0 ? (unit.bottom - unit.top) / page.contentHeightPx : 0;
+    return heightRatio >= 0.28;
+  });
 }
 
 function computeBottomPanelFillRatio(page: PageModel['pages'][number]): number {

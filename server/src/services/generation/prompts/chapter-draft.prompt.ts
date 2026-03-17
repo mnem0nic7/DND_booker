@@ -31,6 +31,8 @@ Content rules:
 - Include encounter details where the plan specifies encounter sections
 - Treat this as DM-facing adventure copy, not fiction. Most paragraphs should help run the table.
 - Every section should make clear: what is happening, what the players can do, what checks or tactics matter, and what changes next.
+- Every non-transition section should include concrete scene detail, not just summary: give the DM sensory setup, immediate pressure, actionable clues or rewards, and a visible consequence or escalation.
+- Every non-transition section should feel fully stocked for play: aim for at least two substantial DM-facing prose paragraphs plus multiple utilities, not one thin setup paragraph followed by a box.
 - Social sections should surface leverage, asks, tells, likely reactions, and what the NPC knows or will reveal.
 - Exploration sections should surface clues, hazards, discoveries, and consequences.
 - Encounter sections should surface terrain, enemy tactics, triggers, rewards, and aftermath.
@@ -41,6 +43,8 @@ Content rules:
 - Use the planned utility blocks as real block markers. Do not replace them with plain prose summaries.
 - If a section includes route choices, discoveries, loot, tactics, or consequence summaries, prefer bullets, tables, handouts, or callouts over dense exposition.
 - Keep connective prose lean. Avoid long atmospheric passages unless they are boxed read-aloud text.
+- Do not let a section collapse into one short setup paragraph plus one utility block. Build enough detail that the DM can improvise follow-up questions, setbacks, rewards, and follow-through without guessing.
+- When in doubt, add concrete table detail rather than atmosphere: what the DM can point at, what the players can test, what worsens if they delay, and what payoff follows decisive action.
 - End sections with actionable hooks, stakes, or consequences for the next section
 - Do NOT include JSON wrapping — output raw markdown only`;
 }
@@ -78,6 +82,16 @@ export function buildChapterDraftUserPrompt(
     const sectionNotes: string[] = [];
     if (section.contentType === 'encounter') {
       sectionNotes.push('Encounter packet: keep setup, terrain, enemy tactics, reward, and aftermath easy to scan.');
+    }
+    if (section.contentType === 'narrative') {
+      sectionNotes.push('Narrative scenes still need table-ready detail: give the DM sensory texture, active pressure, at least one clue or reward, and a consequence the DM can point to immediately.');
+    }
+    if (section.contentType === 'exploration') {
+      sectionNotes.push('Exploration scenes should name concrete hazards, route choices, discoveries, and what changes if the party delays, fails, or pushes deeper.');
+      sectionNotes.push('If the section spans multiple areas or routes, give the DM more than one discovery or complication so the chapter does not feel thin.');
+    }
+    if (section.contentType === 'social') {
+      sectionNotes.push('Social scenes should include what the NPC notices, what shifts their attitude, what they reveal only under pressure or with leverage, and what they ask from the party in return.');
     }
     if (section.blocksNeeded.includes('randomTable')) {
       sectionNotes.push('Random encounter table entries must each include situation, threat or opportunity, and payoff in 16-32 words.');
@@ -141,6 +155,8 @@ export function buildChapterDraftUserPrompt(
     `Difficulty progression: ${plan.difficultyProgression}`,
     'Prioritize reusable DM utility. If a point can be delivered with a stat block, table, NPC profile, handout, or short callout, use the block instead of extra exposition.',
     'Every non-transition section should visibly contain at least two DM-usable utilities such as a boxed read-aloud, tactical callout, encounter table, NPC card, random table, or handout.',
+    'Make every section feel fully stocked for the DM: include sensory setup, immediate pressure, a clue or reward worth pursuing, and a visible consequence or escalation.',
+    'Err on the side of more playable detail. A chapter should feel like a stocked toolkit for the DM, not a synopsis with ornament.',
     'Random encounter tables must be GM-runnable without guessing. Make each result specific enough to run immediately.',
   );
 

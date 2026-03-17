@@ -955,7 +955,7 @@ export function assembleHtml(options: AssembleOptions): string {
     .npc-profile {
       background: var(--stat-block-bg);
       border: 2px solid var(--color-primary);
-      padding: 0.85rem;
+      padding: 0.85rem 0.85rem 1.12rem;
       margin: 0.7rem 0;
       page-break-inside: avoid;
     }
@@ -1019,7 +1019,7 @@ export function assembleHtml(options: AssembleOptions): string {
 
     .npc-profile__trait {
       font-size: 0.85rem;
-      margin: 0.2rem 0;
+      margin: 0.2rem 0 0.32rem;
     }
 
     .npc-profile__trait-label {
@@ -1205,6 +1205,12 @@ export function assembleHtml(options: AssembleOptions): string {
       margin: 0.6rem 0 0.2rem;
     }
 
+    .layout-fragment.layout-placement-bottom_panel .full-bleed-image--art-role-sparse_page_repair {
+      margin-top: 0.95rem;
+      padding-top: 0.45rem;
+      border-top: 1px solid var(--color-divider, #8b1a1a);
+    }
+
     .layout-fragment.layout-placement-bottom_panel .full-bleed-image__img {
       min-height: 20rem;
       max-height: 24rem;
@@ -1215,6 +1221,8 @@ export function assembleHtml(options: AssembleOptions): string {
     .layout-fragment.layout-placement-bottom_panel .full-bleed-image--art-role-sparse_page_repair .full-bleed-image__img {
       min-height: 38rem;
       max-height: 46rem;
+      border: 1px solid rgba(88, 24, 13, 0.2);
+      box-shadow: 0 10px 24px rgba(24, 18, 8, 0.12);
     }
 
     .full-bleed-image__img {

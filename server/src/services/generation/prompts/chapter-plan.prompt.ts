@@ -52,11 +52,13 @@ blocksNeeded options (D&D editor block types):
 - handout: player-facing letter, clue sheet, inscription, or prop text
 
 Rules:
-- targetWords per section: narrative 600-1200, encounter 800-1500, exploration 600-1000, social 400-800, transition 200-400
+- targetWords per section: narrative 1000-1600, encounter 1200-1800, exploration 1000-1500, social 800-1200, transition 300-550
 - Every encounter section MUST have a matching encounter spec
 - contentType must be ONE value only: narrative, encounter, exploration, social, or transition. Never return a pipe-delimited list.
 - Every non-transition section MUST include scenePurpose, playerObjective, decisionPoint, and consequenceSummary
-- Every non-transition section MUST include at least two reusable DM utility blocks in blocksNeeded
+- Every non-transition section MUST include at least three reusable DM utility blocks in blocksNeeded
+- Every non-transition section MUST include at least 4 keyBeats, and those beats should be concrete enough for the DM to run immediately rather than broad plot summary
+- Every non-transition section MUST plan three kinds of usable detail: one immediate sensory impression, one active pressure/obstacle, and one clue/reward/revelation
 - Narrative sections should include readAloud plus dmTips and usually handout
 - Encounter sections MUST include encounterTable, statBlock, and dmTips for setup, terrain, tactics, rewards, and aftermath
 - Exploration sections MUST include randomTable, encounterTable, or handout, and should usually include at least two of them
@@ -65,6 +67,8 @@ Rules:
 - Encounter sections should plan a single runnable encounter packet: trigger, opposition, terrain, tactics, consequences, and payoff all need a home in the draft
 - Social sections should plan for NPC leverage: what the NPC wants, what they know, what persuades them, and how they react under pressure
 - Exploration sections that include random encounters must make those encounters runnable. Random table entries should not be nouns only; they should capture the immediate situation, active threat or opportunity, and clue, reward, or consequence
+- Do not plan thin scenes. Each non-transition section should give the writer enough material for at least one strong opening image, one concrete choice, one obstacle or complication, one useful clue or reward, and one visible aftermath
+- Favor 4-6 substantial beats per section over vague summary. If a section could be mistaken for a synopsis, it is under-detailed.
 - entityReferences must use slugs from the campaign bible
 - readAloudCount: 1-2 per narrative section, 1 per encounter
 - dmTipCount: 1-2 per chapter
@@ -87,6 +91,8 @@ export function buildChapterPlanUserPrompt(
     '',
     'Planning priority: make this chapter table-ready for a DM. Prefer scene goals, choices, consequences, checks, hazards, rewards, and reusable utility blocks over long prose summary.',
     'If you plan random encounters, make each one runnable: situation, threat or opportunity, and payoff must all be visible in the plan and draft.',
+    'Push for richer chapter detail: every non-transition section should give the writer enough material for sensory setup, table-facing obstacles, clues or rewards, and a visible consequence that changes later play.',
+    'Do not underwrite chapters. Favor fewer, denser sections with 4-6 concrete beats and multiple reusable DM aids over light summary prose.',
     '',
     'Sections from outline:',
     ...chapter.sections.map(s =>

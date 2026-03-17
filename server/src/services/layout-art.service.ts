@@ -17,6 +17,7 @@ const SPOT_ART_ROLE_VALUES = new Set([
 const DEFAULT_SPOT_ART_MODEL = 'gpt-image-1';
 const COLUMN_SPOT_ART_SIZE = '1024x1536';
 const WIDE_SPOT_ART_SIZE = '1536x1024';
+const PREFLIGHT_SPOT_ART_TIMEOUT_MS = 25_000;
 
 type SpotArtRole = 'spot_art' | 'column_fill_art' | 'sparse_page_repair' | 'overflow_spot_art';
 type SpotArtPlacementHint = 'side_panel' | 'bottom_panel';
@@ -380,6 +381,40 @@ function collectRepairCandidates(
 
   const candidates: SpotArtCandidate[] = [];
 
+  const findLateSectionRepairAnchor = (): { insertAt: number; heading: string; contextIndex: number } | null => {
+    for (let index = nodes.length - 1; index >= 0; index -= 1) {
+      const node = nodes[index];
+      if (node?.type !== 'heading') continue;
+
+      let insertAfter = index;
+      for (let cursor = index + 1; cursor < nodes.length; cursor += 1) {
+        const current = nodes[cursor];
+        if (!current || current.type === 'heading') break;
+        if (current.type === 'readAloudBox' || current.type === 'sidebarCallout') {
+          insertAfter = cursor;
+          break;
+        }
+        if (isSceneSupportBlock(current)) {
+          insertAfter = cursor;
+          const followUp = nodes[cursor + 1];
+          if (followUp?.type === 'readAloudBox' || followUp?.type === 'sidebarCallout') {
+            insertAfter = cursor + 1;
+          }
+          break;
+        }
+      }
+
+      if (hasNearbyImage(nodes, insertAfter + 1)) continue;
+      return {
+        insertAt: insertAfter + 1,
+        heading: headingText(node) || title,
+        contextIndex: Math.max(index, insertAfter - 1),
+      };
+    }
+
+    return null;
+  };
+
   if (
     budgets.overflowBudget > 0
     && (
@@ -388,33 +423,25 @@ function collectRepairCandidates(
       || reviewCodes.has('EXPORT_MISSED_ART_OPPORTUNITY')
     )
   ) {
-    for (let index = nodes.length - 1; index >= Math.max(1, Math.floor(nodes.length / 3)); index -= 1) {
-      const node = nodes[index];
-      if (!isSceneSupportBlock(node)) continue;
-      const heading = (() => {
-        for (let cursor = index; cursor >= 0; cursor -= 1) {
-          if (nodes[cursor]?.type === 'heading') return headingText(nodes[cursor]) || title;
-        }
-        return title;
-      })();
+    const anchoredRepair = findLateSectionRepairAnchor();
+    if (anchoredRepair) {
       candidates.push({
-        insertAt: index + 1,
+        insertAt: anchoredRepair.insertAt,
         role: 'column_fill_art',
-        heading,
+        heading: anchoredRepair.heading,
         prompt: buildSpotArtPrompt({
           title,
-          heading,
-          context: buildContextText(nodes, index, title),
+          heading: anchoredRepair.heading,
+          context: buildContextText(nodes, anchoredRepair.contextIndex, title),
           role: 'column_fill_art',
           layoutPlacementHint: 'side_panel',
           layoutSpanHint: 'column',
         }),
-        position: 'full',
+        position: 'half',
         layoutPlacementHint: 'side_panel',
         layoutSpanHint: 'column',
         imageGenerationSize: COLUMN_SPOT_ART_SIZE,
       });
-      break;
     }
   }
 
@@ -620,10 +647,10 @@ function retuneExistingSparseRepairForColumnRecovery(input: {
   });
 
   const nextContent = replaceInsertedArtNode(input.content, nodeId, {
-    src: '',
-    imageAssetId: '',
+    src: readStringAttr(targetNode, 'src') || '',
+    imageAssetId: readStringAttr(targetNode, 'imageAssetId') || '',
     artRole: 'column_fill_art',
-    position: 'full',
+    position: 'half',
     imagePrompt: prompt,
     imageGenerationSize: COLUMN_SPOT_ART_SIZE,
     layoutPlacementHint: 'side_panel',
@@ -679,8 +706,8 @@ function retuneExistingOverflowForSparseRepair(input: {
   });
 
   const nextContent = replaceInsertedArtNode(input.content, nodeId, {
-    src: '',
-    imageAssetId: '',
+    src: readStringAttr(targetNode, 'src') || '',
+    imageAssetId: readStringAttr(targetNode, 'imageAssetId') || '',
     artRole: 'sparse_page_repair',
     position: 'full',
     imagePrompt: prompt,
@@ -724,6 +751,20 @@ export function materializeSparsePageArt(
     || reviewCodes.has('EXPORT_MISSED_ART_OPPORTUNITY');
 
   if (reviewDriven && needsSparseRepair && needsColumnBalanceRepair && existingCounts.sparse_page_repair > 0) {
+    return retuneExistingSparseRepairForColumnRecovery({
+      content: normalized,
+      title,
+    });
+  }
+
+  if (
+    reviewDriven
+    && needsSparseRepair
+    && !needsColumnBalanceRepair
+    && reviewCodes.has('EXPORT_MISSED_ART_OPPORTUNITY')
+    && existingCounts.sparse_page_repair > 0
+    && existingCounts.spot_art > 0
+  ) {
     return retuneExistingSparseRepairForColumnRecovery({
       content: normalized,
       title,
@@ -850,6 +891,7 @@ export async function realizeSparsePageArt(
         prompt,
         model,
         size,
+        timeoutMs: PREFLIGHT_SPOT_ART_TIMEOUT_MS,
       });
       const buffer = Buffer.from(image.base64, 'base64');
       const filename = `${sanitizeAssetBaseName(readStringAttr(node, 'artRole') || 'spot-art')}-${sanitizeAssetBaseName(nodeId)}.png`;

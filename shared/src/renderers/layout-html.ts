@@ -49,8 +49,13 @@ function renderGroup(groupId: string, fragments: Array<LayoutFlowFragment | Page
     if (currentPair.length > 0) pairs.push(currentPair);
 
     if (pairs.length > 1) {
-      return `<div class="layout-group layout-group-utility-grid"${dataAttr} data-group-id="${groupId}">
-        ${pairs.map((pair) => `<div class="layout-group-utility-grid__panel">${pair.map((fragment) => renderFragment(fragment)).join('\n')}</div>`).join('\n')}
+      return `<div class="layout-group layout-group-utility-grid layout-group-utility-grid--band"${dataAttr} data-group-id="${groupId}">
+        ${pairs.map((pair) => {
+          const panelClass = pair.some((fragment) => fragment.nodeType === 'sidebarCallout' || fragment.nodeType === 'readAloudBox')
+            ? 'layout-group-utility-grid__panel layout-group-utility-grid__panel--callout'
+            : 'layout-group-utility-grid__panel layout-group-utility-grid__panel--notes';
+          return `<div class="${panelClass}">${pair.map((fragment) => renderFragment(fragment)).join('\n')}</div>`;
+        }).join('\n')}
       </div>`;
     }
   }
@@ -329,8 +334,30 @@ export function getCanonicalLayoutCss(): string {
       align-items: start;
     }
 
+    .layout-group-utility-grid--band {
+      grid-template-columns: minmax(0, 1.12fr) minmax(15rem, 0.88fr);
+      gap: 0.9rem 1.15rem;
+      padding: 0.7rem 0.9rem 0.45rem;
+      background: color-mix(in srgb, var(--page-bg, #f7ecd2) 78%, var(--callout-bg, #e8dcc8) 22%);
+      border-top: 1px solid var(--color-divider, #8b1a1a);
+      border-bottom: 1px solid color-mix(in srgb, var(--color-divider, #8b1a1a) 32%, transparent);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35);
+    }
+
     .layout-group-utility-grid__panel {
       min-width: 0;
+    }
+
+    .layout-group-utility-grid--band .layout-group-utility-grid__panel--notes {
+      padding-top: 0.05rem;
+    }
+
+    .layout-group-utility-grid--band .layout-group-utility-grid__panel--callout {
+      align-self: stretch;
+    }
+
+    .layout-group-utility-grid--band .layout-group-utility-grid__panel > *:last-child {
+      margin-bottom: 0;
     }
 
     .layout-group-packet {

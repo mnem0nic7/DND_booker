@@ -248,6 +248,8 @@ async function applyPreflightCorrections(input: {
         });
         if (realized.changed) {
           nextContent = realized.content;
+        } else if (hasRenderableInsertedArt(nextContent, artAugmented.insertedNodeIds)) {
+          nextContent = artAugmented.content;
         } else {
           nextContent = originalContent;
         }
@@ -282,6 +284,18 @@ async function applyPreflightCorrections(input: {
     docs: nextDocs,
     theme: input.theme,
     pagePreset: input.pagePreset,
+  });
+}
+
+function hasRenderableInsertedArt(content: DocumentContent, nodeIds: string[]): boolean {
+  if (nodeIds.length === 0) return false;
+  const topLevel = content.content ?? [];
+  const nodeIdSet = new Set(nodeIds);
+  return topLevel.some((node) => {
+    const attrs = node.attrs ?? {};
+    if (!nodeIdSet.has(String(attrs.nodeId ?? ''))) return false;
+    if (node.type !== 'fullBleedImage') return false;
+    return Boolean(String(attrs.src ?? '').trim() || String(attrs.imageAssetId ?? '').trim());
   });
 }
 

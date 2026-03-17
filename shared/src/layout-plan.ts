@@ -1178,10 +1178,13 @@ function estimateUnitHeight(unit: LayoutFlowUnit, fragments: LayoutFlowFragment[
 
 function getUnitLayoutReserve(unit: LayoutFlowUnit, flow: LayoutFlowModel): number {
   const nodeTypes = getUnitNodeTypes(unit, flow);
+  if (nodeTypes.has('npcProfile')) {
+    return 15;
+  }
+
   if (
     nodeTypes.has('sidebarCallout')
     || nodeTypes.has('readAloudBox')
-    || nodeTypes.has('npcProfile')
     || nodeTypes.has('statBlock')
     || nodeTypes.has('encounterTable')
   ) {

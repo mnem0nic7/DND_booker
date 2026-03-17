@@ -15,6 +15,7 @@ interface GenerateImageOptions {
   model: ImageModel;
   size: string;
   quality?: string;
+  timeoutMs?: number;
 }
 
 const DEFAULT_IMAGE_TIMEOUT_MS = 90_000;
@@ -96,7 +97,7 @@ export async function generateAiImage(
   apiKey: string,
   options: GenerateImageOptions,
 ): Promise<{ base64: string; mimeType: string }> {
-  const { prompt, model, size, quality } = options;
+  const { prompt, model, size, quality, timeoutMs: explicitTimeoutMs } = options;
   const sanitizedPrompt = sanitizeImagePrompt(prompt);
 
   const sizes = ALLOWED_SIZES[model];
@@ -113,7 +114,9 @@ export async function generateAiImage(
     providerOptions.openai = { quality };
   }
 
-  const timeoutMs = resolveImageTimeoutMs();
+  const timeoutMs = explicitTimeoutMs && explicitTimeoutMs > 0
+    ? explicitTimeoutMs
+    : resolveImageTimeoutMs();
   const image = await withHardImageTimeout(timeoutMs, async (signal) => {
     const result = await generateImage({
       model: openai.image(model),
