@@ -12,6 +12,9 @@ const connection = new IORedis({
   maxRetriesPerRequest: null,
 });
 
+const LONG_RUNNING_JOB_LOCK_MS = 15 * 60 * 1000;
+const STALLED_CHECK_INTERVAL_MS = 60 * 1000;
+
 const worker = new Worker('export', processExportJob, {
   connection: connection as unknown as ConnectionOptions,
   concurrency: 2,
@@ -28,11 +31,17 @@ const cleanupWorker = new Worker('cleanup', async () => {
 const generationWorker = new Worker('generation', processGenerationJob, {
   connection: connection as unknown as ConnectionOptions,
   concurrency: 1,
+  lockDuration: LONG_RUNNING_JOB_LOCK_MS,
+  stalledInterval: STALLED_CHECK_INTERVAL_MS,
+  maxStalledCount: 2,
 });
 
 const agentWorker = new Worker('agent', processAgentRun, {
   connection: connection as unknown as ConnectionOptions,
   concurrency: 1,
+  lockDuration: LONG_RUNNING_JOB_LOCK_MS,
+  stalledInterval: STALLED_CHECK_INTERVAL_MS,
+  maxStalledCount: 2,
 });
 
 // Schedule cleanup to run every hour

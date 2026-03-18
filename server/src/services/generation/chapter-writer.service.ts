@@ -17,6 +17,8 @@ export interface ChapterDraftResult {
   wordCount: number;
 }
 
+const MAX_CHAPTER_DRAFT_OUTPUT_TOKENS = 6144;
+
 /**
  * Generate a chapter draft.
  * Assembles context, calls AI for markdown prose, converts to TipTap JSON,
@@ -49,7 +51,10 @@ export async function executeChapterDraftGeneration(
   );
 
   const { text, usage } = await generateTextWithTimeout(`Chapter draft generation for ${chapter.title}`, {
-    model, system, prompt, maxOutputTokens,
+    model,
+    system,
+    prompt,
+    maxOutputTokens: Math.min(maxOutputTokens, MAX_CHAPTER_DRAFT_OUTPUT_TOKENS),
   });
 
   // Convert markdown to TipTap JSON

@@ -16,6 +16,31 @@ type ProjectLookup = {
   documentCount: number;
 };
 
+type ProjectExportJob = {
+  id: string;
+  projectId: string;
+  format: 'pdf' | 'epub' | 'print_pdf';
+  status: 'queued' | 'processing' | 'completed' | 'failed';
+  progress: number;
+  outputUrl: string | null;
+  errorMessage: string | null;
+  review: {
+    status: 'passed' | 'needs_attention' | 'unavailable';
+    score: number;
+    findings: Array<{
+      code: string;
+      severity: 'info' | 'warning' | 'error';
+      page: number | null;
+      message: string;
+    }>;
+    metrics: {
+      pageCount: number;
+    };
+  } | null;
+  createdAt: string;
+  completedAt: string | null;
+};
+
 type AiSettingsInput = {
   provider: 'anthropic' | 'openai' | 'ollama';
   model: string;
@@ -78,6 +103,17 @@ async function getAccessToken(page: Page): Promise<string> {
   }
 
   return result.accessToken;
+}
+
+async function getCurrentProjectId(page: Page): Promise<string | null> {
+  const currentUrl = page.url();
+  try {
+    const url = new URL(currentUrl);
+    const match = url.pathname.match(/\/projects\/([0-9a-f-]+)/i);
+    return match ? match[1] : null;
+  } catch {
+    return null;
+  }
 }
 
 async function getStoredAiSettings(page: Page): Promise<StoredAiSettings> {
@@ -170,6 +206,50 @@ async function findProjectByTitle(page: Page, title: string): Promise<ProjectLoo
   }
 
   return result.project as ProjectLookup | null;
+}
+
+export async function getLatestExportJobForProject(page: Page, title: string): Promise<ProjectExportJob> {
+  const project = await findProjectByTitle(page, title);
+  if (!project) {
+    throw new Error(`Project "${title}" was not found`);
+  }
+
+  const accessToken = await getAccessToken(page);
+  const result = await page.evaluate(async ({ projectId, token }) => {
+    const response = await fetch(`/api/projects/${projectId}/export-jobs`, {
+      credentials: 'include',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      return {
+        ok: false,
+        status: response.status,
+        body: await response.text(),
+      };
+    }
+
+    const exportJobs = await response.json() as ProjectExportJob[];
+    return {
+      ok: true,
+      exportJobs,
+    };
+  }, { projectId: project.id, token: accessToken });
+
+  if (!result.ok) {
+    throw new Error(`Failed to load export jobs: ${result.status} ${result.body}`);
+  }
+
+  const exportJobs = result.exportJobs as ProjectExportJob[];
+  if (!Array.isArray(exportJobs) || exportJobs.length === 0) {
+    throw new Error(`Project "${title}" has no export jobs`);
+  }
+
+  return exportJobs
+    .slice()
+    .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())[0];
 }
 
 async function deleteProjectById(page: Page, projectId: string) {
@@ -657,6 +737,8 @@ export async function waitForGenerationCompletion(page: Page, timeoutMs = 240_00
   const failedStatus = page.getByText('Failed', { exact: true }).first();
   const generationComplete = page.getByText('Generation complete', { exact: true }).first();
   const cancelButton = page.getByRole('button', { name: 'Cancel' }).first();
+  const projectId = await getCurrentProjectId(page);
+  const accessToken = projectId ? await getAccessToken(page) : null;
 
   await expect
     .poll(async () => {
@@ -669,12 +751,44 @@ export async function waitForGenerationCompletion(page: Page, timeoutMs = 240_00
       const hasCancelButton = await cancelButton.isVisible().catch(() => false);
       if (hasCompleteStatus && hasDismissButton) return 'completed';
       if (hasDismissButton && hasReviewButton && hasGenerationComplete && !hasCancelButton) return 'completed';
+
+      if (projectId && accessToken) {
+        const backendStatus = await page.evaluate(async ({ currentProjectId, token }) => {
+          const response = await fetch(`/api/projects/${currentProjectId}/ai/generation-runs`, {
+            credentials: 'include',
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          });
+
+          if (!response.ok) {
+            return null;
+          }
+
+          const runs = await response.json() as Array<{ status: string; createdAt: string }>;
+          if (!Array.isArray(runs) || runs.length === 0) {
+            return null;
+          }
+
+          const latest = runs
+            .slice()
+            .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())[0];
+          return latest.status;
+        }, { currentProjectId: projectId, token: accessToken });
+
+        if (backendStatus === 'completed' || backendStatus === 'failed' || backendStatus === 'cancelled') {
+          return backendStatus;
+        }
+      }
+
       return 'running';
     }, { timeout: timeoutMs })
     .toBe('completed');
 
-  await dismissButton.click();
-  await expect(dismissButton).not.toBeVisible({ timeout: 5_000 });
+  if (await dismissButton.isVisible({ timeout: 1_000 }).catch(() => false)) {
+    await dismissButton.click();
+    await expect(dismissButton).not.toBeVisible({ timeout: 5_000 });
+  }
 }
 
 /**

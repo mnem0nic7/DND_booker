@@ -37,6 +37,29 @@ async function withOptionalStageTimeout<T>(label: string, task: Promise<T>): Pro
   });
 }
 
+async function resetRunStateForRetry(runId: string, projectId: string): Promise<void> {
+  await prisma.$transaction([
+    prisma.projectDocument.deleteMany({
+      where: { runId, projectId },
+    }),
+    prisma.assemblyManifest.deleteMany({
+      where: { runId, projectId },
+    }),
+    prisma.generationTask.deleteMany({
+      where: { runId },
+    }),
+    prisma.generatedArtifact.deleteMany({
+      where: { runId, projectId },
+    }),
+    prisma.canonEntity.deleteMany({
+      where: { runId, projectId },
+    }),
+    prisma.campaignBible.deleteMany({
+      where: { runId, projectId },
+    }),
+  ]);
+}
+
 /**
  * Main orchestrator job for autonomous generation.
  *
@@ -62,6 +85,11 @@ export async function processGenerationJob(job: Job<GenerationJobData>): Promise
   };
   const isPolished = fullRun.quality === 'polished';
   const isOneShot = fullRun.mode === 'one_shot';
+  const shouldResetForRetry = fullRun.progressPercent > 0 || fullRun.startedAt !== null;
+
+  if (shouldResetForRetry) {
+    await resetRunStateForRetry(runId, projectId);
+  }
 
   // Dynamic imports to avoid cross-package resolution issues at module load time
   const { transitionRunStatus, updateRunProgress } = await import('../../../server/src/services/generation/run.service.js');

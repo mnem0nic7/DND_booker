@@ -258,6 +258,7 @@ describe('Chapter Writer Service — executeChapterDraftGeneration', () => {
     expect(call.prompt).toContain('The Duskhollow region');
     expect(call.prompt).toContain('second person');
     expect(call.prompt).toContain('ch-1-the-village');
+    expect(call.maxOutputTokens).toBe(6144);
   });
 
   it('should store word count in artifact metadata', async () => {
