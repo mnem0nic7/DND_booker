@@ -96,12 +96,12 @@ afterAll(async () => {
 });
 
 describe('front-matter.service', () => {
-  it('builds a one-shot DM brief without a TOC for short adventures', () => {
+  it('builds front matter with a TOC and DM brief for short adventures', () => {
     const doc = buildFrontMatterDocument(SAMPLE_BIBLE, SAMPLE_OUTLINE);
     const nodeTypes = (doc.content ?? []).map((node) => node.type);
 
     expect(nodeTypes[0]).toBe('titlePage');
-    expect(nodeTypes).not.toContain('tableOfContents');
+    expect(nodeTypes).toContain('tableOfContents');
     expect(JSON.stringify(doc)).toContain('DM Brief');
     expect(JSON.stringify(doc)).toContain('Prep Checklist');
     expect(JSON.stringify(doc)).toContain('Adventure Flow');

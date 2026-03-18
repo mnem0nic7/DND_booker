@@ -7,6 +7,36 @@ export interface GenerationJobData {
   projectId: string;
 }
 
+const DEFAULT_OPTIONAL_STAGE_TIMEOUT_MS = 4 * 60 * 1000;
+
+function resolveOptionalStageTimeoutMs(): number {
+  const parsed = Number.parseInt(process.env.GENERATION_OPTIONAL_STAGE_TIMEOUT_MS ?? '', 10);
+  if (Number.isFinite(parsed) && parsed > 0) {
+    return parsed;
+  }
+  return DEFAULT_OPTIONAL_STAGE_TIMEOUT_MS;
+}
+
+async function withOptionalStageTimeout<T>(label: string, task: Promise<T>): Promise<T> {
+  const timeoutMs = resolveOptionalStageTimeoutMs();
+
+  return await new Promise<T>((resolve, reject) => {
+    const timeoutHandle = setTimeout(() => {
+      reject(new Error(`${label} timed out after ${Math.round(timeoutMs / 1000)}s`));
+    }, timeoutMs);
+
+    task
+      .then((value) => {
+        clearTimeout(timeoutHandle);
+        resolve(value);
+      })
+      .catch((error) => {
+        clearTimeout(timeoutHandle);
+        reject(error);
+      });
+  });
+}
+
 /**
  * Main orchestrator job for autonomous generation.
  *
@@ -212,7 +242,10 @@ export async function processGenerationJob(job: Job<GenerationJobData>): Promise
     if (isOneShot) {
       await publishProgress('assembling', 'art_direction', 99);
       try {
-        const artDirection = await executeArtDirectionPass(run, model, maxOutputTokens);
+        const artDirection = await withOptionalStageTimeout(
+          'Art direction pass',
+          executeArtDirectionPass(run, model, maxOutputTokens),
+        );
         if (artDirection.generatedImageCount > 0) {
           await publishGenerationEvent(runId, {
             type: 'run_warning',
@@ -248,7 +281,10 @@ export async function processGenerationJob(job: Job<GenerationJobData>): Promise
 
     await publishProgress('assembling', 'layout_director', 99);
     try {
-      const layoutDirector = await executeLayoutDirectorPass(run);
+      const layoutDirector = await withOptionalStageTimeout(
+        'Layout director pass',
+        executeLayoutDirectorPass(run),
+      );
       if (layoutDirector.documentsUpdated > 0) {
         await publishGenerationEvent(runId, {
           type: 'run_warning',

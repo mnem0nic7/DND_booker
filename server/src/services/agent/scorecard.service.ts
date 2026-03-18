@@ -20,6 +20,8 @@ function findingPriority(finding: ExportReviewFinding): number {
   const codeBonus = (() => {
     switch (finding.code) {
       case 'EXPORT_PLACEHOLDER_STAT_BLOCK':
+      case 'EXPORT_INCOMPLETE_STAT_BLOCK':
+      case 'EXPORT_INCOMPLETE_ENCOUNTER_PACKET':
         return 25;
       case 'EXPORT_THIN_RANDOM_TABLE':
         return 18;
@@ -35,7 +37,6 @@ function findingPriority(finding: ExportReviewFinding): number {
       case 'EXPORT_MARGIN_COLLISION':
       case 'EXPORT_FOOTER_COLLISION':
       case 'EXPORT_ORPHAN_TAIL_PARAGRAPH':
-      case 'EXPORT_OVERLONG_TOC_FOR_SHORT_BOOK':
         return 8;
       default:
         return 0;
@@ -74,7 +75,12 @@ export function buildScorecardFromExportReview(
   )).length;
   const thinRandomTableCount = review.findings.filter((finding) => finding.code === 'EXPORT_THIN_RANDOM_TABLE').length;
   const lowUtilityDensityCount = review.findings.filter((finding) => finding.code === 'EXPORT_LOW_UTILITY_DENSITY').length;
-  const suspiciousStatBlockCount = review.findings.filter((finding) => finding.code === 'EXPORT_SUSPICIOUS_STAT_BLOCK' || finding.code === 'EXPORT_PLACEHOLDER_STAT_BLOCK').length;
+  const suspiciousStatBlockCount = review.findings.filter((finding) => (
+    finding.code === 'EXPORT_SUSPICIOUS_STAT_BLOCK'
+    || finding.code === 'EXPORT_PLACEHOLDER_STAT_BLOCK'
+    || finding.code === 'EXPORT_INCOMPLETE_STAT_BLOCK'
+    || finding.code === 'EXPORT_INCOMPLETE_ENCOUNTER_PACKET'
+  )).length;
   const utilityDensityAverage = review.metrics.utilityCoverage.length > 0
     ? Number(
         (

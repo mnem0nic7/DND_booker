@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   assessRandomTableEntries,
+  assessStatBlockAttrs,
   escapeHtml,
   hasEncounterTableContent,
   normalizeChapterHeaderTitle,
@@ -227,6 +228,24 @@ describe('Worker Renderer Utils', () => {
       expect(normalized.int).toBe(6);
       expect(normalized.speed).toBe('fly 40 ft. (hover)');
       expect(normalized.savingThrows).toBeUndefined();
+    });
+  });
+
+  describe('assessStatBlockAttrs', () => {
+    it('flags stat blocks that are missing required combat data as incomplete', () => {
+      const assessment = assessStatBlockAttrs({
+        name: 'Ghostly Miner',
+        ac: 11,
+        hp: 45,
+        speed: 'fly 30 ft. (hover)',
+        cr: '',
+        actions: '[]',
+      });
+
+      expect(assessment.isPlaceholder).toBe(false);
+      expect(assessment.isIncomplete).toBe(true);
+      expect(assessment.flags).toContain('missing_challenge');
+      expect(assessment.flags).toContain('missing_actions');
     });
   });
 

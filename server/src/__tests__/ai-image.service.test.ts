@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { sanitizeImagePrompt, stripImageTextRenderingInstructions } from '../services/ai-image.service.js';
+import { normalizeImageQuality, sanitizeImagePrompt, stripImageTextRenderingInstructions } from '../services/ai-image.service.js';
 
 describe('ai-image prompt sanitization', () => {
+  it('maps legacy standard quality to a valid gpt-image-1 value', () => {
+    expect(normalizeImageQuality('gpt-image-1', 'standard')).toBe('medium');
+    expect(normalizeImageQuality('gpt-image-1', 'high')).toBe('high');
+    expect(normalizeImageQuality('gpt-image-1', 'hd')).toBeUndefined();
+  });
+
   it('removes direct requests for visible words and lettering', () => {
     const sanitized = sanitizeImagePrompt(
       'A painted fantasy book cover for The Blackglass Mine. Put the title across the top in ornate lettering, add a logo, and include a caption at the bottom.',

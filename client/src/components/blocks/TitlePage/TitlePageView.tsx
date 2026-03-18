@@ -24,6 +24,24 @@ export function TitlePageView({
     [updateAttributes],
   );
 
+  const imageControls = projectId ? (
+    <div className="mt-3 rounded-lg border border-gray-200 bg-white/90 p-3">
+      <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">
+        Cover Artwork
+      </p>
+      <ProjectImageControls
+        projectId={projectId}
+        blockType="titlePage"
+        imageUrl={attrs.coverImageUrl}
+        imagePrompt={attrs.imagePrompt}
+        onUrlChange={(url) => updateAttr('coverImageUrl', url)}
+        onPromptChange={(prompt) => updateAttr('imagePrompt', prompt)}
+        urlPlaceholder="Or enter image URL"
+        promptPlaceholder="Suggested cover art prompt"
+      />
+    </div>
+  ) : null;
+
   return (
     <NodeViewWrapper>
       <div
@@ -72,17 +90,20 @@ export function TitlePageView({
 
         {/* Edit toggle + AI buttons */}
         {selected && (
-          <div className="block-button-group">
-            <AiGenerateButton blockType="titlePage" onGenerated={updateAttributes} />
-            <AiAutoFillButton blockType="titlePage" currentAttrs={{ ...attrs }} onApply={updateAttributes} />
-            <button
-              onClick={() => setEditing((v) => !v)}
-              type="button"
-              className="block-edit-btn"
-            >
-              {editing ? 'Done Editing' : 'Edit Properties'}
-            </button>
-          </div>
+          <>
+            <div className="block-button-group">
+              <AiGenerateButton blockType="titlePage" onGenerated={updateAttributes} />
+              <AiAutoFillButton blockType="titlePage" currentAttrs={{ ...attrs }} onApply={updateAttributes} />
+              <button
+                onClick={() => setEditing((v) => !v)}
+                type="button"
+                className="block-edit-btn"
+              >
+                {editing ? 'Done Editing' : 'Edit Properties'}
+              </button>
+            </div>
+            {imageControls}
+          </>
         )}
 
         {/* Edit panel */}
@@ -109,21 +130,6 @@ export function TitlePageView({
                 value={attrs.author}
                 onChange={(e) => updateAttr('author', e.target.value)}
               />
-            </div>
-            <div className="title-page__edit-row">
-              <label>Cover Image</label>
-              {projectId && (
-                <ProjectImageControls
-                  projectId={projectId}
-                  blockType="titlePage"
-                  imageUrl={attrs.coverImageUrl}
-                  imagePrompt={attrs.imagePrompt}
-                  onUrlChange={(url) => updateAttr('coverImageUrl', url)}
-                  onPromptChange={(prompt) => updateAttr('imagePrompt', prompt)}
-                  urlPlaceholder="Or enter image URL"
-                  promptPlaceholder="Suggested cover art prompt"
-                />
-              )}
             </div>
           </div>
         )}

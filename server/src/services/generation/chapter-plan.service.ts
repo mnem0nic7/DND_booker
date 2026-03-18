@@ -34,11 +34,11 @@ const ACTIONABLE_SUPPORT_BLOCKS = new Set<ChapterPlanBlockType>([
 ]);
 
 const TARGET_WORD_RANGES: Record<SectionSpec['contentType'], { min: number; max: number }> = {
-  narrative: { min: 1000, max: 1600 },
-  encounter: { min: 1200, max: 1800 },
-  exploration: { min: 1000, max: 1500 },
-  social: { min: 800, max: 1200 },
-  transition: { min: 300, max: 550 },
+  narrative: { min: 1300, max: 1900 },
+  encounter: { min: 1500, max: 2200 },
+  exploration: { min: 1400, max: 2100 },
+  social: { min: 1100, max: 1600 },
+  transition: { min: 400, max: 700 },
 };
 
 const SectionSpecSchema = z.object({
@@ -333,10 +333,10 @@ function minimumUtilityBlockCount(contentType: SectionSpec['contentType']): numb
   switch (contentType) {
     case 'encounter':
     case 'exploration':
-      return 4;
+      return 5;
     case 'social':
     case 'narrative':
-      return 3;
+      return 4;
     case 'transition':
       return 0;
   }
@@ -403,14 +403,18 @@ function fallbackKeyBeats(
     case 'encounter':
       beats.push(
         `Establish the trigger, battlefield pressure, and first enemy move in ${title}.`,
+        `Define the terrain, hazards, and positioning choices that change how ${title} plays at the table.`,
         `Show what tactical choice, environmental edge, or immediate cost defines ${title}.`,
+        `Surface the clue, reward, or consequence that the party can secure during ${title}.`,
         `Resolve the payoff and aftermath of ${title} so the next scene changes meaningfully.`,
       );
       break;
     case 'exploration':
       beats.push(
         `Present a concrete route, hazard, or investigative angle in ${title}.`,
+        `Name a second route, obstacle, or discovery so ${title} offers more than one meaningful path.`,
         `Surface a clue, discovery, or reward the DM can point to during ${title}.`,
+        `Show how pressure escalates while the party lingers, backtracks, or pushes deeper in ${title}.`,
         `Show what changes if the party delays, fails, or presses deeper during ${title}.`,
       );
       break;
@@ -418,18 +422,22 @@ function fallbackKeyBeats(
       beats.push(
         `Establish what the NPC or faction wants right now in ${title}.`,
         `Reveal one useful truth and one withheld truth or pressure point in ${title}.`,
+        `Show what leverage, offer, or proof shifts the conversation inside ${title}.`,
         `Show how attitude, leverage, or consequences shift once the party pushes ${title}.`,
       );
       break;
     case 'transition':
       beats.push(
         `Reposition the party and clarify the next immediate objective in ${title}.`,
+        `Flag the most important resource, clue, or threat that carries forward from ${title}.`,
       );
       break;
     case 'narrative':
       beats.push(
         `Show the first sensory impression and immediate pressure in ${title}.`,
+        `Give the DM at least one actionable obstacle, countdown, or risk inside ${title}.`,
         `Give the DM a clue, reveal, or actionable lead inside ${title}.`,
+        `Show how NPCs, factions, or the environment react while ${title} is in motion.`,
         `End ${title} with a clear consequence, escalation, or choice that pushes the chapter forward.`,
       );
       break;
@@ -455,13 +463,13 @@ function ensureDetailedKeyBeats(
 function minimumKeyBeatCount(contentType: SectionSpec['contentType']): number {
   switch (contentType) {
     case 'transition':
-      return 2;
+      return 3;
     case 'social':
-      return 4;
+      return 5;
     case 'narrative':
     case 'encounter':
     case 'exploration':
-      return 5;
+      return 6;
   }
 }
 

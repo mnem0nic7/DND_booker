@@ -58,6 +58,29 @@ function resolveImageTimeoutMs(): number {
   return DEFAULT_IMAGE_TIMEOUT_MS;
 }
 
+export function normalizeImageQuality(model: ImageModel, quality?: string): string | undefined {
+  if (!quality) return undefined;
+  const normalized = quality.trim().toLowerCase();
+  if (!normalized) return undefined;
+
+  if (model === 'gpt-image-1') {
+    if (normalized === 'standard') return 'medium';
+    if (['low', 'medium', 'high', 'auto'].includes(normalized)) {
+      return normalized;
+    }
+    return undefined;
+  }
+
+  if (model === 'dall-e-3') {
+    if (['standard', 'hd'].includes(normalized)) {
+      return normalized;
+    }
+    return undefined;
+  }
+
+  return undefined;
+}
+
 function isAbortLikeImageError(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
   return error.name === 'AbortError'
@@ -99,6 +122,7 @@ export async function generateAiImage(
 ): Promise<{ base64: string; mimeType: string }> {
   const { prompt, model, size, quality, timeoutMs: explicitTimeoutMs } = options;
   const sanitizedPrompt = sanitizeImagePrompt(prompt);
+  const normalizedQuality = normalizeImageQuality(model, quality);
 
   const sizes = ALLOWED_SIZES[model];
   if (!sizes.includes(size)) {
@@ -109,9 +133,9 @@ export async function generateAiImage(
 
   const providerOptions: Record<string, Record<string, string>> = {};
   if (model === 'dall-e-3') {
-    providerOptions.openai = { style: 'vivid', ...(quality ? { quality } : {}) };
-  } else if (quality) {
-    providerOptions.openai = { quality };
+    providerOptions.openai = { style: 'vivid', ...(normalizedQuality ? { quality: normalizedQuality } : {}) };
+  } else if (normalizedQuality) {
+    providerOptions.openai = { quality: normalizedQuality };
   }
 
   const timeoutMs = explicitTimeoutMs && explicitTimeoutMs > 0

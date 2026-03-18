@@ -114,8 +114,7 @@ function normalizeExportContent(
   const withSplitRandomTables = splitOversizedRandomTables(withoutOrphanedUtilityScaffold);
   const withAttachedStatBlockLeadIns = attachStatBlockLeadIns(withSplitRandomTables);
   const withoutRedundantBreaks = stripRedundantStructuralPageBreaks(withAttachedStatBlockLeadIns);
-  const withoutShortFormToc = stripShortFormTableOfContents(withoutRedundantBreaks, options);
-  const withoutEmptyParagraphs = stripEmptyParagraphs(withoutShortFormToc);
+  const withoutEmptyParagraphs = stripEmptyParagraphs(withoutRedundantBreaks);
 
   if (withoutEmptyParagraphs.length === 0) return null;
 
@@ -992,21 +991,6 @@ function attachStatBlockLeadIns(nodes: DocumentContent[]): DocumentContent[] {
   }
 
   return result;
-}
-
-function stripShortFormTableOfContents(
-  nodes: DocumentContent[],
-  options: NormalizeExportOptions & { chapterLikeCount: number },
-): DocumentContent[] {
-  if (!shouldStripShortFormTableOfContents(options)) return nodes;
-  return nodes.filter((node) => node.type !== 'tableOfContents');
-}
-
-function shouldStripShortFormTableOfContents(
-  options: NormalizeExportOptions & { chapterLikeCount: number },
-): boolean {
-  if (options.chapterLikeCount <= 4) return true;
-  return options.projectType === 'one_shot' && options.chapterLikeCount <= 5;
 }
 
 function stripEmptyParagraphs(nodes: DocumentContent[]): DocumentContent[] {

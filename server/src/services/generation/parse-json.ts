@@ -16,6 +16,7 @@ export function parseJsonResponse(text: string): unknown {
   cleaned = stripJsonComments(cleaned);
   cleaned = convertSingleQuotedStrings(cleaned);
   cleaned = quoteBareObjectKeys(cleaned);
+  cleaned = escapeControlCharactersInStrings(cleaned);
   cleaned = cleaned.replace(/,\s*([}\]])/g, '$1');
 
   try {
@@ -268,6 +269,65 @@ function quoteBareObjectKeys(text: string): string {
 
     out += ch;
     i++;
+  }
+
+  return out;
+}
+
+function escapeControlCharactersInStrings(text: string): string {
+  let out = '';
+  let inDoubleString = false;
+  let escaped = false;
+
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+
+    if (escaped) {
+      out += ch;
+      escaped = false;
+      continue;
+    }
+
+    if (ch === '\\' && inDoubleString) {
+      out += ch;
+      escaped = true;
+      continue;
+    }
+
+    if (ch === '"') {
+      inDoubleString = !inDoubleString;
+      out += ch;
+      continue;
+    }
+
+    if (inDoubleString) {
+      switch (ch) {
+        case '\n':
+          out += '\\n';
+          continue;
+        case '\r':
+          out += '\\r';
+          continue;
+        case '\t':
+          out += '\\t';
+          continue;
+        case '\b':
+          out += '\\b';
+          continue;
+        case '\f':
+          out += '\\f';
+          continue;
+        default: {
+          const code = ch.charCodeAt(0);
+          if (code < 0x20) {
+            out += `\\u${code.toString(16).padStart(4, '0')}`;
+            continue;
+          }
+        }
+      }
+    }
+
+    out += ch;
   }
 
   return out;

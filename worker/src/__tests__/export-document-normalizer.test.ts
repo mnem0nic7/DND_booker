@@ -36,8 +36,8 @@ describe('normalizeExportDocuments', () => {
         author: '',
       },
     });
-    expect(nodes[1]).toMatchObject({ type: 'paragraph' });
-    expect(nodes.some((node) => node.type === 'tableOfContents')).toBe(false);
+    expect(nodes[1]).toMatchObject({ type: 'tableOfContents' });
+    expect(nodes.some((node) => node.type === 'tableOfContents')).toBe(true);
     expect(nodes.some((node) => node.type === 'heading')).toBe(false);
     expect(nodes.some((node) => node.type === 'pageBreak')).toBe(false);
   });
@@ -683,7 +683,7 @@ describe('normalizeExportDocuments', () => {
     ]);
   });
 
-  it('removes a table of contents from short one-shot front matter', () => {
+  it('preserves a table of contents in short one-shot front matter', () => {
     const documents = normalizeExportDocuments([
       {
         title: 'Front Matter',
@@ -722,10 +722,11 @@ describe('normalizeExportDocuments', () => {
 
     expect(documents[0].content?.content).toEqual([
       { type: 'titlePage', attrs: { title: 'The Blackglass Mine', subtitle: '', author: '' } },
+      { type: 'tableOfContents', attrs: { title: 'Table of Contents' } },
     ]);
   });
 
-  it('removes a stored table of contents for any short export with four or fewer chapter documents', () => {
+  it('preserves a stored table of contents for short exports with four or fewer chapter documents', () => {
     const documents = normalizeExportDocuments([
       {
         title: 'Front Matter',
@@ -752,6 +753,7 @@ describe('normalizeExportDocuments', () => {
 
     expect(documents[0].content?.content).toEqual([
       { type: 'titlePage', attrs: { title: 'The Blackglass Mine', subtitle: '', author: '' } },
+      { type: 'tableOfContents', attrs: { title: 'Contents' } },
     ]);
   });
 

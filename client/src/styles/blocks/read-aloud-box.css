@@ -1,12 +1,12 @@
 .read-aloud-box {
   position: relative;
-  padding: 1rem 1.25rem;
-  margin: 1rem 0;
+  padding: 0.76rem 0.95rem;
+  margin: 0.76rem 0;
   border-radius: 4px;
   font-family: var(--body-font);
-  font-size: 0.95em;
+  font-size: 0.88em;
   font-style: italic;
-  line-height: 1.6;
+  line-height: 1.44;
 }
 
 /* Parchment style */
@@ -34,7 +34,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.34rem;
   cursor: grab;
   user-select: none;
 }
@@ -112,7 +112,7 @@
 }
 
 .read-aloud-box__content p {
-  margin: 0 0 0.5rem;
+  margin: 0 0 0.34rem;
 }
 
 .read-aloud-box__content p:last-child {

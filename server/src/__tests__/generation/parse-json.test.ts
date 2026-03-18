@@ -62,6 +62,18 @@ describe('parseJsonResponse', () => {
     });
   });
 
+  it('escapes raw control characters that appear inside JSON strings', () => {
+    const text = '{\n'
+      + '  "chapterSlug": "chapter-1-town-square",\n'
+      + '  "notes": "Line one\nLine two\twith tabs"\n'
+      + '}';
+
+    expect(parseJsonResponse(text)).toEqual({
+      chapterSlug: 'chapter-1-town-square',
+      notes: 'Line one\nLine two\twith tabs',
+    });
+  });
+
   it('throws a contextual error when the payload is not recoverable JSON', () => {
     expect(() => parseJsonResponse('not even close to json')).toThrow(
       /Failed to parse AI JSON response/,

@@ -15,19 +15,28 @@ import { redis } from '../config/redis.js';
 
 const router = Router();
 
+function envNumber(name: string, fallback: number): number {
+  const raw = process.env[name];
+  if (!raw) return fallback;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+const AUTH_RATE_LIMIT_WINDOW_MS = envNumber('AUTH_RATE_LIMIT_WINDOW_MS', 15 * 60 * 1000);
+const AUTH_RATE_LIMIT_MAX = envNumber('AUTH_RATE_LIMIT_MAX', 10);
+const ACCOUNT_LOCKOUT_THRESHOLD = envNumber('AUTH_ACCOUNT_LOCKOUT_THRESHOLD', 10);
+const ACCOUNT_LOCKOUT_TTL = envNumber('AUTH_ACCOUNT_LOCKOUT_TTL_SECONDS', 900);
+
 // Rate limiting for auth endpoints — prevent brute-force
 const authRateLimit = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 10, // 10 attempts per window (reduced from 20)
+  windowMs: AUTH_RATE_LIMIT_WINDOW_MS,
+  max: AUTH_RATE_LIMIT_MAX,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many attempts. Please try again later.' },
 });
 
 // Per-account lockout tracking via Redis (persists across restarts)
-const ACCOUNT_LOCKOUT_THRESHOLD = 10;
-const ACCOUNT_LOCKOUT_TTL = 900; // 15 minutes in seconds
-
 function lockoutKey(email: string): string {
   return `lockout:${email}`;
 }

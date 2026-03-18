@@ -37,9 +37,9 @@ const REFERENCES: DesignReference[] = [
 
 const CONSTRAINTS: DesignConstraint[] = [
   {
-    code: 'NO_SHORT_ONESHOT_TOC',
-    title: 'No TOC For Short One-Shots',
-    description: 'Skip the table of contents by default for short one-shots unless the document is materially longer than a compact quick-start module.',
+    code: 'TOC_MUST_EARN_SPACE',
+    title: 'TOC Must Stay Compact And Useful',
+    description: 'Keep the table of contents when present, but pack it efficiently and avoid letting it crowd out the DM brief or force a filler front-matter page.',
     severity: 'required',
   },
   {

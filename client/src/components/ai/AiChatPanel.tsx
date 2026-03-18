@@ -530,7 +530,19 @@ export function AiChatPanel({ projectId, editor }: AiChatPanelProps) {
     if (!editor) return;
     setInsertError(null);
     try {
-      editor.chain().focus().insertContent({ type: blockType, attrs }).run();
+      const inserted = editor.chain().focus().insertContent({ type: blockType, attrs }).run();
+      if (!inserted) {
+        const fallbackPosition = Math.max(editor.state.doc.content.size, 0);
+        const fallbackInserted = editor
+          .chain()
+          .focus()
+          .insertContentAt(fallbackPosition, { type: blockType, attrs })
+          .run();
+
+        if (!fallbackInserted) {
+          throw new Error(`Insert command for ${blockType} returned false.`);
+        }
+      }
     } catch (err) {
       console.error('[AI] Failed to insert block:', err);
       setInsertError(`Failed to insert ${blockType}. The generated data may be invalid.`);

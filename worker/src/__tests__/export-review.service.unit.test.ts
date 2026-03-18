@@ -560,7 +560,6 @@ Page size: 612 x 792 pts (letter)
     });
 
     const codes = review.findings.map((finding) => finding.code);
-    expect(codes).toContain('EXPORT_OVERLONG_TOC_FOR_SHORT_BOOK');
     expect(codes).toContain('EXPORT_WEAK_HERO_PLACEMENT');
     expect(codes).toContain('EXPORT_SPLIT_SCENE_PACKET');
     expect(codes).toContain('EXPORT_UNBALANCED_COLUMNS');
@@ -1196,6 +1195,8 @@ Page size: 612 x 792 pts (letter)
                   ac: 13,
                   hp: 10,
                   speed: '0 ft., fly 40 ft. (hover)',
+                  cr: '2',
+                  actions: JSON.stringify([{ name: 'Withering Touch', description: 'Melee Spell Attack: +5 to hit, reach 5 ft., one target. Hit: 10 necrotic damage.' }]),
                   str: 10,
                   dex: 10,
                   con: 10,
@@ -1215,6 +1216,80 @@ Page size: 612 x 792 pts (letter)
     });
 
     expect(review.findings.map((finding) => finding.code)).toContain('EXPORT_SUSPICIOUS_STAT_BLOCK');
+  });
+
+  it('flags stat blocks that are missing challenge or actions as incomplete', () => {
+    const review = analyzePdfExportLayout({
+      documents: [
+        {
+          title: 'Chapter 3: The Deep',
+          kind: 'chapter',
+          content: {
+            type: 'doc',
+            content: [
+              {
+                type: 'statBlock',
+                attrs: {
+                  name: 'Ghostly Miner',
+                  ac: 11,
+                  hp: 45,
+                  speed: 'fly 30 ft. (hover)',
+                  cr: '',
+                  actions: '[]',
+                },
+              },
+            ],
+          },
+        },
+      ],
+      pages: [],
+      pageCount: 1,
+      pageWidthPts: 612,
+      pageHeightPts: 792,
+    });
+
+    expect(review.findings.map((finding) => finding.code)).toContain('EXPORT_INCOMPLETE_STAT_BLOCK');
+  });
+
+  it('flags encounter content that lacks a complete runnable packet', () => {
+    const review = analyzePdfExportLayout({
+      documents: [
+        {
+          title: 'Chapter 4: The Guardian',
+          kind: 'chapter',
+          content: {
+            type: 'doc',
+            content: [
+              {
+                type: 'statBlock',
+                attrs: {
+                  name: 'Gravel Guardian',
+                  ac: 17,
+                  hp: 85,
+                  speed: '30 ft.',
+                  cr: '5',
+                  actions: JSON.stringify([{ name: 'Slam', description: 'Melee Weapon Attack: +7 to hit, reach 5 ft., one target. Hit: 13 bludgeoning damage.' }]),
+                },
+              },
+              {
+                type: 'encounterTable',
+                attrs: {
+                  title: 'Guardian Awakens',
+                  setup: 'The statue stirs.',
+                  tactics: 'It attacks the nearest target.',
+                },
+              },
+            ],
+          },
+        },
+      ],
+      pages: [],
+      pageCount: 1,
+      pageWidthPts: 612,
+      pageHeightPts: 792,
+    });
+
+    expect(review.findings.map((finding) => finding.code)).toContain('EXPORT_INCOMPLETE_ENCOUNTER_PACKET');
   });
 
   it('flags prose-heavy chapters with weak utility density', () => {

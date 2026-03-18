@@ -31,7 +31,7 @@ export async function executeFrontMatterGeneration(
         includesToc: shouldIncludeFrontMatterToc(outline),
       } as any,
       tiptapContent: tiptapContent as any,
-      pageEstimate: shouldIncludeFrontMatterToc(outline) ? 3 : 2,
+      pageEstimate: 3,
       tokenCount: 0,
     },
   });
@@ -110,7 +110,7 @@ export function buildFrontMatterDocument(
 }
 
 function shouldIncludeFrontMatterToc(outline: ChapterOutline): boolean {
-  return outline.totalPageEstimate > 10 && outline.chapters.length > 4;
+  return outline.chapters.length > 0;
 }
 
 function summarizeLevelRange(outline: ChapterOutline): string {

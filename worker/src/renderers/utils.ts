@@ -4,6 +4,7 @@
  */
 export {
   assessRandomTableEntries,
+  assessStatBlockAttrs,
   escapeHtml,
   hasEncounterTableContent,
   normalizeChapterHeaderTitle,

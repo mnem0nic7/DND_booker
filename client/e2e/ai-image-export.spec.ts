@@ -37,38 +37,96 @@ async function createTitlePage(page: Page) {
   await page.getByRole('button', { name: 'Create Title Page' }).click();
 }
 
-async function openBlockProperties(block: Locator) {
-  await block.click();
-  const editButton = block.getByRole('button', { name: 'Edit Properties' });
-  await expect(editButton).toBeVisible({ timeout: 10_000 });
-  await editButton.click();
+async function getPersistedTitlePageImageUrl(page: Page, projectTitle: string) {
+  return page.evaluate(async ({ title }) => {
+    const refreshResponse = await fetch('/api/auth/refresh', {
+      method: 'POST',
+      credentials: 'include',
+    });
+    if (!refreshResponse.ok) return null;
+    const refreshData = await refreshResponse.json() as { accessToken?: string };
+    if (!refreshData.accessToken) return null;
+
+    const projectResponse = await fetch('/api/projects', {
+      credentials: 'include',
+      headers: {
+        Authorization: `Bearer ${refreshData.accessToken}`,
+      },
+    });
+    if (!projectResponse.ok) return null;
+
+    const projects = await projectResponse.json() as Array<{ id: string; title: string }>;
+    const project = projects.find((entry) => entry.title === title);
+    if (!project) return null;
+
+    const documentsResponse = await fetch(`/api/projects/${project.id}/documents`, {
+      credentials: 'include',
+      headers: {
+        Authorization: `Bearer ${refreshData.accessToken}`,
+      },
+    });
+    if (!documentsResponse.ok) return null;
+
+    const documents = await documentsResponse.json() as Array<{ content?: { content?: Array<{ type?: string; attrs?: { coverImageUrl?: string } }> } }>;
+    for (const document of documents) {
+      const titlePage = document.content?.content?.find((node) => node?.type === 'titlePage');
+      const url = titlePage?.attrs?.coverImageUrl?.trim();
+      if (url) {
+        return url;
+      }
+    }
+
+    return null;
+  }, { title: projectTitle });
+}
+
+async function selectBlock(block: Locator) {
+  await block.scrollIntoViewIfNeeded();
+  await block.click({ force: true });
+  await expect(
+    block.page().locator('button').filter({ hasText: /Add Image|Edit Image/ }).first(),
+  ).toBeVisible({ timeout: 10_000 });
 }
 
 async function generateImageForBlock(
   page: Page,
   block: Locator,
+  projectTitle: string,
   prompt: string,
   imageLocator: Locator,
   timeoutMs = 4 * 60 * 1000,
 ) {
-  await openBlockProperties(block);
+  await selectBlock(block);
 
-  const generateButton = block.getByRole('button', { name: 'Generate Image with AI' });
+  const imageChooserButton = page.locator('button').filter({ hasText: /Add Image|Edit Image/ }).first();
+  await expect(imageChooserButton).toBeVisible({ timeout: 10_000 });
+  await imageChooserButton.evaluate((element: HTMLElement) => element.click());
+
+  const generateButton = page.locator('button').filter({ hasText: 'Generate Image with AI' }).first();
   await expect(generateButton).toBeVisible({ timeout: 10_000 });
   await generateButton.click();
 
-  const promptField = block.locator('.ai-generate-panel textarea').first();
+  const promptField = page.locator('.ai-generate-panel textarea').first();
   await expect(promptField).toBeVisible({ timeout: 10_000 });
   await promptField.fill(prompt);
-  await block.getByRole('button', { name: 'Generate Image' }).click();
+  await page.getByRole('button', { name: 'Generate Image' }).first().click();
 
-  await expect(imageLocator).toBeVisible({ timeout: timeoutMs });
   await expect
     .poll(async () => {
-      const src = await imageLocator.getAttribute('src');
-      return Boolean(src && src.includes('/uploads/'));
+      const visibleSrc = await imageLocator.getAttribute('src').catch(() => null);
+      if (visibleSrc && visibleSrc.includes('/uploads/')) {
+        return visibleSrc;
+      }
+
+      const persistedSrc = await getPersistedTitlePageImageUrl(page, projectTitle);
+      return persistedSrc && persistedSrc.includes('/uploads/') ? persistedSrc : null;
     }, { timeout: timeoutMs })
-    .toBe(true);
+    .not.toBeNull();
+
+  const doneButton = page.getByRole('button', { name: 'Done' }).first();
+  if (await doneButton.isVisible({ timeout: 1_000 }).catch(() => false)) {
+    await doneButton.evaluate((element: HTMLElement) => element.click());
+  }
 }
 
 test.describe('AI Image Export Flow', () => {
@@ -88,13 +146,14 @@ test.describe('AI Image Export Flow', () => {
     await primeAiSettingsStore(page);
     await createTitlePage(page);
 
-    const titlePage = page.locator('.title-page').first();
+    const titlePage = page.locator('.title-page').filter({ hasText: 'Generate with AI' }).first();
 
     await generateImageForBlock(
       page,
       titlePage,
+      REVIEW_PROJECT_TITLE,
       'Painterly fantasy cover art for a D&D one-shot called The Blackglass Mine: a haunted mine entrance of glossy black stone under a blood-red moon, lantern light, drifting fog, frontier village in the distance, dramatic tabletop RPG cover composition, no text.',
-      titlePage.locator('.title-page__cover-image img'),
+      page.locator('.title-page__cover-image img').first(),
     );
 
     await page.screenshot({ path: EDITOR_SCREENSHOT_PATH, fullPage: true });

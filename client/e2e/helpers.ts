@@ -688,22 +688,25 @@ export async function insertFirstGeneratedBlock(
 ) {
   const timeoutMs = options?.timeoutMs ?? 10_000;
   const editor = page.locator('.ProseMirror').first();
+  const renderedSurface = page.locator('.parity-render-surface').first();
   const insertButton = page.getByRole('button', { name: 'Insert' }).last();
-  const initialMarkup = await editor.evaluate((el) => el.innerHTML);
-
-  const editorTail = page.locator('.ProseMirror p').last();
-  if (await editorTail.isVisible({ timeout: 2_000 }).catch(() => false)) {
-    await editorTail.click();
-  } else {
-    await editor.click();
-  }
+  const initialEditorMarkup = await editor.evaluate((el) => el.innerHTML).catch(() => '');
+  const initialRenderedMarkup = await renderedSurface.evaluate((el) => el.innerHTML).catch(() => '');
 
   await expect(insertButton).toBeVisible({ timeout: timeoutMs });
   await insertButton.click();
   await page.waitForTimeout(2000);
 
   await expect
-    .poll(async () => await editor.evaluate((el, before) => el.innerHTML !== before, initialMarkup), {
+    .poll(async () => {
+      const editorChanged = await editor
+        .evaluate((el, before) => el.innerHTML !== before, initialEditorMarkup)
+        .catch(() => false);
+      const renderedChanged = await renderedSurface
+        .evaluate((el, before) => el.innerHTML !== before, initialRenderedMarkup)
+        .catch(() => false);
+      return editorChanged || renderedChanged;
+    }, {
       timeout: 15_000,
     })
     .toBe(true);

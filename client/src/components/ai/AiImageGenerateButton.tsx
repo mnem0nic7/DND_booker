@@ -59,7 +59,7 @@ export function AiImageGenerateButton({
   const [prompt, setPrompt] = useState(initialPrompt || '');
   const model: ImageModel = 'gpt-image-1';
   const [size, setSize] = useState(defaults.size);
-  const [quality, setQuality] = useState('standard');
+  const [quality, setQuality] = useState('medium');
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -138,7 +138,8 @@ export function AiImageGenerateButton({
             className="ai-generate-input"
             style={{ padding: '4px 6px', minHeight: 'unset' }}
           >
-            <option value="standard">Standard</option>
+            <option value="auto">Auto</option>
+            <option value="medium">Medium</option>
             <option value="high">High</option>
           </select>
         </label>

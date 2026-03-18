@@ -669,7 +669,7 @@ export function assembleHtml(options: AssembleOptions): string {
     .stat-block {
       background: var(--stat-block-bg);
       border: 2px solid var(--stat-block-border);
-      padding: 0.85rem;
+      padding: 0.72rem;
       margin: 0.7rem 0;
       page-break-inside: avoid;
     }
@@ -678,13 +678,13 @@ export function assembleHtml(options: AssembleOptions): string {
       font-family: var(--font-heading);
       color: var(--color-primary);
       margin: 0 0 0.1rem;
-      font-size: 1.3rem;
+      font-size: 1.16rem;
     }
 
     .stat-block__subtitle {
       font-style: italic;
-      font-size: 0.85rem;
-      margin-bottom: 0.5rem;
+      font-size: 0.78rem;
+      margin-bottom: 0.34rem;
     }
 
     .stat-block__divider {
@@ -692,12 +692,13 @@ export function assembleHtml(options: AssembleOptions): string {
       border-top: 1px solid var(--color-divider);
       background: none;
       height: 0;
-      margin: 0.5rem 0;
+      margin: 0.34rem 0;
     }
 
     .stat-block__property {
-      font-size: 0.85rem;
-      margin: 0.15rem 0;
+      font-size: 0.8rem;
+      line-height: 1.25;
+      margin: 0.12rem 0;
     }
 
     .stat-block__property-name {
@@ -709,7 +710,7 @@ export function assembleHtml(options: AssembleOptions): string {
       display: flex;
       justify-content: space-around;
       text-align: center;
-      margin: 0.5rem 0;
+      margin: 0.3rem 0;
     }
 
     .stat-block__ability-name {
@@ -719,22 +720,23 @@ export function assembleHtml(options: AssembleOptions): string {
     }
 
     .stat-block__ability-score {
-      font-size: 0.85rem;
+      font-size: 0.78rem;
     }
 
     .stat-block__section-title {
       font-family: var(--font-heading);
-      font-size: 1rem;
+      font-size: 0.92rem;
       color: var(--color-primary);
       border-bottom: 1px solid var(--color-divider);
-      margin-top: 0.75rem;
-      margin-bottom: 0.3rem;
+      margin-top: 0.5rem;
+      margin-bottom: 0.2rem;
       padding-bottom: 0.2rem;
     }
 
     .stat-block__trait {
-      font-size: 0.85rem;
-      margin: 0.3rem 0;
+      font-size: 0.8rem;
+      line-height: 1.25;
+      margin: 0.22rem 0;
     }
 
     .stat-block__trait-name {
@@ -744,11 +746,13 @@ export function assembleHtml(options: AssembleOptions): string {
 
     /* Read Aloud Box */
     .read-aloud-box {
-      padding: 0.8rem;
-      margin: 0.65rem 0;
+      padding: 0.68rem 0.8rem;
+      margin: 0.55rem 0;
       border-left: 4px solid var(--read-aloud-border);
       background: var(--read-aloud-bg);
       page-break-inside: avoid;
+      font-size: 0.84rem;
+      line-height: 1.4;
     }
 
     .read-aloud-box--parchment {
@@ -763,7 +767,7 @@ export function assembleHtml(options: AssembleOptions): string {
     .read-aloud-box__label {
       font-family: var(--font-heading);
       font-weight: bold;
-      font-size: 0.75rem;
+      font-size: 0.7rem;
       text-transform: uppercase;
       letter-spacing: 0.05em;
       color: var(--color-primary);
@@ -924,7 +928,7 @@ export function assembleHtml(options: AssembleOptions): string {
 
     /* Random Table */
     .random-table {
-      margin: 0.55rem 0;
+      margin: 0.45rem 0;
       page-break-inside: avoid;
     }
 
@@ -932,20 +936,20 @@ export function assembleHtml(options: AssembleOptions): string {
       display: flex;
       align-items: center;
       gap: 0.4rem;
-      margin-bottom: 0.24rem;
+      margin-bottom: 0.18rem;
     }
 
     .random-table__title {
       font-family: var(--font-heading);
       color: var(--color-heading);
       margin: 0;
-      font-size: 1rem;
+      font-size: 0.9rem;
     }
 
     .random-table__die-badge {
       background: var(--color-primary);
       color: white;
-      font-size: 0.66rem;
+      font-size: 0.62rem;
       padding: 0.08rem 0.34rem;
       border-radius: 3px;
       font-weight: bold;
@@ -955,20 +959,20 @@ export function assembleHtml(options: AssembleOptions): string {
     .npc-profile {
       background: var(--stat-block-bg);
       border: 2px solid var(--color-primary);
-      padding: 0.85rem 0.85rem 1.12rem;
+      padding: 0.72rem 0.76rem 0.86rem;
       margin: 0.7rem 0;
       page-break-inside: avoid;
     }
 
     .npc-profile__header {
       display: flex;
-      gap: 1rem;
+      gap: 0.68rem;
       align-items: flex-start;
     }
 
     .npc-profile__portrait {
-      width: 80px;
-      height: 80px;
+      width: 72px;
+      height: 72px;
       flex-shrink: 0;
       border-radius: 50%;
       overflow: hidden;
@@ -996,12 +1000,12 @@ export function assembleHtml(options: AssembleOptions): string {
       font-family: var(--font-heading);
       color: var(--color-primary);
       margin: 0;
-      font-size: 1.2rem;
+      font-size: 1.08rem;
     }
 
     .npc-profile__subtitle {
       font-style: italic;
-      font-size: 0.85rem;
+      font-size: 0.78rem;
     }
 
     .npc-profile__divider {
@@ -1009,17 +1013,19 @@ export function assembleHtml(options: AssembleOptions): string {
       border-top: 1px solid var(--color-divider);
       background: none;
       height: 0;
-      margin: 0.45rem 0;
+      margin: 0.34rem 0;
     }
 
     .npc-profile__description {
-      font-size: 0.85rem;
-      margin: 0.5rem 0;
+      font-size: 0.8rem;
+      line-height: 1.28;
+      margin: 0.34rem 0;
     }
 
     .npc-profile__trait {
-      font-size: 0.85rem;
-      margin: 0.2rem 0 0.32rem;
+      font-size: 0.8rem;
+      line-height: 1.24;
+      margin: 0.14rem 0 0.24rem;
     }
 
     .npc-profile__trait-label {
@@ -1029,35 +1035,35 @@ export function assembleHtml(options: AssembleOptions): string {
 
     /* Encounter Table */
     .encounter-table {
-      margin: 0.7rem 0;
+      margin: 0.55rem 0;
       page-break-inside: avoid;
     }
 
     .encounter-table__header {
-      margin-bottom: 0.5rem;
+      margin-bottom: 0.34rem;
     }
 
     .encounter-table__title {
       font-family: var(--font-heading);
       color: var(--color-heading);
       margin: 0;
-      font-size: 1.1rem;
+      font-size: 1rem;
     }
 
     .encounter-table__cr-range {
-      font-size: 0.8rem;
+      font-size: 0.74rem;
       font-style: italic;
     }
 
     .encounter-table__details {
-      margin-top: 0.55rem;
+      margin-top: 0.38rem;
       display: grid;
-      gap: 0.28rem;
+      gap: 0.2rem;
     }
 
     .encounter-table__detail {
-      font-size: 0.82rem;
-      line-height: 1.35;
+      font-size: 0.78rem;
+      line-height: 1.24;
     }
 
     .encounter-table__detail-label {
@@ -1402,12 +1408,13 @@ export function assembleHtml(options: AssembleOptions): string {
 
     /* Table of Contents */
     .table-of-contents {
-      padding: 1.5rem 1rem;
+      padding: 0.95rem 0.8rem;
     }
 
     .table-of-contents__heading {
       text-align: center;
-      margin-bottom: 1.5rem;
+      margin-bottom: 0.8rem;
+      font-size: 1.08rem;
     }
 
     .table-of-contents__note {
@@ -1420,7 +1427,9 @@ export function assembleHtml(options: AssembleOptions): string {
     .table-of-contents__entry {
       display: flex;
       align-items: baseline;
-      margin: 0.3rem 0;
+      margin: 0.18rem 0;
+      font-size: 0.8rem;
+      line-height: 1.2;
     }
 
     .table-of-contents__entry-title {

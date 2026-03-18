@@ -222,7 +222,7 @@ describe('Chapter Plan Service — executeChapterPlanGeneration', () => {
       {} as any, 8192,
     );
 
-    expect(result.plan.sections[0].targetWords).toBeLessThanOrEqual(1400);
+    expect(result.plan.sections[0].targetWords).toBeLessThanOrEqual(1900);
     expect(result.plan.sections[0].blocksNeeded).toContain('readAloud');
     expect(result.plan.sections[0].blocksNeeded).toContain('dmTips');
     expect(result.plan.sections[0].blocksNeeded).toContain('handout');
@@ -230,12 +230,14 @@ describe('Chapter Plan Service — executeChapterPlanGeneration', () => {
     expect(result.plan.sections[0].playerObjective).toBeTruthy();
     expect(result.plan.sections[0].decisionPoint).toBeTruthy();
     expect(result.plan.sections[0].consequenceSummary).toBeTruthy();
-    expect(result.plan.sections[0].keyBeats.length).toBeGreaterThanOrEqual(5);
-    expect(result.plan.sections[1].targetWords).toBeGreaterThanOrEqual(1200);
+    expect(result.plan.sections[0].blocksNeeded.length).toBeGreaterThanOrEqual(4);
+    expect(result.plan.sections[0].keyBeats.length).toBeGreaterThanOrEqual(6);
+    expect(result.plan.sections[1].targetWords).toBeGreaterThanOrEqual(1500);
     expect(result.plan.sections[1].blocksNeeded).toContain('encounterTable');
     expect(result.plan.sections[1].blocksNeeded).toContain('statBlock');
     expect(result.plan.sections[1].blocksNeeded).toContain('dmTips');
-    expect(result.plan.sections[1].keyBeats.length).toBeGreaterThanOrEqual(5);
+    expect(result.plan.sections[1].blocksNeeded.length).toBeGreaterThanOrEqual(5);
+    expect(result.plan.sections[1].keyBeats.length).toBeGreaterThanOrEqual(6);
     expect(result.plan.readAloudCount).toBeGreaterThanOrEqual(2);
     expect(result.plan.dmTipCount).toBeGreaterThanOrEqual(1);
     expect(result.plan.difficultyProgression).toBeTruthy();

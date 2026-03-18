@@ -44,6 +44,9 @@ export type StatBlockSanityFlag =
   | 'missing_name'
   | 'invalid_ac'
   | 'invalid_hp'
+  | 'missing_speed'
+  | 'missing_challenge'
+  | 'missing_actions'
   | 'default_ability_scores'
   | 'suspicious_speed';
 
@@ -51,6 +54,7 @@ export interface StatBlockSanityAssessment {
   normalizedAttrs: Record<string, unknown>;
   flags: StatBlockSanityFlag[];
   isPlaceholder: boolean;
+  isIncomplete: boolean;
   isSuspicious: boolean;
 }
 
@@ -584,6 +588,29 @@ function hasSuspiciousSpeed(value: unknown): boolean {
   return false;
 }
 
+function hasNameDescEntries(value: unknown): boolean {
+  let parsed: unknown = value;
+
+  if (typeof value === 'string') {
+    try {
+      parsed = JSON.parse(value);
+    } catch {
+      return false;
+    }
+  }
+
+  if (!Array.isArray(parsed)) return false;
+
+  return parsed.some((entry) => {
+    if (!isPlainObject(entry)) return false;
+    const name = normalizeStructuredText(entry.name ?? entry.type ?? entry.title ?? entry.label).trim();
+    const description = normalizeStructuredText(
+      entry.description ?? entry.desc ?? entry.notes ?? entry.text,
+    ).trim();
+    return Boolean(name || description);
+  });
+}
+
 export function assessStatBlockAttrs(attrs: Record<string, unknown>): StatBlockSanityAssessment {
   const normalizedAttrs = normalizeStatBlockAttrs(attrs);
   const flags: StatBlockSanityFlag[] = [];
@@ -595,13 +622,24 @@ export function assessStatBlockAttrs(attrs: Record<string, unknown>): StatBlockS
   if (!name) flags.push('missing_name');
   if (ac === undefined || ac <= 0) flags.push('invalid_ac');
   if (hp === undefined || hp <= 0) flags.push('invalid_hp');
+  if (!normalizeString(normalizedAttrs.speed).trim()) flags.push('missing_speed');
+  if (!normalizeString(normalizedAttrs.cr).trim()) flags.push('missing_challenge');
+  if (!hasNameDescEntries(normalizedAttrs.actions)) flags.push('missing_actions');
   if (hasDefaultAbilityScores(normalizedAttrs)) flags.push('default_ability_scores');
   if (hasSuspiciousSpeed(normalizedAttrs.speed)) flags.push('suspicious_speed');
+
+  const isPlaceholder = flags.includes('missing_name') || flags.includes('invalid_ac') || flags.includes('invalid_hp');
+  const isIncomplete = !isPlaceholder && (
+    flags.includes('missing_speed')
+    || flags.includes('missing_challenge')
+    || flags.includes('missing_actions')
+  );
 
   return {
     normalizedAttrs,
     flags,
-    isPlaceholder: flags.includes('missing_name') || flags.includes('invalid_ac') || flags.includes('invalid_hp'),
+    isPlaceholder,
+    isIncomplete,
     isSuspicious: flags.includes('default_ability_scores') || flags.includes('suspicious_speed'),
   };
 }

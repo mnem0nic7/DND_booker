@@ -15,6 +15,7 @@ import {
   assessRandomTableEntries,
   assessStatBlockAttrs,
   hasEncounterTableContent,
+  normalizeEncounterTableAttrs,
   normalizeChapterHeaderTitle,
   resolveRandomTableEntries,
 } from '@dnd-booker/shared';
@@ -22,9 +23,9 @@ import {
 const execFile = promisify(execFileCallback);
 
 const CHAPTER_OPENER_TOP_RATIO_THRESHOLD = 0.25;
-const LAST_PAGE_FILL_RATIO_THRESHOLD = 0.45;
+const LAST_PAGE_FILL_RATIO_THRESHOLD = 0.5;
 const HEADING_LINE_HEIGHT_THRESHOLD = 14;
-const UTILITY_DENSITY_THRESHOLD = 0.18;
+const UTILITY_DENSITY_THRESHOLD = 0.24;
 
 const UTILITY_BLOCK_WEIGHTS: Record<string, number> = {
   readAloudBox: 0.5,
@@ -318,21 +319,6 @@ export function analyzePdfExportLayout(input: {
   const sectionStartPages = new Set(sectionStarts.map((metric) => metric.page).filter((page): page is number => page !== null));
   findings.push(...analyzePageLayout(pages, sectionStartPages));
 
-  if (
-    pageCount <= 10 &&
-    documents.some((document) => documentContainsNodeType(document.content ?? null, 'tableOfContents'))
-  ) {
-    findings.push({
-      code: 'EXPORT_OVERLONG_TOC_FOR_SHORT_BOOK',
-      severity: 'warning',
-      page: 2,
-      message: 'A short one-shot still includes a table of contents that is likely wasting front-matter space.',
-      details: {
-        pageCount,
-      },
-    });
-  }
-
   const lastDocument = documents.at(-1);
   if (
     lastPageFillRatio !== null &&
@@ -460,19 +446,6 @@ function analyzePdfExportLayoutFromPageModels(input: {
 
   const effectivePageCount = pageCount || globalPages.length;
 
-  if (
-    effectivePageCount <= 10 &&
-    documents.some((document) => documentContainsNodeType(document.content ?? null, 'tableOfContents'))
-  ) {
-    findings.push({
-      code: 'EXPORT_OVERLONG_TOC_FOR_SHORT_BOOK',
-      severity: 'warning',
-      page: 2,
-      message: 'A short one-shot still includes a table of contents that is likely wasting front-matter space.',
-      details: { pageCount: effectivePageCount },
-    });
-  }
-
   const lastPageFillRatio = globalPages.at(-1)?.fillRatio ?? null;
   const lastDocument = documents.at(-1);
   if (
@@ -548,7 +521,6 @@ export function planExportAutoFixes(review: ExportReview): ExportReviewAutoFix[]
     || codes.has('EXPORT_MARGIN_COLLISION')
     || codes.has('EXPORT_FOOTER_COLLISION')
     || codes.has('EXPORT_ORPHAN_TAIL_PARAGRAPH')
-    || codes.has('EXPORT_OVERLONG_TOC_FOR_SHORT_BOOK')
   ) {
     fixes.push('refresh_layout_plan');
   }
@@ -788,15 +760,17 @@ function findingPenalty(code: ExportReviewFinding['code']): number {
       return 18;
     case 'EXPORT_ORPHAN_TAIL_PARAGRAPH':
       return 12;
-    case 'EXPORT_OVERLONG_TOC_FOR_SHORT_BOOK':
-      return 10;
     case 'EXPORT_EMPTY_ENCOUNTER_TABLE':
       return 22;
+    case 'EXPORT_INCOMPLETE_ENCOUNTER_PACKET':
+      return 24;
     case 'EXPORT_EMPTY_RANDOM_TABLE':
       return 18;
     case 'EXPORT_THIN_RANDOM_TABLE':
       return 14;
     case 'EXPORT_PLACEHOLDER_STAT_BLOCK':
+      return 24;
+    case 'EXPORT_INCOMPLETE_STAT_BLOCK':
       return 24;
     case 'EXPORT_SUSPICIOUS_STAT_BLOCK':
       return 12;
@@ -826,8 +800,9 @@ function analyzeDocumentUtility(document: ReviewableDocument): {
   const isStructurallyThin = (
     (document.kind === 'chapter' || document.kind === 'appendix')
     && (
-      (inspection.proseParagraphCount >= 6 && inspection.utilityBlockCount < 4)
-      || (inspection.proseParagraphCount >= 5 && inspection.referenceBlockCount === 0)
+      (inspection.proseParagraphCount >= 6 && inspection.utilityBlockCount < 5)
+      || (inspection.proseParagraphCount >= 5 && inspection.referenceBlockCount < 2)
+      || (inspection.proseParagraphCount >= 8 && utilityDensity < UTILITY_DENSITY_THRESHOLD + 0.03)
     )
   );
 
@@ -926,6 +901,7 @@ function inspectDocumentContent(content: DocumentContent | null, documentTitle: 
   let utilityBlockCount = 0;
   let referenceBlockCount = 0;
   let utilityWeight = 0;
+  const encounterAssessment = assessEncounterPacketCompleteness(content);
 
   const visit = (node: DocumentContent, documentTitle: string, insideUtilityContainer = false) => {
     const nodeType = node.type;
@@ -1000,6 +976,21 @@ function inspectDocumentContent(content: DocumentContent | null, documentTitle: 
               flags: assessment.flags,
             },
           });
+        } else if (assessment.isIncomplete) {
+          findings.push({
+            code: 'EXPORT_INCOMPLETE_STAT_BLOCK',
+            severity: 'error',
+            page: null,
+            message: `"${documentTitle}" includes a partial stat block that is missing required combat data.`,
+            details: {
+              title: documentTitle,
+              blockType: nodeType,
+              name: typeof assessment.normalizedAttrs.name === 'string'
+                ? assessment.normalizedAttrs.name
+                : readStringAttr(node, 'name'),
+              flags: assessment.flags,
+            },
+          });
         } else if (assessment.isSuspicious) {
           findings.push({
             code: 'EXPORT_SUSPICIOUS_STAT_BLOCK',
@@ -1051,6 +1042,22 @@ function inspectDocumentContent(content: DocumentContent | null, documentTitle: 
 
   visit(content, documentTitle);
 
+  if (encounterAssessment.hasEncounterMarkers && encounterAssessment.isIncomplete) {
+    findings.push({
+      code: 'EXPORT_INCOMPLETE_ENCOUNTER_PACKET',
+      severity: 'error',
+      page: null,
+      message: `"${documentTitle}" includes encounter content without a complete runnable packet.`,
+      details: {
+        title: documentTitle,
+        statBlockCount: encounterAssessment.statBlockCount,
+        encounterTableCount: encounterAssessment.encounterTableCount,
+        completeEncounterTableCount: encounterAssessment.completeEncounterTableCount,
+        supportBlockCount: encounterAssessment.supportBlockCount,
+      },
+    });
+  }
+
   return {
     proseParagraphCount,
     utilityBlockCount,
@@ -1071,7 +1078,7 @@ function analyzePageLayout(pages: PdfPage[], sectionStartPages: Set<number>): Ex
     const fillRatio = computeLastPageFillRatio(page);
     if (
       fillRatio !== null &&
-      fillRatio < 0.58 &&
+      fillRatio < 0.62 &&
       pageNumber > 1 &&
       pageNumber < pages.length &&
       !sectionStartPages.has(pageNumber) &&
@@ -1175,11 +1182,11 @@ function analyzeMeasuredPageLayout(pages: MeasuredReviewPage[]): ExportReviewFin
       && !page.isOpener
       && !page.isFullPageInsert
       && (
-        page.fillRatio < 0.58
+        page.fillRatio < 0.62
         || (
-          page.fillRatio < 0.7
-          && whitespace.bottomGapRatio > 0.24
-          && page.bottomPanelFillRatio < 0.28
+          page.fillRatio < 0.74
+          && whitespace.bottomGapRatio > 0.2
+          && page.bottomPanelFillRatio < 0.3
           && !hasSubstantialArtRecovery
         )
       )
@@ -1368,7 +1375,7 @@ function shouldFlagMissedArtOpportunity(
   if (!largeBottomGap) return false;
   if (hasSubstantialArtRecovery && page.fillRatio >= 0.68 && whitespace.bottomGapRatio <= 0.34) return false;
 
-  const isSparse = page.fillRatio < 0.7;
+  const isSparse = page.fillRatio < 0.74;
   const isUnbalanced = (page.deltaRatio ?? 0) > 0.18 && page.bottomPanelFillRatio < 0.12;
   const hasBottomPanelArt = units.some((unit) => unit.hasArt && unit.placements.includes('bottom_panel'));
 
@@ -1448,8 +1455,76 @@ function hasHeroCandidate(content: DocumentContent | null): boolean {
 
 function hasEncounterPacketContent(content: DocumentContent | null): boolean {
   return documentContainsNodeType(content, 'statBlock')
-    || documentContainsNodeType(content, 'encounterTable')
-    || documentContainsNodeType(content, 'randomTable');
+    || documentContainsNodeType(content, 'encounterTable');
+}
+
+function assessEncounterPacketCompleteness(content: DocumentContent | null): {
+  hasEncounterMarkers: boolean;
+  isIncomplete: boolean;
+  statBlockCount: number;
+  encounterTableCount: number;
+  completeEncounterTableCount: number;
+  supportBlockCount: number;
+} {
+  let statBlockCount = 0;
+  let encounterTableCount = 0;
+  let completeEncounterTableCount = 0;
+  let supportBlockCount = 0;
+
+  const visit = (node: DocumentContent) => {
+    if (node.type === 'statBlock') {
+      statBlockCount += 1;
+    } else if (node.type === 'encounterTable') {
+      encounterTableCount += 1;
+      if (isCompleteEncounterTable(node.attrs ?? {})) {
+        completeEncounterTableCount += 1;
+      }
+    } else if (
+      node.type === 'readAloudBox'
+      || node.type === 'sidebarCallout'
+      || node.type === 'bulletList'
+      || node.type === 'orderedList'
+      || node.type === 'handout'
+      || (node.type === 'paragraph' && isStructuredUtilityParagraph(node))
+    ) {
+      supportBlockCount += 1;
+    }
+
+    for (const child of node.content ?? []) {
+      visit(child);
+    }
+  };
+
+  if (content) visit(content);
+
+  const hasEncounterMarkers = statBlockCount > 0 || encounterTableCount > 0;
+  const isIncomplete = hasEncounterMarkers && (
+    statBlockCount === 0
+    || encounterTableCount === 0
+    || completeEncounterTableCount === 0
+    || supportBlockCount < 2
+  );
+
+  return {
+    hasEncounterMarkers,
+    isIncomplete,
+    statBlockCount,
+    encounterTableCount,
+    completeEncounterTableCount,
+    supportBlockCount,
+  };
+}
+
+function isCompleteEncounterTable(attrs: Record<string, unknown>): boolean {
+  if (!hasEncounterTableContent(attrs)) return false;
+
+  const normalized = normalizeEncounterTableAttrs(attrs);
+  const requiredKeys = ['setup', 'opposition', 'terrain', 'tactics'] as const;
+  const optionalKeys = ['rewards', 'payoff', 'aftermath', 'objective', 'description', 'notes'] as const;
+  const requiredCount = requiredKeys.filter((key) => readStructuredAttr(normalized[key]).length > 0).length;
+  const optionalCount = optionalKeys.filter((key) => readStructuredAttr(normalized[key]).length > 0).length;
+
+  return requiredCount >= 3 && optionalCount >= 2;
 }
 
 function hasStrongHeroPlacement(layoutPlan: LayoutPlan | null, pageModel: PageModel | null): boolean {
@@ -1537,6 +1612,12 @@ function isStructuredUtilityParagraph(node: DocumentContent): boolean {
 function readStringAttr(node: DocumentContent, key: string): string {
   const value = node.attrs?.[key];
   return typeof value === 'string' ? value : value == null ? '' : String(value);
+}
+
+function readStructuredAttr(value: unknown): string {
+  if (typeof value === 'string') return value.trim();
+  if (value === null || value === undefined) return '';
+  return String(value).trim();
 }
 
 function readNumberAttr(node: DocumentContent, key: string): number {
