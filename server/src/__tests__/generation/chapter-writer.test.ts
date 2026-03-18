@@ -9,6 +9,12 @@ vi.mock('ai', () => ({ generateText: vi.fn() }));
 vi.mock('../../services/generation/pubsub.service.js', () => ({
   publishGenerationEvent: vi.fn(),
 }));
+vi.mock('../../services/generation/markdown-artifact-conversion.service.js', () => ({
+  convertMarkdownToTipTapWithTimeout: vi.fn(async (markdown: string) => {
+    const { markdownToTipTap } = await import('../../services/ai-wizard.service.js');
+    return markdownToTipTap(markdown);
+  }),
+}));
 const mockGenerateText = vi.mocked(generateText);
 
 let testUser: { id: string };
@@ -320,5 +326,36 @@ describe('Chapter Writer Service — executeChapterDraftGeneration', () => {
     const types = tiptap.content.map((n: any) => n.type);
     expect(types).toContain('heading');
     expect(types).toContain('readAloudBox');
+  });
+
+  it('should keep markdown artifact even if TipTap conversion fails', async () => {
+    const { convertMarkdownToTipTapWithTimeout } = await import('../../services/generation/markdown-artifact-conversion.service.js');
+    vi.mocked(convertMarkdownToTipTapWithTimeout).mockRejectedValueOnce(new Error('conversion stalled'));
+
+    mockGenerateText.mockResolvedValueOnce({
+      text: SAMPLE_MARKDOWN,
+      usage: { inputTokens: 2000, outputTokens: 3000 },
+    } as any);
+
+    const run = await createRun({
+      projectId: testProject.id,
+      userId: testUser.id,
+      prompt: 'test',
+    });
+
+    const result = await executeChapterDraftGeneration(
+      run!,
+      SAMPLE_CHAPTER,
+      SAMPLE_PLAN,
+      SAMPLE_BIBLE,
+      [],
+      {} as any,
+      16384,
+    );
+
+    const artifact = await prisma.generatedArtifact.findUnique({ where: { id: result.artifactId } });
+    expect(artifact).not.toBeNull();
+    expect(artifact!.markdownContent).toContain('Chapter 1: The Village');
+    expect(artifact!.tiptapContent).toBeNull();
   });
 });

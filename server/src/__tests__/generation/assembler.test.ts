@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, vi, beforeEach } from 'vitest';
+import { Prisma } from '@prisma/client';
 import type { ChapterOutline } from '@dnd-booker/shared';
 import { prisma } from '../../config/database.js';
 import {
@@ -9,6 +10,9 @@ import { createRun } from '../../services/generation/run.service.js';
 
 vi.mock('../../services/generation/pubsub.service.js', () => ({
   publishGenerationEvent: vi.fn(),
+}));
+vi.mock('../../services/generation/markdown-artifact-conversion.service.js', () => ({
+  convertMarkdownToTipTapWithTimeout: vi.fn(async () => ({ type: 'doc', content: [{ type: 'paragraph' }] })),
 }));
 
 let testUser: { id: string };
@@ -271,6 +275,47 @@ describe('Assembler — assembleDocuments', () => {
 
     const result = await assembleDocuments(run!);
     expect(result.documentIds).toHaveLength(3);
+  });
+
+  it('hydrates markdown-only chapter drafts during assembly', async () => {
+    const run = await createRun({
+      projectId: testProject.id,
+      userId: testUser.id,
+      prompt: 'markdown hydrate test',
+    });
+
+    await prisma.generatedArtifact.create({
+      data: {
+        runId: run!.id,
+        projectId: run!.projectId,
+        artifactType: 'chapter_outline',
+        artifactKey: 'chapter-outline',
+        status: 'accepted',
+        version: 1,
+        title: 'Outline',
+        jsonContent: SAMPLE_OUTLINE as any,
+      },
+    });
+
+    const draft = await prisma.generatedArtifact.create({
+      data: {
+        runId: run!.id,
+        projectId: run!.projectId,
+        artifactType: 'chapter_draft',
+        artifactKey: 'chapter-draft-goblin-ambush',
+        status: 'accepted',
+        version: 1,
+        title: 'The Goblin Ambush',
+        markdownContent: '## The Goblin Ambush\n\nThis draft only has markdown.',
+        tiptapContent: Prisma.DbNull,
+        jsonContent: { wordCount: 2500 } as any,
+      },
+    });
+
+    await assembleDocuments(run!);
+
+    const hydrated = await prisma.generatedArtifact.findUniqueOrThrow({ where: { id: draft.id } });
+    expect(hydrated.tiptapContent).not.toBeNull();
   });
 
   it('throws when no outline exists at all', async () => {

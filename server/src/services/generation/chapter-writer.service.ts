@@ -1,14 +1,15 @@
 import type { LanguageModel } from 'ai';
+import { Prisma } from '@prisma/client';
 import type { BibleContent, ChapterPlan, ChapterOutlineEntry } from '@dnd-booker/shared';
 import { prisma } from '../../config/database.js';
 import { publishGenerationEvent } from './pubsub.service.js';
-import { markdownToTipTap } from '../ai-wizard.service.js';
 import { assembleChapterContext } from './context-assembler.service.js';
 import {
   buildChapterDraftSystemPrompt,
   buildChapterDraftUserPrompt,
 } from './prompts/chapter-draft.prompt.js';
 import { generateTextWithTimeout } from './model-timeouts.js';
+import { convertMarkdownToTipTapWithTimeout } from './markdown-artifact-conversion.service.js';
 
 export interface ChapterDraftResult {
   artifactId: string;
@@ -21,8 +22,8 @@ const MAX_CHAPTER_DRAFT_OUTPUT_TOKENS = 6144;
 
 /**
  * Generate a chapter draft.
- * Assembles context, calls AI for markdown prose, converts to TipTap JSON,
- * creates a chapter_draft artifact with both markdown and TipTap content.
+ * Assembles context, calls AI for markdown prose, persists it immediately,
+ * and then hydrates TipTap JSON behind a bounded conversion step.
  */
 export async function executeChapterDraftGeneration(
   run: { id: string; projectId: string },
@@ -57,9 +58,6 @@ export async function executeChapterDraftGeneration(
     maxOutputTokens: Math.min(maxOutputTokens, MAX_CHAPTER_DRAFT_OUTPUT_TOKENS),
   });
 
-  // Convert markdown to TipTap JSON
-  const tiptapContent = markdownToTipTap(text);
-
   // Count words in the markdown
   const wordCount = text.split(/\s+/).filter(Boolean).length;
 
@@ -77,7 +75,7 @@ export async function executeChapterDraftGeneration(
       title: chapter.title,
       summary: `${wordCount} words, ${plan.sections.length} sections`,
       markdownContent: text,
-      tiptapContent: tiptapContent as any,
+      tiptapContent: Prisma.DbNull,
       jsonContent: {
         chapterSlug: chapter.slug,
         act: chapter.act,
@@ -126,6 +124,26 @@ export async function executeChapterDraftGeneration(
     title: chapter.title,
     version: 1,
   });
+
+  try {
+    const tiptapContent = await convertMarkdownToTipTapWithTimeout(
+      text,
+      `Chapter draft conversion for ${chapter.title}`,
+    );
+
+    await prisma.generatedArtifact.update({
+      where: { id: artifact.id },
+      data: { tiptapContent: tiptapContent as any },
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown markdown conversion failure';
+    await publishGenerationEvent(run.id, {
+      type: 'run_warning',
+      runId: run.id,
+      message: `Stored markdown for "${chapter.title}", but TipTap conversion failed: ${message}`,
+      severity: 'warning',
+    });
+  }
 
   return {
     artifactId: artifact.id,

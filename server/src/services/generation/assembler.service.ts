@@ -3,10 +3,45 @@ import { prisma } from '../../config/database.js';
 import { publishGenerationEvent } from './pubsub.service.js';
 import { resolveOutlineArtifact } from './outline-artifact.service.js';
 import { resolveDocumentLayout } from '../layout-plan.service.js';
+import { convertMarkdownToTipTapWithTimeout } from './markdown-artifact-conversion.service.js';
 
 export interface AssemblyResult {
   manifestId: string;
   documentIds: string[];
+}
+
+async function resolveArtifactContent(
+  artifact: {
+    id: string;
+    title: string;
+    markdownContent: string | null;
+    tiptapContent: unknown;
+    jsonContent: unknown;
+  } | undefined,
+): Promise<unknown> {
+  if (!artifact) {
+    return {};
+  }
+
+  if (artifact.tiptapContent) {
+    return artifact.tiptapContent;
+  }
+
+  if (artifact.markdownContent) {
+    const tiptapContent = await convertMarkdownToTipTapWithTimeout(
+      artifact.markdownContent,
+      `Assembly conversion for ${artifact.title}`,
+    );
+
+    await prisma.generatedArtifact.update({
+      where: { id: artifact.id },
+      data: { tiptapContent: tiptapContent as any },
+    });
+
+    return tiptapContent;
+  }
+
+  return artifact.jsonContent ?? {};
 }
 
 // Map artifact types to document kinds
@@ -139,7 +174,13 @@ export async function assembleDocuments(
     const draftKey = spec.artifactKeys[0];
     const artifact = acceptedByKey.get(draftKey);
 
-    const content = artifact?.tiptapContent ?? artifact?.jsonContent ?? {};
+    const content = await resolveArtifactContent(artifact ? {
+      id: artifact.id,
+      title: artifact.title,
+      markdownContent: artifact.markdownContent,
+      tiptapContent: artifact.tiptapContent,
+      jsonContent: artifact.jsonContent,
+    } : undefined);
     const resolvedLayout = resolveDocumentLayout({
       content,
       kind: spec.kind,

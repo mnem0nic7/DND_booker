@@ -100,7 +100,7 @@ export async function processGenerationJob(job: Job<GenerationJobData>): Promise
   const { expandAllCanonEntities } = await import('../../../server/src/services/generation/canon.service.js');
   const { executeChapterPlanGeneration } = await import('../../../server/src/services/generation/chapter-plan.service.js');
   const { executeChapterDraftGeneration } = await import('../../../server/src/services/generation/chapter-writer.service.js');
-  const { evaluateArtifact } = await import('../../../server/src/services/generation/evaluator.service.js');
+  const { evaluateArtifact, getArtifactCategory } = await import('../../../server/src/services/generation/evaluator.service.js');
   const { reviseArtifact } = await import('../../../server/src/services/generation/reviser.service.js');
   const { assembleDocuments } = await import('../../../server/src/services/generation/assembler.service.js');
   const { runPreflight } = await import('../../../server/src/services/generation/preflight.service.js');
@@ -118,6 +118,40 @@ export async function processGenerationJob(job: Job<GenerationJobData>): Promise
       stage,
       progressPercent: percent,
     });
+  }
+
+  async function acceptNonBlockingArtifactIfSafe(
+    artifactId: string,
+    overallScore: number,
+    findings: Array<{ severity: string; message: string }>,
+  ): Promise<boolean> {
+    const latestArtifact = await prisma.generatedArtifact.findUnique({
+      where: { id: artifactId },
+      select: { id: true, artifactType: true, title: true },
+    });
+
+    if (!latestArtifact) return false;
+
+    const category = getArtifactCategory(latestArtifact.artifactType);
+    const hasCriticalFinding = findings.some((finding) => finding.severity === 'critical');
+
+    if (!['planning', 'reference'].includes(category) || hasCriticalFinding) {
+      return false;
+    }
+
+    await prisma.generatedArtifact.update({
+      where: { id: latestArtifact.id },
+      data: { status: 'accepted' },
+    });
+
+    await publishGenerationEvent(runId, {
+      type: 'run_warning',
+      runId,
+      message: `Accepted ${latestArtifact.artifactType} "${latestArtifact.title}" after revision exhaustion with score ${overallScore}. Proceeding because it is not export-critical.`,
+      severity: 'warning',
+    });
+
+    return true;
   }
 
   try {
@@ -191,20 +225,32 @@ export async function processGenerationJob(job: Job<GenerationJobData>): Promise
       });
 
       for (const artifact of generatedArtifacts) {
-        const evalResult = await evaluateArtifact({ id: runId }, artifact.id, bibleContent, model, maxOutputTokens);
+        let currentArtifactId = artifact.id;
+        let evalResult = await evaluateArtifact({ id: runId }, currentArtifactId, bibleContent, model, maxOutputTokens);
 
         if (!evalResult.passed) {
           await transitionRunStatus(runId, userId, 'revising');
-          const revised = await reviseArtifact({ id: runId }, artifact.id, evalResult.findings, bibleContent, model, maxOutputTokens);
+          const revised = await reviseArtifact({ id: runId }, currentArtifactId, evalResult.findings, bibleContent, model, maxOutputTokens);
           if (revised) {
-            const reEval = await evaluateArtifact({ id: runId }, revised.newArtifactId, bibleContent, model, maxOutputTokens);
-            if (!reEval.passed) {
-              const revised2 = await reviseArtifact({ id: runId }, revised.newArtifactId, reEval.findings, bibleContent, model, maxOutputTokens);
+            currentArtifactId = revised.newArtifactId;
+            evalResult = await evaluateArtifact({ id: runId }, currentArtifactId, bibleContent, model, maxOutputTokens);
+            if (!evalResult.passed) {
+              const revised2 = await reviseArtifact({ id: runId }, currentArtifactId, evalResult.findings, bibleContent, model, maxOutputTokens);
               if (revised2) {
-                await evaluateArtifact({ id: runId }, revised2.newArtifactId, bibleContent, model, maxOutputTokens);
+                currentArtifactId = revised2.newArtifactId;
+                evalResult = await evaluateArtifact({ id: runId }, currentArtifactId, bibleContent, model, maxOutputTokens);
               }
             }
           }
+
+          if (!evalResult.passed) {
+            await acceptNonBlockingArtifactIfSafe(
+              currentArtifactId,
+              evalResult.overallScore,
+              evalResult.findings,
+            );
+          }
+
           await transitionRunStatus(runId, userId, 'evaluating');
         }
       }

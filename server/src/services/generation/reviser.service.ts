@@ -1,15 +1,16 @@
 import type { LanguageModel } from 'ai';
+import { Prisma } from '@prisma/client';
 import type { BibleContent, EvaluationFinding } from '@dnd-booker/shared';
 import { prisma } from '../../config/database.js';
 import { publishGenerationEvent } from './pubsub.service.js';
 import { parseJsonResponse } from './parse-json.js';
-import { markdownToTipTap } from '../ai-wizard.service.js';
 import { analyzeEstimatedArtifactLayout } from './layout-estimate.service.js';
 import {
   buildReviseArtifactSystemPrompt,
   buildReviseArtifactUserPrompt,
 } from './prompts/revise-artifact.prompt.js';
 import { generateTextWithTimeout } from './model-timeouts.js';
+import { convertMarkdownToTipTapWithTimeout } from './markdown-artifact-conversion.service.js';
 
 const MAX_REVISIONS = 2;
 
@@ -116,7 +117,7 @@ export async function reviseArtifact(
       title: artifact.title,
       summary: artifact.summary,
       markdownContent: isMarkdown ? text : null,
-      tiptapContent: isMarkdown ? markdownToTipTap(text) as any : null,
+      tiptapContent: Prisma.DbNull,
       jsonContent: isMarkdown ? artifact.jsonContent : parseJsonResponse(text) as any,
       tokenCount: totalTokens,
       pageEstimate: artifact.pageEstimate,
@@ -152,6 +153,28 @@ export async function reviseArtifact(
     title: artifact.title,
     version: newVersion,
   });
+
+  if (isMarkdown) {
+    try {
+      const tiptapContent = await convertMarkdownToTipTapWithTimeout(
+        text,
+        `Artifact revision conversion for ${artifact.title}`,
+      );
+
+      await prisma.generatedArtifact.update({
+        where: { id: newArtifact.id },
+        data: { tiptapContent: tiptapContent as any },
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown markdown conversion failure';
+      await publishGenerationEvent(run.id, {
+        type: 'run_warning',
+        runId: run.id,
+        message: `Stored revised markdown for "${artifact.title}", but TipTap conversion failed: ${message}`,
+        severity: 'warning',
+      });
+    }
+  }
 
   return {
     newArtifactId: newArtifact.id,
