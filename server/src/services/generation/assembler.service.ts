@@ -1,4 +1,5 @@
 import type { ChapterOutline, AssemblyDocumentSpec } from '@dnd-booker/shared';
+import { Prisma } from '@prisma/client';
 import { prisma } from '../../config/database.js';
 import { publishGenerationEvent } from './pubsub.service.js';
 import { resolveOutlineArtifact } from './outline-artifact.service.js';
@@ -196,7 +197,7 @@ export async function assembleDocuments(
         slug: spec.documentSlug,
         sortOrder: spec.sortOrder,
         targetPageCount: spec.targetPageCount ?? null,
-        outlineJson: artifact?.jsonContent as any ?? null,
+        outlineJson: (artifact?.jsonContent as any) ?? Prisma.JsonNull,
         layoutPlan: resolvedLayout.layoutPlan as any,
         content: resolvedLayout.content as any,
         status: 'draft',
