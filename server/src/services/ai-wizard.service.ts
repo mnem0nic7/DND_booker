@@ -3,6 +3,7 @@ import { prisma } from '../config/database.js';
 import { generateText } from 'ai';
 import type { WizardPhase, WizardParameters, WizardOutline, WizardOutlineSection, WizardGeneratedSection, WizardQuestion } from '@dnd-booker/shared';
 import {
+  normalizeEncounterTableAttrs,
   normalizeNpcProfileAttrs,
   normalizeRandomTableEntries,
   normalizeStatBlockAttrs,
@@ -272,7 +273,8 @@ export function markdownToTipTap(markdown: string): TipTapNode {
           content.push(...(markdownToTipTap(remainder).content ?? []));
         }
       } else {
-        const structuredBlockNode = parseStructuredBlockNode(rawBlockType, blockContent);
+        const structuredBlockPayload = [inlineAttrs, blockContent].filter(Boolean).join('\n').trim();
+        const structuredBlockNode = parseStructuredBlockNode(rawBlockType, structuredBlockPayload);
         if (structuredBlockNode) {
           content.push(structuredBlockNode);
         } else {
@@ -608,7 +610,348 @@ function normalizeStructuredBlockAttrs(
     return attrs;
   }
 
+  if (blockType === 'encounterTable') {
+    return normalizeEncounterTableAttrs(attrs);
+  }
+
   return attrs;
+}
+
+function extractLeadingJsonObject(blockContent: string): { jsonText: string; remainder: string } | null {
+  const trimmed = blockContent.trim();
+  if (!trimmed.startsWith('{')) return null;
+
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+
+  for (let index = 0; index < trimmed.length; index += 1) {
+    const char = trimmed[index];
+
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+      if (char === '\\') {
+        escaped = true;
+        continue;
+      }
+      if (char === '"') {
+        inString = false;
+      }
+      continue;
+    }
+
+    if (char === '"') {
+      inString = true;
+      continue;
+    }
+
+    if (char === '{') depth += 1;
+    if (char === '}') {
+      depth -= 1;
+      if (depth === 0) {
+        return {
+          jsonText: trimmed.slice(0, index + 1),
+          remainder: trimmed.slice(index + 1).trim(),
+        };
+      }
+    }
+  }
+
+  return null;
+}
+
+function stripListPrefix(line: string): string {
+  return line.trim().replace(/^[-*]\s+/, '').trim();
+}
+
+function stripEmphasis(text: string): string {
+  return text.replace(/[*_`]+/g, '').trim();
+}
+
+function parseLabeledLines(body: string): Array<{ label: string | null; value: string }> {
+  const entries: Array<{ label: string | null; value: string }> = [];
+
+  for (const rawLine of body.split('\n')) {
+    const line = stripListPrefix(rawLine);
+    if (!line) continue;
+
+    const labelMatch = line.match(/^(.+?)\s*:\s*(.+)$/);
+    if (labelMatch) {
+      const label = stripEmphasis(labelMatch[1]);
+      if (!label) continue;
+      entries.push({
+        label,
+        value: stripEmphasis(labelMatch[2]),
+      });
+      continue;
+    }
+
+    const last = entries[entries.length - 1];
+    if (last) {
+      last.value = `${last.value} ${stripEmphasis(line)}`.trim();
+    } else {
+      entries.push({
+        label: null,
+        value: stripEmphasis(line),
+      });
+    }
+  }
+
+  return entries;
+}
+
+function applyRandomTableBody(attrs: Record<string, unknown>, body: string): Record<string, unknown> {
+  const entries: Array<{ roll: string; result: string }> = [];
+  let current: { roll: string; result: string } | null = null;
+
+  for (const rawLine of body.split('\n')) {
+    const line = rawLine.trim();
+    if (!line) continue;
+
+    const entryMatch = line.match(/^(\d+(?:\s*[-–]\s*\d+)?)\.\s+(.+)$/);
+    if (entryMatch) {
+      if (current) entries.push(current);
+      current = {
+        roll: entryMatch[1].replace(/\s+/g, ''),
+        result: stripEmphasis(entryMatch[2]),
+      };
+      continue;
+    }
+
+    if (current) {
+      current.result = `${current.result} ${stripEmphasis(line)}`.trim();
+    }
+  }
+
+  if (current) entries.push(current);
+  if (entries.length === 0) return attrs;
+
+  return {
+    ...attrs,
+    entries,
+  };
+}
+
+function applyNpcProfileBody(attrs: Record<string, unknown>, body: string): Record<string, unknown> {
+  const next = { ...attrs };
+  const extraDescription: string[] = [];
+
+  for (const entry of parseLabeledLines(body)) {
+    if (!entry.label) {
+      extraDescription.push(entry.value);
+      continue;
+    }
+
+    const label = entry.label.toLowerCase();
+    if (label === 'goal') {
+      next.goal = entry.value;
+    } else if (label === 'knowledge' || label === 'what they know' || label === 'what he knows' || label === 'what she knows') {
+      next.whatTheyKnow = entry.value;
+    } else if (label === 'leverage') {
+      next.leverage = entry.value;
+    } else if (label === 'reaction' || label === 'likely reaction') {
+      next.likelyReaction = entry.value;
+    } else if (label === 'description' || label === 'appearance' || label === 'demeanor') {
+      next.description = entry.value;
+    } else if (label === 'traits' || label === 'personality traits') {
+      next.personalityTraits = entry.value;
+    } else {
+      extraDescription.push(`${entry.label}: ${entry.value}`);
+    }
+  }
+
+  if (extraDescription.length > 0) {
+    const existing = String(next.description ?? '').trim();
+    next.description = [existing, ...extraDescription].filter(Boolean).join(' ');
+  }
+
+  return next;
+}
+
+function parseNamedDescription(value: string, fallbackName: string): { name: string; description: string } {
+  const cleaned = value.trim();
+  const match = cleaned.match(/^(?:\*\*|__|\*)?([^:]+?)(?:\*\*|__|\*)?\s*:\s*(.+)$/);
+  if (match) {
+    return {
+      name: stripEmphasis(match[1]),
+      description: stripEmphasis(match[2]),
+    };
+  }
+
+  return {
+    name: fallbackName,
+    description: stripEmphasis(cleaned),
+  };
+}
+
+function applyEncounterTableBody(attrs: Record<string, unknown>, body: string): Record<string, unknown> {
+  const next = { ...attrs };
+  const extraNotes: string[] = [];
+
+  for (const entry of parseLabeledLines(body)) {
+    if (!entry.label) {
+      extraNotes.push(entry.value);
+      continue;
+    }
+
+    const label = entry.label.toLowerCase();
+    if (label === 'terrain') {
+      next.terrain = entry.value;
+    } else if (label === 'enemy tactics' || label === 'tactics') {
+      next.tactics = entry.value;
+    } else if (label === 'player options' || label === 'options') {
+      next.notes = [String(next.notes ?? '').trim(), entry.value].filter(Boolean).join(' ');
+    } else if (label === 'rewards' || label === 'reward') {
+      next.rewards = entry.value;
+    } else if (label === 'setup') {
+      next.setup = entry.value;
+    } else if (label === 'opposition' || label === 'enemies') {
+      next.opposition = entry.value;
+    } else if (label === 'objective') {
+      next.objective = entry.value;
+    } else if (label === 'aftermath' || label === 'consequences') {
+      next.aftermath = entry.value;
+    } else if (label === 'description' || label === 'summary') {
+      next.description = entry.value;
+    } else {
+      extraNotes.push(`${entry.label}: ${entry.value}`);
+    }
+  }
+
+  if (extraNotes.length > 0) {
+    next.notes = [String(next.notes ?? '').trim(), ...extraNotes].filter(Boolean).join(' ');
+  }
+
+  return next;
+}
+
+function applyStatBlockBody(attrs: Record<string, unknown>, body: string): Record<string, unknown> {
+  const next = { ...attrs };
+  const traits: Array<{ name: string; description: string }> = [];
+  const actions: Array<{ name: string; description: string }> = [];
+  const reactions: Array<{ name: string; description: string }> = [];
+  const legendaryActions: Array<{ name: string; description: string }> = [];
+
+  for (const entry of parseLabeledLines(body)) {
+    if (!entry.label) continue;
+
+    const label = entry.label.toLowerCase();
+    if (label === 'armor class') {
+      const acMatch = entry.value.match(/^(\d+)(?:\s*\((.+)\))?$/);
+      if (acMatch) {
+        next.ac = Number(acMatch[1]);
+        if (acMatch[2]) next.acType = acMatch[2].trim();
+      } else {
+        next.ac = Number(entry.value.replace(/[^\d.-]/g, ''));
+      }
+      continue;
+    }
+    if (label === 'hit points') {
+      const hpMatch = entry.value.match(/^(\d+)(?:\s*\((.+)\))?$/);
+      if (hpMatch) {
+        next.hp = Number(hpMatch[1]);
+        if (hpMatch[2]) next.hitDice = hpMatch[2].trim();
+      } else {
+        next.hp = Number(entry.value.replace(/[^\d.-]/g, ''));
+      }
+      continue;
+    }
+    if (label === 'speed') {
+      next.speed = entry.value;
+      continue;
+    }
+    if (label === 'challenge' || label === 'challenge rating') {
+      next.cr = entry.value;
+      continue;
+    }
+    if (label === 'saving throws') {
+      next.savingThrows = entry.value;
+      continue;
+    }
+    if (label === 'skills') {
+      next.skills = entry.value;
+      continue;
+    }
+    if (label === 'damage resistances') {
+      next.damageResistances = entry.value;
+      continue;
+    }
+    if (label === 'damage immunities') {
+      next.damageImmunities = entry.value;
+      continue;
+    }
+    if (label === 'condition immunities') {
+      next.conditionImmunities = entry.value;
+      continue;
+    }
+    if (label === 'senses') {
+      next.senses = entry.value;
+      continue;
+    }
+    if (label === 'languages') {
+      next.languages = entry.value;
+      continue;
+    }
+    if (label === 'actions') {
+      actions.push(parseNamedDescription(entry.value, 'Action'));
+      continue;
+    }
+    if (label === 'reactions') {
+      reactions.push(parseNamedDescription(entry.value, 'Reaction'));
+      continue;
+    }
+    if (label === 'legendary actions') {
+      legendaryActions.push(parseNamedDescription(entry.value, 'Legendary Action'));
+      continue;
+    }
+
+    traits.push({
+      name: entry.label,
+      description: entry.value,
+    });
+  }
+
+  if (traits.length > 0) next.traits = traits;
+  if (actions.length > 0) next.actions = actions;
+  if (reactions.length > 0) next.reactions = reactions;
+  if (legendaryActions.length > 0) next.legendaryActions = legendaryActions;
+
+  return next;
+}
+
+function recoverStructuredBlockAttrs(
+  blockType: string,
+  blockContent: string,
+): Record<string, unknown> | null {
+  const extracted = extractLeadingJsonObject(blockContent);
+  if (!extracted) return null;
+
+  let parsedAttrs: Record<string, unknown>;
+  try {
+    parsedAttrs = JSON.parse(extracted.jsonText) as Record<string, unknown>;
+  } catch {
+    const recovered = parseJsonResponse(extracted.jsonText);
+    if (!recovered || typeof recovered !== 'object' || Array.isArray(recovered)) return null;
+    parsedAttrs = recovered as Record<string, unknown>;
+  }
+
+  if (blockType === 'randomTable') {
+    return applyRandomTableBody(parsedAttrs, extracted.remainder);
+  }
+  if (blockType === 'npcProfile') {
+    return applyNpcProfileBody(parsedAttrs, extracted.remainder);
+  }
+  if (blockType === 'encounterTable') {
+    return applyEncounterTableBody(parsedAttrs, extracted.remainder);
+  }
+  if (blockType === 'statBlock') {
+    return applyStatBlockBody(parsedAttrs, extracted.remainder);
+  }
+
+  return parsedAttrs;
 }
 
 function parseStructuredBlockNode(rawBlockType: string, blockContent: string): TipTapNode | null {
@@ -618,9 +961,17 @@ function parseStructuredBlockNode(rawBlockType: string, blockContent: string): T
     const parsedAttrs = JSON.parse(blockContent) as Record<string, unknown>;
     return {
       type: blockType,
-      attrs: normalizeStructuredBlockAttrs(blockType, parsedAttrs),
-    };
+        attrs: normalizeStructuredBlockAttrs(blockType, parsedAttrs),
+      };
   } catch {
+    const recoveredAttrs = recoverStructuredBlockAttrs(blockType, blockContent);
+    if (recoveredAttrs) {
+      return {
+        type: blockType,
+        attrs: normalizeStructuredBlockAttrs(blockType, recoveredAttrs),
+      };
+    }
+
     try {
       const recovered = parseJsonResponse(blockContent);
       const parsedAttrs = Array.isArray(recovered) && (blockType === 'randomTable' || blockType === 'encounterTable')

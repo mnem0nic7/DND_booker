@@ -849,8 +849,9 @@ function analyzeDocumentLayout(document: ReviewableDocument): ExportReviewFindin
   const content = document.content ?? null;
   const layoutPlan = document.layoutPlan ?? null;
   const pageModel = document.pageModel ?? null;
+  const isFrontMatterTitlePage = document.kind === 'front_matter' && documentContainsNodeType(content, 'titlePage');
 
-  if (hasHeroCandidate(content) && !hasStrongHeroPlacement(layoutPlan, pageModel)) {
+  if (!isFrontMatterTitlePage && hasHeroCandidate(content) && !hasStrongHeroPlacement(layoutPlan, pageModel)) {
     findings.push({
       code: 'EXPORT_WEAK_HERO_PLACEMENT',
       severity: 'warning',

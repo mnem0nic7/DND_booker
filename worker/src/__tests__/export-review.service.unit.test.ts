@@ -1608,6 +1608,89 @@ Page size: 612 x 792 pts (letter)
     expect(review.findings.map((finding) => finding.code)).toContain('EXPORT_MISSED_ART_OPPORTUNITY');
   });
 
+  it('does not flag weak hero placement for front matter that already uses a title page cover', () => {
+    const review = reviewMeasuredExportLayout({
+      documents: [
+        {
+          title: 'Front Matter',
+          kind: 'front_matter',
+          content: {
+            type: 'doc',
+            content: [
+              {
+                type: 'titlePage',
+                attrs: {
+                  title: 'The Sunken Bell of Alderwatch',
+                  coverImageUrl: '/uploads/project/cover.png',
+                },
+              },
+            ],
+          },
+          pageModel: {
+            preset: 'standard_pdf',
+            flow: { preset: 'standard_pdf', sectionRecipe: 'intro_split_spread', columnBalanceTarget: 'balanced', fragments: [], units: [] },
+            pages: [{
+              index: 1,
+              preset: 'standard_pdf',
+              recipe: 'intro_split_spread',
+              fragments: [
+                {
+                  nodeId: 'title-page',
+                  sourceIndex: 0,
+                  presentationOrder: 0,
+                  span: 'full_page',
+                  placement: 'full_page_insert',
+                  groupId: null,
+                  keepTogether: true,
+                  allowWrapBelow: false,
+                  nodeType: 'titlePage',
+                  content: { type: 'titlePage', attrs: { title: 'The Sunken Bell of Alderwatch' } },
+                  unitId: 'unit:title-page',
+                  pageIndex: 1,
+                  columnIndex: null,
+                  region: 'full_page',
+                  bounds: { x: 0, y: 0, width: 672, height: 864 },
+                  isHero: false,
+                  isOpener: true,
+                },
+              ],
+              contentHeightPx: 864,
+              fillRatio: 1,
+              columnMetrics: { leftFillRatio: 1, rightFillRatio: 1, deltaRatio: 0 },
+              nodeIds: ['title-page'],
+              documentIds: ['Front Matter'],
+              openerDocumentId: 'Front Matter',
+            }],
+            fragments: [
+              {
+                nodeId: 'title-page',
+                sourceIndex: 0,
+                presentationOrder: 0,
+                span: 'full_page',
+                placement: 'full_page_insert',
+                groupId: null,
+                keepTogether: true,
+                allowWrapBelow: false,
+                nodeType: 'titlePage',
+                content: { type: 'titlePage', attrs: { title: 'The Sunken Bell of Alderwatch' } },
+                unitId: 'unit:title-page',
+                pageIndex: 1,
+                columnIndex: null,
+                region: 'full_page',
+                bounds: { x: 0, y: 0, width: 672, height: 864 },
+                isHero: false,
+                isOpener: true,
+              },
+            ],
+            metrics: { fragmentCount: 1, heroFragmentCount: 0, groupedFragmentCount: 0, keepTogetherCount: 1, pageCount: 1 },
+          },
+        },
+      ],
+    });
+
+    expect(review.findings.map((finding) => finding.code)).not.toContain('EXPORT_WEAK_HERO_PLACEMENT');
+  });
+
   it('flags unused page regions when a sparse page still leaves a large bottom gap below existing art', () => {
     const review = reviewMeasuredExportLayout({
       documents: [

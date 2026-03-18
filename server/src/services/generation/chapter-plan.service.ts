@@ -104,9 +104,10 @@ export async function executeChapterPlanGeneration(
   });
 
   const parsed = parseJsonResponse(text);
+  const normalizedCandidate = coerceChapterPlanCandidate(chapter, parsed);
   const plan = normalizeChapterPlan(
     chapter,
-    ChapterPlanSchema.parse(parsed) as ChapterPlan,
+    ChapterPlanSchema.parse(normalizedCandidate) as ChapterPlan,
   );
 
   const totalTokens = (usage?.inputTokens ?? 0) + (usage?.outputTokens ?? 0);
@@ -142,6 +143,72 @@ export async function executeChapterPlanGeneration(
   });
 
   return { plan, artifactId: artifact.id };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function coerceString(value: unknown, fallback = ''): string {
+  const normalized = cleanText(typeof value === 'string' ? value : value == null ? '' : String(value));
+  return normalized || fallback;
+}
+
+function coerceStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return uniqueStrings(
+    value
+      .map((entry) => cleanText(typeof entry === 'string' ? entry : entry == null ? '' : String(entry)))
+      .filter(Boolean),
+  );
+}
+
+function defaultTargetWords(contentType: SectionSpec['contentType']): number {
+  const range = TARGET_WORD_RANGES[contentType];
+  return Math.round((range.min + range.max) / 2);
+}
+
+function coerceChapterPlanCandidate(
+  chapter: ChapterOutlineEntry,
+  raw: unknown,
+): Record<string, unknown> {
+  const candidate = isRecord(raw) ? raw : {};
+  const rawSections = Array.isArray(candidate.sections) ? candidate.sections : [];
+
+  const sections = chapter.sections.map((outlineSection, index) => {
+    const matchingRaw = rawSections.find((entry) => isRecord(entry) && (
+      coerceString(entry.slug) === outlineSection.slug
+      || coerceString(entry.title).toLowerCase() === outlineSection.title.toLowerCase()
+    ));
+    const rawSection = isRecord(matchingRaw) ? matchingRaw : (isRecord(rawSections[index]) ? rawSections[index] : {});
+    const normalizedContentType = normalizeGenerationContentType(rawSection.contentType ?? outlineSection.contentType) as SectionSpec['contentType'];
+
+    return {
+      slug: coerceString(rawSection.slug, outlineSection.slug),
+      title: coerceString(rawSection.title, outlineSection.title),
+      contentType: normalizedContentType,
+      targetWords: Number(rawSection.targetWords) || defaultTargetWords(normalizedContentType),
+      outline: coerceString(rawSection.outline, outlineSection.summary),
+      scenePurpose: coerceString(rawSection.scenePurpose),
+      playerObjective: coerceString(rawSection.playerObjective),
+      decisionPoint: coerceString(rawSection.decisionPoint),
+      consequenceSummary: coerceString(rawSection.consequenceSummary),
+      keyBeats: coerceStringArray(rawSection.keyBeats),
+      entityReferences: coerceStringArray(rawSection.entityReferences),
+      blocksNeeded: coerceStringArray(rawSection.blocksNeeded),
+    };
+  });
+
+  return {
+    chapterSlug: coerceString(candidate.chapterSlug, chapter.slug),
+    chapterTitle: coerceString(candidate.chapterTitle, chapter.title),
+    sections,
+    encounters: Array.isArray(candidate.encounters) ? candidate.encounters : [],
+    entityReferences: coerceStringArray(candidate.entityReferences),
+    readAloudCount: Number(candidate.readAloudCount) || 0,
+    dmTipCount: Number(candidate.dmTipCount) || 0,
+    difficultyProgression: coerceString(candidate.difficultyProgression),
+  };
 }
 
 function normalizeChapterPlan(

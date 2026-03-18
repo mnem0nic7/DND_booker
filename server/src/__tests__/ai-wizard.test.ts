@@ -190,6 +190,109 @@ Keep the pressure on as the party crosses the threshold.
     });
   });
 
+  it('should recover multiline npcProfile blocks with bullet fields', () => {
+    const md = `:::npcProfile {"name":"Elira the Elusive","race":"Human","class":"Rogue"}
+- **Goal**: Maintain control of smuggling routes through deception.
+- **Knowledge**: Intimate with the routes and conspiracies tied to the Sunken Relic.
+- **Leverage**: Sworn to secrecy but holds a grudge against past betrayals.
+- **Reaction**: Suspicious and cautious but willing to broker if profits are involved.
+:::`;
+
+    const result = markdownToTipTap(md);
+
+    expect(result.content![0]).toMatchObject({
+      type: 'npcProfile',
+      attrs: {
+        name: 'Elira the Elusive',
+        race: 'Human',
+        class: 'Rogue',
+        goal: 'Maintain control of smuggling routes through deception.',
+        whatTheyKnow: 'Intimate with the routes and conspiracies tied to the Sunken Relic.',
+        leverage: 'Sworn to secrecy but holds a grudge against past betrayals.',
+        likelyReaction: 'Suspicious and cautious but willing to broker if profits are involved.',
+      },
+    });
+  });
+
+  it('should recover multiline randomTable blocks with numbered entries', () => {
+    const md = `:::randomTable {"title":"Marshland Hazards","dieType":"d6"}
+1. Quicksand pocket hidden beneath thick mud. Momentary struggle; DC 13 Strength check to free a limb.
+2. Swarming leeches burst from the water. DC 12 Constitution save or suffer 1d4 poison damage.
+:::`;
+
+    const result = markdownToTipTap(md);
+
+    expect(result.content![0]).toMatchObject({
+      type: 'randomTable',
+      attrs: {
+        title: 'Marshland Hazards',
+        dieType: 'd6',
+      },
+    });
+    expect(JSON.parse(String(result.content![0].attrs?.entries ?? '[]'))).toEqual([
+      {
+        roll: '1',
+        result: 'Quicksand pocket hidden beneath thick mud. Momentary struggle; DC 13 Strength check to free a limb.',
+      },
+      {
+        roll: '2',
+        result: 'Swarming leeches burst from the water. DC 12 Constitution save or suffer 1d4 poison damage.',
+      },
+    ]);
+  });
+
+  it('should recover multiline encounterTable blocks with bullet detail fields', () => {
+    const md = `:::encounterTable {"name":"Spectral Marsh Spirits","difficulty":"Medium"}
+- **Terrain**: A circle of bog surrounded by dense mist and reflective water.
+- **Enemy Tactics**: Spirits phase in and out of cover, exploiting obscured terrain.
+- **Player Options**: Use Persuasion or Religion to attempt a peaceful resolution.
+- **Rewards**: A Whispering Amulet and an engraved fragment of the Sunken Bell.
+:::`;
+
+    const result = markdownToTipTap(md);
+
+    expect(result.content![0]).toMatchObject({
+      type: 'encounterTable',
+      attrs: {
+        title: 'Spectral Marsh Spirits',
+        difficulty: 'Medium',
+        terrain: 'A circle of bog surrounded by dense mist and reflective water.',
+        tactics: 'Spirits phase in and out of cover, exploiting obscured terrain.',
+        rewards: 'A Whispering Amulet and an engraved fragment of the Sunken Bell.',
+      },
+    });
+    expect(String(result.content![0].attrs?.notes ?? '')).toContain('Use Persuasion or Religion');
+  });
+
+  it('should recover multiline statBlock blocks with bullet detail fields', () => {
+    const md = `:::statBlock {"name":"Marsh Spirit","size":"Medium","type":"Undead","challenge":1,"hit_points":"22","speed":"0 ft., fly 40 ft. (hover)"}
+- **Armor Class**: 12
+- **Hit Points**: 22 (5d8)
+- **Damage Immunities**: Necrotic, Poison
+- **Senses**: Darkvision 60 ft., passive Perception 10
+- **Languages**: Understands Common but doesn't speak
+- **Etherealness**: Can shift between the Ethereal and Material Plane.
+- **Actions**: *Mournful Wail*: DC 13 Wisdom save or be frightened for 1 minute.
+:::`;
+
+    const result = markdownToTipTap(md);
+
+    expect(result.content![0]).toMatchObject({
+      type: 'statBlock',
+      attrs: {
+        name: 'Marsh Spirit',
+        ac: 12,
+        hp: 22,
+        speed: 'fly 40 ft. (hover)',
+        damageImmunities: 'Necrotic, Poison',
+        senses: 'Darkvision 60 ft., passive Perception 10',
+        languages: "Understands Common but doesn't speak",
+      },
+    });
+    expect(String(result.content![0].attrs?.traits ?? '')).toContain('Etherealness');
+    expect(String(result.content![0].attrs?.actions ?? '')).toContain('Mournful Wail');
+  });
+
   it('should recover wizard blocks wrapped inside triple-backtick code fences', () => {
     const md = '```json\n:::statBlock\n{"name":"Gravel Guardian","armorClass":15,"hitPoints":85}\n```\n';
     const result = markdownToTipTap(md);

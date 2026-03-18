@@ -297,6 +297,50 @@ describe('Chapter Plan Service — executeChapterPlanGeneration', () => {
     );
   });
 
+  it('backfills missing required section titles from the outline before validation', async () => {
+    mockGenerateText.mockResolvedValueOnce({
+      text: JSON.stringify({
+        chapterSlug: 'ch-1',
+        chapterTitle: 'Chapter 1: The Village',
+        sections: [
+          {
+            slug: 'arrival',
+            contentType: 'narrative',
+            targetWords: 1500,
+            outline: 'The party reaches the village.',
+            keyBeats: ['PCs arrive'],
+            entityReferences: ['chief-gnarltooth'],
+            blocksNeeded: ['readAloud'],
+          },
+          {
+            slug: 'ambush',
+            contentType: 'encounter',
+            targetWords: 1700,
+            outline: 'Goblins strike from cover.',
+            keyBeats: ['combat starts'],
+            entityReferences: ['chief-gnarltooth'],
+            blocksNeeded: ['encounterTable', 'statBlock'],
+          },
+        ],
+        encounters: VALID_PLAN.encounters,
+      }),
+      usage: { inputTokens: 1000, outputTokens: 1500 },
+    } as any);
+
+    const run = await createRun({
+      projectId: testProject.id, userId: testUser.id, prompt: 'test',
+    });
+
+    const result = await executeChapterPlanGeneration(
+      run!, SAMPLE_CHAPTER, SAMPLE_BIBLE,
+      SAMPLE_BIBLE.entities.map(e => ({ slug: e.slug, entityType: e.entityType, name: e.name, summary: e.summary })),
+      {} as any, 8192,
+    );
+
+    expect(result.plan.sections[0].title).toBe('Arrival');
+    expect(result.plan.sections[1].title).toBe('Goblin Ambush');
+  });
+
   it('should throw on malformed AI response', async () => {
     mockGenerateText.mockResolvedValueOnce({
       text: 'not json', usage: { inputTokens: 100, outputTokens: 50 },
