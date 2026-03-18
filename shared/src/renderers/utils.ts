@@ -386,7 +386,7 @@ export function normalizeEncounterTableAttrs(attrs: Record<string, unknown>): Re
     ['description', ['description', 'summary']],
     ['objective', ['objective', 'goal']],
     ['opposition', ['opposition', 'enemies']],
-    ['terrain', ['terrain']],
+    ['terrain', ['terrain', 'location', 'environment']],
     ['setup', ['setup']],
     ['tactics', ['tactics']],
     ['rewards', ['rewards', 'treasure']],
@@ -493,7 +493,7 @@ export function strengthenRandomTableEntries(value: unknown): NormalizedRandomTa
 
 export function normalizeStatBlockAttrs(attrs: Record<string, unknown>): Record<string, unknown> {
   const normalized: Record<string, unknown> = { ...attrs };
-  const abilitySource = pickFirst(normalized, ['abilities', 'abilityScores']);
+  const abilitySource = pickFirst(normalized, ['abilities', 'abilityScores', 'Abilities', 'AbilityScores']);
   let parsedAbilitySource: Record<string, unknown> | null = null;
 
   if (typeof abilitySource === 'string') {
@@ -508,14 +508,14 @@ export function normalizeStatBlockAttrs(attrs: Record<string, unknown>): Record<
   }
 
   const numberAliases: Array<[string, string[]]> = [
-    ['ac', ['ac', 'armorClass']],
-    ['hp', ['hp', 'hitPoints']],
-    ['str', ['str', 'strength']],
-    ['dex', ['dex', 'dexterity']],
-    ['con', ['con', 'constitution']],
-    ['int', ['int', 'intelligence']],
-    ['wis', ['wis', 'wisdom']],
-    ['cha', ['cha', 'charisma']],
+    ['ac', ['ac', 'armorClass', 'AC']],
+    ['hp', ['hp', 'hitPoints', 'HP']],
+    ['str', ['str', 'strength', 'Str', 'STR']],
+    ['dex', ['dex', 'dexterity', 'Dex', 'DEX']],
+    ['con', ['con', 'constitution', 'Con', 'CON']],
+    ['int', ['int', 'intelligence', 'Int', 'INT']],
+    ['wis', ['wis', 'wisdom', 'Wis', 'WIS']],
+    ['cha', ['cha', 'charisma', 'Cha', 'CHA']],
   ];
 
   for (const [target, aliases] of numberAliases) {
@@ -527,20 +527,20 @@ export function normalizeStatBlockAttrs(attrs: Record<string, unknown>): Record<
   }
 
   const stringAliases: Array<[string, string[]]> = [
-    ['acType', ['acType', 'armorType']],
-    ['hitDice', ['hitDice']],
-    ['speed', ['speed', 'movement', 'movementSpeed', 'speedText']],
-    ['cr', ['cr', 'challengeRating', 'challenge']],
-    ['xp', ['xp', 'experience']],
-    ['savingThrows', ['savingThrows', 'savingThrowsText', 'saves']],
-    ['skills', ['skills']],
-    ['damageResistances', ['damageResistances', 'resistances']],
-    ['damageImmunities', ['damageImmunities', 'immunities']],
-    ['conditionImmunities', ['conditionImmunities']],
-    ['senses', ['senses']],
-    ['languages', ['languages']],
-    ['legendaryDescription', ['legendaryDescription']],
-    ['leadInText', ['leadInText']],
+    ['acType', ['acType', 'armorType', 'ACType']],
+    ['hitDice', ['hitDice', 'HitDice']],
+    ['speed', ['speed', 'movement', 'movementSpeed', 'speedText', 'Speed']],
+    ['cr', ['cr', 'challengeRating', 'challenge', 'CR', 'Challenge']],
+    ['xp', ['xp', 'experience', 'XP']],
+    ['savingThrows', ['savingThrows', 'savingThrowsText', 'saves', 'SavingThrows', 'Saving Throws']],
+    ['skills', ['skills', 'Skills']],
+    ['damageResistances', ['damageResistances', 'resistances', 'DamageResistances', 'Damage Resistances']],
+    ['damageImmunities', ['damageImmunities', 'immunities', 'DamageImmunities', 'Damage Immunities']],
+    ['conditionImmunities', ['conditionImmunities', 'ConditionImmunities', 'Condition Immunities']],
+    ['senses', ['senses', 'Senses']],
+    ['languages', ['languages', 'Languages']],
+    ['legendaryDescription', ['legendaryDescription', 'LegendaryDescription']],
+    ['leadInText', ['leadInText', 'LeadInText']],
   ];
 
   for (const [target, aliases] of stringAliases) {
@@ -553,10 +553,10 @@ export function normalizeStatBlockAttrs(attrs: Record<string, unknown>): Record<
   }
 
   const arrayAliases: Array<[string, string[]]> = [
-    ['traits', ['traits']],
-    ['actions', ['actions']],
-    ['reactions', ['reactions']],
-    ['legendaryActions', ['legendaryActions', 'legendaryAbilities']],
+    ['traits', ['traits', 'Traits']],
+    ['actions', ['actions', 'Actions']],
+    ['reactions', ['reactions', 'Reactions']],
+    ['legendaryActions', ['legendaryActions', 'legendaryAbilities', 'LegendaryActions', 'LegendaryAbilities']],
   ];
 
   for (const [target, aliases] of arrayAliases) {

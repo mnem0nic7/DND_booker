@@ -354,4 +354,100 @@ describe('Evaluator — evaluateArtifact', () => {
     expect(result.findings[0].code).toBe('HOOK_CLARITY');
     expect(result.recommendedActions).toContain('Clarify the opening stakes');
   });
+
+  it('fails chapter drafts that contain placeholder stat blocks even when the model score is high', async () => {
+    mockGenerateText.mockResolvedValueOnce({
+      text: JSON.stringify(PASSING_EVAL_RESPONSE),
+      usage: { inputTokens: 1000, outputTokens: 500 },
+    } as any);
+
+    const run = await createRun({
+      projectId: testProject.id,
+      userId: testUser.id,
+      prompt: 'test',
+    });
+
+    const artifact = await prisma.generatedArtifact.create({
+      data: {
+        runId: run!.id,
+        projectId: run!.projectId,
+        artifactType: 'chapter_draft',
+        artifactKey: 'test-placeholder-statblock',
+        status: 'generated',
+        version: 1,
+        title: 'Broken Stat Block Chapter',
+        tiptapContent: {
+          type: 'doc',
+          content: [
+            {
+              type: 'statBlock',
+              attrs: {
+                name: 'Marsh Spirit',
+                AC: 13,
+                HP: 27,
+                Speed: 'fly 30 ft. (hover)',
+                Abilities: { Str: 6, Dex: 16, Con: 10, Int: 12, Wis: 17, Cha: 14 },
+              },
+            },
+          ],
+        } as any,
+        jsonContent: { test: true } as any,
+      },
+    });
+
+    const result = await evaluateArtifact(run!, artifact.id, SAMPLE_BIBLE, {} as any, 4096);
+
+    expect(result.passed).toBe(false);
+    expect(result.findings.some((finding) => finding.code === 'PLACEHOLDER_STAT_BLOCK')).toBe(true);
+  });
+
+  it('fails chapter drafts that contain encounter markers without a full runnable packet', async () => {
+    mockGenerateText.mockResolvedValueOnce({
+      text: JSON.stringify(PASSING_EVAL_RESPONSE),
+      usage: { inputTokens: 1000, outputTokens: 500 },
+    } as any);
+
+    const run = await createRun({
+      projectId: testProject.id,
+      userId: testUser.id,
+      prompt: 'test',
+    });
+
+    const artifact = await prisma.generatedArtifact.create({
+      data: {
+        runId: run!.id,
+        projectId: run!.projectId,
+        artifactType: 'chapter_draft',
+        artifactKey: 'test-incomplete-encounter-packet',
+        status: 'generated',
+        version: 1,
+        title: 'Incomplete Encounter Packet Chapter',
+        tiptapContent: {
+          type: 'doc',
+          content: [
+            {
+              type: 'encounterTable',
+              attrs: {
+                name: 'Goblin Patrol',
+                opposition: '4x Goblin (CR 1/4)',
+                tactics: 'Use fog and terrain for ambushes.',
+                rewards: '10 gp each',
+              },
+            },
+            {
+              type: 'sidebarCallout',
+              attrs: { title: 'DM Tips', calloutType: 'info' },
+              content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Use the fog to break line of sight.' }] }],
+            },
+          ],
+        } as any,
+        jsonContent: { test: true } as any,
+      },
+    });
+
+    const result = await evaluateArtifact(run!, artifact.id, SAMPLE_BIBLE, {} as any, 4096);
+
+    expect(result.passed).toBe(false);
+    expect(result.findings.some((finding) => finding.code === 'INCOMPLETE_ENCOUNTER_PACKET')).toBe(true);
+  });
 });

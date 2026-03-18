@@ -229,6 +229,32 @@ describe('Worker Renderer Utils', () => {
       expect(normalized.speed).toBe('fly 40 ft. (hover)');
       expect(normalized.savingThrows).toBeUndefined();
     });
+
+    it('normalizes uppercase legacy stat block keys from generated JSON', () => {
+      const normalized = normalizeStatBlockAttrs({
+        name: 'Marsh Spirit',
+        AC: 13,
+        HP: 27,
+        Speed: 'fly 30 ft. (hover)',
+        Challenge: '2',
+        Abilities: {
+          Str: 6,
+          Dex: 16,
+          Con: 10,
+          Int: 12,
+          Wis: 17,
+          Cha: 14,
+        },
+        Actions: [{ name: 'Withering Touch', description: 'Melee Spell Attack: +5 to hit.' }],
+      });
+
+      expect(normalized.ac).toBe(13);
+      expect(normalized.hp).toBe(27);
+      expect(normalized.speed).toBe('fly 30 ft. (hover)');
+      expect(normalized.cr).toBe('2');
+      expect(normalized.dex).toBe(16);
+      expect(String(normalized.actions)).toContain('Withering Touch');
+    });
   });
 
   describe('assessStatBlockAttrs', () => {

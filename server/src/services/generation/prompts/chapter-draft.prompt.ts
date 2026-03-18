@@ -37,6 +37,9 @@ Content rules:
 - Exploration sections should surface clues, hazards, discoveries, and consequences.
 - Encounter sections should surface terrain, enemy tactics, triggers, rewards, and aftermath.
 - Every encounter section should read like a runnable encounter packet: setup, trigger, terrain, opposition, tactics, payoff, and consequences must be easy to scan.
+- When you emit :::encounterTable, make it a full packet, not a loose roster. Include setup, opposition, terrain, tactics, rewards, and aftermath/objective either in the JSON attrs or the labeled body lines.
+- Do not use :::encounterTable for a grab-bag of possible creatures or a wandering-monster list. Use :::randomTable for varied encounter possibilities, and reserve :::encounterTable for a specific runnable scene packet.
+- Every :::statBlock must be complete and combat-usable. Include canonical lowercase keys such as "ac", "hp", "speed", "challenge", plus populated "traits" and "actions". Do not emit placeholder or abbreviated stat blocks, and do not use legacy keys like "AC", "HP", "Speed", or "Abilities".
 - If you emit a :::randomTable block, every entry must be runnable. Each result should be 16-32 words and tell the DM the immediate situation, the active threat or opportunity, and the clue, reward, or consequence. Do not write bare results like "2d4 shadows" or "A miner spirit".
 - NPC profiles must include actionable table data: goal, what they know, leverage, and likely reaction, not just personality color.
 - If a scene introduces multiple named townsfolk, witnesses, or informants, emit each one as a separate :::npcProfile block instead of a numbered list with prose bullets.
@@ -84,6 +87,8 @@ export function buildChapterDraftUserPrompt(
     if (section.contentType === 'encounter') {
       sectionNotes.push('Encounter packet: keep setup, terrain, enemy tactics, reward, and aftermath easy to scan.');
       sectionNotes.push('Do not stop at a partial packet. The DM should be able to run the full fight from this section without inventing missing trigger, action economy, consequence, or reward details.');
+      sectionNotes.push('If you include an encounterTable, it must represent one specific runnable encounter with setup, opposition, terrain, tactics, rewards, and aftermath. Do not use an encounterTable as a generic list of creatures.');
+      sectionNotes.push('Any creature introduced for combat should receive a complete statBlock with lowercase canonical keys and real traits/actions.');
     }
     if (section.contentType === 'narrative') {
       sectionNotes.push('Narrative scenes still need table-ready detail: give the DM sensory texture, active pressure, at least one clue or reward, and a consequence the DM can point to immediately.');
@@ -97,6 +102,12 @@ export function buildChapterDraftUserPrompt(
     }
     if (section.blocksNeeded.includes('randomTable')) {
       sectionNotes.push('Random encounter table entries must each include situation, threat or opportunity, and payoff in 16-32 words.');
+    }
+    if (section.blocksNeeded.includes('encounterTable')) {
+      sectionNotes.push('Encounter tables must be complete scene packets with setup, opposition, terrain, tactics, rewards, and aftermath.');
+    }
+    if (section.blocksNeeded.includes('statBlock')) {
+      sectionNotes.push('Stat blocks must be complete and combat-ready: include ac, hp, speed, challenge, traits, and actions using lowercase canonical JSON keys.');
     }
     if (section.blocksNeeded.includes('npcProfile')) {
       sectionNotes.push('NPC profiles must include goal, what they know, leverage, and likely reaction.');
@@ -161,6 +172,7 @@ export function buildChapterDraftUserPrompt(
     'Err on the side of more playable detail. A chapter should feel like a stocked toolkit for the DM, not a synopsis with ornament.',
     'Random encounter tables must be GM-runnable without guessing. Make each result specific enough to run immediately.',
     'Keep full encounter packets and full stat blocks intact. If an encounter or monster is introduced, give complete support rather than a teaser or partial writeup.',
+    'A chapter draft should fail your own internal quality bar if it contains a vague encounter roster in an encounterTable or a statBlock without real actions and challenge data.',
   );
 
   return parts.join('\n');

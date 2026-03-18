@@ -1,7 +1,14 @@
 import type { LanguageModel } from 'ai';
 import { z } from 'zod';
 import type { BibleContent, EvaluationFinding, EvaluationWeights, AcceptanceThreshold } from '@dnd-booker/shared';
-import { EVALUATION_WEIGHTS, ACCEPTANCE_THRESHOLDS } from '@dnd-booker/shared';
+import {
+  ACCEPTANCE_THRESHOLDS,
+  EVALUATION_WEIGHTS,
+  assessStatBlockAttrs,
+  hasEncounterTableContent,
+  normalizeEncounterTableAttrs,
+  normalizeStructuredText,
+} from '@dnd-booker/shared';
 import { prisma } from '../../config/database.js';
 import { publishGenerationEvent } from './pubsub.service.js';
 import { parseJsonResponse } from './parse-json.js';
@@ -58,6 +65,12 @@ export interface EvaluationResult {
   recommendedActions: string[];
 }
 
+interface TipTapLikeNode {
+  type?: unknown;
+  attrs?: Record<string, unknown>;
+  content?: TipTapLikeNode[];
+}
+
 function mergeRecommendedActions(
   recommendedActions: string[],
   findings: EvaluationFinding[],
@@ -71,6 +84,99 @@ function mergeRecommendedActions(
   }
 
   return merged;
+}
+
+function readStructuredAttr(value: unknown): string {
+  return normalizeStructuredText(value).trim();
+}
+
+function isCompleteEncounterTableForAcceptance(attrs: Record<string, unknown>): boolean {
+  if (!hasEncounterTableContent(attrs)) return false;
+
+  const normalized = normalizeEncounterTableAttrs(attrs);
+  const requiredKeys = ['setup', 'opposition', 'terrain', 'tactics'] as const;
+  const optionalKeys = ['rewards', 'payoff', 'aftermath', 'objective', 'description', 'notes'] as const;
+  const requiredCount = requiredKeys.filter((key) => readStructuredAttr(normalized[key]).length > 0).length;
+  const optionalCount = optionalKeys.filter((key) => readStructuredAttr(normalized[key]).length > 0).length;
+
+  return requiredCount >= 3 && optionalCount >= 2;
+}
+
+function collectDeterministicContentFindings(content: unknown): EvaluationFinding[] {
+  if (!content || typeof content !== 'object') return [];
+
+  const findings: EvaluationFinding[] = [];
+  let statBlockCount = 0;
+  let encounterTableCount = 0;
+  let completeEncounterTableCount = 0;
+  let supportBlockCount = 0;
+
+  const visit = (node: unknown) => {
+    if (!node || typeof node !== 'object') return;
+    if (Array.isArray(node)) {
+      for (const child of node) visit(child);
+      return;
+    }
+
+    const tiptapNode = node as TipTapLikeNode;
+    const nodeType = typeof tiptapNode.type === 'string' ? tiptapNode.type : '';
+
+    if (nodeType === 'statBlock') {
+      statBlockCount += 1;
+      const assessment = assessStatBlockAttrs(tiptapNode.attrs ?? {});
+      if (assessment.isPlaceholder || assessment.isIncomplete || assessment.isSuspicious) {
+        findings.push({
+          severity: 'critical',
+          code: 'PLACEHOLDER_STAT_BLOCK',
+          message: `The stat block "${String((tiptapNode.attrs ?? {}).name ?? 'Unknown Creature')}" is incomplete or placeholder-grade.`,
+          affectedScope: String((tiptapNode.attrs ?? {}).name ?? 'statBlock'),
+          suggestedFix: 'Rewrite the stat block with canonical lowercase keys, a challenge rating, and real traits/actions.',
+        });
+      }
+    } else if (nodeType === 'encounterTable') {
+      encounterTableCount += 1;
+      if (isCompleteEncounterTableForAcceptance(tiptapNode.attrs ?? {})) {
+        completeEncounterTableCount += 1;
+      }
+    } else if (
+      nodeType === 'readAloudBox'
+      || nodeType === 'sidebarCallout'
+      || nodeType === 'bulletList'
+      || nodeType === 'orderedList'
+      || nodeType === 'handout'
+      || nodeType === 'npcProfile'
+      || nodeType === 'randomTable'
+    ) {
+      supportBlockCount += 1;
+    }
+
+    if (Array.isArray(tiptapNode.content)) {
+      for (const child of tiptapNode.content) visit(child);
+    }
+  };
+
+  visit(content);
+
+  const hasEncounterMarkers = statBlockCount > 0 || encounterTableCount > 0;
+  if (
+    hasEncounterMarkers
+    && (
+      statBlockCount === 0
+      || encounterTableCount === 0
+      || completeEncounterTableCount === 0
+      || supportBlockCount < 2
+    )
+  ) {
+    findings.push({
+      severity: 'critical',
+      code: 'INCOMPLETE_ENCOUNTER_PACKET',
+      message: 'Encounter content is present without a full runnable packet and adequate support blocks.',
+      affectedScope: 'chapter',
+      suggestedFix: 'Rewrite the encounter as a full packet with setup, opposition, terrain, tactics, rewards, aftermath, and any needed stat blocks.',
+    });
+  }
+
+  return findings;
 }
 
 /**
@@ -150,6 +256,9 @@ export async function evaluateArtifact(
     (artifact.tiptapContent as unknown) ?? artifact.jsonContent,
   );
   const deterministicLayoutFindings = layoutAnalysis?.findings ?? [];
+  const deterministicContentFindings = collectDeterministicContentFindings(
+    (artifact.tiptapContent as unknown) ?? artifact.jsonContent,
+  );
 
   const system = buildEvaluateArtifactSystemPrompt();
   const prompt = buildEvaluateArtifactUserPrompt(
@@ -169,7 +278,7 @@ export async function evaluateArtifact(
   const evalResponse = EvaluationResponseSchema.parse(parsed);
   const mergedFindings = mergeEvaluationFindings(
     evalResponse.findings as EvaluationFinding[],
-    deterministicLayoutFindings,
+    [...deterministicLayoutFindings, ...deterministicContentFindings],
   );
   const adjustedPublicationFit = applyDeterministicPublicationPenalty(
     evalResponse.publicationFit,
@@ -177,7 +286,7 @@ export async function evaluateArtifact(
   );
   const mergedRecommendedActions = mergeRecommendedActions(
     evalResponse.recommendedActions,
-    deterministicLayoutFindings,
+    [...deterministicLayoutFindings, ...deterministicContentFindings],
   );
 
   const overallScore = calculateOverallScore({
