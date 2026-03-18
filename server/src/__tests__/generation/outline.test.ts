@@ -227,4 +227,38 @@ describe('Outline Service — executeOutlineGeneration', () => {
     expect(result.outline.chapters[0].sections[0].contentType).toBe('narrative');
     expect(result.outline.chapters[0].sections[1].contentType).toBe('social');
   });
+
+  it('should normalize richer scene labels like puzzle and combat', async () => {
+    mockGenerateText.mockResolvedValueOnce({
+      text: JSON.stringify({
+        ...VALID_OUTLINE,
+        chapters: [
+          {
+            ...VALID_OUTLINE.chapters[0],
+            sections: [
+              {
+                ...VALID_OUTLINE.chapters[0].sections[0],
+                contentType: 'puzzle',
+              },
+              {
+                ...VALID_OUTLINE.chapters[0].sections[1],
+                contentType: 'combat',
+              },
+            ],
+          },
+          ...VALID_OUTLINE.chapters.slice(1),
+        ],
+      }),
+      usage: { inputTokens: 800, outputTokens: 1200 },
+    } as any);
+
+    const run = await createRun({
+      projectId: testProject.id, userId: testUser.id, prompt: 'test',
+    });
+
+    const result = await executeOutlineGeneration(run!, SAMPLE_BIBLE, {} as any, 8192);
+
+    expect(result.outline.chapters[0].sections[0].contentType).toBe('exploration');
+    expect(result.outline.chapters[0].sections[1].contentType).toBe('encounter');
+  });
 });

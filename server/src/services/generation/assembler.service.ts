@@ -11,6 +11,8 @@ export interface AssemblyResult {
   documentIds: string[];
 }
 
+const ASSEMBLY_MARKDOWN_CONVERSION_TIMEOUT_MS = 120_000;
+
 async function resolveArtifactContent(
   artifact: {
     id: string;
@@ -32,6 +34,7 @@ async function resolveArtifactContent(
     const tiptapContent = await convertMarkdownToTipTapWithTimeout(
       artifact.markdownContent,
       `Assembly conversion for ${artifact.title}`,
+      ASSEMBLY_MARKDOWN_CONVERSION_TIMEOUT_MS,
     );
 
     await prisma.generatedArtifact.update({

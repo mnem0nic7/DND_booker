@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { fork } from 'node:child_process';
 
-const DEFAULT_MARKDOWN_CONVERSION_TIMEOUT_MS = 20_000;
+const DEFAULT_MARKDOWN_CONVERSION_TIMEOUT_MS = 60_000;
 
 interface MarkdownConversionResult {
   ok: boolean;
