@@ -109,6 +109,9 @@ export function buildManifestDocuments(
   // Appendices in outline order
   for (const app of outline.appendices) {
     const draftKey = `appendix-draft-${app.slug}`;
+    if (!acceptedKeys.has(draftKey)) {
+      continue;
+    }
     docs.push({
       documentSlug: app.slug,
       title: app.title,

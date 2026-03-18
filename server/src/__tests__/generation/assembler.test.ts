@@ -112,9 +112,10 @@ describe('Assembler — buildManifestDocuments', () => {
     const keys = new Set<string>();
     const docs = buildManifestDocuments(SAMPLE_OUTLINE, keys);
 
-    // All chapters and appendices still appear
-    expect(docs).toHaveLength(3);
+    // Core chapters still appear even without accepted drafts
+    expect(docs).toHaveLength(2);
     expect(docs[0].documentSlug).toBe('goblin-ambush');
+    expect(docs.some((doc) => doc.documentSlug === 'monster-index')).toBe(false);
   });
 });
 
@@ -159,7 +160,7 @@ describe('Assembler — assembleDocuments', () => {
 
     expect(result.manifestId).toBeDefined();
     // 2 chapters + 1 appendix = 3 documents
-    expect(result.documentIds).toHaveLength(3);
+    expect(result.documentIds).toHaveLength(2);
 
     // Verify manifest
     const manifest = await prisma.assemblyManifest.findUnique({
@@ -173,7 +174,7 @@ describe('Assembler — assembleDocuments', () => {
       where: { runId: run!.id },
       orderBy: { sortOrder: 'asc' },
     });
-    expect(docs).toHaveLength(3);
+    expect(docs).toHaveLength(2);
     expect(docs[0].kind).toBe('chapter');
     expect(docs[0].slug).toBe('goblin-ambush');
     expect(docs[0].sourceArtifactId).not.toBeNull();
@@ -236,7 +237,7 @@ describe('Assembler — assembleDocuments', () => {
     });
 
     expect(docs.some((doc) => doc.slug === 'old-draft')).toBe(false);
-    expect(docs).toHaveLength(3);
+    expect(docs).toHaveLength(2);
   });
 
   it('falls back to the latest non-accepted outline when needed', async () => {
@@ -274,7 +275,7 @@ describe('Assembler — assembleDocuments', () => {
     });
 
     const result = await assembleDocuments(run!);
-    expect(result.documentIds).toHaveLength(3);
+    expect(result.documentIds).toHaveLength(2);
   });
 
   it('hydrates markdown-only chapter drafts during assembly', async () => {

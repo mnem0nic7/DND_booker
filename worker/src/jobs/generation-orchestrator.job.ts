@@ -8,6 +8,7 @@ export interface GenerationJobData {
 }
 
 const DEFAULT_OPTIONAL_STAGE_TIMEOUT_MS = 4 * 60 * 1000;
+const REVISION_ELIGIBLE_CATEGORIES = new Set(['written']);
 
 function resolveOptionalStageTimeoutMs(): number {
   const parsed = Number.parseInt(process.env.GENERATION_OPTIONAL_STAGE_TIMEOUT_MS ?? '', 10);
@@ -133,9 +134,7 @@ export async function processGenerationJob(job: Job<GenerationJobData>): Promise
     if (!latestArtifact) return false;
 
     const category = getArtifactCategory(latestArtifact.artifactType);
-    const hasCriticalFinding = findings.some((finding) => finding.severity === 'critical');
-
-    if (!['planning', 'reference'].includes(category) || hasCriticalFinding) {
+    if (!['planning', 'reference'].includes(category)) {
       return false;
     }
 
@@ -227,6 +226,16 @@ export async function processGenerationJob(job: Job<GenerationJobData>): Promise
       for (const artifact of generatedArtifacts) {
         let currentArtifactId = artifact.id;
         let evalResult = await evaluateArtifact({ id: runId }, currentArtifactId, bibleContent, model, maxOutputTokens);
+        const artifactCategory = getArtifactCategory(artifact.artifactType);
+
+        if (!evalResult.passed && !REVISION_ELIGIBLE_CATEGORIES.has(artifactCategory)) {
+          await acceptNonBlockingArtifactIfSafe(
+            currentArtifactId,
+            evalResult.overallScore,
+            evalResult.findings,
+          );
+          continue;
+        }
 
         if (!evalResult.passed) {
           await transitionRunStatus(runId, userId, 'revising');
