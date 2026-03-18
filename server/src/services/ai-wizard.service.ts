@@ -226,8 +226,13 @@ export function markdownToTipTap(markdown: string): TipTapNode {
       continue;
     }
 
+    if (line.match(/^\s*:{3,}\s*$/)) {
+      i++;
+      continue;
+    }
+
     // ── Fenced D&D block: :::blockType ... ::: (with optional attrs like title="...")
-    const blockMatch = line.match(/^\s*:::(\w+)(.*)$/);
+    const blockMatch = line.match(/^\s*:{3,}(\w+)(.*)$/);
     if (blockMatch) {
       const rawBlockType = blockMatch[1];
       const blockType = normalizeWizardBlockType(rawBlockType);
@@ -241,11 +246,13 @@ export function markdownToTipTap(markdown: string): TipTapNode {
 
       const blockLines: string[] = [];
       i++;
-      while (i < lines.length && lines[i].trim() !== ':::') {
+      while (i < lines.length && !lines[i].trim().match(/^:{3,}\s*$/)) {
         blockLines.push(lines[i]);
         i++;
       }
-      i++; // skip closing :::
+      if (i < lines.length) {
+        i++; // skip closing fence
+      }
 
       const blockContent = blockLines.join('\n').trim();
 
@@ -529,7 +536,7 @@ function splitMalformedProseBlockContent(blockContent: string): { primaryContent
   const lines = blockContent.split('\n');
   const remainderIndex = lines.findIndex((line, index) => {
     if (index === 0) return false;
-    return /^\s*(#{1,6}\s+|:::\w+|---+\s*$|\*\*\*+\s*$)/.test(line);
+    return /^\s*(#{1,6}\s+|:{3,}\w+|---+\s*$|\*\*\*+\s*$)/.test(line);
   });
 
   if (remainderIndex === -1) {
@@ -543,7 +550,7 @@ function splitMalformedProseBlockContent(blockContent: string): { primaryContent
 }
 
 function parseLooseWizardBlock(text: string): TipTapNode[] | null {
-  const match = text.trim().match(/^:::(\w+)\s+([\s\S]+)$/);
+  const match = text.trim().match(/^:{3,}(\w+)\s+([\s\S]+)$/);
   if (!match) return null;
 
   const rawBlockType = match[1];
@@ -559,7 +566,7 @@ function parseLooseWizardBlock(text: string): TipTapNode[] | null {
 }
 
 function parseSameLineWizardBlock(text: string): TipTapNode[] | null {
-  const match = text.trim().match(/^(?:#{1,6}\s+[^:]+?\s+)?:::(\w+)\s+([\s\S]*?)\s*:::\s*$/);
+  const match = text.trim().match(/^(?:#{1,6}\s+[^:]+?\s+)?:{3,}(\w+)\s+([\s\S]*?)\s*:{3,}\s*$/);
   if (!match) return null;
 
   const rawBlockType = match[1];

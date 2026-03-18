@@ -293,6 +293,44 @@ Keep the pressure on as the party crosses the threshold.
     expect(String(result.content![0].attrs?.actions ?? '')).toContain('Mournful Wail');
   });
 
+  it('should parse four-colon fenced utility blocks', () => {
+    const md = `::::readAloud
+*The marsh wind carries the sound of a bell.*
+::::
+
+::::npcProfile {"name":"Merrin","race":"Human","alignment":"Neutral","goal":"Protect the village","knowledge":"Knows the tunnels","leverage":"Needs allies","reaction":"Wary"}
+::::
+
+::::encounterTable {"name":"Goblin Patrol","difficulty":"Medium","location":"Forest edge"}
+- **Enemies**: 4 Goblins
+- **Tactics**: Ambush from cover
+::::
+`;
+
+    const result = markdownToTipTap(md);
+
+    expect(result.content?.some((node) => node.type === 'readAloudBox')).toBe(true);
+    expect(result.content?.some((node) => node.type === 'npcProfile')).toBe(true);
+    expect(result.content?.some((node) => node.type === 'encounterTable')).toBe(true);
+  });
+
+  it('should ignore stray closing fences after same-line structured blocks', () => {
+    const md = `:::encounterTable {"name":"Goblin Patrol","difficulty":"Medium","location":"Forest edge"} :::
+- **Enemies**: 4 Goblins
+- **Tactics**: Ambush from cover
+:::
+
+#### Aftermath
+
+The goblins scatter into the reeds.`;
+
+    const result = markdownToTipTap(md);
+
+    expect(result.content?.some((node) => node.type === 'encounterTable')).toBe(true);
+    expect(result.content?.some((node) => node.type === 'heading')).toBe(true);
+    expect(result.content?.some((node) => node.type === 'paragraph')).toBe(true);
+  });
+
   it('should recover wizard blocks wrapped inside triple-backtick code fences', () => {
     const md = '```json\n:::statBlock\n{"name":"Gravel Guardian","armorClass":15,"hitPoints":85}\n```\n';
     const result = markdownToTipTap(md);
