@@ -528,7 +528,7 @@ function renderNpcProfile(attrs: Record<string, unknown>): string {
   if (portraitUrl) {
     html += `<div class="npc-profile__portrait"><img src="${safeUrl(portraitUrl)}" alt="${name}" class="npc-profile__portrait-img" /></div>`;
   } else {
-    html += `<div class="npc-profile__portrait"><div class="npc-profile__portrait-placeholder"><span>Portrait</span></div></div>`;
+    html += `<div class="npc-profile__portrait"><div class="npc-profile__portrait-placeholder" aria-hidden="true"><div class="npc-profile__portrait-sigil"></div></div></div>`;
   }
   html += `<div class="npc-profile__header-info">`;
   html += `<h2 class="npc-profile__name">${name}</h2>`;

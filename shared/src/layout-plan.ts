@@ -236,6 +236,7 @@ function createDefaultBlockPlan(
   sourceIndex: number,
   sectionRecipe: LayoutRecipe | null,
   blocks: DocumentContent[],
+  options: ResolveLayoutPlanOptions,
 ): LayoutPlanBlock {
   const nodeId = getNodeId(block, sourceIndex);
   let span: LayoutSpan = 'column';
@@ -250,7 +251,15 @@ function createDefaultBlockPlan(
     span = 'full_page';
     placement = 'full_page_insert';
     keepTogether = true;
-  } else if (block.type === 'tableOfContents' || block.type === 'creditsPage') {
+  } else if (block.type === 'tableOfContents') {
+    if (options.documentKind === 'front_matter') {
+      span = 'full_page';
+      placement = 'full_page_insert';
+    } else {
+      span = 'both_columns';
+    }
+    keepTogether = true;
+  } else if (block.type === 'creditsPage') {
     span = 'both_columns';
     keepTogether = true;
   } else if (block.type === 'fullBleedImage' && hintedSpan && hintedPlacement) {
@@ -791,7 +800,7 @@ export function buildDefaultLayoutPlan(
   const normalizedContent = ensureStableNodeIds(content);
   const blocks = getTopLevelBlocks(normalizedContent);
   const sectionRecipe = detectRecipe(blocks, options);
-  const layoutBlocks = blocks.map((block, index) => createDefaultBlockPlan(block, index, sectionRecipe, blocks));
+  const layoutBlocks = blocks.map((block, index) => createDefaultBlockPlan(block, index, sectionRecipe, blocks, options));
 
   if (sectionRecipe === 'chapter_hero_split') {
     const heroIndex = blocks.findIndex((block) => isHeroCandidate(block));
@@ -1094,6 +1103,39 @@ function readNodeText(node: DocumentContent | undefined): string {
   return (node.content ?? []).map((child) => readNodeText(child)).join(' ');
 }
 
+function estimateStructuredFragmentHeight(fragment: LayoutFlowFragment): number {
+  if (fragment.nodeType === 'randomTable') {
+    const entries = resolveRandomTableEntries(fragment.content.attrs ?? {});
+    if (entries.length === 0) return 220;
+    const totalChars = entries.reduce((sum, entry) => sum + entry.roll.length + entry.result.length, 0);
+    return 86 + (entries.length * 46) + (Math.ceil(totalChars / 90) * 10);
+  }
+
+  if (fragment.nodeType === 'npcProfile') {
+    const attrs = fragment.content.attrs ?? {};
+    const profileChars = [
+      attrs.name,
+      attrs.race,
+      attrs.class,
+      attrs.description,
+      attrs.goal,
+      attrs.whatTheyKnow,
+      attrs.leverage,
+      attrs.likelyReaction,
+      attrs.personalityTraits,
+      attrs.ideals,
+      attrs.bonds,
+      attrs.flaws,
+    ]
+      .map((value) => String(value ?? '').trim())
+      .join(' ')
+      .length;
+    return 150 + Math.ceil(profileChars / 120) * 16;
+  }
+
+  return 0;
+}
+
 function buildLayoutFlowUnits(fragments: LayoutFlowFragment[]): LayoutFlowUnit[] {
   const units: LayoutFlowUnit[] = [];
   let currentUnit: LayoutFlowUnit | null = null;
@@ -1153,6 +1195,7 @@ function estimateUnitHeight(unit: LayoutFlowUnit, fragments: LayoutFlowFragment[
   const unitFragments = fragments.filter((fragment) => fragmentSet.has(fragment.nodeId));
   const textChars = unitFragments.reduce((total, fragment) => total + readNodeText(fragment.content).length, 0);
   const primaryTypes = new Set(unitFragments.map((fragment) => fragment.nodeType));
+  const structuredHeight = unitFragments.reduce((total, fragment) => total + estimateStructuredFragmentHeight(fragment), 0);
 
   if (unit.span === 'full_page' || unit.placement === 'full_page_insert') return 780;
   if (unit.isHero) return primaryTypes.has('chapterHeader') ? 260 : 340;
@@ -1164,11 +1207,12 @@ function estimateUnitHeight(unit: LayoutFlowUnit, fragments: LayoutFlowFragment[
     return Math.max(360, 220 + Math.ceil(textChars / 140) * 24);
   }
   if (unit.groupId?.startsWith('utility-table')) {
-    return Math.max(260, 180 + Math.ceil(textChars / 160) * 22);
+    return Math.max(280, 104 + structuredHeight + Math.ceil(textChars / 180) * 18);
   }
   if (primaryTypes.has('statBlock')) return 320;
-  if (primaryTypes.has('randomTable') || primaryTypes.has('encounterTable')) return 220;
-  if (primaryTypes.has('npcProfile')) return 180;
+  if (primaryTypes.has('randomTable')) return Math.max(220, structuredHeight);
+  if (primaryTypes.has('encounterTable')) return 220;
+  if (primaryTypes.has('npcProfile')) return Math.max(180, structuredHeight);
   if (primaryTypes.has('mapBlock') || primaryTypes.has('handout') || primaryTypes.has('fullBleedImage')) return 260;
   if (primaryTypes.has('readAloudBox') || primaryTypes.has('sidebarCallout')) return 140 + Math.ceil(textChars / 140) * 18;
   if (primaryTypes.has('bulletList') || primaryTypes.has('orderedList')) return 90 + Math.ceil(textChars / 120) * 16;
@@ -1187,11 +1231,12 @@ function getUnitLayoutReserve(unit: LayoutFlowUnit, flow: LayoutFlowModel): numb
     || nodeTypes.has('readAloudBox')
     || nodeTypes.has('statBlock')
     || nodeTypes.has('encounterTable')
+    || nodeTypes.has('randomTable')
   ) {
     return 12;
   }
 
-  if (nodeTypes.has('randomTable') || nodeTypes.has('fullBleedImage')) {
+  if (nodeTypes.has('fullBleedImage')) {
     return 6;
   }
 

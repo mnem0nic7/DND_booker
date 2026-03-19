@@ -51,8 +51,8 @@ export function NpcProfileView({
                 className="npc-profile__portrait-img"
               />
             ) : (
-              <div className="npc-profile__portrait-placeholder">
-                <span>Portrait</span>
+              <div className="npc-profile__portrait-placeholder" aria-hidden="true">
+                <div className="npc-profile__portrait-sigil" />
               </div>
             )}
           </div>

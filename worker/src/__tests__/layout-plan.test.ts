@@ -672,6 +672,57 @@ describe('layout-plan', () => {
     expect(pageModel.pages[1]?.fragments.some((fragment) => fragment.region === 'column_right')).toBe(true);
   });
 
+  it('gives a front-matter table of contents a dedicated full page when DM brief content follows', () => {
+    const content: DocumentContent = {
+      type: 'doc',
+      content: [
+        {
+          type: 'titlePage',
+          attrs: {
+            title: 'The Blackglass Mine',
+          },
+        },
+        {
+          type: 'tableOfContents',
+          attrs: {
+            title: 'Table of Contents',
+          },
+        },
+        { type: 'heading', attrs: { level: 1 }, content: [{ type: 'text', text: 'DM Brief' }] },
+        paragraph('A compact one-shot for 4-5 characters exploring a cursed mine outside a frightened frontier village.'),
+        {
+          type: 'bulletList',
+          content: [
+            { type: 'listItem', content: [paragraph('Run time: 3-4 hours.')] },
+            { type: 'listItem', content: [paragraph('Tone: eerie frontier mystery.')] },
+            { type: 'listItem', content: [paragraph('Primary threat: spectral miners and living stone.')] },
+          ],
+        },
+      ],
+    };
+
+    const resolved = resolveLayoutPlan(content, null, {
+      documentKind: 'front_matter',
+      documentTitle: 'Front Matter',
+    });
+    const tocNodeId = String(resolved.content.content?.[1]?.attrs?.nodeId ?? '');
+    const tocPlan = resolved.layoutPlan?.blocks.find((block) => block.nodeId === tocNodeId);
+
+    expect(tocPlan).toMatchObject({
+      span: 'full_page',
+      placement: 'full_page_insert',
+      keepTogether: true,
+    });
+
+    const pageModel = compilePageModel(resolved.content, resolved.layoutPlan, 'standard_pdf', {
+      documentKind: 'front_matter',
+      documentTitle: 'Front Matter',
+    });
+
+    expect(pageModel.pages.length).toBeGreaterThanOrEqual(3);
+    expect(pageModel.pages[1]?.fragments.some((fragment) => fragment.nodeId === tocNodeId && fragment.region === 'full_page')).toBe(true);
+  });
+
   it('keeps grouped encounter packets on the current page when they fit below existing content', () => {
     const content: DocumentContent = {
       type: 'doc',

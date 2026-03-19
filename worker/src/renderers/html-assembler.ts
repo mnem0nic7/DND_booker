@@ -991,21 +991,53 @@ export function assembleHtml(options: AssembleOptions): string {
       display: flex;
       align-items: center;
       justify-content: center;
-      background: var(--color-accent);
-      font-size: 0.65rem;
-      color: #888;
+      background:
+        radial-gradient(circle at 50% 35%, rgba(255, 250, 231, 0.92), rgba(228, 210, 164, 0.74) 58%, rgba(111, 46, 21, 0.12) 100%),
+        linear-gradient(145deg, rgba(140, 74, 38, 0.14), rgba(255, 255, 255, 0.04));
+      position: relative;
+    }
+
+    .npc-profile__portrait-sigil {
+      width: 54%;
+      height: 54%;
+      border-radius: 50%;
+      border: 2px solid rgba(123, 51, 25, 0.55);
+      box-shadow:
+        inset 0 0 0 2px rgba(255, 248, 220, 0.75),
+        0 0 0 1px rgba(123, 51, 25, 0.12);
+      opacity: 0.88;
+      position: relative;
+    }
+
+    .npc-profile__portrait-sigil::before,
+    .npc-profile__portrait-sigil::after {
+      content: "";
+      position: absolute;
+      inset: 50% auto auto 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(123, 51, 25, 0.5);
+    }
+
+    .npc-profile__portrait-sigil::before {
+      width: 2px;
+      height: 56%;
+    }
+
+    .npc-profile__portrait-sigil::after {
+      width: 56%;
+      height: 2px;
     }
 
     .npc-profile__name {
       font-family: var(--font-heading);
       color: var(--color-primary);
       margin: 0;
-      font-size: 1.08rem;
+      font-size: 1rem;
     }
 
     .npc-profile__subtitle {
       font-style: italic;
-      font-size: 0.78rem;
+      font-size: 0.74rem;
     }
 
     .npc-profile__divider {
@@ -1017,15 +1049,15 @@ export function assembleHtml(options: AssembleOptions): string {
     }
 
     .npc-profile__description {
-      font-size: 0.8rem;
-      line-height: 1.28;
-      margin: 0.34rem 0;
+      font-size: 0.76rem;
+      line-height: 1.24;
+      margin: 0.28rem 0;
     }
 
     .npc-profile__trait {
-      font-size: 0.8rem;
-      line-height: 1.24;
-      margin: 0.14rem 0 0.24rem;
+      font-size: 0.76rem;
+      line-height: 1.2;
+      margin: 0.12rem 0 0.2rem;
     }
 
     .npc-profile__trait-label {
