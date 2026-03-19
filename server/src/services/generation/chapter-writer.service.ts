@@ -10,6 +10,7 @@ import {
 } from './prompts/chapter-draft.prompt.js';
 import { generateTextWithTimeout } from './model-timeouts.js';
 import { convertMarkdownToTipTapWithTimeout } from './markdown-artifact-conversion.service.js';
+import { normalizeGeneratedMarkdown } from './markdown-normalizer.js';
 
 export interface ChapterDraftResult {
   artifactId: string;
@@ -57,9 +58,10 @@ export async function executeChapterDraftGeneration(
     prompt,
     maxOutputTokens: Math.min(maxOutputTokens, MAX_CHAPTER_DRAFT_OUTPUT_TOKENS),
   });
+  const normalizedText = normalizeGeneratedMarkdown(text);
 
   // Count words in the markdown
-  const wordCount = text.split(/\s+/).filter(Boolean).length;
+  const wordCount = normalizedText.split(/\s+/).filter(Boolean).length;
 
   const totalTokens = (usage?.inputTokens ?? 0) + (usage?.outputTokens ?? 0);
 
@@ -74,7 +76,7 @@ export async function executeChapterDraftGeneration(
       version: 1,
       title: chapter.title,
       summary: `${wordCount} words, ${plan.sections.length} sections`,
-      markdownContent: text,
+      markdownContent: normalizedText,
       tiptapContent: Prisma.DbNull,
       jsonContent: {
         chapterSlug: chapter.slug,
@@ -127,7 +129,7 @@ export async function executeChapterDraftGeneration(
 
   try {
     const tiptapContent = await convertMarkdownToTipTapWithTimeout(
-      text,
+      normalizedText,
       `Chapter draft conversion for ${chapter.title}`,
     );
 

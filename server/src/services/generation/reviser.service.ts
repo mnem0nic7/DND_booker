@@ -11,6 +11,7 @@ import {
 } from './prompts/revise-artifact.prompt.js';
 import { generateTextWithTimeout } from './model-timeouts.js';
 import { convertMarkdownToTipTapWithTimeout } from './markdown-artifact-conversion.service.js';
+import { normalizeGeneratedMarkdown } from './markdown-normalizer.js';
 
 const MAX_REVISIONS = 2;
 
@@ -100,6 +101,7 @@ export async function reviseArtifact(
   const { text, usage } = await generateTextWithTimeout(`Artifact revision for ${artifact.title}`, {
     model, system, prompt, maxOutputTokens,
   });
+  const normalizedText = isMarkdown ? normalizeGeneratedMarkdown(text) : text;
 
   const totalTokens = (usage?.inputTokens ?? 0) + (usage?.outputTokens ?? 0);
   const newVersion = artifact.version + 1;
@@ -116,9 +118,9 @@ export async function reviseArtifact(
       version: newVersion,
       title: artifact.title,
       summary: artifact.summary,
-      markdownContent: isMarkdown ? text : null,
+      markdownContent: isMarkdown ? normalizedText : null,
       tiptapContent: Prisma.DbNull,
-      jsonContent: isMarkdown ? artifact.jsonContent : parseJsonResponse(text) as any,
+      jsonContent: isMarkdown ? artifact.jsonContent : parseJsonResponse(normalizedText) as any,
       tokenCount: totalTokens,
       pageEstimate: artifact.pageEstimate,
     },
@@ -157,7 +159,7 @@ export async function reviseArtifact(
   if (isMarkdown) {
     try {
       const tiptapContent = await convertMarkdownToTipTapWithTimeout(
-        text,
+        normalizedText,
         `Artifact revision conversion for ${artifact.title}`,
       );
 

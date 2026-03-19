@@ -5,6 +5,10 @@ import { publishGenerationEvent } from './pubsub.service.js';
 import { resolveOutlineArtifact } from './outline-artifact.service.js';
 import { resolveDocumentLayout } from '../layout-plan.service.js';
 import { convertMarkdownToTipTapWithTimeout } from './markdown-artifact-conversion.service.js';
+import {
+  extractMarkdownFromWrappedCodeBlock,
+  normalizeGeneratedMarkdown,
+} from './markdown-normalizer.js';
 
 export interface AssemblyResult {
   manifestId: string;
@@ -26,20 +30,32 @@ async function resolveArtifactContent(
     return {};
   }
 
-  if (artifact.tiptapContent) {
+  const recoveredMarkdownFromTipTap = extractMarkdownFromWrappedCodeBlock(artifact.tiptapContent);
+  if (artifact.tiptapContent && !recoveredMarkdownFromTipTap) {
     return artifact.tiptapContent;
   }
 
-  if (artifact.markdownContent) {
+  const normalizedMarkdown = artifact.markdownContent
+    ? normalizeGeneratedMarkdown(artifact.markdownContent)
+    : recoveredMarkdownFromTipTap;
+
+  if (normalizedMarkdown) {
     const tiptapContent = await convertMarkdownToTipTapWithTimeout(
-      artifact.markdownContent,
+      normalizedMarkdown,
       `Assembly conversion for ${artifact.title}`,
       ASSEMBLY_MARKDOWN_CONVERSION_TIMEOUT_MS,
     );
 
+    const nextData: Record<string, unknown> = {
+      tiptapContent: tiptapContent as any,
+    };
+    if (artifact.markdownContent && artifact.markdownContent !== normalizedMarkdown) {
+      nextData.markdownContent = normalizedMarkdown;
+    }
+
     await prisma.generatedArtifact.update({
       where: { id: artifact.id },
-      data: { tiptapContent: tiptapContent as any },
+      data: nextData,
     });
 
     return tiptapContent;

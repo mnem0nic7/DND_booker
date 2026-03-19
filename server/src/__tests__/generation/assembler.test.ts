@@ -319,6 +319,67 @@ describe('Assembler — assembleDocuments', () => {
     expect(hydrated.tiptapContent).not.toBeNull();
   });
 
+  it('re-hydrates fenced markdown artifacts that were stored as markdown code blocks', async () => {
+    const run = await createRun({
+      projectId: testProject.id,
+      userId: testUser.id,
+      prompt: 'fenced markdown repair test',
+    });
+
+    await prisma.generatedArtifact.create({
+      data: {
+        runId: run!.id,
+        projectId: run!.projectId,
+        artifactType: 'chapter_outline',
+        artifactKey: 'chapter-outline',
+        status: 'accepted',
+        version: 1,
+        title: 'Outline',
+        jsonContent: SAMPLE_OUTLINE as any,
+      },
+    });
+
+    const fencedMarkdown = '```markdown\n## The Goblin Ambush\n\nRecovered body text.\n```';
+    const draft = await prisma.generatedArtifact.create({
+      data: {
+        runId: run!.id,
+        projectId: run!.projectId,
+        artifactType: 'chapter_draft',
+        artifactKey: 'chapter-draft-goblin-ambush',
+        status: 'accepted',
+        version: 1,
+        title: 'The Goblin Ambush',
+        markdownContent: fencedMarkdown,
+        tiptapContent: {
+          type: 'doc',
+          content: [
+            {
+              type: 'codeBlock',
+              attrs: { language: 'markdown' },
+              content: [
+                {
+                  type: 'text',
+                  text: '## The Goblin Ambush\n\nRecovered body text.',
+                },
+              ],
+            },
+          ],
+        } as any,
+        jsonContent: { wordCount: 2500 } as any,
+      },
+    });
+
+    const result = await assembleDocuments(run!);
+    const doc = await prisma.projectDocument.findUniqueOrThrow({ where: { id: result.documentIds[0] } });
+    const content = doc.content as any;
+    expect(content.type).toBe('doc');
+    expect(content.content.map((node: any) => node.type)).not.toContain('codeBlock');
+
+    const hydrated = await prisma.generatedArtifact.findUniqueOrThrow({ where: { id: draft.id } });
+    expect(typeof hydrated.markdownContent).toBe('string');
+    expect(hydrated.markdownContent?.startsWith('```')).toBe(false);
+  });
+
   it('throws when no outline exists at all', async () => {
     const run = await createRun({
       projectId: testProject.id,

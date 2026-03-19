@@ -328,6 +328,37 @@ describe('Chapter Writer Service — executeChapterDraftGeneration', () => {
     expect(types).toContain('readAloudBox');
   });
 
+  it('should strip outer markdown fences before persisting and converting', async () => {
+    mockGenerateText.mockResolvedValueOnce({
+      text: `\`\`\`markdown\n${SAMPLE_MARKDOWN}\n\`\`\``,
+      usage: { inputTokens: 2000, outputTokens: 3000 },
+    } as any);
+
+    const run = await createRun({
+      projectId: testProject.id,
+      userId: testUser.id,
+      prompt: 'fenced markdown test',
+    });
+
+    const result = await executeChapterDraftGeneration(
+      run!,
+      SAMPLE_CHAPTER,
+      SAMPLE_PLAN,
+      SAMPLE_BIBLE,
+      [],
+      {} as any,
+      16384,
+    );
+
+    const artifact = await prisma.generatedArtifact.findUniqueOrThrow({ where: { id: result.artifactId } });
+    expect(artifact.markdownContent?.startsWith('```')).toBe(false);
+
+    const tiptap = artifact.tiptapContent as any;
+    const types = tiptap.content.map((node: any) => node.type);
+    expect(types).toContain('heading');
+    expect(types).not.toContain('codeBlock');
+  });
+
   it('should keep markdown artifact even if TipTap conversion fails', async () => {
     const { convertMarkdownToTipTapWithTimeout } = await import('../../services/generation/markdown-artifact-conversion.service.js');
     vi.mocked(convertMarkdownToTipTapWithTimeout).mockRejectedValueOnce(new Error('conversion stalled'));

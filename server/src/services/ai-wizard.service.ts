@@ -9,6 +9,7 @@ import {
   normalizeStatBlockAttrs,
 } from '@dnd-booker/shared';
 import { getSupportedBlockTypes } from './ai-content.service.js';
+import { normalizeGeneratedMarkdown } from './generation/markdown-normalizer.js';
 import { parseJsonResponse } from './generation/parse-json.js';
 
 // ── Session CRUD ────────────────────────────────────────────────
@@ -211,7 +212,7 @@ interface TipTapNode {
  * Handles: headings, paragraphs, bold, italic, lists, and fenced D&D blocks.
  */
 export function markdownToTipTap(markdown: string): TipTapNode {
-  const lines = markdown.split('\n');
+  const lines = normalizeGeneratedMarkdown(markdown).split('\n');
   const content: TipTapNode[] = [];
   let i = 0;
 
