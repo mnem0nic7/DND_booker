@@ -5,6 +5,8 @@ import { publishGenerationEvent } from './pubsub.service.js';
 import { resolveOutlineArtifact } from './outline-artifact.service.js';
 import { resolveDocumentLayout } from '../layout-plan.service.js';
 import { convertMarkdownToTipTapWithTimeout } from './markdown-artifact-conversion.service.js';
+import { applyRealizedArtToDocuments } from './art-direction.service.js';
+import type { ImageModel } from '../ai-image.service.js';
 import {
   extractMarkdownFromWrappedCodeBlock,
   normalizeGeneratedMarkdown,
@@ -13,6 +15,17 @@ import {
 export interface AssemblyResult {
   manifestId: string;
   documentIds: string[];
+}
+
+interface RealizedArtPlacement {
+  documentSlug: string;
+  nodeIndex: number;
+  blockType: 'titlePage' | 'chapterHeader' | 'fullBleedImage' | 'mapBlock' | 'backCover' | 'npcProfile';
+  prompt: string;
+  model: ImageModel;
+  size: string;
+  assetId: string;
+  assetUrl: string;
 }
 
 const ASSEMBLY_MARKDOWN_CONVERSION_TIMEOUT_MS = 120_000;
@@ -86,6 +99,64 @@ async function getAcceptedArtifacts(runId: string) {
     if (seen.has(a.artifactKey)) return false;
     seen.add(a.artifactKey);
     return true;
+  });
+}
+
+async function getAcceptedGeneratedImages(runId: string): Promise<RealizedArtPlacement[]> {
+  const artifact = await prisma.generatedArtifact.findFirst({
+    where: {
+      runId,
+      artifactType: 'art_direction_plan',
+      status: 'accepted',
+    },
+    orderBy: {
+      version: 'desc',
+    },
+    select: {
+      jsonContent: true,
+    },
+  });
+
+  if (!artifact?.jsonContent || typeof artifact.jsonContent !== 'object' || Array.isArray(artifact.jsonContent)) {
+    return [];
+  }
+
+  const generatedImages = (artifact.jsonContent as Record<string, unknown>).generatedImages;
+  if (!Array.isArray(generatedImages)) {
+    return [];
+  }
+
+  return generatedImages.flatMap((entry) => {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return [];
+    const candidate = entry as Record<string, unknown>;
+    const documentSlug = String(candidate.documentSlug ?? '').trim();
+    const nodeIndex = Number(candidate.nodeIndex);
+    const blockType = String(candidate.blockType ?? '').trim();
+    const prompt = String(candidate.prompt ?? '').trim();
+    const rawModel = String(candidate.model ?? '').trim();
+    const model: ImageModel = rawModel === 'dall-e-3' ? 'dall-e-3' : 'gpt-image-1';
+    const size = String(candidate.size ?? '').trim() || '1024x1024';
+    const assetId = String(candidate.assetId ?? '').trim();
+    const assetUrl = String(candidate.assetUrl ?? '').trim();
+
+    if (!documentSlug || !Number.isFinite(nodeIndex) || !blockType || !assetId || !assetUrl) {
+      return [];
+    }
+
+    if (!['titlePage', 'chapterHeader', 'fullBleedImage', 'mapBlock', 'backCover', 'npcProfile'].includes(blockType)) {
+      return [];
+    }
+
+    return [{
+      documentSlug,
+      nodeIndex,
+      blockType: blockType as RealizedArtPlacement['blockType'],
+      prompt,
+      model,
+      size,
+      assetId,
+      assetUrl,
+    }];
   });
 }
 
@@ -168,6 +239,7 @@ export async function assembleDocuments(
 
   // 2. Get all accepted artifacts
   const accepted = await getAcceptedArtifacts(run.id);
+  const acceptedGeneratedImages = await getAcceptedGeneratedImages(run.id);
   const acceptedByKey = new Map(accepted.map((a) => [a.artifactKey, a]));
   const acceptedKeys = new Set(accepted.map((a) => a.artifactKey));
 
@@ -191,6 +263,14 @@ export async function assembleDocuments(
 
   // 5. Create ProjectDocument records
   const documentIds: string[] = [];
+  const createdDocs: Array<{
+    id: string;
+    slug: string;
+    title: string;
+    kind: 'front_matter' | 'chapter' | 'appendix' | 'back_matter';
+    layoutPlan: unknown;
+    content: unknown;
+  }> = [];
 
   for (const spec of manifestDocs) {
     // Find the primary content artifact (draft > plan)
@@ -228,6 +308,47 @@ export async function assembleDocuments(
     });
 
     documentIds.push(doc.id);
+    createdDocs.push({
+      id: doc.id,
+      slug: doc.slug,
+      title: doc.title,
+      kind: doc.kind,
+      layoutPlan: doc.layoutPlan,
+      content: doc.content,
+    });
+  }
+
+  if (acceptedGeneratedImages.length > 0) {
+    const artUpdatedDocuments = applyRealizedArtToDocuments(
+      createdDocs.map((document) => ({
+        id: document.id,
+        slug: document.slug,
+        content: document.content as any,
+      })),
+      acceptedGeneratedImages,
+    );
+
+    await Promise.all(
+      artUpdatedDocuments.map((document) => {
+        const existing = createdDocs.find((candidate) => candidate.id === document.id);
+        if (!existing) return Promise.resolve();
+
+        const resolvedLayout = resolveDocumentLayout({
+          content: document.content as any,
+          layoutPlan: existing.layoutPlan ?? null,
+          kind: existing.kind,
+          title: existing.title,
+        });
+
+        return prisma.projectDocument.update({
+          where: { id: document.id },
+          data: {
+            content: resolvedLayout.content as any,
+            layoutPlan: resolvedLayout.layoutPlan as any,
+          },
+        });
+      }),
+    );
   }
 
   // 6. Update manifest status

@@ -182,6 +182,113 @@ describe('Assembler — assembleDocuments', () => {
     expect(docs[1].slug).toBe('dark-forest');
   });
 
+  it('reapplies accepted realized art placements after rebuilding project documents', async () => {
+    const run = await createRun({
+      projectId: testProject.id,
+      userId: testUser.id,
+      prompt: 'reapply art test',
+    });
+
+    await prisma.generatedArtifact.create({
+      data: {
+        runId: run!.id,
+        projectId: run!.projectId,
+        artifactType: 'chapter_outline',
+        artifactKey: 'chapter-outline',
+        status: 'accepted',
+        version: 1,
+        title: 'Outline',
+        jsonContent: SAMPLE_OUTLINE as any,
+      },
+    });
+
+    await prisma.generatedArtifact.create({
+      data: {
+        runId: run!.id,
+        projectId: run!.projectId,
+        artifactType: 'front_matter_draft',
+        artifactKey: 'front-matter',
+        status: 'accepted',
+        version: 1,
+        title: 'Front Matter',
+        tiptapContent: {
+          type: 'doc',
+          content: [
+            {
+              type: 'titlePage',
+              attrs: {
+                title: 'The Goblin Ambush',
+                subtitle: 'A D&D 5e Adventure',
+                author: '',
+                coverImageUrl: '',
+              },
+            },
+          ],
+        } as any,
+        jsonContent: Prisma.JsonNull,
+      },
+    });
+
+    await prisma.generatedArtifact.create({
+      data: {
+        runId: run!.id,
+        projectId: run!.projectId,
+        artifactType: 'chapter_draft',
+        artifactKey: 'chapter-draft-goblin-ambush',
+        status: 'accepted',
+        version: 1,
+        title: 'The Goblin Ambush',
+        tiptapContent: { type: 'doc', content: [{ type: 'paragraph' }] } as any,
+        jsonContent: { wordCount: 2500 } as any,
+      },
+    });
+
+    await prisma.generatedArtifact.create({
+      data: {
+        runId: run!.id,
+        projectId: run!.projectId,
+        artifactType: 'art_direction_plan',
+        artifactKey: 'art-direction-plan',
+        status: 'accepted',
+        version: 1,
+        title: 'Art Direction Plan',
+        jsonContent: {
+          generatedImages: [
+            {
+              documentSlug: 'front-matter',
+              nodeIndex: 0,
+              blockType: 'titlePage',
+              prompt: 'Cover prompt',
+              assetId: 'asset-cover-1',
+              assetUrl: '/uploads/project-1/front-matter-cover.png',
+            },
+          ],
+        } as any,
+      },
+    });
+
+    await assembleDocuments(run!);
+
+    const frontMatter = await prisma.projectDocument.findFirst({
+      where: { runId: run!.id, slug: 'front-matter' },
+      select: { content: true },
+    });
+
+    expect(frontMatter?.content).toMatchObject({
+      type: 'doc',
+      content: [
+        {
+          type: 'titlePage',
+          attrs: expect.objectContaining({
+            coverImageUrl: '/uploads/project-1/front-matter-cover.png',
+            imageAssetId: 'asset-cover-1',
+            imagePrompt: 'Cover prompt',
+          }),
+        },
+      ],
+    });
+  });
+
   it('replaces any existing project documents before assembling new ones', async () => {
     const run = await createRun({
       projectId: testProject.id,
