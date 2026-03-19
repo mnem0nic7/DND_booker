@@ -536,6 +536,19 @@ describe('normalizeExportDocuments', () => {
 
     expect(documents[0].content?.content).toEqual([
       {
+        type: 'heading',
+        attrs: { level: 2 },
+        content: [{ type: 'text', text: 'Encounter Table' }],
+      },
+      {
+        type: 'encounterTable',
+        attrs: {
+          environment: 'Ancient hallways',
+          crRange: '4-6',
+          terrain: 'Ancient hallways',
+        },
+      },
+      {
         type: 'paragraph',
         content: [{ type: 'text', text: 'Real body copy survives.' }],
       },
@@ -605,6 +618,52 @@ describe('normalizeExportDocuments', () => {
     expect(entries[0]?.result).toMatch(/A cracked lantern still flickers/i);
     expect(entries[0]?.result).toMatch(/choice or check|resource spend/i);
     expect(entries[1]?.result).toMatch(/Footprints end at a cave wall/i);
+  });
+
+  it('repairs stat blocks whose traits field contains embedded traits/actions wrappers', () => {
+    const documents = normalizeExportDocuments([
+      {
+        title: 'Chapter 2: Marsh Tower',
+        sortOrder: 2,
+        kind: 'chapter',
+        content: doc([
+          {
+            type: 'statBlock',
+            attrs: {
+              name: 'Marsh Spirit',
+              ac: 13,
+              hp: 36,
+              speed: 'fly 40 ft. (hover)',
+              cr: '2',
+              traits: JSON.stringify([
+                {
+                  name: '"traits"',
+                  description: '[{"name":"Incorporeal Movement","desc":"Moves through objects."}],',
+                },
+                {
+                  name: '"actions"',
+                  description: '[{"name":"Embalming Touch","desc":"Melee Spell Attack: +4 to hit."}]',
+                },
+              ]),
+            },
+          },
+        ]),
+      },
+    ], 'Bog Mystery');
+
+    const node = documents[0].content?.content?.[0];
+    expect(node).toMatchObject({
+      type: 'statBlock',
+      attrs: {
+        name: 'Marsh Spirit',
+        ac: 13,
+        hp: 36,
+        cr: '2',
+      },
+    });
+    expect(String(node?.attrs?.traits ?? '')).toContain('Incorporeal Movement');
+    expect(String(node?.attrs?.traits ?? '')).not.toContain('\\"traits\\"');
+    expect(String(node?.attrs?.actions ?? '')).toContain('Embalming Touch');
   });
 
   it('demotes malformed long display headings to normal paragraphs', () => {

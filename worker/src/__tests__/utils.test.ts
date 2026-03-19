@@ -255,6 +255,31 @@ describe('Worker Renderer Utils', () => {
       expect(normalized.dex).toBe(16);
       expect(String(normalized.actions)).toContain('Withering Touch');
     });
+
+    it('recovers malformed embedded section wrappers inside stat block traits', () => {
+      const normalized = normalizeStatBlockAttrs({
+        name: 'Marsh Spirit',
+        ac: 13,
+        hp: 36,
+        speed: 'fly 40 ft. (hover)',
+        cr: '2',
+        traits: JSON.stringify([
+          {
+            name: '"traits"',
+            description: '[{"name":"Incorporeal Movement","desc":"Move through creatures and objects."},{"name":"Frightful Wail","desc":"Creatures within 60 feet save or become frightened."}],',
+          },
+          {
+            name: '"actions"',
+            description: '[{"name":"Embalming Touch","desc":"Melee Spell Attack: +4 to hit."}]',
+          },
+        ]),
+      });
+
+      expect(String(normalized.traits)).toContain('Incorporeal Movement');
+      expect(String(normalized.traits)).not.toContain('\\"traits\\"');
+      expect(String(normalized.actions)).toContain('Embalming Touch');
+      expect(String(normalized.actions)).not.toContain('\\"actions\\"');
+    });
   });
 
   describe('assessStatBlockAttrs', () => {

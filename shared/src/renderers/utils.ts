@@ -154,19 +154,19 @@ interface NameDescLike {
   text?: unknown;
 }
 
-function normalizeNameDescList(value: unknown): string {
+function normalizeNameDescEntries(value: unknown): Array<Record<string, string>> {
   let parsed: unknown;
   if (typeof value === 'string') {
     try {
       parsed = JSON.parse(value);
     } catch {
-      return value;
+      return [];
     }
   } else {
     parsed = value;
   }
 
-  if (!Array.isArray(parsed)) return '[]';
+  if (!Array.isArray(parsed)) return [];
 
   const normalized = parsed.flatMap((entry) => {
     if (entry == null || typeof entry !== 'object') return [];
@@ -185,7 +185,64 @@ function normalizeNameDescList(value: unknown): string {
     return [result];
   });
 
-  return JSON.stringify(normalized);
+  return normalized;
+}
+
+function normalizeNameDescList(value: unknown): string {
+  if (typeof value === 'string') {
+    try {
+      JSON.parse(value);
+    } catch {
+      return value;
+    }
+  }
+
+  return JSON.stringify(normalizeNameDescEntries(value));
+}
+
+function normalizeEmbeddedSectionKey(value: string): 'traits' | 'actions' | 'reactions' | 'legendaryActions' | null {
+  const normalized = value
+    .replace(/^"+|"+$/g, '')
+    .replace(/[.:]+$/g, '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, '');
+
+  switch (normalized) {
+    case 'traits':
+      return 'traits';
+    case 'actions':
+      return 'actions';
+    case 'reactions':
+      return 'reactions';
+    case 'legendaryactions':
+    case 'legendaryabilities':
+      return 'legendaryActions';
+    default:
+      return null;
+  }
+}
+
+function extractEmbeddedStatBlockSections(value: unknown): Partial<Record<'traits' | 'actions' | 'reactions' | 'legendaryActions', string>> {
+  const entries = normalizeNameDescEntries(value);
+  if (entries.length === 0) return {};
+
+  const recovered: Partial<Record<'traits' | 'actions' | 'reactions' | 'legendaryActions', string>> = {};
+
+  for (const entry of entries) {
+    const sectionKey = normalizeEmbeddedSectionKey(String(entry.name ?? ''));
+    if (!sectionKey) continue;
+
+    const rawDescription = String(entry.description ?? '').replace(/,\s*$/, '').trim();
+    if (!rawDescription) continue;
+
+    const normalizedList = normalizeNameDescList(rawDescription);
+    if (normalizedList === rawDescription || normalizedList === '[]') continue;
+
+    recovered[sectionKey] = normalizedList;
+  }
+
+  return recovered;
 }
 
 export function escapeHtml(text: unknown): string {
@@ -562,6 +619,26 @@ export function normalizeStatBlockAttrs(attrs: Record<string, unknown>): Record<
   for (const [target, aliases] of arrayAliases) {
     const value = pickFirst(normalized, aliases);
     if (value !== undefined) normalized[target] = normalizeNameDescList(value);
+  }
+
+  const recoveredSections: Partial<Record<'traits' | 'actions' | 'reactions' | 'legendaryActions', string>> = {};
+  const embeddedSources = new Set<string>();
+  for (const [target] of arrayAliases) {
+    const embedded = extractEmbeddedStatBlockSections(normalized[target]);
+    if (Object.keys(embedded).length === 0) continue;
+    embeddedSources.add(target);
+    Object.assign(recoveredSections, embedded);
+  }
+
+  if (embeddedSources.size > 0) {
+    for (const [target] of arrayAliases) {
+      const recovered = recoveredSections[target as keyof typeof recoveredSections];
+      if (recovered) {
+        normalized[target] = recovered;
+      } else if (embeddedSources.has(target)) {
+        delete normalized[target];
+      }
+    }
   }
 
   return normalized;
