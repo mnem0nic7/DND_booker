@@ -201,7 +201,7 @@ function isShortLeadIn(node: DocumentContent | undefined): boolean {
 function isWideRandomTable(node: DocumentContent | undefined): boolean {
   return Boolean(node)
     && node?.type === 'randomTable'
-    && resolveRandomTableEntries(node.attrs ?? {}).length >= 10;
+    && resolveRandomTableEntries(node.attrs ?? {}).length >= 8;
 }
 
 function detectRecipe(blocks: DocumentContent[], options: ResolveLayoutPlanOptions): LayoutRecipe | null {
@@ -342,6 +342,12 @@ function isShortSupportBlock(node: DocumentContent | undefined): boolean {
   return node.type === 'bulletList' || node.type === 'orderedList';
 }
 
+function isLeadLabelParagraph(node: DocumentContent | undefined): boolean {
+  if (!node || node.type !== 'paragraph') return false;
+  const text = readNodeText(node).trim();
+  return text.length > 0 && text.length <= 48 && text.endsWith(':');
+}
+
 function headingLevel(node: DocumentContent | undefined): number | null {
   if (!node || node.type !== 'heading') return null;
   const raw = node.attrs?.level;
@@ -472,6 +478,40 @@ function applyHeadingAttachmentGrouping(
   }
 }
 
+function applyLeadLabelAttachmentGrouping(
+  blocks: DocumentContent[],
+  layoutBlocks: LayoutPlanBlock[],
+): void {
+  let groupIndex = 1;
+
+  for (let index = 0; index < blocks.length - 1; index += 1) {
+    const label = blocks[index];
+    const next = blocks[index + 1];
+    if (!isLeadLabelParagraph(label) || layoutBlocks[index]?.groupId) continue;
+    if (!next || layoutBlocks[index + 1]?.groupId) continue;
+    if (!HEADING_ATTACHMENT_NODE_TYPES.has(next.type)) continue;
+
+    const members = [index, index + 1];
+    const maybeThird = blocks[index + 2];
+    if (
+      next.type === 'paragraph'
+      && maybeThird
+      && !layoutBlocks[index + 2]?.groupId
+      && (maybeThird.type === 'bulletList' || maybeThird.type === 'orderedList')
+    ) {
+      members.push(index + 2);
+    }
+
+    const groupId = `lead-label-packet-${groupIndex}`;
+    groupIndex += 1;
+    for (const memberIndex of members) {
+      layoutBlocks[memberIndex].groupId = groupId;
+      layoutBlocks[memberIndex].keepTogether = true;
+    }
+    index = members[members.length - 1] - 1;
+  }
+}
+
 function applyLocalUtilityPacketGrouping(
   blocks: DocumentContent[],
   layoutBlocks: LayoutPlanBlock[],
@@ -543,6 +583,7 @@ function applyShortTailParagraphGrouping(
     const previous = blocks[index - 1];
     if (!block || !previous) continue;
     if (block.type !== 'paragraph' || textLength(block) > 180) continue;
+    if (isLeadLabelParagraph(block)) continue;
     if (
       !isShortSupportBlock(previous)
       && previous.type !== 'npcProfile'
@@ -823,6 +864,7 @@ export function buildDefaultLayoutPlan(
   applyNpcRosterGrouping(blocks, layoutBlocks);
   if (sectionRecipe !== 'intro_split_spread') {
     applyHeadingAttachmentGrouping(blocks, layoutBlocks);
+    applyLeadLabelAttachmentGrouping(blocks, layoutBlocks);
     applyLocalUtilityPacketGrouping(blocks, layoutBlocks);
     applyShortTailParagraphGrouping(blocks, layoutBlocks);
     applyTerminalOrphanTailGrouping(blocks, layoutBlocks);

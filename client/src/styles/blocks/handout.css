@@ -26,17 +26,17 @@
 
 .handout--letter .handout__title {
   font-family: var(--body-font);
-  font-size: 1.1em;
+  font-size: 1em;
   font-weight: 600;
   color: #333;
-  margin-bottom: 0.75rem;
-  padding-bottom: 0.5rem;
+  margin-bottom: 0.55rem;
+  padding-bottom: 0.4rem;
   border-bottom: 1px solid #e5ddd0;
 }
 
 .handout--letter .handout__content {
-  font-size: 0.95em;
-  line-height: 1.7;
+  font-size: 0.84em;
+  line-height: 1.45;
   color: #444;
   white-space: pre-wrap;
 }
@@ -48,24 +48,24 @@
   border-top: 6px solid #c4a462;
   border-bottom: 6px solid #c4a462;
   font-family: var(--heading-font);
-  padding: 2rem 2.5rem;
+  padding: 1rem 1.15rem;
 }
 
 .handout--scroll .handout__title {
   font-family: var(--heading-font);
-  font-size: 1.2em;
+  font-size: 0.92em;
   font-weight: 700;
   color: var(--accent-color);
   text-align: center;
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.45rem;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.03em;
 }
 
 .handout--scroll .handout__content {
   font-family: var(--body-font);
-  font-size: 0.95em;
-  line-height: 1.6;
+  font-size: 0.78em;
+  line-height: 1.28;
   color: #3a2f1f;
   text-align: center;
   white-space: pre-wrap;
@@ -83,19 +83,19 @@
 
 .handout--poster .handout__title {
   font-family: var(--heading-font);
-  font-size: 1.5em;
+  font-size: 1.2em;
   font-weight: 700;
   color: #1a1a1a;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  margin-bottom: 1rem;
+  margin-bottom: 0.8rem;
   border-bottom: 3px double #333;
-  padding-bottom: 0.75rem;
+  padding-bottom: 0.6rem;
 }
 
 .handout--poster .handout__content {
-  font-size: 1em;
-  line-height: 1.5;
+  font-size: 0.86em;
+  line-height: 1.38;
   color: #222;
   white-space: pre-wrap;
 }

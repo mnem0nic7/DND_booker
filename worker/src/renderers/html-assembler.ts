@@ -33,6 +33,13 @@ export interface AssembleOptions {
   renderMode?: 'paged' | 'flow';
 }
 
+interface TocRenderEntry {
+  level: number;
+  prefix: string;
+  title: string;
+  page: number | null;
+}
+
 function resolveTextureValue(theme: string): string {
   const textureByTheme: Record<string, string | null> = {
     'classic-parchment': 'parchment-classic.jpg',
@@ -300,10 +307,100 @@ function getThemeVariables(theme: string): string {
   return `${themes[theme] || themes['classic-parchment']}\n${getSharedThemeLayoutVariables(theme)}`;
 }
 
+function extractTextContent(node: DocumentContent): string {
+  if (node.type === 'text') return node.text || '';
+  if (!node.content) return '';
+  return node.content.map((child) => extractTextContent(child)).join('');
+}
+
+function dedupeAdjacentTocEntries(entries: TocRenderEntry[]): TocRenderEntry[] {
+  return entries.filter((entry, index) => {
+    if (index === 0) return true;
+    const previous = entries[index - 1];
+    if (
+      previous.level === entry.level
+      && previous.prefix === entry.prefix
+      && previous.title.trim() === entry.title.trim()
+    ) {
+      if (previous.page == null && entry.page != null) {
+        previous.page = entry.page;
+      }
+      return false;
+    }
+    return true;
+  });
+}
+
+function buildPageLookup(pageModel: PageModel | null | undefined, pageNumberOffset: number): Map<string, number> {
+  const lookup = new Map<string, number>();
+  if (!pageModel) return lookup;
+
+  for (const page of pageModel.pages) {
+    const pageNumber = page.index + pageNumberOffset;
+    for (const fragment of page.fragments) {
+      if (!lookup.has(fragment.nodeId)) {
+        lookup.set(fragment.nodeId, pageNumber);
+      }
+    }
+  }
+
+  return lookup;
+}
+
+function walkTocEntriesWithPages(
+  node: DocumentContent,
+  entries: TocRenderEntry[],
+  pageLookup: Map<string, number>,
+): void {
+  const nodeId = String(node.attrs?.nodeId || '').trim();
+  const page = nodeId ? pageLookup.get(nodeId) ?? null : null;
+
+  if (node.type === 'chapterHeader') {
+    const chapterNumber = String(node.attrs?.chapterNumber || '');
+    entries.push({
+      level: 1,
+      prefix: chapterNumber ? `${chapterNumber}.` : '',
+      title: String(node.attrs?.title || 'Untitled Chapter'),
+      page,
+    });
+  } else if (node.type === 'heading') {
+    const level = Number(node.attrs?.level ?? 2);
+    if (level >= 1 && level <= 3) {
+      const title = extractTextContent(node).trim();
+      if (title) {
+        entries.push({
+          level,
+          prefix: '',
+          title,
+          page,
+        });
+      }
+    }
+  }
+
+  for (const child of node.content ?? []) {
+    walkTocEntriesWithPages(child, entries, pageLookup);
+  }
+}
+
+function extractTocEntriesWithPages(
+  docs: Array<{ content: DocumentContent | null; pageModel?: PageModel | null; pageNumberOffset: number }>,
+): TocRenderEntry[] {
+  const entries: TocRenderEntry[] = [];
+
+  for (const doc of docs) {
+    if (!doc.content) continue;
+    const pageLookup = buildPageLookup(doc.pageModel ?? null, doc.pageNumberOffset);
+    walkTocEntriesWithPages(doc.content, entries, pageLookup);
+  }
+
+  return dedupeAdjacentTocEntries(entries);
+}
+
 /**
  * Build TOC entry HTML from extracted entries with indentation by level.
  */
-function buildTocEntriesHtml(entries: Array<{ level: number; prefix: string; title: string }>): string {
+function buildTocEntriesHtml(entries: TocRenderEntry[]): string {
   if (entries.length === 0) {
     return `<p class="table-of-contents__note">No chapters or headings found.</p>`;
   }
@@ -311,10 +408,11 @@ function buildTocEntriesHtml(entries: Array<{ level: number; prefix: string; tit
   return entries.map((entry) => {
     const indent = entry.level > 1 ? ` style="padding-left: ${(entry.level - 1) * 1.2}rem"` : '';
     const prefix = entry.prefix ? `${escapeHtml(entry.prefix)} ` : '';
+    const page = entry.page == null ? '&mdash;' : escapeHtml(String(entry.page));
     return `<div class="table-of-contents__entry"${indent}>
       <span class="table-of-contents__entry-title">${prefix}${escapeHtml(entry.title)}</span>
       <span class="table-of-contents__entry-leader"></span>
-      <span class="table-of-contents__entry-page">&mdash;</span>
+      <span class="table-of-contents__entry-page">${page}</span>
     </div>`;
   }).join('\n');
 }
@@ -328,12 +426,10 @@ export function assembleHtml(options: AssembleOptions): string {
   // Sort documents by sortOrder
   const sorted = [...documents].sort((a, b) => a.sortOrder - b.sortOrder);
 
-  // Extract chapter headers and headings for TOC population
-  const tocEntries = extractTocEntriesFromDocuments(sorted);
-
   // Render each document's canonical layout HTML
   let pageNumberOffset = 0;
-  const documentHtmlParts = sorted.map((doc) => {
+  const renderedDocuments = sorted.map((doc) => {
+    const currentPageNumberOffset = pageNumberOffset;
     const rendered = doc.content
       ? (renderMode === 'flow'
         ? renderFlowContentWithLayoutPlan({
@@ -361,12 +457,23 @@ export function assembleHtml(options: AssembleOptions): string {
     if (renderMode === 'paged' && rendered?.pageModel) {
       pageNumberOffset += rendered.pageModel.pages.length;
     }
-    return `<section class="document" data-title="${escapeHtml(doc.title)}" data-kind="${escapeHtml(String(doc.kind ?? ''))}">
+    return {
+      html: `<section class="document" data-title="${escapeHtml(doc.title)}" data-kind="${escapeHtml(String(doc.kind ?? ''))}">
       <div class="ProseMirror">
         ${rendered?.html ?? ''}
       </div>
-    </section>`;
+    </section>`,
+      content: doc.content,
+      pageModel: rendered?.pageModel ?? null,
+      pageNumberOffset: currentPageNumberOffset,
+    };
   });
+
+  const tocEntries = renderMode === 'paged'
+    ? extractTocEntriesWithPages(renderedDocuments)
+    : extractTocEntriesFromDocuments(sorted).map((entry) => ({ ...entry, page: null }));
+
+  const documentHtmlParts = renderedDocuments.map((doc) => doc.html);
 
   // Post-process: inject entries into the first empty TOC entries div
   const tocEntriesHtml = buildTocEntriesHtml(tocEntries);
@@ -943,16 +1050,60 @@ export function assembleHtml(options: AssembleOptions): string {
       font-family: var(--font-heading);
       color: var(--color-heading);
       margin: 0;
-      font-size: 0.9rem;
+      font-size: 0.82rem;
     }
 
     .random-table__die-badge {
       background: var(--color-primary);
       color: white;
-      font-size: 0.62rem;
-      padding: 0.08rem 0.34rem;
+      font-size: 0.56rem;
+      padding: 0.06rem 0.28rem;
       border-radius: 3px;
       font-weight: bold;
+    }
+
+    .random-table__table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.64rem;
+      table-layout: fixed;
+    }
+
+    .random-table__th {
+      background: var(--color-primary);
+      color: rgba(255, 248, 231, 0.96);
+      padding: 0.12rem 0.24rem;
+      text-align: left;
+      font-weight: 700;
+      font-size: 0.56rem;
+    }
+
+    .random-table__th--roll {
+      width: 2.15rem;
+      text-align: center;
+    }
+
+    .random-table__row:nth-child(even) {
+      background: var(--table-stripe-bg, rgba(114, 55, 26, 0.06));
+    }
+
+    .random-table__row:nth-child(odd) {
+      background: transparent;
+    }
+
+    .random-table__td {
+      padding: 0.1rem 0.24rem;
+      border-bottom: 1px solid rgba(131, 55, 23, 0.14);
+      line-height: 1.02;
+      vertical-align: top;
+      overflow-wrap: anywhere;
+    }
+
+    .random-table__td--roll {
+      text-align: center;
+      font-weight: 700;
+      color: var(--color-primary);
+      white-space: nowrap;
     }
 
     /* NPC Profile */
@@ -1337,6 +1488,7 @@ export function assembleHtml(options: AssembleOptions): string {
       border: 2px solid #8b7355;
       border-radius: 8px;
       font-family: 'Libre Baskerville', serif;
+      padding: 1rem 1.15rem;
     }
 
     .handout--poster {
@@ -1349,13 +1501,25 @@ export function assembleHtml(options: AssembleOptions): string {
     .handout__title {
       font-family: var(--font-heading);
       font-weight: bold;
-      font-size: 1.1rem;
-      margin-bottom: 0.5rem;
+      font-size: 0.98rem;
+      margin-bottom: 0.38rem;
     }
 
     .handout__content {
-      font-size: 0.9rem;
+      font-size: 0.82rem;
+      line-height: 1.34;
       white-space: pre-wrap;
+    }
+
+    .handout--scroll .handout__title {
+      font-size: 0.92rem;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+    }
+
+    .handout--scroll .handout__content {
+      font-size: 0.78rem;
+      line-height: 1.28;
     }
 
     /* Page Border */

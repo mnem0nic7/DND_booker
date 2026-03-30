@@ -62,6 +62,30 @@ npm run dev --workspace=client    # UI on :3000
 npm run dev --workspace=worker    # PDF worker
 ```
 
+## Deploying Changes
+
+Use the Docker Compose service that matches the code you changed:
+
+```bash
+# Client-only changes
+docker compose build client
+docker compose up -d client
+
+# Server-only changes
+docker compose build server
+docker compose up -d server
+
+# Worker-only changes
+docker compose build worker
+docker compose up -d worker
+
+# shared/ changes or cross-cutting changes spanning multiple packages
+docker compose build server worker client
+docker compose up -d server worker client
+```
+
+If a change touches `shared/`, rebuild every app service that imports it. If a change touches both generation logic and export rendering, treat it as a `server` + `worker` redeploy even when the UI also changed.
+
 ## Features
 
 ### Block Editor

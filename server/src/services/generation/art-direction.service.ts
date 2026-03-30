@@ -637,6 +637,69 @@ function sanitizeAssetBaseName(value: string): string {
     .slice(0, 80) || 'art';
 }
 
+function normalizeComparableLabel(value: string | null | undefined): string {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+function extractPlacementSubject(blockType: ImageCapableBlockType, prompt: string): string {
+  if (blockType === 'npcProfile') {
+    const match = prompt.match(/^([^,.]+?)(?:,|\.)/);
+    return match?.[1]?.trim() ?? '';
+  }
+
+  if (blockType === 'mapBlock' || blockType === 'fullBleedImage' || blockType === 'chapterHeader') {
+    const quoted = prompt.match(/"([^"]+)"/);
+    return quoted?.[1]?.trim() ?? '';
+  }
+
+  return '';
+}
+
+function resolvePlacementNodeIndex(
+  content: DocumentContent,
+  placement: Pick<RealizedImagePlacement, 'nodeIndex' | 'blockType' | 'prompt' | 'assetUrl'>,
+): number {
+  const nodes = getTopLevelNodes(content);
+  const imageAttr = IMAGE_ATTR_BY_BLOCK[placement.blockType];
+  const exactNode = nodes[placement.nodeIndex];
+
+  if (exactNode?.type === placement.blockType) {
+    return placement.nodeIndex;
+  }
+
+  const subjectHint = normalizeComparableLabel(extractPlacementSubject(placement.blockType, placement.prompt));
+  const candidates = nodes
+    .map((node, index) => ({ node, index }))
+    .filter(({ node }) => node.type === placement.blockType)
+    .map(({ node, index }) => {
+      const label = normalizeComparableLabel(
+        String(node.attrs?.name || node.attrs?.title || node.attrs?.chapterTitle || ''),
+      );
+      const currentImage = String(node.attrs?.[imageAttr] || '').trim();
+      const matchesSubject = Boolean(subjectHint) && label.includes(subjectHint);
+      const isEmptySlot = !currentImage;
+      const alreadyApplied = currentImage === placement.assetUrl;
+      return {
+        index,
+        matchesSubject,
+        isEmptySlot,
+        alreadyApplied,
+        distance: Math.abs(index - placement.nodeIndex),
+      };
+    })
+    .sort((left, right) => {
+      if (left.matchesSubject !== right.matchesSubject) return left.matchesSubject ? -1 : 1;
+      if (left.isEmptySlot !== right.isEmptySlot) return left.isEmptySlot ? -1 : 1;
+      if (left.alreadyApplied !== right.alreadyApplied) return left.alreadyApplied ? -1 : 1;
+      return left.distance - right.distance;
+    });
+
+  return candidates[0]?.index ?? placement.nodeIndex;
+}
+
 function applyImageToNode(
   content: DocumentContent,
   nodeIndex: number,
@@ -646,10 +709,19 @@ function applyImageToNode(
   assetUrl: string,
 ): DocumentContent {
   const nodes = getTopLevelNodes(content);
-  if (!Array.isArray(content.content) || !nodes[nodeIndex]) return content;
+  if (!Array.isArray(content.content) || nodes.length === 0) return content;
+
+  const resolvedNodeIndex = resolvePlacementNodeIndex(content, {
+    nodeIndex,
+    blockType,
+    prompt,
+    assetUrl,
+  });
+
+  if (!nodes[resolvedNodeIndex]) return content;
 
   const nextNodes = nodes.map((child, index) => {
-    if (index !== nodeIndex) return child;
+    if (index !== resolvedNodeIndex) return child;
     return {
       ...child,
       attrs: {

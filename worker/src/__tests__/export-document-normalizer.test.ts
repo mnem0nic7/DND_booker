@@ -176,7 +176,7 @@ describe('normalizeExportDocuments', () => {
     });
   });
 
-  it('splits verbose random tables by word budget even when they stay under the raw entry cap', () => {
+  it('keeps medium random tables intact even when entries are verbose', () => {
     const entries = Array.from({ length: 10 }, (_, index) => ({
       roll: String(index + 1),
       result: `Outcome ${index + 1} presents an immediate threat, a forced choice, and a clue that changes the next scene for the party.`,
@@ -202,19 +202,12 @@ describe('normalizeExportDocuments', () => {
     ], 'Goblin Caper');
 
     const nodes = documents[0].content?.content ?? [];
-    expect(nodes.length).toBeGreaterThan(1);
+    expect(nodes).toHaveLength(1);
     expect(nodes[0]).toMatchObject({
       type: 'randomTable',
       attrs: {
         nodeId: 'randomtable-verbose',
         title: 'Artifact Interactions',
-      },
-    });
-    expect(nodes[1]).toMatchObject({
-      type: 'randomTable',
-      attrs: {
-        nodeId: 'randomtable-verbose-part-2',
-        title: 'Artifact Interactions (cont.)',
       },
     });
   });

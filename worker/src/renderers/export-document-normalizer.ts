@@ -65,6 +65,7 @@ const SELF_PAGINATING_NODE_TYPES = new Set([
 
 const MAX_RANDOM_TABLE_ENTRIES_PER_EXPORT_BLOCK = 8;
 const MAX_RANDOM_TABLE_WORDS_PER_EXPORT_BLOCK = 90;
+const MIN_RANDOM_TABLE_ENTRIES_TO_ALLOW_SPLIT = 11;
 
 export function normalizeExportDocuments<T extends ExportDocument>(
   documents: T[],
@@ -250,6 +251,10 @@ function splitOversizedRandomTables(nodes: DocumentContent[]): DocumentContent[]
 }
 
 function chunkRandomTableEntries(entries: Array<{ roll: string; result: string }>): Array<Array<{ roll: string; result: string }>> {
+  if (entries.length < MIN_RANDOM_TABLE_ENTRIES_TO_ALLOW_SPLIT) {
+    return [entries];
+  }
+
   const chunks: Array<Array<{ roll: string; result: string }>> = [];
   let currentChunk: Array<{ roll: string; result: string }> = [];
   let currentWordCount = 0;

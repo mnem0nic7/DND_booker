@@ -723,6 +723,45 @@ describe('layout-plan', () => {
     expect(pageModel.pages[1]?.fragments.some((fragment) => fragment.nodeId === tocNodeId && fragment.region === 'full_page')).toBe(true);
   });
 
+  it('attaches short label paragraphs to the following list so they do not orphan at page bottoms', () => {
+    const content: DocumentContent = {
+      type: 'doc',
+      content: [
+        paragraph('Setup copy for the scene.'),
+        {
+          type: 'paragraph',
+          content: [{
+            type: 'text',
+            text: 'Player Options:',
+            marks: [{ type: 'bold' }],
+          }],
+        },
+        {
+          type: 'bulletList',
+          content: [
+            { type: 'listItem', content: [paragraph('Push further into the mine.')] },
+            { type: 'listItem', content: [paragraph('Return to town for help.')] },
+          ],
+        },
+      ],
+    };
+
+    const resolved = resolveLayoutPlan(content, null, {
+      documentKind: 'chapter',
+      documentTitle: 'The Village',
+    });
+
+    const labelNodeId = String(resolved.content.content?.[1]?.attrs?.nodeId ?? '');
+    const listNodeId = String(resolved.content.content?.[2]?.attrs?.nodeId ?? '');
+    const labelPlan = resolved.layoutPlan?.blocks.find((block) => block.nodeId === labelNodeId);
+    const listPlan = resolved.layoutPlan?.blocks.find((block) => block.nodeId === listNodeId);
+
+    expect(labelPlan?.groupId).toBeTruthy();
+    expect(labelPlan?.groupId).toBe(listPlan?.groupId);
+    expect(labelPlan?.keepTogether).toBe(true);
+    expect(listPlan?.keepTogether).toBe(true);
+  });
+
   it('keeps grouped encounter packets on the current page when they fit below existing content', () => {
     const content: DocumentContent = {
       type: 'doc',

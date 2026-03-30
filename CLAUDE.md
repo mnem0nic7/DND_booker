@@ -70,6 +70,15 @@ Zustand stores in `client/src/stores/`. The `aiStore.ts` is the largest, combini
 ### TipTap editor
 Custom D&D block types each have an Extension (`.ts`) and a View (`.tsx`) in `client/src/components/blocks/`. Content stored as TipTap JSON in the `Document.content` column. The Toolbar subscribes to editor `transaction` events via `useEffect`/`useState` to reactively update active formatting states (bold, italic, headings, etc.).
 
+### Export/layout heuristics
+Paged export TOC entries should use rendered page-model data when available so chapter headers and headings show concrete page numbers instead of placeholder dashes.
+
+Short lead-label paragraphs that end with `:` should stay attached to the following utility block or list to avoid page-bottom orphans during layout planning.
+
+Random tables with 8+ entries are treated as wide in layout planning, but export splitting should stay conservative: keep 8-10 entry tables intact and only split once tables grow beyond that range.
+
+When reapplying accepted art placements after document rebuilds, do not trust stored node indices alone. Resolve against the rebuilt document by block type, subject label, empty-image preference, and proximity.
+
 ### Authentication
 JWT access token (15min) + refresh token (7d, httpOnly cookie). Token version incremented on logout. Client axios interceptor auto-refreshes on 401.
 
@@ -84,7 +93,14 @@ PropertiesPanel shows document stats and a Document Outline that includes both H
 
 ## Deployment
 
-Docker Compose with four services: `postgres`, `redis`, `server`, `client`. Client builds via multi-stage Dockerfile (Vite build → Nginx). Changes require `docker compose build client && docker compose up -d client` to deploy.
+Docker Compose runs `postgres`, `redis`, `server`, `worker`, and `client`. Rebuild and restart the services that match the changed packages:
+
+- `client/` only: `docker compose build client && docker compose up -d client`
+- `server/` only: `docker compose build server && docker compose up -d server`
+- `worker/` only: `docker compose build worker && docker compose up -d worker`
+- `shared/` or cross-package changes: `docker compose build server worker client && docker compose up -d server worker client`
+
+Ship flow for requested production updates: validate the touched paths, commit, push, and redeploy the affected services.
 
 ## Environment
 

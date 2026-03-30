@@ -289,6 +289,110 @@ describe('Assembler — assembleDocuments', () => {
     });
   });
 
+  it('reapplies accepted NPC portrait art when realized node indices drift from the rebuilt document', async () => {
+    const run = await createRun({
+      projectId: testProject.id,
+      userId: testUser.id,
+      prompt: 'npc art replay drift test',
+    });
+
+    await prisma.generatedArtifact.create({
+      data: {
+        runId: run!.id,
+        projectId: run!.projectId,
+        artifactType: 'chapter_outline',
+        artifactKey: 'chapter-outline',
+        status: 'accepted',
+        version: 1,
+        title: 'Outline',
+        jsonContent: {
+          chapters: [
+            {
+              slug: 'goblin-ambush',
+              title: 'The Goblin Ambush',
+              act: 1,
+              sortOrder: 0,
+              levelRange: { min: 1, max: 2 },
+              targetPages: 10,
+              summary: 'Goblins attack the party.',
+              keyEntities: ['elder-mara'],
+              sections: [],
+            },
+          ],
+          appendices: [],
+          totalPageEstimate: 10,
+        } as any,
+      },
+    });
+
+    await prisma.generatedArtifact.create({
+      data: {
+        runId: run!.id,
+        projectId: run!.projectId,
+        artifactType: 'chapter_draft',
+        artifactKey: 'chapter-draft-goblin-ambush',
+        status: 'accepted',
+        version: 1,
+        title: 'The Goblin Ambush',
+        tiptapContent: {
+          type: 'doc',
+          content: [
+            { type: 'paragraph', content: [{ type: 'text', text: 'Village overview.' }] },
+            {
+              type: 'npcProfile',
+              attrs: {
+                name: 'Elder Mara',
+                race: 'Human',
+                class: 'Wise Woman',
+                portraitUrl: '',
+              },
+            },
+          ],
+        } as any,
+        jsonContent: { wordCount: 1200 } as any,
+      },
+    });
+
+    await prisma.generatedArtifact.create({
+      data: {
+        runId: run!.id,
+        projectId: run!.projectId,
+        artifactType: 'art_direction_plan',
+        artifactKey: 'art-direction-plan',
+        status: 'accepted',
+        version: 1,
+        title: 'Art Direction Plan',
+        jsonContent: {
+          generatedImages: [
+            {
+              documentSlug: 'goblin-ambush',
+              nodeIndex: 2,
+              blockType: 'npcProfile',
+              prompt: 'Elder Mara, a wise and weathered village elder with an herbalist satchel. Portrait-focused composition, no text.',
+              assetId: 'asset-elder-mara-1',
+              assetUrl: '/uploads/project-1/elder-mara.png',
+            },
+          ],
+        } as any,
+      },
+    });
+
+    await assembleDocuments(run!);
+
+    const chapter = await prisma.projectDocument.findFirst({
+      where: { runId: run!.id, slug: 'goblin-ambush' },
+      select: { content: true },
+    });
+
+    const npcNode = (chapter?.content as any)?.content?.find?.((node: any) => node?.type === 'npcProfile');
+    expect(npcNode?.attrs).toMatchObject({
+      name: 'Elder Mara',
+      portraitUrl: '/uploads/project-1/elder-mara.png',
+      imageAssetId: 'asset-elder-mara-1',
+    });
+    expect(String(npcNode?.attrs?.imagePrompt || '')).toContain('Elder Mara');
+  });
+
   it('replaces any existing project documents before assembling new ones', async () => {
     const run = await createRun({
       projectId: testProject.id,

@@ -109,7 +109,7 @@ describe('HTML Assembler', () => {
 
       expect(html).toContain('full-bleed-image--art-role-sparse_page_repair');
       expect(html).toContain('.full-bleed-image--art-role-sparse_page_repair .full-bleed-image__img');
-      expect(html).toContain('min-height: 28rem;');
+      expect(html).toContain('min-height: 38rem;');
     });
 
     it('renders column-fill spot art at full column width in export HTML', () => {
@@ -232,6 +232,40 @@ describe('HTML Assembler', () => {
       expect(html).toContain('The Beginning');
       expect(html).toContain('2.');
       expect(html).toContain('The End');
+    });
+
+    it('should inject rendered page numbers into ToC entries when paged output is available', () => {
+      const html = assembleHtml({
+        documents: [
+          {
+            title: 'ToC Doc',
+            content: {
+              type: 'doc',
+              content: [
+                { type: 'tableOfContents', attrs: { title: 'Contents', nodeId: 'toc-1' } },
+              ],
+            },
+            sortOrder: 1,
+          },
+          {
+            title: 'Chapter Doc',
+            content: {
+              type: 'doc',
+              content: [
+                { type: 'chapterHeader', attrs: { title: 'The Beginning', chapterNumber: '1', subtitle: '', nodeId: 'chapter-1' } },
+                { type: 'paragraph', attrs: { nodeId: 'para-1' }, content: [{ type: 'text', text: 'Opening scene text.' }] },
+              ],
+            },
+            sortOrder: 2,
+          },
+        ],
+        theme: 'classic-parchment',
+        projectTitle: 'Test',
+      });
+
+      expect(html).toContain('The Beginning');
+      expect(html).not.toContain('<span class="table-of-contents__entry-page">&mdash;</span>');
+      expect(html).toMatch(/table-of-contents__entry-page">[0-9]+</);
     });
 
     it('should inject heading nodes (h1, h2, h3) into ToC entries', () => {
