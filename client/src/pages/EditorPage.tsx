@@ -83,6 +83,19 @@ export default function EditorPage() {
     [updateDocumentLayoutPlan],
   );
 
+  const activeDocumentFallbackScopeIds = activeDocument
+    ? (() => {
+      const fallbackMap = currentProject?.settings?.textLayoutFallbacks;
+      if (!fallbackMap || typeof fallbackMap !== 'object') return [];
+      const entry = (fallbackMap as Record<string, unknown>)[activeDocument.id];
+      if (!entry || typeof entry !== 'object') return [];
+      const rawScopeIds = (entry as { scopeIds?: unknown }).scopeIds;
+      return Array.isArray(rawScopeIds)
+        ? rawScopeIds.filter((scopeId): scopeId is string => typeof scopeId === 'string')
+        : [];
+    })()
+    : [];
+
   return (
     <div className="h-screen flex flex-col bg-gray-50">
       {/* Top header */}
@@ -161,6 +174,7 @@ export default function EditorPage() {
               projectId={projectId!}
               content={activeDocument.content as DocumentContent}
               layoutPlan={activeDocument.layoutPlan}
+              textLayoutFallbackScopeIds={activeDocumentFallbackScopeIds}
               documentKind={activeDocument.kind}
               documentTitle={activeDocument.title}
               onUpdate={handleDocumentContentUpdate}

@@ -48,6 +48,12 @@ export function analyzePageMetrics(snapshot: Pick<PageMetricsSnapshot, 'pages' |
     }
 
     if (page.isNearlyBlank) {
+      const boundaryNodeIndex = page.boundaryType === 'pageBreak'
+        ? (page.nodeIndices ?? [])
+          .map((idx) => nodeLookup.get(idx))
+          .find((node) => node?.nodeType === 'pageBreak')
+          ?.nodeIndex ?? null
+        : null;
       findings.push({
         code: page.boundaryType === 'pageBreak' ? 'manual_break_nearly_blank_page' : 'nearly_blank_page',
         severity: 'warning',
@@ -55,7 +61,7 @@ export function analyzePageMetrics(snapshot: Pick<PageMetricsSnapshot, 'pages' |
           ? `Page ${page.page} is nearly blank and ends with a manual page break.`
           : `Page ${page.page} is nearly blank in the rendered layout.`,
         page: page.page,
-        nodeIndex: page.nodeIndices?.[0] ?? null,
+        nodeIndex: boundaryNodeIndex ?? page.nodeIndices?.[0] ?? null,
       });
     }
 

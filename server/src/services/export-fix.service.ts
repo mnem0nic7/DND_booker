@@ -15,6 +15,10 @@ import {
 } from '@dnd-booker/shared';
 import type { ExportJob as PrismaExportJob } from '@prisma/client';
 import { prisma } from '../config/database.js';
+import {
+  applyPublicationPolishEdits,
+  derivePublicationPolishEdits,
+} from './generation/publication-polish.helpers.js';
 import { resolveDocumentLayout } from './layout-plan.service.js';
 import { materializeSparsePageArt, realizeSparsePageArt } from './layout-art.service.js';
 
@@ -37,6 +41,25 @@ const LAYOUT_REFRESH_CODES = new Set<ExportReviewCode>([
   'EXPORT_MARGIN_COLLISION',
   'EXPORT_FOOTER_COLLISION',
   'EXPORT_ORPHAN_TAIL_PARAGRAPH',
+  'EXPORT_TEXT_LAYOUT_PAGE_COUNT_DRIFT',
+  'EXPORT_TEXT_LAYOUT_GROUP_SPLIT_DRIFT',
+  'EXPORT_TEXT_LAYOUT_MANUAL_BREAK_DRIFT',
+  'EXPORT_TEXT_LAYOUT_FALLBACK_RECOMMENDED',
+]);
+
+const PARITY_REVIEW_CODES = new Set<ExportReviewCode>([
+  'EXPORT_TEXT_LAYOUT_PAGE_COUNT_DRIFT',
+  'EXPORT_TEXT_LAYOUT_GROUP_SPLIT_DRIFT',
+  'EXPORT_TEXT_LAYOUT_MANUAL_BREAK_DRIFT',
+  'EXPORT_TEXT_LAYOUT_FALLBACK_RECOMMENDED',
+]);
+
+const PARITY_MANUAL_BREAK_CODES = new Set<ExportReviewCode>([
+  'EXPORT_TEXT_LAYOUT_MANUAL_BREAK_DRIFT',
+]);
+
+const PARITY_FALLBACK_CODES = new Set<ExportReviewCode>([
+  'EXPORT_TEXT_LAYOUT_FALLBACK_RECOMMENDED',
 ]);
 
 const ART_DRIVEN_LAYOUT_CODES = new Set<LayoutRefreshReviewCode>([
@@ -49,6 +72,7 @@ const ART_DRIVEN_LAYOUT_CODES = new Set<LayoutRefreshReviewCode>([
 
 type ContentFixableReviewCode = typeof CONTENT_FIXABLE_CODES extends Set<infer T> ? T : never;
 type LayoutRefreshReviewCode = typeof LAYOUT_REFRESH_CODES extends Set<infer T> ? T : never;
+type ParityReviewCode = typeof PARITY_REVIEW_CODES extends Set<infer T> ? T : never;
 
 type ProjectDocumentRecord = {
   id: string;
@@ -65,12 +89,31 @@ type AppliedFixCounter = {
   oversizedHeadingsDemoted: number;
 };
 
+type PublicationPolishSignal = {
+  code: 'MANUAL_BREAK_NEARLY_BLANK_PAGE' | 'CHAPTER_HEADING_MID_PAGE';
+  affectedScope: string;
+};
+
+type ParityFixState = {
+  codes: Set<ParityReviewCode>;
+  fallbackScopeIds: Set<string>;
+  publicationPolishSignals: PublicationPolishSignal[];
+};
+
 function emptyFixCounter(): AppliedFixCounter {
   return {
     encounterTablesRemoved: 0,
     randomTablesRemoved: 0,
     placeholderStatBlocksRemoved: 0,
     oversizedHeadingsDemoted: 0,
+  };
+}
+
+function emptyParityFixState(): ParityFixState {
+  return {
+    codes: new Set<ParityReviewCode>(),
+    fallbackScopeIds: new Set<string>(),
+    publicationPolishSignals: [],
   };
 }
 
@@ -110,6 +153,89 @@ function getFindingTitle(
   }
 
   return matchedTitle;
+}
+
+function getFindingDetails(
+  finding: ExportReview['findings'][number],
+): Record<string, unknown> | null {
+  return finding.details && typeof finding.details === 'object'
+    ? finding.details as Record<string, unknown>
+    : null;
+}
+
+function getFindingDocumentId(
+  finding: ExportReview['findings'][number],
+): string | null {
+  const details = getFindingDetails(finding);
+  const documentId = details?.documentId;
+  return typeof documentId === 'string' && documentId.trim().length > 0
+    ? documentId.trim()
+    : null;
+}
+
+function normalizeFallbackScopeIds(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return [...new Set(
+    value
+      .filter((scopeId): scopeId is string => typeof scopeId === 'string' && /^(group|unit):.+$/.test(scopeId))
+      .map((scopeId) => scopeId.trim())
+      .filter(Boolean),
+  )];
+}
+
+function extractParityFixState(finding: ExportReview['findings'][number]): ParityFixState {
+  const state = emptyParityFixState();
+  state.codes.add(finding.code as ParityReviewCode);
+
+  const details = getFindingDetails(finding);
+  const scopeIds = normalizeFallbackScopeIds(details?.scopeIds);
+  for (const scopeId of scopeIds) {
+    state.fallbackScopeIds.add(scopeId);
+  }
+
+  const layoutFindings = Array.isArray(details?.layoutFindings) ? details.layoutFindings : [];
+  for (const entry of layoutFindings) {
+    if (!entry || typeof entry !== 'object') continue;
+    const layoutFinding = entry as Record<string, unknown>;
+    const nodeIndex = Number(layoutFinding.nodeIndex);
+    if (!Number.isInteger(nodeIndex) || nodeIndex < 0) continue;
+
+    if (layoutFinding.code === 'manual_break_nearly_blank_page') {
+      state.publicationPolishSignals.push({
+        code: 'MANUAL_BREAK_NEARLY_BLANK_PAGE',
+        affectedScope: `node-${nodeIndex}`,
+      });
+    } else if (layoutFinding.code === 'chapter_heading_mid_page') {
+      state.publicationPolishSignals.push({
+        code: 'CHAPTER_HEADING_MID_PAGE',
+        affectedScope: `node-${nodeIndex}`,
+      });
+    }
+  }
+
+  return state;
+}
+
+function mergeParityFixState(target: ParityFixState, source: ParityFixState) {
+  for (const code of source.codes) target.codes.add(code);
+  for (const scopeId of source.fallbackScopeIds) target.fallbackScopeIds.add(scopeId);
+  target.publicationPolishSignals.push(...source.publicationPolishSignals);
+}
+
+function normalizeTextLayoutFallbacks(
+  settings: unknown,
+): Record<string, { scopeIds: string[] }> {
+  if (!settings || typeof settings !== 'object' || Array.isArray(settings)) return {};
+  const raw = (settings as Record<string, unknown>).textLayoutFallbacks;
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+
+  return Object.fromEntries(
+    Object.entries(raw as Record<string, unknown>).flatMap(([documentId, entry]) => {
+      if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return [];
+      const scopeIds = normalizeFallbackScopeIds((entry as { scopeIds?: unknown }).scopeIds);
+      return scopeIds.length > 0 ? [[documentId, { scopeIds }]] : [];
+    }),
+  );
 }
 
 function isPlaceholderStatBlock(node: DocumentContent): boolean {
@@ -308,8 +434,57 @@ function buildSpotArtChanges(
   }];
 }
 
+function buildPageBreakNormalizationChanges(
+  title: string,
+  count: number,
+): ExportReviewFixChange[] {
+  if (count <= 0) return [];
+  return [{
+    code: 'EXPORT_TEXT_LAYOUT_MANUAL_BREAK_DRIFT',
+    action: 'normalize_page_breaks',
+    title,
+    count,
+  }];
+}
+
+function buildFallbackConfigurationChanges(
+  title: string,
+  count: number,
+): ExportReviewFixChange[] {
+  if (count <= 0) return [];
+  return [{
+    code: 'EXPORT_TEXT_LAYOUT_FALLBACK_RECOMMENDED',
+    action: 'configure_text_layout_fallbacks',
+    title,
+    count,
+  }];
+}
+
 function layoutPlanChanged(previous: unknown, next: LayoutPlan): boolean {
   return JSON.stringify(previous ?? null) !== JSON.stringify(next);
+}
+
+function normalizePageBreaksInDocument(
+  content: DocumentContent | null,
+  parityState: ParityFixState | null,
+): { content: DocumentContent; changed: boolean; editCount: number } {
+  const baseContent = ensureDocContent(content);
+  const signals = parityState?.publicationPolishSignals ?? [];
+  const edits = derivePublicationPolishEdits(baseContent, signals);
+  if (edits.length === 0) {
+    return {
+      content: baseContent,
+      changed: false,
+      editCount: 0,
+    };
+  }
+
+  const nextContent = ensureDocContent(applyPublicationPolishEdits(baseContent, edits) as DocumentContent);
+  return {
+    content: nextContent,
+    changed: JSON.stringify(baseContent) !== JSON.stringify(nextContent),
+    editCount: edits.length,
+  };
 }
 
 type RawExportJob = PrismaExportJob & {
@@ -318,6 +493,10 @@ type RawExportJob = PrismaExportJob & {
 
 export async function applySafeExportReviewFixes(
   exportJob: RawExportJob,
+  options: {
+    allowedCodes?: Set<ExportReviewCode>;
+    targetTitle?: string | null;
+  } = {},
 ): Promise<Omit<ExportReviewFixResult, 'exportJob'> & { projectId: string; userId: string; format: RawExportJob['format'] }> {
   const review = exportJob.reviewJson;
   if (!review) {
@@ -334,13 +513,36 @@ export async function applySafeExportReviewFixes(
     };
   }
 
+  const findings = review.findings.filter((finding) => (
+    !options.allowedCodes || options.allowedCodes.has(finding.code)
+  ));
   const contentFindingsByTitle = new Map<string, Set<ContentFixableReviewCode>>();
   const layoutFindingsByTitle = new Map<string, Set<LayoutRefreshReviewCode>>();
+  const parityFindingsByDocumentId = new Map<string, ParityFixState>();
   let unsupportedFindingCount = 0;
 
-  for (const finding of review.findings) {
+  for (const finding of findings) {
     const title = getFindingTitle(finding, review);
+    if (options.targetTitle && title !== options.targetTitle) {
+      continue;
+    }
+
+    if (PARITY_REVIEW_CODES.has(finding.code)) {
+      const documentId = getFindingDocumentId(finding);
+      if (!documentId) {
+        unsupportedFindingCount += 1;
+        continue;
+      }
+
+      const existing = parityFindingsByDocumentId.get(documentId) ?? emptyParityFixState();
+      mergeParityFixState(existing, extractParityFixState(finding));
+      parityFindingsByDocumentId.set(documentId, existing);
+    }
+
     if (!title) {
+      if (PARITY_REVIEW_CODES.has(finding.code)) {
+        continue;
+      }
       unsupportedFindingCount += 1;
       continue;
     }
@@ -362,7 +564,7 @@ export async function applySafeExportReviewFixes(
     unsupportedFindingCount += 1;
   }
 
-  if (contentFindingsByTitle.size === 0 && layoutFindingsByTitle.size === 0) {
+  if (contentFindingsByTitle.size === 0 && layoutFindingsByTitle.size === 0 && parityFindingsByDocumentId.size === 0) {
     return {
       status: 'no_fixes',
       summary: unsupportedFindingCount > 0
@@ -378,8 +580,15 @@ export async function applySafeExportReviewFixes(
     };
   }
 
+  const project = await prisma.project.findUnique({
+    where: { id: exportJob.projectId },
+    select: { settings: true },
+  });
   const documents = await prisma.projectDocument.findMany({
-    where: { projectId: exportJob.projectId },
+    where: {
+      projectId: exportJob.projectId,
+      ...(options.targetTitle ? { title: options.targetTitle } : {}),
+    },
     orderBy: { sortOrder: 'asc' },
     select: {
       id: true,
@@ -392,6 +601,9 @@ export async function applySafeExportReviewFixes(
 
   const changes: ExportReviewFixChange[] = [];
   let documentsUpdated = 0;
+  let fallbackConfigChanged = false;
+  const projectTextLayoutFallbacks = normalizeTextLayoutFallbacks(project?.settings);
+  const fallbackChangeCounts = new Map<string, number>();
 
   const pendingUpdates: Array<{
     id: string;
@@ -403,12 +615,15 @@ export async function applySafeExportReviewFixes(
     contentChanged: boolean;
     layoutChanged: boolean;
     generatedSpotArtCount: number;
+    pageBreakEditCount: number;
+    fallbackScopeCount: number;
   }> = [];
 
   for (const document of documents) {
     const contentCodes = contentFindingsByTitle.get(document.title) ?? null;
     const layoutCodes = layoutFindingsByTitle.get(document.title) ?? null;
-    if (!contentCodes && !layoutCodes) continue;
+    const parityState = parityFindingsByDocumentId.get(document.id) ?? null;
+    if (!contentCodes && !layoutCodes && !parityState) continue;
 
     const baseContent = document.content as DocumentContent | null;
     let nextContent = ensureDocContent(baseContent);
@@ -416,18 +631,27 @@ export async function applySafeExportReviewFixes(
     let contentChanged = false;
     let nextFixes = emptyFixCounter();
     let generatedSpotArtCount = 0;
+    let pageBreakEditCount = 0;
+    let fallbackScopeCount = 0;
+
+    if (parityState && Array.from(parityState.codes).some((code) => PARITY_MANUAL_BREAK_CODES.has(code))) {
+      const normalized = normalizePageBreaksInDocument(baseContent, parityState);
+      nextContent = normalized.content;
+      contentChanged = normalized.changed;
+      pageBreakEditCount = normalized.editCount;
+    }
 
     if (contentCodes) {
       const safeResult = applySafeFixesToDocument({
         id: document.id,
         title: document.title,
         kind: document.kind,
-        content: baseContent,
+        content: nextContent,
         layoutPlan: document.layoutPlan ?? null,
       }, contentCodes);
       nextContent = safeResult.content;
       nextFixes = safeResult.fixes;
-      contentChanged = safeResult.changed;
+      contentChanged = contentChanged || safeResult.changed;
     }
 
     if (layoutCodes && Array.from(layoutCodes).some((code) => ART_DRIVEN_LAYOUT_CODES.has(code))) {
@@ -451,6 +675,21 @@ export async function applySafeExportReviewFixes(
           nextContent = realizedArt.content;
           generatedSpotArtCount = realizedArt.generatedCount;
         }
+      }
+    }
+
+    if (parityState && Array.from(parityState.codes).some((code) => PARITY_FALLBACK_CODES.has(code))) {
+      const existingScopeIds = new Set(projectTextLayoutFallbacks[document.id]?.scopeIds ?? []);
+      const previousCount = existingScopeIds.size;
+      for (const scopeId of parityState.fallbackScopeIds) {
+        existingScopeIds.add(scopeId);
+      }
+      const nextScopeIds = [...existingScopeIds].sort();
+      if (nextScopeIds.length > 0 && JSON.stringify(nextScopeIds) !== JSON.stringify(projectTextLayoutFallbacks[document.id]?.scopeIds ?? [])) {
+        projectTextLayoutFallbacks[document.id] = { scopeIds: nextScopeIds };
+        fallbackConfigChanged = true;
+        fallbackScopeCount = nextScopeIds.length - previousCount;
+        fallbackChangeCounts.set(document.id, fallbackScopeCount);
       }
     }
 
@@ -490,10 +729,24 @@ export async function applySafeExportReviewFixes(
       contentChanged,
       layoutChanged,
       generatedSpotArtCount,
+      pageBreakEditCount,
+      fallbackScopeCount,
     });
   }
 
   await prisma.$transaction(async (tx) => {
+    if (fallbackConfigChanged && project) {
+      await tx.project.update({
+        where: { id: exportJob.projectId },
+        data: {
+          settings: {
+            ...(((project.settings as Record<string, unknown> | null) ?? {})),
+            textLayoutFallbacks: projectTextLayoutFallbacks,
+          } as Prisma.InputJsonValue,
+        },
+      });
+    }
+
     for (const update of pendingUpdates) {
       await tx.projectDocument.update({
         where: { id: update.id },
@@ -506,6 +759,8 @@ export async function applySafeExportReviewFixes(
 
       documentsUpdated += 1;
       changes.push(...buildFixChanges(update.title, update.nextFixes));
+      changes.push(...buildPageBreakNormalizationChanges(update.title, update.pageBreakEditCount));
+      changes.push(...buildFallbackConfigurationChanges(update.title, update.fallbackScopeCount));
       if (update.layoutCodes && update.generatedSpotArtCount > 0) {
         changes.push(...buildSpotArtChanges(update.title, update.layoutCodes, update.generatedSpotArtCount));
       }
@@ -514,6 +769,16 @@ export async function applySafeExportReviewFixes(
       }
     }
   });
+
+  if (fallbackConfigChanged) {
+    const pendingDocumentIds = new Set(pendingUpdates.map((update) => update.id));
+    for (const document of documents) {
+      if (pendingDocumentIds.has(document.id)) continue;
+      const addedScopeCount = fallbackChangeCounts.get(document.id) ?? 0;
+      if (addedScopeCount <= 0) continue;
+      changes.push(...buildFallbackConfigurationChanges(document.title, addedScopeCount));
+    }
+  }
 
   const appliedFixCount = changes.reduce((total, change) => total + change.count, 0);
 

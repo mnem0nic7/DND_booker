@@ -215,9 +215,18 @@ DND_booker/
 │   └── Dockerfile
 ├── shared/                   # Shared TypeScript types
 ├── text-layout/              # Local Pretext fork and adapter
+├── docs/agents/              # Product agent catalog and responsibilities
+├── docs/skills/              # Repo-specific execution skills and runbooks
 ├── docker-compose.yml        # Full stack: Postgres, Redis, server, worker, client
 └── docs/plans/               # Design doc & implementation plan
 ```
+
+## Agent And Skill Docs
+
+When working on the autonomous editor runtime or the Pretext layout stack, start here:
+
+- `docs/agents/` documents the top-level controller and specialist mutators
+- `docs/skills/` documents repo-specific execution runbooks for safe agent and layout work
 
 ## Testing
 

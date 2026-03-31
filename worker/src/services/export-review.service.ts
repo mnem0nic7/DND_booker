@@ -6,6 +6,7 @@ import type {
   ExportReviewAutoFix,
   ExportReview,
   ExportReviewFinding,
+  ExportReviewTextLayoutParityMetrics,
   LayoutPlan,
   PageModel,
   ExportSectionReviewMetric,
@@ -54,11 +55,14 @@ const REFERENCE_BLOCK_TYPES = new Set([
 ]);
 
 interface ReviewableDocument {
+  id?: string | null;
   title: string;
   kind?: DocumentKind | null;
   content?: DocumentContent | null;
   layoutPlan?: LayoutPlan | null;
   pageModel?: PageModel | null;
+  textLayoutParity?: ExportReviewTextLayoutParityMetrics | null;
+  textLayoutParityFindings?: ExportReviewFinding[];
 }
 
 interface PdfWord {
@@ -177,7 +181,29 @@ export function buildUnavailableExportReview(message: string): ExportReview {
       lastPageFillRatio: null,
       sectionStarts: [],
       utilityCoverage: [],
+      textLayoutParity: null,
     },
+  };
+}
+
+function mergeTextLayoutParityMetrics(
+  documents: ReviewableDocument[],
+): ExportReviewTextLayoutParityMetrics | null {
+  const metrics = documents
+    .map((document) => document.textLayoutParity)
+    .filter((value): value is ExportReviewTextLayoutParityMetrics => Boolean(value));
+
+  if (metrics.length === 0) return null;
+
+  return {
+    mode: metrics.at(-1)?.mode ?? 'legacy',
+    legacyPageCount: metrics.reduce((total, metric) => total + metric.legacyPageCount, 0),
+    enginePageCount: metrics.reduce((total, metric) => total + metric.enginePageCount, 0),
+    supportedUnitCount: metrics.reduce((total, metric) => total + metric.supportedUnitCount, 0),
+    unsupportedUnitCount: metrics.reduce((total, metric) => total + metric.unsupportedUnitCount, 0),
+    totalHeightDeltaPx: metrics.reduce((total, metric) => total + metric.totalHeightDeltaPx, 0),
+    driftScopeIds: [...new Set(metrics.flatMap((metric) => metric.driftScopeIds))],
+    unsupportedScopeIds: [...new Set(metrics.flatMap((metric) => metric.unsupportedScopeIds))],
   };
 }
 
@@ -359,6 +385,7 @@ export function analyzePdfExportLayout(input: {
       lastPageFillRatio: lastPageFillRatio === null ? null : roundRatio(lastPageFillRatio),
       sectionStarts,
       utilityCoverage,
+      textLayoutParity: null,
     },
   };
 }
@@ -443,6 +470,7 @@ function analyzePdfExportLayoutFromPageModels(input: {
   }
 
   findings.push(...analyzeMeasuredPageLayout(globalPages));
+  findings.push(...documents.flatMap((document) => document.textLayoutParityFindings ?? []));
 
   const effectivePageCount = pageCount || globalPages.length;
 
@@ -487,6 +515,7 @@ function analyzePdfExportLayoutFromPageModels(input: {
       lastPageFillRatio: lastPageFillRatio === null ? null : roundRatio(lastPageFillRatio),
       sectionStarts,
       utilityCoverage,
+      textLayoutParity: mergeTextLayoutParityMetrics(documents),
     },
   };
 }
@@ -521,6 +550,9 @@ export function planExportAutoFixes(review: ExportReview): ExportReviewAutoFix[]
     || codes.has('EXPORT_MARGIN_COLLISION')
     || codes.has('EXPORT_FOOTER_COLLISION')
     || codes.has('EXPORT_ORPHAN_TAIL_PARAGRAPH')
+    || codes.has('EXPORT_TEXT_LAYOUT_PAGE_COUNT_DRIFT')
+    || codes.has('EXPORT_TEXT_LAYOUT_GROUP_SPLIT_DRIFT')
+    || codes.has('EXPORT_TEXT_LAYOUT_MANUAL_BREAK_DRIFT')
   ) {
     fixes.push('refresh_layout_plan');
   }
@@ -778,6 +810,14 @@ function findingPenalty(code: ExportReviewFinding['code']): number {
       return 18;
     case 'EXPORT_LOW_UTILITY_DENSITY':
       return 16;
+    case 'EXPORT_TEXT_LAYOUT_PAGE_COUNT_DRIFT':
+      return 14;
+    case 'EXPORT_TEXT_LAYOUT_GROUP_SPLIT_DRIFT':
+      return 20;
+    case 'EXPORT_TEXT_LAYOUT_MANUAL_BREAK_DRIFT':
+      return 16;
+    case 'EXPORT_TEXT_LAYOUT_FALLBACK_RECOMMENDED':
+      return 10;
     case 'EXPORT_REVIEW_UNAVAILABLE':
       return 0;
     default:

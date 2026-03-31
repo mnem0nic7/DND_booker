@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildTextLayoutParityAnalysis,
   buildFlowTextLayoutShadowTelemetry,
   buildPageMetricsSnapshotFromPageModel,
   compileFlowModel,
@@ -408,6 +409,103 @@ describe('shared text layout engine integration', () => {
     expect(snapshot.findings?.some((finding) => finding.code === 'consecutive_page_breaks')).toBe(true);
   });
 
+  it('honors scoped legacy fallbacks for supported units', () => {
+    ensureNodeCanvasMeasurementBackend();
+
+    const content: DocumentContent = {
+      type: 'doc',
+      content: [
+        {
+          type: 'heading',
+          attrs: { level: 2 },
+          content: [{ type: 'text', text: 'Measured Heading' }],
+        },
+        {
+          type: 'readAloudBox',
+          content: [
+            paragraph('This boxed text is forced onto the legacy measurement path.'),
+          ],
+        },
+      ],
+    };
+
+    const flow = compileFlowModel(content, null, 'editor_preview', {});
+    const forcedScopeId = flow.flow.units.find((unit) => (
+      flow.flow.fragments.some((fragment) => fragment.unitId === unit.id && fragment.nodeType === 'readAloudBox')
+    ))?.id;
+    expect(forcedScopeId).toBeTruthy();
+
+    const result = measureFlowTextUnits(flow.flow, {
+      theme: 'gilded-folio',
+      fallbackMeasurements: [{ unitId: forcedScopeId!, heightPx: 333 }],
+      fallbackScopeIds: [forcedScopeId!],
+    });
+
+    expect(result.appliedFallbackScopeIds).toContain(forcedScopeId!);
+    expect(result.measurements.find((measurement) => measurement.unitId === forcedScopeId)?.heightPx).toBe(333);
+    expect(result.unsupportedUnitIds).not.toContain(forcedScopeId!);
+  });
+
+  it('builds text layout parity findings from legacy vs pretext drift', () => {
+    ensureNodeCanvasMeasurementBackend();
+
+    const content: DocumentContent = {
+      type: 'doc',
+      content: [
+        paragraph('Opening copy that fills the first page.'),
+        { type: 'pageBreak' },
+        {
+          type: 'heading',
+          attrs: { level: 1 },
+          content: [{ type: 'text', text: 'The Next Descent' }],
+        },
+        paragraph('Follow-up content after the break.'),
+      ],
+    };
+
+    const flow = compileFlowModel(content, null, 'standard_pdf', {
+      documentKind: 'chapter',
+      documentTitle: 'The Next Descent',
+    });
+    const engineResult = measureFlowTextUnits(flow.flow, {
+      theme: 'gilded-folio',
+      documentKind: 'chapter',
+      documentTitle: 'The Next Descent',
+    });
+    const legacyMeasurements = engineResult.measurements.map((measurement) => ({
+      unitId: measurement.unitId,
+      heightPx: measurement.heightPx + (measurement.unitId === flow.flow.units[0]?.id ? 120 : 0),
+    }));
+    const legacyPageModel = compileMeasuredPageModel(flow.flow, legacyMeasurements, {
+      documentKind: 'chapter',
+      documentTitle: 'The Next Descent',
+      respectManualPageBreaks: false,
+    });
+    const enginePageModel = compileMeasuredPageModel(flow.flow, engineResult.measurements, {
+      documentKind: 'chapter',
+      documentTitle: 'The Next Descent',
+      respectManualPageBreaks: true,
+    });
+
+    const parity = buildTextLayoutParityAnalysis({
+      mode: 'pretext',
+      flow: flow.flow,
+      documentId: 'doc-1',
+      documentTitle: 'The Next Descent',
+      legacyMeasurements,
+      engineMeasurements: engineResult.measurements,
+      engineTelemetry: engineResult.telemetry,
+      legacyPageModel,
+      enginePageModel,
+      unsupportedScopeIds: engineResult.unsupportedUnitIds,
+    });
+
+    expect(parity.metrics.legacyPageCount).toBeGreaterThanOrEqual(1);
+    expect(parity.metrics.enginePageCount).toBeGreaterThanOrEqual(1);
+    expect(parity.metrics.driftScopeIds.length).toBeGreaterThan(0);
+    expect(parity.findings.map((finding) => finding.code)).toContain('EXPORT_TEXT_LAYOUT_FALLBACK_RECOMMENDED');
+  });
+
   it('builds consistent shadow telemetry payloads', () => {
     const telemetry = buildFlowTextLayoutShadowTelemetry({
       legacyMeasurements: [{ unitId: 'u1', heightPx: 100 }, { unitId: 'u2', heightPx: 220 }],
@@ -421,10 +519,13 @@ describe('shared text layout engine integration', () => {
       },
       legacyPageCount: 3,
       pretextPageCount: 2,
+      unsupportedScopeIds: ['u3'],
     });
 
     expect(telemetry.totalHeightDeltaPx).toBe(52);
     expect(telemetry.pageCountDelta).toBe(-1);
     expect(telemetry.supportedUnitCount).toBe(2);
+    expect(telemetry.driftScopeIds).toEqual(['u1', 'u2']);
+    expect(telemetry.unsupportedScopeIds).toEqual(['u3']);
   });
 });

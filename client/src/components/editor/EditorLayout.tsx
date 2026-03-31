@@ -25,6 +25,7 @@ interface EditorLayoutProps {
   projectId: string;
   content: DocumentContent;
   layoutPlan?: LayoutPlan | null;
+  textLayoutFallbackScopeIds?: string[];
   documentKind?: string | null;
   documentTitle?: string | null;
   onUpdate: (content: DocumentContent) => void;
@@ -35,6 +36,7 @@ export function EditorLayout({
   projectId,
   content,
   layoutPlan = null,
+  textLayoutFallbackScopeIds = [],
   documentKind = null,
   documentTitle = null,
   onUpdate,
@@ -112,6 +114,7 @@ export function EditorLayout({
     editor,
     theme: currentTheme,
     layoutPlan: localLayoutPlan,
+    fallbackScopeIds: textLayoutFallbackScopeIds,
     documentKind,
     documentTitle: resolvedDocumentTitle,
     preset: 'editor_preview',

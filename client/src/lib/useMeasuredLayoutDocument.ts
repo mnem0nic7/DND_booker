@@ -23,6 +23,7 @@ interface UseMeasuredLayoutDocumentOptions {
   editor: Editor | null;
   theme?: string | null;
   layoutPlan?: LayoutPlan | null;
+  fallbackScopeIds?: string[];
   documentKind?: string | null;
   documentTitle?: string | null;
   preset: PagePreset;
@@ -66,12 +67,14 @@ export function useMeasuredLayoutDocument({
   editor,
   theme = 'gilded-folio',
   layoutPlan = null,
+  fallbackScopeIds = [],
   documentKind = null,
   documentTitle = null,
   preset,
   footerTitle = null,
 }: UseMeasuredLayoutDocumentOptions): MeasuredLayoutDocumentResult {
   const textLayoutMode = parseTextLayoutEngineMode(import.meta.env.VITE_TEXT_LAYOUT_ENGINE_MODE);
+  const fallbackScopeIdsKey = fallbackScopeIds.join('|');
   const measurementRef = useRef<HTMLDivElement>(null);
   const flowModelRef = useRef<LayoutFlowModel | null>(null);
   const contentRef = useRef<DocumentContent | null>(null);
@@ -162,22 +165,29 @@ export function useMeasuredLayoutDocument({
             documentKind,
             documentTitle,
             fallbackMeasurements: legacyMeasurements,
+            fallbackScopeIds,
           })
           : (() => {
             const initialResult = measureFlowTextUnits(flowModel, {
               theme,
               documentKind,
               documentTitle,
+              fallbackScopeIds,
             });
-            if (initialResult.unsupportedUnitIds.length === 0) {
+            const requiredFallbackScopeIds = [...new Set([
+              ...initialResult.unsupportedUnitIds,
+              ...fallbackScopeIds,
+            ])];
+            if (requiredFallbackScopeIds.length === 0) {
               return initialResult;
             }
-            const fallbackMeasurements = collectUnitMeasurements(measurementRef.current!, initialResult.unsupportedUnitIds);
+            const fallbackMeasurements = collectUnitMeasurements(measurementRef.current!, requiredFallbackScopeIds);
             return measureFlowTextUnits(flowModel, {
               theme,
               documentKind,
               documentTitle,
               fallbackMeasurements,
+              fallbackScopeIds,
             });
           })();
         const enginePageModel = compileMeasuredPageModel(flowModel, engineResult.measurements, {
@@ -195,6 +205,7 @@ export function useMeasuredLayoutDocument({
             engineTelemetry: engineResult.telemetry,
             legacyPageCount: legacyPageModel.pages.length,
             pretextPageCount: enginePageModel.pages.length,
+            unsupportedScopeIds: engineResult.unsupportedUnitIds,
           });
           console.info('[text-layout:shadow]', {
             scope: 'client-editor',
@@ -241,7 +252,7 @@ export function useMeasuredLayoutDocument({
     return () => {
       window.cancelAnimationFrame(handle);
     };
-  }, [documentKind, documentTitle, footerTitle, layoutPlan, measurementHtml, preset, textLayoutMode, theme]);
+  }, [documentKind, documentTitle, fallbackScopeIdsKey, footerTitle, layoutPlan, measurementHtml, preset, textLayoutMode, theme]);
 
   return {
     measurementHtml,

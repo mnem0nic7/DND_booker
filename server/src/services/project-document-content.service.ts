@@ -11,6 +11,7 @@ const canonicalProjectSelect = {
   userId: true,
   title: true,
   type: true,
+  settings: true,
   content: true,
   updatedAt: true,
 } satisfies Prisma.ProjectSelect;

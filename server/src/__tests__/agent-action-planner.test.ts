@@ -88,6 +88,44 @@ describe('agent action planner', () => {
     expect(plan.targetTitle).toBe('Chapter 1: Arrival');
   });
 
+  it('prioritizes layout parity audits ahead of generic layout refresh', () => {
+    const plan = chooseNextAgentAction({
+      backlog: [
+        {
+          id: 'parity-1',
+          code: 'EXPORT_TEXT_LAYOUT_GROUP_SPLIT_DRIFT',
+          title: 'Grouped layout drift',
+          detail: 'A packet lands on different pages between legacy and Pretext.',
+          severity: 'error',
+          priority: 95,
+          targetTitle: 'Chapter 1: Arrival',
+          page: 6,
+        },
+      ],
+      scorecard: {
+        overallScore: 61,
+        exportScore: 61,
+        blockingFindingCount: 1,
+        warningFindingCount: 0,
+        utilityDensityAverage: 0.5,
+        sparsePageCount: 0,
+        thinRandomTableCount: 0,
+        lowUtilityDensityCount: 0,
+        suspiciousStatBlockCount: 0,
+        generatedAt: new Date().toISOString(),
+        summary: 'Parity drift needs targeted remediation.',
+        latestExportJobId: 'job-parity',
+      },
+      designProfile,
+      budget,
+      cycleCount: 2,
+      exportCount: 2,
+    });
+
+    expect(plan.actionType).toBe('audit_layout_parity');
+    expect(plan.targetTitle).toBe('Chapter 1: Arrival');
+  });
+
   it('chooses stat-block repair for suspicious or placeholder stat blocks', () => {
     const plan = chooseNextAgentAction({
       backlog: [

@@ -16,6 +16,13 @@ const LAYOUT_CODES = new Set([
   'EXPORT_UNBALANCED_COLUMNS',
 ]);
 
+const PARITY_CODES = new Set([
+  'EXPORT_TEXT_LAYOUT_PAGE_COUNT_DRIFT',
+  'EXPORT_TEXT_LAYOUT_GROUP_SPLIT_DRIFT',
+  'EXPORT_TEXT_LAYOUT_MANUAL_BREAK_DRIFT',
+  'EXPORT_TEXT_LAYOUT_FALLBACK_RECOMMENDED',
+]);
+
 const STAT_BLOCK_CODES = new Set([
   'EXPORT_PLACEHOLDER_STAT_BLOCK',
   'EXPORT_INCOMPLETE_STAT_BLOCK',
@@ -75,6 +82,15 @@ export function chooseNextAgentAction(input: {
     return {
       actionType: 'densify_section_utility',
       rationale: `The strongest remaining weakness is DM utility density. ${input.designProfile.constraints.find((constraint) => constraint.code === 'UTILITY_PACKETS_REQUIRED')?.description ?? ''}`.trim(),
+      targetTitle: highestPriority.targetTitle,
+      relevantCodes: [highestPriority.code],
+    };
+  }
+
+  if (PARITY_CODES.has(highestPriority.code)) {
+    return {
+      actionType: 'audit_layout_parity',
+      rationale: `The strongest remaining issue is text-layout parity drift (${highestPriority.code}). Stabilize manual breaks and fallback routing before another generic layout refresh.`,
       targetTitle: highestPriority.targetTitle,
       relevantCodes: [highestPriority.code],
     };

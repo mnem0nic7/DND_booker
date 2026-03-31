@@ -104,6 +104,33 @@ describe('publication-polish helpers', () => {
     ]);
   });
 
+  it('removes a manual page break that creates a nearly blank page', () => {
+    const content = {
+      type: 'doc',
+      content: [
+        { type: 'paragraph', content: [{ type: 'text', text: 'A short bridge paragraph.' }] },
+        { type: 'pageBreak' },
+        { type: 'heading', attrs: { level: 1 }, content: [{ type: 'text', text: 'Fresh Page' }] },
+      ],
+    };
+
+    const edits = derivePublicationPolishEdits(content, [
+      { code: 'MANUAL_BREAK_NEARLY_BLANK_PAGE', affectedScope: 'node-1' },
+    ]);
+
+    expect(edits).toContainEqual(expect.objectContaining({
+      kind: 'remove',
+      index: 1,
+      code: 'REMOVE_NEARLY_BLANK_PAGE_BREAK',
+    }));
+
+    const updated = applyPublicationPolishEdits(content, edits) as { content: Array<{ type: string }> };
+    expect(updated.content.map((node) => node.type)).toEqual([
+      'paragraph',
+      'heading',
+    ]);
+  });
+
   it('inserts a page break before a mid-page chapterHeader block', () => {
     const content = {
       type: 'doc',

@@ -20,6 +20,7 @@ export type AgentActionType =
   | 'observe_project'
   | 'create_design_profile'
   | 'create_export_review'
+  | 'audit_layout_parity'
   | 'refresh_layout_plan'
   | 'expand_random_tables'
   | 'repair_stat_blocks'

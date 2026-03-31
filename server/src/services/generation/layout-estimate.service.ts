@@ -30,6 +30,13 @@ export interface EstimatedLayoutAnalysis {
   summary: string;
 }
 
+interface AnalyzeEstimatedArtifactLayoutOptions {
+  theme?: string | null;
+  documentKind?: string | null;
+  documentTitle?: string | null;
+  fallbackScopeIds?: string[];
+}
+
 const PAGE_HEIGHT = 864;
 const LINE_HEIGHT = 17;
 const CHARS_PER_COL_LINE = 40;
@@ -137,7 +144,10 @@ function uniqueFindings(findings: EvaluationFinding[]): EvaluationFinding[] {
   });
 }
 
-export function analyzeEstimatedArtifactLayout(content: unknown): EstimatedLayoutAnalysis | null {
+export function analyzeEstimatedArtifactLayout(
+  content: unknown,
+  options: AnalyzeEstimatedArtifactLayoutOptions = {},
+): EstimatedLayoutAnalysis | null {
   if (!content || typeof content !== 'object') return null;
 
   const doc = content as TipTapNode;
@@ -302,7 +312,10 @@ export function analyzeEstimatedArtifactLayout(content: unknown): EstimatedLayou
         heightPx: estimateFlowUnitHeight(unit, flow.flow.fragments),
       }));
       const engineResult = measureFlowTextUnits(flow.flow, {
-        theme: process.env.TEXT_LAYOUT_THEME ?? 'gilded-folio',
+        theme: options.theme ?? process.env.TEXT_LAYOUT_THEME ?? 'gilded-folio',
+        documentKind: options.documentKind ?? null,
+        documentTitle: options.documentTitle ?? null,
+        fallbackScopeIds: options.fallbackScopeIds,
       });
       const enginePageModel = compileMeasuredPageModel(flow.flow, engineResult.measurements, {
         respectManualPageBreaks: true,
@@ -326,6 +339,7 @@ export function analyzeEstimatedArtifactLayout(content: unknown): EstimatedLayou
             engineTelemetry: engineResult.telemetry,
             legacyPageCount: pageSummaries.length,
             pretextPageCount: engineSummaries.length,
+            unsupportedScopeIds: engineResult.unsupportedUnitIds,
           }),
         });
       }

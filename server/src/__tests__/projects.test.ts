@@ -200,6 +200,35 @@ describe('Projects API', () => {
       expect(res.body.settings.columns).toBe(originalSettings.columns);
     });
 
+    it('should accept typed text layout fallback settings', async () => {
+      const doc = await prisma.projectDocument.findFirst({
+        where: { projectId: createdProjectId },
+        orderBy: { sortOrder: 'asc' },
+        select: { id: true },
+      });
+      expect(doc).toBeTruthy();
+
+      const res = await request(app)
+        .put(`/api/projects/${createdProjectId}`)
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({
+          settings: {
+            textLayoutFallbacks: {
+              [doc!.id]: {
+                scopeIds: ['unit:test-node', 'group:test-group'],
+              },
+            },
+          },
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.body.settings.textLayoutFallbacks[doc!.id].scopeIds).toEqual([
+        'unit:test-node',
+        'group:test-group',
+      ]);
+      expect(res.body.settings.theme).toBeDefined();
+    });
+
     it('should reject invalid theme in settings', async () => {
       const res = await request(app)
         .put(`/api/projects/${createdProjectId}`)

@@ -98,6 +98,7 @@ export async function processAgentRun(job: Job<AgentJobData>): Promise<void> {
   const { chooseNextAgentAction, shouldStopForBudget } = await import('../../../server/src/services/agent/action-planner.service.js');
   const { buildDefaultDesignProfile } = await import('../../../server/src/services/agent/design-profile.service.js');
   const { buildScorecardFromExportReview, isMeaningfulImprovement, isTargetQuality } = await import('../../../server/src/services/agent/scorecard.service.js');
+  const { auditLayoutParityFromReview } = await import('../../../server/src/services/agent/layout-parity-auditor.service.js');
   const { refreshLayoutPlansFromReview } = await import('../../../server/src/services/agent/layout-refresh.service.js');
   const { expandRandomTablesFromBacklog } = await import('../../../server/src/services/agent/random-table-expander.service.js');
   const { repairStatBlocksFromBacklog } = await import('../../../server/src/services/agent/stat-block-repair.service.js');
@@ -498,6 +499,14 @@ export async function processAgentRun(job: Job<AgentJobData>): Promise<void> {
 
       let actionResult: Record<string, unknown>;
       switch (plan.actionType) {
+        case 'audit_layout_parity':
+          actionResult = await auditLayoutParityFromReview({
+            exportJobId: completedExport.id,
+            projectId,
+            userId,
+            targetTitle: plan.targetTitle,
+          });
+          break;
         case 'refresh_layout_plan':
           actionResult = await refreshLayoutPlansFromReview({
             projectId,

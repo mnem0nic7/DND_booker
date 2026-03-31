@@ -39,6 +39,12 @@ const settingsSchema = z.object({
   ]).optional(),
   pageSize: z.enum(['letter', 'a4']).optional(),
   columns: z.number().int().min(1).max(3).optional(),
+  textLayoutFallbacks: z.record(
+    z.string().uuid(),
+    z.object({
+      scopeIds: z.array(z.string().regex(/^(group|unit):.+$/)).max(64),
+    }).strip(),
+  ).optional(),
 }).strip(); // strip unknown fields to prevent arbitrary key injection into settings JSON
 
 const updateSchema = z.object({

@@ -111,6 +111,11 @@ Single `.env` file at project root (not in `server/`). Required vars:
 
 Docker Compose maps PostgreSQL to `:5433` and Redis to `:6380` on host.
 
+## Agent And Skill Docs
+
+- `docs/agents/` documents the current product agent catalog, including the Autonomous Creative Director and specialist mutators.
+- `docs/skills/` documents repo-specific execution skills for Pretext regression work, layout triage, safe document mutation, and agent-run operations.
+
 ## Style Conventions
 
 - Purple accent color system (`#7c3aed` / `purple-600`)

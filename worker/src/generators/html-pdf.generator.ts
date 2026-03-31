@@ -1,12 +1,14 @@
 import { chromium, type Page } from 'playwright-core';
 import {
-  buildFlowTextLayoutShadowTelemetry,
+  buildTextLayoutParityAnalysis,
   compileFlowModel,
   compileMeasuredPageModel,
   measureFlowTextUnits,
   parseTextLayoutEngineMode,
   type DocumentContent,
   type DocumentKind,
+  type ExportReviewFinding,
+  type ExportReviewTextLayoutParityMetrics,
   type LayoutPlan,
   type MeasuredLayoutUnitMetric,
   type PageModel,
@@ -62,15 +64,21 @@ function collectMeasurements(unitIds: string[] | null): MeasuredLayoutUnitMetric
 
 export async function measureDocumentPageModels(input: {
   documents: Array<{
+    id?: string | null;
     title: string;
     content: DocumentContent | null;
     kind?: DocumentKind | null;
     sortOrder: number;
     layoutPlan?: LayoutPlan | null;
+    fallbackScopeIds?: string[];
   }>;
   theme: string;
   pagePreset: PagePreset;
-}): Promise<Array<PageModel | null>> {
+}): Promise<Array<{
+  pageModel: PageModel | null;
+  textLayoutParity: ExportReviewTextLayoutParityMetrics | null;
+  textLayoutParityFindings: ExportReviewFinding[];
+}>> {
   const textLayoutMode = parseTextLayoutEngineMode(process.env.TEXT_LAYOUT_ENGINE_MODE);
   if (textLayoutMode !== 'legacy') {
     ensureNodeCanvasMeasurementBackend();
@@ -84,11 +92,19 @@ export async function measureDocumentPageModels(input: {
 
   try {
     const page = await browser.newPage();
-    const models: Array<PageModel | null> = [];
+    const models: Array<{
+      pageModel: PageModel | null;
+      textLayoutParity: ExportReviewTextLayoutParityMetrics | null;
+      textLayoutParityFindings: ExportReviewFinding[];
+    }> = [];
 
     for (const document of input.documents) {
       if (!document.content) {
-        models.push(null);
+        models.push({
+          pageModel: null,
+          textLayoutParity: null,
+          textLayoutParityFindings: [],
+        });
         continue;
       }
 
@@ -116,9 +132,16 @@ export async function measureDocumentPageModels(input: {
       await page.setContent(html, { waitUntil: 'load' });
       await waitForDocumentReady(page);
       let finalMeasurements: MeasuredLayoutUnitMetric[];
+      let finalPageModel: PageModel | null = null;
+      let nextTextLayoutParity: ExportReviewTextLayoutParityMetrics | null = null;
+      let nextTextLayoutParityFindings: ExportReviewFinding[] = [];
 
       if (textLayoutMode === 'legacy') {
         finalMeasurements = await page.evaluate(collectMeasurements, null);
+        finalPageModel = compileMeasuredPageModel(flow.flow, finalMeasurements, {
+          documentKind: document.kind ?? null,
+          documentTitle: document.title,
+        });
       } else if (textLayoutMode === 'shadow') {
         const legacyMeasurements = await page.evaluate(collectMeasurements, null);
         const engineResult = measureFlowTextUnits(flow.flow, {
@@ -126,6 +149,7 @@ export async function measureDocumentPageModels(input: {
           documentKind: document.kind ?? null,
           documentTitle: document.title,
           fallbackMeasurements: legacyMeasurements,
+          fallbackScopeIds: document.fallbackScopeIds,
         });
         const legacyPageModel = compileMeasuredPageModel(flow.flow, legacyMeasurements, {
           documentKind: document.kind ?? null,
@@ -136,44 +160,73 @@ export async function measureDocumentPageModels(input: {
           documentTitle: document.title,
           respectManualPageBreaks: true,
         });
+        const parityAnalysis = buildTextLayoutParityAnalysis({
+          mode: textLayoutMode,
+          flow: flow.flow,
+          documentId: document.id ?? document.title,
+          documentTitle: document.title,
+          legacyMeasurements,
+          engineMeasurements: engineResult.measurements,
+          engineTelemetry: engineResult.telemetry,
+          legacyPageModel,
+          enginePageModel,
+          unsupportedScopeIds: engineResult.unsupportedUnitIds,
+        });
         console.info('[text-layout:shadow]', {
           scope: 'worker-html-pdf',
           documentTitle: document.title,
           pagePreset: input.pagePreset,
-          ...buildFlowTextLayoutShadowTelemetry({
-            legacyMeasurements,
-            engineMeasurements: engineResult.measurements,
-            engineTelemetry: engineResult.telemetry,
-            legacyPageCount: legacyPageModel.pages.length,
-            pretextPageCount: enginePageModel.pages.length,
-          }),
+          ...parityAnalysis.metrics,
         });
         finalMeasurements = legacyMeasurements;
+        finalPageModel = legacyPageModel;
+        nextTextLayoutParity = parityAnalysis.metrics;
+        nextTextLayoutParityFindings = parityAnalysis.findings;
       } else {
-        const initialEngineResult = measureFlowTextUnits(flow.flow, {
+        const legacyMeasurements = await page.evaluate(collectMeasurements, null);
+        const engineResult = measureFlowTextUnits(flow.flow, {
           theme: input.theme,
           documentKind: document.kind ?? null,
           documentTitle: document.title,
+          fallbackMeasurements: legacyMeasurements,
+          fallbackScopeIds: document.fallbackScopeIds,
         });
-        const fallbackMeasurements = initialEngineResult.unsupportedUnitIds.length > 0
-          ? await page.evaluate(collectMeasurements, initialEngineResult.unsupportedUnitIds)
-          : [];
-        const engineResult = initialEngineResult.unsupportedUnitIds.length > 0
-          ? measureFlowTextUnits(flow.flow, {
-            theme: input.theme,
-            documentKind: document.kind ?? null,
-            documentTitle: document.title,
-            fallbackMeasurements,
-          })
-          : initialEngineResult;
+        const legacyPageModel = compileMeasuredPageModel(flow.flow, legacyMeasurements, {
+          documentKind: document.kind ?? null,
+          documentTitle: document.title,
+        });
+        const enginePageModel = compileMeasuredPageModel(flow.flow, engineResult.measurements, {
+          documentKind: document.kind ?? null,
+          documentTitle: document.title,
+          respectManualPageBreaks: true,
+        });
+        const parityAnalysis = buildTextLayoutParityAnalysis({
+          mode: textLayoutMode,
+          flow: flow.flow,
+          documentId: document.id ?? document.title,
+          documentTitle: document.title,
+          legacyMeasurements,
+          engineMeasurements: engineResult.measurements,
+          engineTelemetry: engineResult.telemetry,
+          legacyPageModel,
+          enginePageModel,
+          unsupportedScopeIds: engineResult.unsupportedUnitIds,
+        });
         finalMeasurements = engineResult.measurements;
+        finalPageModel = enginePageModel;
+        nextTextLayoutParity = parityAnalysis.metrics;
+        nextTextLayoutParityFindings = parityAnalysis.findings;
       }
 
-      models.push(compileMeasuredPageModel(flow.flow, finalMeasurements, {
-        documentKind: document.kind ?? null,
-        documentTitle: document.title,
-        respectManualPageBreaks: textLayoutMode === 'pretext',
-      }));
+      models.push({
+        pageModel: finalPageModel ?? compileMeasuredPageModel(flow.flow, finalMeasurements, {
+          documentKind: document.kind ?? null,
+          documentTitle: document.title,
+          respectManualPageBreaks: textLayoutMode === 'pretext',
+        }),
+        textLayoutParity: nextTextLayoutParity,
+        textLayoutParityFindings: nextTextLayoutParityFindings,
+      });
     }
 
     return models;

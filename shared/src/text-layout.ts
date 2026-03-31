@@ -5,6 +5,7 @@ import {
   type TextSurfaceMeasurement,
 } from '@dnd-booker/text-layout';
 import { estimateFlowUnitHeight, getLayoutMeasurementFrame } from './layout-plan.js';
+import { buildPageMetricsSnapshotFromPageModel } from './page-metrics.js';
 import {
   normalizeChapterHeaderTitle,
   normalizeEncounterCreatures,
@@ -17,10 +18,15 @@ import {
 import { extractTocEntriesFromContent } from './toc.js';
 import type { DocumentContent } from './types/document.js';
 import type {
+  ExportReviewFinding,
+  ExportReviewTextLayoutParityMetrics,
+} from './types/export.js';
+import type {
   LayoutFlowFragment,
   LayoutFlowModel,
   LayoutFlowUnit,
   MeasuredLayoutUnitMetric,
+  PageModel,
 } from './types/layout-plan.js';
 
 export type TextLayoutEngineMode = 'legacy' | 'shadow' | 'pretext';
@@ -51,6 +57,7 @@ interface MeasureFlowTextUnitsOptions {
   documentKind?: string | null;
   documentTitle?: string | null;
   fallbackMeasurements?: MeasuredLayoutUnitMetric[] | null;
+  fallbackScopeIds?: string[] | null;
 }
 
 export interface FlowTextLayoutTelemetry {
@@ -66,6 +73,8 @@ export interface FlowTextLayoutShadowTelemetry extends FlowTextLayoutTelemetry {
   pretextPageCount: number;
   pageCountDelta: number;
   totalHeightDeltaPx: number;
+  driftScopeIds: string[];
+  unsupportedScopeIds: string[];
 }
 
 export interface FlowTextLayoutMeasurementResult {
@@ -73,6 +82,19 @@ export interface FlowTextLayoutMeasurementResult {
   surfaces: TextLayoutSurface[];
   telemetry: FlowTextLayoutTelemetry;
   unsupportedUnitIds: string[];
+  appliedFallbackScopeIds: string[];
+}
+
+export interface TextLayoutParityScope {
+  scopeId: string;
+  nodeId: string | null;
+  groupId: string | null;
+}
+
+export interface TextLayoutParityAnalysisResult {
+  metrics: ExportReviewTextLayoutParityMetrics;
+  findings: ExportReviewFinding[];
+  driftScopes: TextLayoutParityScope[];
 }
 
 const THEME_FONTS: Record<string, Pick<ThemeTypography, 'headingFontFamily' | 'bodyFontFamily'>> = {
@@ -122,6 +144,9 @@ const UNSUPPORTED_NODE_TYPES = new Set([
   'tableHeader',
 ]);
 
+const TEXT_LAYOUT_SCOPE_PATTERN = /^(group|unit):.+$/;
+const MEASUREMENT_DRIFT_THRESHOLD_PX = 8;
+
 function resolveThemeTypography(theme?: string | null): ThemeTypography {
   const fonts = THEME_FONTS[theme ?? ''] ?? THEME_FONTS['classic-parchment'];
   return {
@@ -134,6 +159,27 @@ function resolveThemeTypography(theme?: string | null): ThemeTypography {
 export function parseTextLayoutEngineMode(value: string | null | undefined): TextLayoutEngineMode {
   if (value === 'shadow' || value === 'pretext') return value;
   return 'legacy';
+}
+
+export function resolveTextLayoutFallbackScopeIds(
+  settings: unknown,
+  documentId: string | null | undefined,
+): string[] {
+  if (!documentId || !settings || typeof settings !== 'object') return [];
+  const fallbackMap = (settings as { textLayoutFallbacks?: unknown }).textLayoutFallbacks;
+  if (!fallbackMap || typeof fallbackMap !== 'object') return [];
+
+  const entry = (fallbackMap as Record<string, unknown>)[documentId];
+  if (!entry || typeof entry !== 'object') return [];
+  const rawScopeIds = (entry as { scopeIds?: unknown }).scopeIds;
+  if (!Array.isArray(rawScopeIds)) return [];
+
+  return [...new Set(
+    rawScopeIds
+      .filter((value): value is string => typeof value === 'string' && TEXT_LAYOUT_SCOPE_PATTERN.test(value))
+      .map((value) => value.trim())
+      .filter(Boolean),
+  )];
 }
 
 function createRun(text: string, style: InlineStyle): StyledTextRun {
@@ -1545,19 +1591,71 @@ function isManualPageBreakUnit(fragments: LayoutFlowFragment[]): boolean {
   return fragments.length > 0 && fragments.every((fragment) => fragment.nodeType === 'pageBreak');
 }
 
+function unitPageMap(pageModel: PageModel): Map<string, number[]> {
+  const pagesByUnit = new Map<string, Set<number>>();
+  for (const fragment of pageModel.fragments) {
+    const entry = pagesByUnit.get(fragment.unitId) ?? new Set<number>();
+    entry.add(fragment.pageIndex);
+    pagesByUnit.set(fragment.unitId, entry);
+  }
+
+  for (const page of pageModel.pages) {
+    if (page.boundaryType !== 'pageBreak' || !page.boundaryNodeId || page.boundarySourceIndex === null) continue;
+    const unitId = `unit:${page.boundaryNodeId}`;
+    const entry = pagesByUnit.get(unitId) ?? new Set<number>();
+    entry.add(page.index);
+    pagesByUnit.set(unitId, entry);
+  }
+
+  return new Map(
+    Array.from(pagesByUnit.entries()).map(([unitId, pages]) => [unitId, [...pages].sort((left, right) => left - right)] as const),
+  );
+}
+
+function sameNumberSet(left: number[] | undefined, right: number[] | undefined): boolean {
+  if (!left && !right) return true;
+  if (!left || !right) return false;
+  if (left.length !== right.length) return false;
+  return left.every((value, index) => value === right[index]);
+}
+
+function buildUnitScopeLookup(flow: LayoutFlowModel): Map<string, TextLayoutParityScope> {
+  const fragmentLookup = new Map(flow.fragments.map((fragment) => [fragment.unitId, fragment] as const));
+  return new Map(flow.units.map((unit) => {
+    const fragment = fragmentLookup.get(unit.id) ?? null;
+    return [unit.id, {
+      scopeId: unit.id,
+      nodeId: fragment?.nodeId ?? null,
+      groupId: unit.groupId ?? null,
+    }];
+  }));
+}
+
+function uniqueScopeIds(scopeIds: Iterable<string>): string[] {
+  return [...new Set(Array.from(scopeIds).filter(Boolean))];
+}
+
 export function buildFlowTextLayoutShadowTelemetry(args: {
   legacyMeasurements: MeasuredLayoutUnitMetric[];
   engineMeasurements: MeasuredLayoutUnitMetric[];
   engineTelemetry: FlowTextLayoutTelemetry;
   legacyPageCount: number;
   pretextPageCount: number;
+  unsupportedScopeIds?: string[];
 }): FlowTextLayoutShadowTelemetry {
   const legacyByUnit = new Map(
     args.legacyMeasurements.map((measurement) => [measurement.unitId, measurement.heightPx] as const),
   );
-  const totalHeightDeltaPx = args.engineMeasurements.reduce((total, measurement) => (
-    total + Math.abs(measurement.heightPx - (legacyByUnit.get(measurement.unitId) ?? measurement.heightPx))
-  ), 0);
+  const driftScopeIds: string[] = [];
+  let totalHeightDeltaPx = 0;
+
+  for (const measurement of args.engineMeasurements) {
+    const delta = Math.abs(measurement.heightPx - (legacyByUnit.get(measurement.unitId) ?? measurement.heightPx));
+    totalHeightDeltaPx += delta;
+    if (delta >= MEASUREMENT_DRIFT_THRESHOLD_PX) {
+      driftScopeIds.push(measurement.unitId);
+    }
+  }
 
   return {
     ...args.engineTelemetry,
@@ -1565,6 +1663,8 @@ export function buildFlowTextLayoutShadowTelemetry(args: {
     pretextPageCount: args.pretextPageCount,
     pageCountDelta: args.pretextPageCount - args.legacyPageCount,
     totalHeightDeltaPx,
+    driftScopeIds: uniqueScopeIds(driftScopeIds),
+    unsupportedScopeIds: uniqueScopeIds(args.unsupportedScopeIds ?? []),
   };
 }
 
@@ -1574,16 +1674,31 @@ export function measureFlowTextUnits(
 ): FlowTextLayoutMeasurementResult {
   const typography = resolveThemeTypography(options.theme);
   const tocEntries = extractTocEntriesFromFlow(flow);
+  const forcedFallbackScopeIds = new Set(options.fallbackScopeIds ?? []);
   const fallbackByUnit = new Map(
     (options.fallbackMeasurements ?? []).map((measurement) => [measurement.unitId, measurement.heightPx] as const),
   );
   const surfaces: TextLayoutSurface[] = [];
   const supportedUnitIds = new Set<string>();
   const unsupportedUnitIds = new Set<string>();
+  const appliedFallbackScopeIds = new Set<string>();
   const measuredHeightByUnit = new Map<string, number>();
 
   for (const unit of flow.units) {
     const fragments = getUnitFragments(flow, unit);
+    if (forcedFallbackScopeIds.has(unit.id)) {
+      supportedUnitIds.add(unit.id);
+      appliedFallbackScopeIds.add(unit.id);
+      measuredHeightByUnit.set(
+        unit.id,
+        Math.max(
+          1,
+          Math.ceil(fallbackByUnit.get(unit.id) ?? estimateFlowUnitHeight(unit, flow.fragments)),
+        ),
+      );
+      continue;
+    }
+
     if (isManualPageBreakUnit(fragments)) {
       supportedUnitIds.add(unit.id);
       measuredHeightByUnit.set(unit.id, 1);
@@ -1638,5 +1753,192 @@ export function measureFlowTextUnits(
       unsupportedUnitCount: unsupportedUnitIds.size,
     },
     unsupportedUnitIds: [...unsupportedUnitIds],
+    appliedFallbackScopeIds: [...appliedFallbackScopeIds],
+  };
+}
+
+function scopeDetailsFor(
+  scopeLookup: Map<string, TextLayoutParityScope>,
+  scopeIds: string[],
+): TextLayoutParityScope[] {
+  return uniqueScopeIds(scopeIds).map((scopeId) => (
+    scopeLookup.get(scopeId) ?? { scopeId, nodeId: null, groupId: null }
+  ));
+}
+
+function mapSourceIndexToUnitId(flow: LayoutFlowModel): Map<number, string> {
+  return new Map(
+    flow.fragments.map((fragment) => [fragment.sourceIndex, fragment.unitId] as const),
+  );
+}
+
+export function buildTextLayoutParityAnalysis(args: {
+  mode: TextLayoutEngineMode;
+  flow: LayoutFlowModel;
+  documentId: string;
+  documentTitle: string;
+  legacyMeasurements: MeasuredLayoutUnitMetric[];
+  engineMeasurements: MeasuredLayoutUnitMetric[];
+  engineTelemetry: FlowTextLayoutTelemetry;
+  legacyPageModel: PageModel;
+  enginePageModel: PageModel;
+  unsupportedScopeIds?: string[];
+}): TextLayoutParityAnalysisResult {
+  const shadowTelemetry = buildFlowTextLayoutShadowTelemetry({
+    legacyMeasurements: args.legacyMeasurements,
+    engineMeasurements: args.engineMeasurements,
+    engineTelemetry: args.engineTelemetry,
+    legacyPageCount: args.legacyPageModel.pages.length,
+    pretextPageCount: args.enginePageModel.pages.length,
+    unsupportedScopeIds: args.unsupportedScopeIds,
+  });
+  const scopeLookup = buildUnitScopeLookup(args.flow);
+  const legacyPagesByUnit = unitPageMap(args.legacyPageModel);
+  const enginePagesByUnit = unitPageMap(args.enginePageModel);
+  const sourceIndexToUnitId = mapSourceIndexToUnitId(args.flow);
+
+  const groupedScopeIds = args.flow.units
+    .filter((unit) => unit.groupId)
+    .map((unit) => unit.id)
+    .filter((unitId) => {
+      const legacyPages = legacyPagesByUnit.get(unitId);
+      const enginePages = enginePagesByUnit.get(unitId);
+      return !sameNumberSet(legacyPages, enginePages) || (enginePages?.length ?? 0) > 1;
+    });
+
+  const engineSnapshot = buildPageMetricsSnapshotFromPageModel(args.enginePageModel, {
+    documentTitle: args.documentTitle,
+  });
+  const manualBreakLayoutFindings = (engineSnapshot.findings ?? [])
+    .filter((finding) => (
+      finding.code === 'manual_break_nearly_blank_page'
+      || finding.code === 'consecutive_page_breaks'
+      || finding.code === 'chapter_heading_mid_page'
+    ));
+
+  const manualBreakFindingScopeIds = manualBreakLayoutFindings
+    .map((finding) => (
+      typeof finding.nodeIndex === 'number'
+        ? sourceIndexToUnitId.get(finding.nodeIndex) ?? null
+        : null
+    ))
+    .filter((scopeId): scopeId is string => Boolean(scopeId));
+
+  const manualBreakBoundaryScopeIds = args.flow.units
+    .filter((unit) => {
+      const fragments = getUnitFragments(args.flow, unit);
+      return isManualPageBreakUnit(fragments)
+        && !sameNumberSet(legacyPagesByUnit.get(unit.id), enginePagesByUnit.get(unit.id));
+    })
+    .map((unit) => unit.id);
+
+  const manualBreakScopeIds = uniqueScopeIds([
+    ...manualBreakFindingScopeIds,
+    ...manualBreakBoundaryScopeIds,
+  ]);
+  const driftScopeIds = uniqueScopeIds([
+    ...shadowTelemetry.driftScopeIds,
+    ...groupedScopeIds,
+    ...manualBreakScopeIds,
+  ]);
+  const driftScopes = scopeDetailsFor(scopeLookup, driftScopeIds);
+  const groupedScopes = scopeDetailsFor(scopeLookup, groupedScopeIds);
+  const manualBreakScopes = scopeDetailsFor(scopeLookup, manualBreakScopeIds);
+
+  const findings: ExportReviewFinding[] = [];
+  const primaryDriftScope = driftScopes[0] ?? null;
+  const sharedDetails = {
+    title: args.documentTitle,
+    documentId: args.documentId,
+  };
+
+  if (shadowTelemetry.pageCountDelta !== 0) {
+    findings.push({
+      code: 'EXPORT_TEXT_LAYOUT_PAGE_COUNT_DRIFT',
+      severity: 'warning',
+      page: null,
+      message: `"${args.documentTitle}" paginates to ${shadowTelemetry.pretextPageCount} pages in Pretext and ${shadowTelemetry.legacyPageCount} pages in the legacy path.`,
+      details: {
+        ...sharedDetails,
+        scopeId: primaryDriftScope?.scopeId ?? null,
+        nodeId: primaryDriftScope?.nodeId ?? null,
+        groupId: primaryDriftScope?.groupId ?? null,
+        pageCountDelta: shadowTelemetry.pageCountDelta,
+        legacyPageCount: shadowTelemetry.legacyPageCount,
+        enginePageCount: shadowTelemetry.pretextPageCount,
+        driftScopeIds,
+      },
+    });
+  }
+
+  if (groupedScopes.length > 0) {
+    findings.push({
+      code: 'EXPORT_TEXT_LAYOUT_GROUP_SPLIT_DRIFT',
+      severity: 'error',
+      page: null,
+      message: `"${args.documentTitle}" contains grouped layout regions that land on different pages between the Pretext and legacy paths.`,
+      details: {
+        ...sharedDetails,
+        scopeId: groupedScopes[0]?.scopeId ?? null,
+        nodeId: groupedScopes[0]?.nodeId ?? null,
+        groupId: groupedScopes[0]?.groupId ?? null,
+        scopeIds: groupedScopes.map((scope) => scope.scopeId),
+        scopes: groupedScopes,
+      },
+    });
+  }
+
+  if (manualBreakScopes.length > 0 || manualBreakLayoutFindings.length > 0) {
+    findings.push({
+      code: 'EXPORT_TEXT_LAYOUT_MANUAL_BREAK_DRIFT',
+      severity: 'warning',
+      page: null,
+      message: `"${args.documentTitle}" has manual page-break behavior that drifts or produces unstable pagination under Pretext.`,
+      details: {
+        ...sharedDetails,
+        scopeId: manualBreakScopes[0]?.scopeId ?? null,
+        nodeId: manualBreakScopes[0]?.nodeId ?? null,
+        groupId: manualBreakScopes[0]?.groupId ?? null,
+        scopeIds: manualBreakScopes.map((scope) => scope.scopeId),
+        scopes: manualBreakScopes,
+        layoutFindings: manualBreakLayoutFindings.map((finding) => ({
+          code: finding.code,
+          nodeIndex: finding.nodeIndex,
+          page: finding.page,
+        })),
+      },
+    });
+  }
+
+  if (driftScopes.length > 0) {
+    findings.push({
+      code: 'EXPORT_TEXT_LAYOUT_FALLBACK_RECOMMENDED',
+      severity: 'warning',
+      page: null,
+      message: `Persisting scoped legacy fallback for ${driftScopes.length} text layout region${driftScopes.length === 1 ? '' : 's'} would stabilize "${args.documentTitle}".`,
+      details: {
+        ...sharedDetails,
+        scopeId: driftScopes[0]?.scopeId ?? null,
+        nodeId: driftScopes[0]?.nodeId ?? null,
+        groupId: driftScopes[0]?.groupId ?? null,
+        scopeIds: driftScopes.map((scope) => scope.scopeId),
+        scopes: driftScopes,
+      },
+    });
+  }
+
+  return {
+    metrics: {
+      mode: args.mode,
+      legacyPageCount: shadowTelemetry.legacyPageCount,
+      enginePageCount: shadowTelemetry.pretextPageCount,
+      supportedUnitCount: args.engineTelemetry.supportedUnitCount,
+      unsupportedUnitCount: args.engineTelemetry.unsupportedUnitCount,
+      totalHeightDeltaPx: shadowTelemetry.totalHeightDeltaPx,
+      driftScopeIds,
+      unsupportedScopeIds: shadowTelemetry.unsupportedScopeIds,
+    },
+    findings,
+    driftScopes,
   };
 }

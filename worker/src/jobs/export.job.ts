@@ -4,10 +4,12 @@ import type {
   DocumentKind,
   ExportReview,
   ExportReviewAutoFix,
+  ExportReviewFinding,
+  ExportReviewTextLayoutParityMetrics,
   LayoutPlan,
   PageModel,
 } from '@dnd-booker/shared';
-import { recommendLayoutPlan, resolveLayoutPlan } from '@dnd-booker/shared';
+import { recommendLayoutPlan, resolveLayoutPlan, resolveTextLayoutFallbackScopeIds } from '@dnd-booker/shared';
 import { prisma } from '../config/database.js';
 import { assembleHtml } from '../renderers/html-assembler.js';
 import { normalizeExportDocuments } from '../renderers/export-document-normalizer.js';
@@ -41,15 +43,19 @@ interface PdfRenderResult {
 }
 
 interface RenderableDocument {
+  id?: string | null;
   title: string;
   content: DocumentContent | null;
   sortOrder: number;
   kind?: DocumentKind | null;
   layoutPlan?: LayoutPlan | null;
+  fallbackScopeIds?: string[];
 }
 
 interface MeasuredRenderableDocument extends RenderableDocument {
   pageModel: PageModel | null;
+  textLayoutParity?: ExportReviewTextLayoutParityMetrics | null;
+  textLayoutParityFindings?: ExportReviewFinding[];
 }
 
 interface PreflightCandidate {
@@ -173,7 +179,9 @@ async function measureRenderableDocs(input: {
 
   return input.docs.map((doc, index) => ({
     ...doc,
-    pageModel: measuredPageModels[index] ?? null,
+    pageModel: measuredPageModels[index]?.pageModel ?? null,
+    textLayoutParity: measuredPageModels[index]?.textLayoutParity ?? null,
+    textLayoutParityFindings: measuredPageModels[index]?.textLayoutParityFindings ?? [],
   }));
 }
 
@@ -359,16 +367,18 @@ export async function processExportJob(job: Job<ExportJobData>): Promise<void> {
     const projectDocuments = await prisma.projectDocument.findMany({
       where: { projectId: exportJob.projectId },
       orderBy: { sortOrder: 'asc' },
-      select: { title: true, content: true, sortOrder: true, kind: true, layoutPlan: true },
+      select: { id: true, title: true, content: true, sortOrder: true, kind: true, layoutPlan: true },
     });
 
     const rawDocs = projectDocuments.length > 0
       ? projectDocuments.map(doc => ({
+          id: doc.id,
           title: doc.title,
           content: doc.content as DocumentContent | null,
           sortOrder: doc.sortOrder,
           kind: doc.kind as DocumentKind,
           layoutPlan: doc.layoutPlan as LayoutPlan | null,
+          fallbackScopeIds: resolveTextLayoutFallbackScopeIds(exportJob.project.settings, doc.id),
         }))
       : [{
           title: exportJob.project.title,

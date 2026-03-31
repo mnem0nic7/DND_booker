@@ -26,6 +26,10 @@ export type ExportReviewCode =
   | 'EXPORT_SUSPICIOUS_STAT_BLOCK'
   | 'EXPORT_OVERSIZED_DISPLAY_HEADING'
   | 'EXPORT_LOW_UTILITY_DENSITY'
+  | 'EXPORT_TEXT_LAYOUT_PAGE_COUNT_DRIFT'
+  | 'EXPORT_TEXT_LAYOUT_GROUP_SPLIT_DRIFT'
+  | 'EXPORT_TEXT_LAYOUT_MANUAL_BREAK_DRIFT'
+  | 'EXPORT_TEXT_LAYOUT_FALLBACK_RECOMMENDED'
   | 'EXPORT_REVIEW_UNAVAILABLE';
 export type ExportReviewAutoFix =
   | 'shrink_h1_headings'
@@ -38,7 +42,20 @@ export type ExportReviewSafeFixAction =
   | 'remove_placeholder_stat_blocks'
   | 'demote_oversized_display_headings'
   | 'generate_spot_art'
+  | 'normalize_page_breaks'
+  | 'configure_text_layout_fallbacks'
   | 'refresh_layout_plan';
+
+export interface ExportReviewTextLayoutParityMetrics {
+  mode: 'legacy' | 'shadow' | 'pretext';
+  legacyPageCount: number;
+  enginePageCount: number;
+  supportedUnitCount: number;
+  unsupportedUnitCount: number;
+  totalHeightDeltaPx: number;
+  driftScopeIds: string[];
+  unsupportedScopeIds: string[];
+}
 
 export interface ExportReviewFinding {
   code: ExportReviewCode;
@@ -73,6 +90,7 @@ export interface ExportReviewMetrics {
   lastPageFillRatio: number | null;
   sectionStarts: ExportSectionReviewMetric[];
   utilityCoverage: ExportUtilityReviewMetric[];
+  textLayoutParity?: ExportReviewTextLayoutParityMetrics | null;
 }
 
 export interface ExportReview {

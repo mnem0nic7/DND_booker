@@ -30,6 +30,7 @@ export interface PublicationPolishEdit {
     | 'REMOVE_LEADING_PAGE_BREAK'
     | 'REMOVE_TRAILING_PAGE_BREAK'
     | 'REMOVE_CONSECUTIVE_PAGE_BREAK'
+    | 'REMOVE_NEARLY_BLANK_PAGE_BREAK'
     | 'REMOVE_PAGE_BREAK_BEFORE_REFERENCE_BLOCK'
     | 'INSERT_PAGE_BREAK_BEFORE_CHAPTER_HEADING';
   reason: string;
@@ -89,6 +90,21 @@ export function derivePublicationPolishEdits(
   }
 
   for (const finding of layoutFindings) {
+    if (finding.code === 'MANUAL_BREAK_NEARLY_BLANK_PAGE') {
+      const index = parseNodeIndex(finding.affectedScope);
+      if (index === null || index < 0 || index >= nodes.length) continue;
+      if (nodes[index]?.type !== 'pageBreak') continue;
+
+      edits.push({
+        kind: 'remove',
+        index,
+        code: 'REMOVE_NEARLY_BLANK_PAGE_BREAK',
+        reason: 'Manual page breaks that create nearly blank pages should be removed.',
+        nodeType: 'pageBreak',
+      });
+      continue;
+    }
+
     if (finding.code === 'REFERENCE_BLOCK_STRANDED_AFTER_BREAK') {
       const index = parseNodeIndex(finding.affectedScope);
       if (index === null || index <= 0 || index >= nodes.length) continue;

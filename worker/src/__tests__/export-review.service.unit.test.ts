@@ -270,6 +270,66 @@ Page size: 612 x 792 pts (letter)
     expect(review.findings.map((finding) => finding.code)).not.toContain('EXPORT_CHAPTER_OPENER_LOW');
   });
 
+  it('merges text layout parity metrics and findings into measured export reviews', () => {
+    const pageModel: PageModel = {
+      preset: 'standard_pdf',
+      flow: { preset: 'standard_pdf', sectionRecipe: null, columnBalanceTarget: 'balanced', fragments: [], units: [] },
+      pages: [{
+        index: 1,
+        preset: 'standard_pdf',
+        recipe: null,
+        fragments: [],
+        contentHeightPx: 864,
+        fillRatio: 0.7,
+        columnMetrics: { leftFillRatio: 0.7, rightFillRatio: null, deltaRatio: null },
+        nodeIds: [],
+        documentIds: ['Drifting Chapter'],
+        openerDocumentId: 'Drifting Chapter',
+        boundaryType: 'end',
+        boundaryNodeId: null,
+        boundarySourceIndex: null,
+      }],
+      fragments: [],
+      metrics: { fragmentCount: 0, heroFragmentCount: 0, groupedFragmentCount: 0, keepTogetherCount: 0, pageCount: 1 },
+    };
+
+    const review = reviewMeasuredExportLayout({
+      documents: [{
+        id: 'doc-1',
+        title: 'Drifting Chapter',
+        kind: 'chapter',
+        pageModel,
+        textLayoutParity: {
+          mode: 'pretext',
+          legacyPageCount: 2,
+          enginePageCount: 1,
+          supportedUnitCount: 3,
+          unsupportedUnitCount: 1,
+          totalHeightDeltaPx: 48,
+          driftScopeIds: ['group:encounter-packet-1'],
+          unsupportedScopeIds: ['unit:map-1'],
+        },
+        textLayoutParityFindings: [{
+          code: 'EXPORT_TEXT_LAYOUT_GROUP_SPLIT_DRIFT',
+          severity: 'error',
+          page: null,
+          message: 'Grouped packet drifted between measurement paths.',
+          details: {
+            title: 'Drifting Chapter',
+            documentId: 'doc-1',
+          },
+        }],
+      }],
+    });
+
+    expect(review.metrics.textLayoutParity).toEqual(expect.objectContaining({
+      legacyPageCount: 2,
+      enginePageCount: 1,
+      driftScopeIds: ['group:encounter-packet-1'],
+    }));
+    expect(review.findings.map((finding) => finding.code)).toContain('EXPORT_TEXT_LAYOUT_GROUP_SPLIT_DRIFT');
+  });
+
   it('flags a visually airy interior page with no art as a missed art opportunity before export', () => {
     const pageModel: PageModel = {
       preset: 'standard_pdf',
@@ -460,8 +520,8 @@ Page size: 612 x 792 pts (letter)
     });
 
     expect(review.findings.map((finding) => finding.code)).toContain('EXPORT_EMPTY_RANDOM_TABLE');
-    expect(review.findings.map((finding) => finding.code)).toContain('EXPORT_EMPTY_ENCOUNTER_TABLE');
     expect(review.findings.map((finding) => finding.code)).toContain('EXPORT_PLACEHOLDER_STAT_BLOCK');
+    expect(review.findings.map((finding) => finding.code)).toContain('EXPORT_INCOMPLETE_ENCOUNTER_PACKET');
     expect(review.metrics.utilityCoverage[0].referenceBlockCount).toBe(3);
   });
 

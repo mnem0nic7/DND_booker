@@ -23,6 +23,12 @@ function findingPriority(finding: ExportReviewFinding): number {
       case 'EXPORT_INCOMPLETE_STAT_BLOCK':
       case 'EXPORT_INCOMPLETE_ENCOUNTER_PACKET':
         return 25;
+      case 'EXPORT_TEXT_LAYOUT_GROUP_SPLIT_DRIFT':
+      case 'EXPORT_TEXT_LAYOUT_MANUAL_BREAK_DRIFT':
+        return 22;
+      case 'EXPORT_TEXT_LAYOUT_PAGE_COUNT_DRIFT':
+      case 'EXPORT_TEXT_LAYOUT_FALLBACK_RECOMMENDED':
+        return 18;
       case 'EXPORT_THIN_RANDOM_TABLE':
         return 18;
       case 'EXPORT_SUSPICIOUS_STAT_BLOCK':
