@@ -1,5 +1,6 @@
 import { chromium, type Page } from 'playwright-core';
 import {
+  buildFlowTextLayoutShadowTelemetry,
   compileFlowModel,
   compileMeasuredPageModel,
   measureFlowTextUnits,
@@ -36,11 +37,12 @@ async function waitForDocumentReady(page: Page) {
   await page.waitForTimeout(150);
 }
 
-function collectMeasurements(): MeasuredLayoutUnitMetric[] {
+function collectMeasurements(unitIds: string[] | null): MeasuredLayoutUnitMetric[] {
+  const allowedUnitIds = unitIds ? new Set(unitIds) : null;
   return Array.from(document.querySelectorAll<HTMLElement>('[data-layout-unit-id]'))
     .map((element) => {
       const unitId = element.dataset.layoutUnitId;
-      if (!unitId) return null;
+      if (!unitId || (allowedUnitIds && !allowedUnitIds.has(unitId))) return null;
       const rect = element.getBoundingClientRect();
       const computed = window.getComputedStyle(element);
       const marginTop = Number.parseFloat(computed.marginTop || '0') || 0;
@@ -113,10 +115,12 @@ export async function measureDocumentPageModels(input: {
 
       await page.setContent(html, { waitUntil: 'load' });
       await waitForDocumentReady(page);
-      const legacyMeasurements = await page.evaluate(collectMeasurements);
-      let finalMeasurements = legacyMeasurements;
+      let finalMeasurements: MeasuredLayoutUnitMetric[];
 
-      if (textLayoutMode !== 'legacy') {
+      if (textLayoutMode === 'legacy') {
+        finalMeasurements = await page.evaluate(collectMeasurements, null);
+      } else if (textLayoutMode === 'shadow') {
+        const legacyMeasurements = await page.evaluate(collectMeasurements, null);
         const engineResult = measureFlowTextUnits(flow.flow, {
           theme: input.theme,
           documentKind: document.kind ?? null,
@@ -131,27 +135,37 @@ export async function measureDocumentPageModels(input: {
           documentKind: document.kind ?? null,
           documentTitle: document.title,
         });
-
-        if (textLayoutMode === 'shadow') {
-          const legacyByUnit = new Map(legacyMeasurements.map((measurement) => [measurement.unitId, measurement.heightPx] as const));
-          const heightDeltaPx = engineResult.measurements.reduce((total, measurement) => (
-            total + Math.abs(measurement.heightPx - (legacyByUnit.get(measurement.unitId) ?? measurement.heightPx))
-          ), 0);
-          console.info('[text-layout:shadow]', {
-            scope: 'worker-html-pdf',
-            documentTitle: document.title,
-            pagePreset: input.pagePreset,
-            heightDeltaPx,
+        console.info('[text-layout:shadow]', {
+          scope: 'worker-html-pdf',
+          documentTitle: document.title,
+          pagePreset: input.pagePreset,
+          ...buildFlowTextLayoutShadowTelemetry({
+            legacyMeasurements,
+            engineMeasurements: engineResult.measurements,
+            engineTelemetry: engineResult.telemetry,
             legacyPageCount: legacyPageModel.pages.length,
             pretextPageCount: enginePageModel.pages.length,
-            unsupportedUnitCount: engineResult.telemetry.unsupportedUnitCount,
-            supportedUnitCount: engineResult.telemetry.supportedUnitCount,
-          });
-        }
-
-        if (textLayoutMode === 'pretext') {
-          finalMeasurements = engineResult.measurements;
-        }
+          }),
+        });
+        finalMeasurements = legacyMeasurements;
+      } else {
+        const initialEngineResult = measureFlowTextUnits(flow.flow, {
+          theme: input.theme,
+          documentKind: document.kind ?? null,
+          documentTitle: document.title,
+        });
+        const fallbackMeasurements = initialEngineResult.unsupportedUnitIds.length > 0
+          ? await page.evaluate(collectMeasurements, initialEngineResult.unsupportedUnitIds)
+          : [];
+        const engineResult = initialEngineResult.unsupportedUnitIds.length > 0
+          ? measureFlowTextUnits(flow.flow, {
+            theme: input.theme,
+            documentKind: document.kind ?? null,
+            documentTitle: document.title,
+            fallbackMeasurements,
+          })
+          : initialEngineResult;
+        finalMeasurements = engineResult.measurements;
       }
 
       models.push(compileMeasuredPageModel(flow.flow, finalMeasurements, {

@@ -1,15 +1,20 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
 import type { Editor } from '@tiptap/react';
 import {
+  buildFlowTextLayoutShadowTelemetry,
+  buildPageMetricsSnapshotFromPageModel,
   compileMeasuredPageModel,
   measureFlowTextUnits,
   parseTextLayoutEngineMode,
   renderContentWithLayoutPlan,
   renderFlowContentWithLayoutPlan,
   type DocumentContent,
+  type FlowTextLayoutShadowTelemetry,
+  type FlowTextLayoutTelemetry,
   type LayoutPlan,
   type LayoutFlowModel,
   type MeasuredLayoutUnitMetric,
+  type PageMetricsSnapshot,
   type PageModel,
   type PagePreset,
 } from '@dnd-booker/shared';
@@ -24,18 +29,23 @@ interface UseMeasuredLayoutDocumentOptions {
   footerTitle?: string | null;
 }
 
-interface MeasuredLayoutDocumentResult {
+export interface MeasuredLayoutDocumentResult {
   measurementHtml: string;
   renderedHtml: string;
   measurementRef: RefObject<HTMLDivElement | null>;
   pageModel: PageModel | null;
+  measurements: MeasuredLayoutUnitMetric[];
+  pageMetrics: PageMetricsSnapshot | null;
+  textLayoutTelemetry: FlowTextLayoutTelemetry | null;
+  shadowTelemetry: FlowTextLayoutShadowTelemetry | null;
 }
 
-function collectUnitMeasurements(root: HTMLElement): MeasuredLayoutUnitMetric[] {
+function collectUnitMeasurements(root: HTMLElement, unitIds?: readonly string[]): MeasuredLayoutUnitMetric[] {
+  const allowedUnitIds = unitIds ? new Set(unitIds) : null;
   return Array.from(root.querySelectorAll<HTMLElement>('[data-layout-unit-id]'))
     .map((element) => {
       const unitId = element.dataset.layoutUnitId;
-      if (!unitId) return null;
+      if (!unitId || (allowedUnitIds && !allowedUnitIds.has(unitId))) return null;
       const computed = window.getComputedStyle(element);
       const marginTop = Number.parseFloat(computed.marginTop || '0') || 0;
       const marginBottom = Number.parseFloat(computed.marginBottom || '0') || 0;
@@ -68,6 +78,10 @@ export function useMeasuredLayoutDocument({
   const [measurementHtml, setMeasurementHtml] = useState('');
   const [renderedHtml, setRenderedHtml] = useState('');
   const [pageModel, setPageModel] = useState<PageModel | null>(null);
+  const [measurements, setMeasurements] = useState<MeasuredLayoutUnitMetric[]>([]);
+  const [pageMetrics, setPageMetrics] = useState<PageMetricsSnapshot | null>(null);
+  const [textLayoutTelemetry, setTextLayoutTelemetry] = useState<FlowTextLayoutTelemetry | null>(null);
+  const [shadowTelemetry, setShadowTelemetry] = useState<FlowTextLayoutShadowTelemetry | null>(null);
 
   const rebuildFlow = useCallback(() => {
     if (!editor) return;
@@ -87,6 +101,13 @@ export function useMeasuredLayoutDocument({
     flowModelRef.current = rendered.flowModel;
     setMeasurementHtml(rendered.html);
     setPageModel(rendered.pageModel);
+    setPageMetrics(buildPageMetricsSnapshotFromPageModel(rendered.pageModel, {
+      documentKind,
+      documentTitle,
+    }));
+    setMeasurements([]);
+    setTextLayoutTelemetry(null);
+    setShadowTelemetry(null);
     setRenderedHtml(
       renderContentWithLayoutPlan({
         content,
@@ -115,53 +136,91 @@ export function useMeasuredLayoutDocument({
     if (!measurementHtml || !measurementRef.current || !flowModelRef.current || !contentRef.current) return;
 
     const handle = window.requestAnimationFrame(() => {
-      const legacyMeasurements = collectUnitMeasurements(measurementRef.current!);
-      const legacyPageModel = compileMeasuredPageModel(flowModelRef.current!, legacyMeasurements, {
-        documentKind,
-        documentTitle,
-      });
-      let finalMeasurements = legacyMeasurements;
+      const flowModel = flowModelRef.current!;
+      let legacyMeasurements: MeasuredLayoutUnitMetric[] = [];
+      let legacyPageModel: PageModel | null = null;
+      let finalMeasurements: MeasuredLayoutUnitMetric[] = [];
+      let measuredPageModel: PageModel | null = null;
+      let nextTextLayoutTelemetry: FlowTextLayoutTelemetry | null = null;
+      let nextShadowTelemetry: FlowTextLayoutShadowTelemetry | null = null;
 
-      if (textLayoutMode !== 'legacy') {
-        const engineResult = measureFlowTextUnits(flowModelRef.current!, {
-          theme,
-          documentKind,
-          documentTitle,
-          fallbackMeasurements: legacyMeasurements,
-        });
-        const enginePageModel = compileMeasuredPageModel(flowModelRef.current!, engineResult.measurements, {
+      if (textLayoutMode === 'legacy' || textLayoutMode === 'shadow') {
+        legacyMeasurements = collectUnitMeasurements(measurementRef.current!);
+        legacyPageModel = compileMeasuredPageModel(flowModel, legacyMeasurements, {
           documentKind,
           documentTitle,
         });
+      }
 
-        if (textLayoutMode === 'shadow') {
-          const legacyByUnit = new Map(legacyMeasurements.map((measurement) => [measurement.unitId, measurement.heightPx] as const));
-          const heightDeltaPx = engineResult.measurements.reduce((total, measurement) => (
-            total + Math.abs(measurement.heightPx - (legacyByUnit.get(measurement.unitId) ?? measurement.heightPx))
-          ), 0);
+      if (textLayoutMode === 'legacy') {
+        finalMeasurements = legacyMeasurements;
+        measuredPageModel = legacyPageModel;
+      } else {
+        const engineResult = textLayoutMode === 'shadow'
+          ? measureFlowTextUnits(flowModel, {
+            theme,
+            documentKind,
+            documentTitle,
+            fallbackMeasurements: legacyMeasurements,
+          })
+          : (() => {
+            const initialResult = measureFlowTextUnits(flowModel, {
+              theme,
+              documentKind,
+              documentTitle,
+            });
+            if (initialResult.unsupportedUnitIds.length === 0) {
+              return initialResult;
+            }
+            const fallbackMeasurements = collectUnitMeasurements(measurementRef.current!, initialResult.unsupportedUnitIds);
+            return measureFlowTextUnits(flowModel, {
+              theme,
+              documentKind,
+              documentTitle,
+              fallbackMeasurements,
+            });
+          })();
+        const enginePageModel = compileMeasuredPageModel(flowModel, engineResult.measurements, {
+          documentKind,
+          documentTitle,
+        });
+
+        nextTextLayoutTelemetry = engineResult.telemetry;
+
+        if (textLayoutMode === 'shadow' && legacyPageModel) {
+          nextShadowTelemetry = buildFlowTextLayoutShadowTelemetry({
+            legacyMeasurements,
+            engineMeasurements: engineResult.measurements,
+            engineTelemetry: engineResult.telemetry,
+            legacyPageCount: legacyPageModel.pages.length,
+            pretextPageCount: enginePageModel.pages.length,
+          });
           console.info('[text-layout:shadow]', {
+            scope: 'client-editor',
             mode: textLayoutMode,
             documentTitle,
             preset,
-            heightDeltaPx,
-            legacyPageCount: legacyPageModel.pages.length,
-            pretextPageCount: enginePageModel.pages.length,
-            unsupportedUnitCount: engineResult.telemetry.unsupportedUnitCount,
-            supportedUnitCount: engineResult.telemetry.supportedUnitCount,
+            ...nextShadowTelemetry,
           });
         }
 
-        if (textLayoutMode === 'pretext') {
-          finalMeasurements = engineResult.measurements;
-        }
+        finalMeasurements = textLayoutMode === 'pretext'
+          ? engineResult.measurements
+          : legacyMeasurements;
+        measuredPageModel = textLayoutMode === 'pretext'
+          ? enginePageModel
+          : legacyPageModel;
       }
 
-      const measuredPageModel = textLayoutMode === 'legacy'
-        ? legacyPageModel
-        : compileMeasuredPageModel(flowModelRef.current!, finalMeasurements, {
-          documentKind,
-          documentTitle,
-        });
+      if (!measuredPageModel) return;
+
+      setMeasurements(finalMeasurements);
+      setTextLayoutTelemetry(nextTextLayoutTelemetry);
+      setShadowTelemetry(nextShadowTelemetry);
+      setPageMetrics(buildPageMetricsSnapshotFromPageModel(measuredPageModel, {
+        documentKind,
+        documentTitle,
+      }));
       setPageModel(measuredPageModel);
       setRenderedHtml(
         renderContentWithLayoutPlan({
@@ -188,5 +247,9 @@ export function useMeasuredLayoutDocument({
     renderedHtml,
     measurementRef,
     pageModel,
+    measurements,
+    pageMetrics,
+    textLayoutTelemetry,
+    shadowTelemetry,
   };
 }

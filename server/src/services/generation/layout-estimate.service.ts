@@ -1,6 +1,8 @@
 import {
+  buildFlowTextLayoutShadowTelemetry,
   compileFlowModel,
   compileMeasuredPageModel,
+  estimateFlowUnitHeight,
   measureFlowTextUnits,
   parseTextLayoutEngineMode,
   type DocumentContent,
@@ -295,6 +297,10 @@ export function analyzeEstimatedArtifactLayout(content: unknown): EstimatedLayou
   if (textLayoutMode !== 'legacy') {
     try {
       const flow = compileFlowModel(doc as unknown as DocumentContent, null, 'standard_pdf', {});
+      const legacyMeasurements = flow.flow.units.map((unit) => ({
+        unitId: unit.id,
+        heightPx: estimateFlowUnitHeight(unit, flow.flow.fragments),
+      }));
       const engineResult = measureFlowTextUnits(flow.flow, {
         theme: process.env.TEXT_LAYOUT_THEME ?? 'gilded-folio',
       });
@@ -308,10 +314,13 @@ export function analyzeEstimatedArtifactLayout(content: unknown): EstimatedLayou
       if (textLayoutMode === 'shadow') {
         console.info('[text-layout:shadow]', {
           scope: 'server-layout-estimate',
-          legacyPageCount: pageSummaries.length,
-          pretextPageCount: engineSummaries.length,
-          unsupportedUnitCount: engineResult.telemetry.unsupportedUnitCount,
-          supportedUnitCount: engineResult.telemetry.supportedUnitCount,
+          ...buildFlowTextLayoutShadowTelemetry({
+            legacyMeasurements,
+            engineMeasurements: engineResult.measurements,
+            engineTelemetry: engineResult.telemetry,
+            legacyPageCount: pageSummaries.length,
+            pretextPageCount: engineSummaries.length,
+          }),
         });
       }
 

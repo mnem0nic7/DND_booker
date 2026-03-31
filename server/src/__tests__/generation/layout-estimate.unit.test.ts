@@ -57,4 +57,43 @@ describe('generation layout-estimate service', () => {
       affectedScope: 'node-1',
     }));
   });
+
+  it('uses the shared text layout engine path in pretext mode without crashing on supported prose-heavy content', () => {
+    const previousMode = process.env.TEXT_LAYOUT_ENGINE_MODE;
+    process.env.TEXT_LAYOUT_ENGINE_MODE = 'pretext';
+
+    try {
+      const content = {
+        type: 'doc',
+        content: [
+          { type: 'tableOfContents', attrs: { title: 'Contents' } },
+          { type: 'chapterHeader', attrs: { chapterNumber: '1', title: 'A Black Banner Rises' } },
+          {
+            type: 'paragraph',
+            content: [{ type: 'text', text: 'A'.repeat(1800) }],
+          },
+          {
+            type: 'readAloudBox',
+            content: [
+              {
+                type: 'paragraph',
+                content: [{ type: 'text', text: 'The ruined tollhouse leans over the road like a crooked watchman.' }],
+              },
+            ],
+          },
+        ],
+      };
+
+      const result = analyzeEstimatedArtifactLayout(content);
+      expect(result).not.toBeNull();
+      expect(result!.estimatedPages).toBeGreaterThan(0);
+      expect(result!.pageSummaries).toHaveLength(result!.estimatedPages);
+    } finally {
+      if (previousMode === undefined) {
+        delete process.env.TEXT_LAYOUT_ENGINE_MODE;
+      } else {
+        process.env.TEXT_LAYOUT_ENGINE_MODE = previousMode;
+      }
+    }
+  });
 });

@@ -9,8 +9,7 @@ import { WizardChatProgress } from './WizardChatProgress';
 import { ImageGenProgress } from './ImageGenProgress';
 import { GenerationRunPanel } from './GenerationRunPanel';
 import { AgentRunPanel } from './AgentRunPanel';
-import { collectPageMetrics } from '../../lib/collectPageMetrics';
-import type { WizardOutline, DocumentEditOperation, ImageGenerationRequest, ImageTargetInsert, ImageGenJobProgress } from '@dnd-booker/shared';
+import type { WizardOutline, DocumentEditOperation, ImageGenerationRequest, ImageTargetInsert, ImageGenJobProgress, PageMetricsSnapshot } from '@dnd-booker/shared';
 
 /**
  * Extract a wizardGenerate outline from an assistant message.
@@ -311,9 +310,10 @@ function resetTrackingSets(projectId: string) {
 interface AiChatPanelProps {
   projectId: string;
   editor: Editor | null;
+  pageMetrics?: PageMetricsSnapshot | null;
 }
 
-export function AiChatPanel({ projectId, editor }: AiChatPanelProps) {
+export function AiChatPanel({ projectId, editor, pageMetrics = null }: AiChatPanelProps) {
   const {
     messages,
     isStreaming,
@@ -511,10 +511,6 @@ export function AiChatPanel({ projectId, editor }: AiChatPanelProps) {
     })();
   }, [messages, isStreaming, editor, settings, projectId, generateImage]);
 
-  function getLayoutSnapshot() {
-    return editor ? collectPageMetrics(editor) : undefined;
-  }
-
   async function handleSend() {
     const text = input.trim();
     if (!text || isStreaming || wizardProgress?.isGenerating) return;
@@ -523,7 +519,7 @@ export function AiChatPanel({ projectId, editor }: AiChatPanelProps) {
     // All messages go through the normal chat — the AI's system prompt
     // handles creation requests by asking questions first, then outputting
     // a _wizardGenerate block when ready
-    await sendMessage(projectId, text, getLayoutSnapshot());
+    await sendMessage(projectId, text, pageMetrics ?? undefined);
   }
 
   function handleInsertBlock(blockType: string, attrs: Record<string, unknown>) {
@@ -659,7 +655,7 @@ export function AiChatPanel({ projectId, editor }: AiChatPanelProps) {
               ].map((suggestion, i) => (
                 <button
                   key={suggestion}
-                  onClick={() => sendMessage(projectId, suggestion, getLayoutSnapshot())}
+                  onClick={() => sendMessage(projectId, suggestion, pageMetrics ?? undefined)}
                   className="block w-full text-left text-xs text-gray-500 bg-white border border-gray-200 rounded-md px-3 py-2 hover:border-purple-300 hover:text-purple-600 hover:shadow-sm transition-all animate-[fadeSlideIn_0.3s_ease-out_both]"
                   style={{ animationDelay: `${i * 80}ms` }}
                 >
@@ -739,7 +735,7 @@ export function AiChatPanel({ projectId, editor }: AiChatPanelProps) {
                   sendMessage(
                     projectId,
                     'Please evaluate my entire document for content quality and formatting. Review pacing, completeness, D&D best practices, block placement, and page balance.',
-                    getLayoutSnapshot(),
+                    pageMetrics ?? undefined,
                   );
                 }}
                 className="text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-md px-2.5 py-1.5 hover:border-purple-300 hover:text-purple-600 hover:bg-purple-50 transition-all"

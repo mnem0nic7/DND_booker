@@ -1,19 +1,14 @@
 import { useEffect, useMemo, useRef, useState, type DragEvent, type MouseEvent } from 'react';
-import type { Editor } from '@tiptap/react';
 import {
   getCanonicalLayoutCss,
-  type LayoutPlan,
 } from '@dnd-booker/shared';
-import { useMeasuredLayoutDocument } from '../../lib/useMeasuredLayoutDocument';
+import type { MeasuredLayoutDocumentResult } from '../../lib/useMeasuredLayoutDocument';
 
 type DropPlacement = 'before' | 'after';
 
 interface RenderedDocumentCanvasProps {
-  editor: Editor | null;
   theme: string;
-  layoutPlan?: LayoutPlan | null;
-  documentKind?: string | null;
-  documentTitle?: string | null;
+  measuredDocument: MeasuredLayoutDocumentResult;
   selectedNodeId: string | null;
   onSelectNodeId: (nodeId: string) => void;
   onReorderNode: (draggedNodeId: string, targetNodeId: string, placement: DropPlacement) => void;
@@ -25,11 +20,8 @@ interface DropTargetState {
 }
 
 export function RenderedDocumentCanvas({
-  editor,
   theme,
-  layoutPlan = null,
-  documentKind = null,
-  documentTitle = null,
+  measuredDocument,
   selectedNodeId,
   onSelectNodeId,
   onReorderNode,
@@ -37,19 +29,7 @@ export function RenderedDocumentCanvas({
   const [dropTarget, setDropTarget] = useState<DropTargetState | null>(null);
   const draggedNodeIdRef = useRef<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const {
-    measurementHtml,
-    renderedHtml,
-    measurementRef,
-  } = useMeasuredLayoutDocument({
-    editor,
-    theme,
-    layoutPlan,
-    documentKind,
-    documentTitle,
-    preset: 'editor_preview',
-    footerTitle: documentTitle,
-  });
+  const { measurementHtml, renderedHtml, measurementRef } = measuredDocument;
 
   useEffect(() => {
     const container = containerRef.current;

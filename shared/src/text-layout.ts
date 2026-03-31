@@ -14,6 +14,7 @@ import {
   normalizeStatBlockAttrs,
   resolveRandomTableEntries,
 } from './renderers/utils.js';
+import { extractTocEntriesFromContent } from './toc.js';
 import type { DocumentContent } from './types/document.js';
 import type {
   LayoutFlowFragment,
@@ -58,6 +59,13 @@ export interface FlowTextLayoutTelemetry {
   unsupportedSurfaceCount: number;
   supportedUnitCount: number;
   unsupportedUnitCount: number;
+}
+
+export interface FlowTextLayoutShadowTelemetry extends FlowTextLayoutTelemetry {
+  legacyPageCount: number;
+  pretextPageCount: number;
+  pageCountDelta: number;
+  totalHeightDeltaPx: number;
 }
 
 export interface FlowTextLayoutMeasurementResult {
@@ -270,6 +278,15 @@ function buildTextLines(lines: Array<{ label?: string; value: string }>, style: 
   });
 }
 
+function extractTocEntriesFromFlow(flow: LayoutFlowModel): ReturnType<typeof extractTocEntriesFromContent> {
+  return extractTocEntriesFromContent({
+    type: 'doc',
+    content: flow.fragments
+      .filter((fragment) => fragment.nodeType !== 'tableOfContents')
+      .map((fragment) => fragment.content),
+  });
+}
+
 function extractParagraphLikeSurface(
   node: DocumentContent,
   baseStyle: InlineStyle,
@@ -468,6 +485,7 @@ function extractCustomAttributeSurfaces(
   theme: string | null | undefined,
   widthPx: number,
   typography: ThemeTypography,
+  tocEntries: ReturnType<typeof extractTocEntriesFromContent>,
 ): SurfaceExtractionResult {
   const bodyStyle: InlineStyle = {
     fontFamily: typography.bodyFontFamily,
@@ -1087,6 +1105,25 @@ function extractCustomAttributeSurfaces(
     }
     case 'tableOfContents': {
       const title = String(fragment.content.attrs?.title || 'Table of Contents');
+      const entrySurfaces = tocEntries.map((entry, index) => {
+        const indentPx = Math.max(0, (entry.level - 1) * 18);
+        const label = [entry.prefix, entry.title].filter((part) => part.trim().length > 0).join(' ').trim();
+        return createSurface({
+          unitId: fragment.unitId,
+          nodeId: fragment.nodeId,
+          kind: 'toc_entry',
+          index: index + 1,
+          theme,
+          widthPx: Math.max(1, widthPx - indentPx),
+          lineHeightPx: 22,
+          minLineCount: 1,
+          runs: [createRun(label, { ...bodyStyle, fontSizePx: 15 })],
+          boxModel: {
+            paddingLeftPx: indentPx,
+            marginBottomPx: index === tocEntries.length - 1 ? 0 : 4,
+          },
+        });
+      });
       return {
         supported: true,
         surfaces: [
@@ -1100,8 +1137,19 @@ function extractCustomAttributeSurfaces(
             lineHeightPx: 30,
             minLineCount: 1,
             runs: [createRun(title, { ...headingStyle, fontSizePx: 24 })],
-            boxModel: { paddingTopPx: 24, paddingBottomPx: 18 },
+            boxModel: {
+              paddingTopPx: 24,
+              marginBottomPx: entrySurfaces.length > 0 ? 12 : 0,
+              paddingBottomPx: entrySurfaces.length > 0 ? 0 : 18,
+            },
           }),
+          ...entrySurfaces.map((surface, index) => ({
+            ...surface,
+            boxModel: {
+              ...(surface.boxModel ?? {}),
+              paddingBottomPx: index === entrySurfaces.length - 1 ? 18 : surface.boxModel?.paddingBottomPx,
+            },
+          })),
         ],
       };
     }
@@ -1115,6 +1163,7 @@ function extractFragmentSurfaces(
   theme: string | null | undefined,
   widthPx: number,
   typography: ThemeTypography,
+  tocEntries: ReturnType<typeof extractTocEntriesFromContent>,
 ): SurfaceExtractionResult {
   if (UNSUPPORTED_NODE_TYPES.has(fragment.nodeType)) {
     return { surfaces: [], supported: false };
@@ -1166,7 +1215,7 @@ function extractFragmentSurfaces(
     return extractSidebarCallout(fragment, bodyStyle, fragment.unitId, widthPx, theme);
   }
 
-  return extractCustomAttributeSurfaces(fragment, theme, widthPx, typography);
+  return extractCustomAttributeSurfaces(fragment, theme, widthPx, typography, tocEntries);
 }
 
 function getUnitFragments(flow: LayoutFlowModel, unit: LayoutFlowUnit): LayoutFlowFragment[] {
@@ -1191,11 +1240,35 @@ function sumUnitMeasurementHeights(measurements: TextSurfaceMeasurement[]): numb
   return measurements.reduce((total, measurement) => total + measurement.totalHeightPx, 0);
 }
 
+export function buildFlowTextLayoutShadowTelemetry(args: {
+  legacyMeasurements: MeasuredLayoutUnitMetric[];
+  engineMeasurements: MeasuredLayoutUnitMetric[];
+  engineTelemetry: FlowTextLayoutTelemetry;
+  legacyPageCount: number;
+  pretextPageCount: number;
+}): FlowTextLayoutShadowTelemetry {
+  const legacyByUnit = new Map(
+    args.legacyMeasurements.map((measurement) => [measurement.unitId, measurement.heightPx] as const),
+  );
+  const totalHeightDeltaPx = args.engineMeasurements.reduce((total, measurement) => (
+    total + Math.abs(measurement.heightPx - (legacyByUnit.get(measurement.unitId) ?? measurement.heightPx))
+  ), 0);
+
+  return {
+    ...args.engineTelemetry,
+    legacyPageCount: args.legacyPageCount,
+    pretextPageCount: args.pretextPageCount,
+    pageCountDelta: args.pretextPageCount - args.legacyPageCount,
+    totalHeightDeltaPx,
+  };
+}
+
 export function measureFlowTextUnits(
   flow: LayoutFlowModel,
   options: MeasureFlowTextUnitsOptions = {},
 ): FlowTextLayoutMeasurementResult {
   const typography = resolveThemeTypography(options.theme);
+  const tocEntries = extractTocEntriesFromFlow(flow);
   const fallbackByUnit = new Map(
     (options.fallbackMeasurements ?? []).map((measurement) => [measurement.unitId, measurement.heightPx] as const),
   );
@@ -1213,7 +1286,7 @@ export function measureFlowTextUnits(
       continue;
     }
 
-    const fragmentResults = fragments.map((fragment) => extractFragmentSurfaces(fragment, options.theme, widthPx, typography));
+    const fragmentResults = fragments.map((fragment) => extractFragmentSurfaces(fragment, options.theme, widthPx, typography, tocEntries));
     const unitSurfaces = fragmentResults.flatMap((result) => result.surfaces);
     const supported = fragmentResults.length > 0 && fragmentResults.every((result) => result.supported);
 

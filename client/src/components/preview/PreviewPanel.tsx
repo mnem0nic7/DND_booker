@@ -1,14 +1,10 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { Editor } from '@tiptap/react';
-import { getCanonicalLayoutCss, type LayoutPlan } from '@dnd-booker/shared';
-import { useMeasuredLayoutDocument } from '../../lib/useMeasuredLayoutDocument';
+import { getCanonicalLayoutCss } from '@dnd-booker/shared';
+import type { MeasuredLayoutDocumentResult } from '../../lib/useMeasuredLayoutDocument';
 
 interface PreviewPanelProps {
-  editor: Editor | null;
   theme: string;
-  layoutPlan?: LayoutPlan | null;
-  documentKind?: string | null;
-  documentTitle?: string | null;
+  measuredDocument: MeasuredLayoutDocumentResult;
 }
 
 type ZoomLevel = 50 | 75 | 100;
@@ -24,24 +20,13 @@ const PAGE_WIDTH = 816;
  * so custom D&D blocks (stat blocks, spell cards, etc.) render fully.
  */
 export function PreviewPanel({
-  editor,
   theme,
-  layoutPlan = null,
-  documentKind = null,
-  documentTitle = null,
+  measuredDocument,
 }: PreviewPanelProps) {
   const [zoom, setZoom] = useState<ZoomLevel>(75);
   const [containerWidth, setContainerWidth] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
-  const { measurementHtml, renderedHtml, measurementRef, pageModel } = useMeasuredLayoutDocument({
-    editor,
-    theme,
-    layoutPlan,
-    documentKind,
-    documentTitle,
-    preset: 'editor_preview',
-    footerTitle: documentTitle,
-  });
+  const { renderedHtml, pageModel } = measuredDocument;
 
   // Measure container width for fit-to-width scaling
   useEffect(() => {
@@ -65,7 +50,6 @@ export function PreviewPanel({
   const pageCount = Math.max(1, pageModel?.pages.length ?? 1);
   const previewHeight = (PAGE_WIDTH * (11 / 8.5) * pageCount) + (Math.max(0, pageCount - 1) * 32);
   const previewMarkup = useMemo(() => ({ __html: renderedHtml }), [renderedHtml]);
-  const measurementMarkup = useMemo(() => ({ __html: measurementHtml }), [measurementHtml]);
 
   return (
     <div className="flex flex-col h-full border-l bg-gray-100">
@@ -95,9 +79,6 @@ export function PreviewPanel({
       {/* Preview content area */}
       <div ref={containerRef} className="flex-1 overflow-auto p-4">
         <style>{getCanonicalLayoutCss()}</style>
-        <div className="parity-measure-host" aria-hidden="true">
-          <div ref={measurementRef} className="page-canvas editor-themed-content parity-measure-canvas" data-theme={theme} dangerouslySetInnerHTML={measurementMarkup} />
-        </div>
         <div
           data-theme={theme}
           className="mx-auto editor-themed-content rounded-sm"

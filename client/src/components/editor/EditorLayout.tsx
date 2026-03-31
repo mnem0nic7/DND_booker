@@ -2,8 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import type { DocumentContent, LayoutPlan } from '@dnd-booker/shared';
 import { ensureStableNodeIds } from '@dnd-booker/shared';
-import { usePageAlignment } from '../../hooks/usePageAlignment';
 import { buildEditorExtensions } from '../../lib/buildEditorExtensions';
+import { useMeasuredLayoutDocument } from '../../lib/useMeasuredLayoutDocument';
 import { Toolbar } from './Toolbar';
 import { FloatingBlockPicker } from './FloatingBlockPicker';
 import { ExportDialog } from './ExportDialog';
@@ -58,16 +58,13 @@ export function EditorLayout({
   const [localLayoutPlan, setLocalLayoutPlan] = useState<LayoutPlan | null>(layoutPlan);
 
   const editor = useEditor({
-    extensions: buildEditorExtensions({ includeAutoPagination: true }),
+    extensions: buildEditorExtensions(),
     content: ensureStableNodeIds(content),
     immediatelyRender: false,
     onUpdate: ({ editor: ed }) => {
       onUpdate(ed.getJSON());
     },
   });
-
-  // Align page breaks to 8.5x11 page boundaries
-  usePageAlignment(editor);
 
   useEffect(() => {
     setLocalLayoutPlan(layoutPlan);
@@ -109,6 +106,17 @@ export function EditorLayout({
       setColumnCount(1);
     }
   }, [pageSize, columnCount]);
+
+  const resolvedDocumentTitle = documentTitle ?? sectionName ?? null;
+  const measuredDocument = useMeasuredLayoutDocument({
+    editor,
+    theme: currentTheme,
+    layoutPlan: localLayoutPlan,
+    documentKind,
+    documentTitle: resolvedDocumentTitle,
+    preset: 'editor_preview',
+    footerTitle: resolvedDocumentTitle,
+  });
 
   const selectNodeById = useCallback((nodeId: string) => {
     if (!editor) return;
@@ -282,11 +290,8 @@ export function EditorLayout({
         </div>
 
         <RenderedDocumentCanvas
-          editor={editor}
           theme={currentTheme}
-          layoutPlan={localLayoutPlan}
-          documentKind={documentKind}
-          documentTitle={documentTitle ?? sectionName}
+          measuredDocument={measuredDocument}
           selectedNodeId={selectedNodeId}
           onSelectNodeId={selectNodeById}
           onReorderNode={handleReorderNode}
@@ -310,14 +315,11 @@ export function EditorLayout({
               : ''
             }`}
           >
-            {showingAi && <AiChatPanel projectId={projectId} editor={editor} />}
+            {showingAi && <AiChatPanel projectId={projectId} editor={editor} pageMetrics={measuredDocument.pageMetrics} />}
             {showingPreview && (
               <PreviewPanel
-                editor={editor}
                 theme={currentTheme}
-                layoutPlan={localLayoutPlan}
-                documentKind={documentKind}
-                documentTitle={documentTitle}
+                measuredDocument={measuredDocument}
               />
             )}
             {showingProps && (
