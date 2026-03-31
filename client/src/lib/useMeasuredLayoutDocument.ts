@@ -183,6 +183,7 @@ export function useMeasuredLayoutDocument({
         const enginePageModel = compileMeasuredPageModel(flowModel, engineResult.measurements, {
           documentKind,
           documentTitle,
+          respectManualPageBreaks: true,
         });
 
         nextTextLayoutTelemetry = engineResult.telemetry;

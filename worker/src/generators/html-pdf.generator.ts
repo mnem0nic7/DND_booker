@@ -134,6 +134,7 @@ export async function measureDocumentPageModels(input: {
         const enginePageModel = compileMeasuredPageModel(flow.flow, engineResult.measurements, {
           documentKind: document.kind ?? null,
           documentTitle: document.title,
+          respectManualPageBreaks: true,
         });
         console.info('[text-layout:shadow]', {
           scope: 'worker-html-pdf',
@@ -171,6 +172,7 @@ export async function measureDocumentPageModels(input: {
       models.push(compileMeasuredPageModel(flow.flow, finalMeasurements, {
         documentKind: document.kind ?? null,
         documentTitle: document.title,
+        respectManualPageBreaks: textLayoutMode === 'pretext',
       }));
     }
 

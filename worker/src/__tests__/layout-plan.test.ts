@@ -976,4 +976,58 @@ describe('layout-plan', () => {
     expect(narrativeParagraphs[0]?.groupId).toBeTruthy();
     expect(narrativeParagraphs[1]?.groupId).toBe(narrativeParagraphs[0]?.groupId);
   });
+
+  it('treats manual page breaks as hard measured boundaries and omits break blocks from paged HTML', () => {
+    const content: DocumentContent = {
+      type: 'doc',
+      content: [
+        paragraph('The opening scene ends here.'),
+        { type: 'pageBreak' },
+        {
+          type: 'heading',
+          attrs: { level: 2 },
+          content: [{ type: 'text', text: 'A Fresh Page Begins' }],
+        },
+        paragraph('The next section should begin on a new page without rendering a pageBreak block.'),
+      ],
+    };
+
+    const flow = compileFlowModel(content, null, 'standard_pdf', {
+      documentKind: 'chapter',
+      documentTitle: 'Fresh Page',
+    });
+    const measurements = flow.flow.units.map((unit) => {
+      const isPageBreakUnit = unit.fragmentNodeIds.some((nodeId) => (
+        flow.flow.fragments.find((fragment) => fragment.nodeId === nodeId)?.nodeType === 'pageBreak'
+      ));
+
+      return {
+        unitId: unit.id,
+        heightPx: isPageBreakUnit ? 1 : 140,
+      };
+    });
+    const pageModel = compileMeasuredPageModel(flow.flow, measurements, {
+      documentKind: 'chapter',
+      documentTitle: 'Fresh Page',
+      respectManualPageBreaks: true,
+    });
+    const html = renderContentWithLayoutPlan({
+      content,
+      pageModel,
+      preset: 'standard_pdf',
+      options: {
+        documentKind: 'chapter',
+        documentTitle: 'Fresh Page',
+      },
+    }).html;
+
+    expect(pageModel.pages).toHaveLength(2);
+    expect(pageModel.pages[0]).toMatchObject({
+      boundaryType: 'pageBreak',
+      boundarySourceIndex: 1,
+    });
+    expect(pageModel.fragments.some((fragment) => fragment.nodeType === 'pageBreak')).toBe(false);
+    expect(html).not.toContain('data-node-type="pageBreak"');
+    expect(html).not.toContain('class="page-break"');
+  });
 });

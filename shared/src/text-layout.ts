@@ -1240,6 +1240,311 @@ function sumUnitMeasurementHeights(measurements: TextSurfaceMeasurement[]): numb
   return measurements.reduce((total, measurement) => total + measurement.totalHeightPx, 0);
 }
 
+interface FragmentMeasurementResult {
+  fragment: LayoutFlowFragment;
+  surfaces: TextLayoutSurface[];
+  supported: boolean;
+  heightPx: number;
+}
+
+interface UnitMeasurementResult {
+  surfaces: TextLayoutSurface[];
+  supported: boolean;
+  heightPx: number | null;
+}
+
+const STACKED_FRAGMENT_GAP_PX = 5;
+const NPC_GRID_GAP_PX = 10;
+const PACKET_COLUMN_GAP_PX = 10;
+const INTRO_BAND_ROW_GAP_PX = 14;
+const INTRO_BAND_COLUMN_GAP_PX = 18;
+const INTRO_BAND_PADDING_X_PX = 14;
+const INTRO_BAND_PADDING_TOP_PX = 11;
+const INTRO_BAND_PADDING_BOTTOM_PX = 7;
+const INTRO_BAND_BORDER_PX = 2;
+const INTRO_BAND_LEFT_RATIO = 1.12;
+const INTRO_BAND_RIGHT_RATIO = 0.88;
+const INTRO_BAND_RIGHT_MIN_WIDTH_PX = 240;
+const PACKET_SIDE_RATIO = 0.95;
+const PACKET_MAIN_RATIO = 1.05;
+
+function sortFragmentsForMeasurement(fragments: LayoutFlowFragment[]): LayoutFlowFragment[] {
+  return [...fragments].sort((left, right) => left.presentationOrder - right.presentationOrder);
+}
+
+function measureFragmentAtWidth(
+  fragment: LayoutFlowFragment,
+  widthPx: number,
+  theme: string | null | undefined,
+  typography: ThemeTypography,
+  tocEntries: ReturnType<typeof extractTocEntriesFromFlow>,
+): FragmentMeasurementResult {
+  const extraction = extractFragmentSurfaces(fragment, theme, widthPx, typography, tocEntries);
+  const measurements = extraction.surfaces.length > 0
+    ? measureTextSurfaces(extraction.surfaces)
+    : [];
+
+  return {
+    fragment,
+    surfaces: extraction.surfaces,
+    supported: extraction.supported,
+    heightPx: applyUnitMinimums([fragment], sumUnitMeasurementHeights(measurements)),
+  };
+}
+
+function measureStackedFragments(
+  fragments: LayoutFlowFragment[],
+  widthPx: number,
+  theme: string | null | undefined,
+  typography: ThemeTypography,
+  tocEntries: ReturnType<typeof extractTocEntriesFromFlow>,
+  gapPx = STACKED_FRAGMENT_GAP_PX,
+): {
+  fragmentMeasurements: FragmentMeasurementResult[];
+  surfaces: TextLayoutSurface[];
+  supported: boolean;
+  heightPx: number;
+} {
+  const fragmentMeasurements = sortFragmentsForMeasurement(fragments).map((fragment) => (
+    measureFragmentAtWidth(fragment, widthPx, theme, typography, tocEntries)
+  ));
+
+  return {
+    fragmentMeasurements,
+    surfaces: fragmentMeasurements.flatMap((measurement) => measurement.surfaces),
+    supported: fragmentMeasurements.every((measurement) => measurement.supported),
+    heightPx: fragmentMeasurements.reduce((total, measurement, index) => (
+      total + measurement.heightPx + (index > 0 ? gapPx : 0)
+    ), 0),
+  };
+}
+
+function resolveGroupContainerWidth(
+  flow: LayoutFlowModel,
+  unit: LayoutFlowUnit,
+  options: Pick<MeasureFlowTextUnitsOptions, 'documentKind' | 'documentTitle'>,
+): number {
+  const frame = getLayoutMeasurementFrame(flow.preset, {
+    documentKind: options.documentKind,
+    documentTitle: options.documentTitle,
+  }, flow.sectionRecipe);
+
+  if (unit.groupId?.startsWith('npc-roster') || unit.groupId?.startsWith('intro-tail-panel')) {
+    return frame.contentWidthPx;
+  }
+  if (unit.span === 'full_page' || unit.span === 'both_columns') return frame.contentWidthPx;
+  if (unit.placement === 'hero_top' || unit.placement === 'full_page_insert' || unit.placement === 'bottom_panel') {
+    return frame.contentWidthPx;
+  }
+  return frame.columnWidthPx;
+}
+
+function measureNpcRosterGroup(
+  fragments: LayoutFlowFragment[],
+  containerWidthPx: number,
+  theme: string | null | undefined,
+  typography: ThemeTypography,
+  tocEntries: ReturnType<typeof extractTocEntriesFromFlow>,
+): UnitMeasurementResult {
+  const cellWidthPx = Math.max(1, (containerWidthPx - NPC_GRID_GAP_PX) / 2);
+  const measurements = sortFragmentsForMeasurement(fragments).map((fragment) => (
+    measureFragmentAtWidth(fragment, cellWidthPx, theme, typography, tocEntries)
+  ));
+
+  let heightPx = 0;
+  for (let index = 0; index < measurements.length; index += 2) {
+    const row = measurements.slice(index, index + 2);
+    if (index > 0) heightPx += NPC_GRID_GAP_PX;
+    heightPx += Math.max(...row.map((measurement) => measurement.heightPx));
+  }
+
+  return {
+    surfaces: measurements.flatMap((measurement) => measurement.surfaces),
+    supported: measurements.every((measurement) => measurement.supported),
+    heightPx,
+  };
+}
+
+function measurePacketGroup(
+  fragments: LayoutFlowFragment[],
+  containerWidthPx: number,
+  theme: string | null | undefined,
+  typography: ThemeTypography,
+  tocEntries: ReturnType<typeof extractTocEntriesFromFlow>,
+): UnitMeasurementResult {
+  const ordered = sortFragmentsForMeasurement(fragments);
+  const hasWideRandomTable = ordered.some((fragment) => fragment.nodeType === 'randomTable' && fragment.span === 'both_columns');
+  const sideFragments = ordered.filter((fragment) => fragment.placement === 'side_panel');
+  const mainFragments = ordered.filter((fragment) => fragment.placement !== 'side_panel');
+
+  if (hasWideRandomTable || sideFragments.length === 0 || mainFragments.length === 0) {
+    const stackMeasurement = measureStackedFragments(
+      ordered,
+      containerWidthPx,
+      theme,
+      typography,
+      tocEntries,
+    );
+    return {
+      surfaces: stackMeasurement.surfaces,
+      supported: stackMeasurement.supported,
+      heightPx: stackMeasurement.heightPx,
+    };
+  }
+
+  const innerWidthPx = Math.max(1, containerWidthPx - PACKET_COLUMN_GAP_PX);
+  const totalRatio = PACKET_SIDE_RATIO + PACKET_MAIN_RATIO;
+  const sideWidthPx = Math.max(1, innerWidthPx * (PACKET_SIDE_RATIO / totalRatio));
+  const mainWidthPx = Math.max(1, innerWidthPx * (PACKET_MAIN_RATIO / totalRatio));
+  const sideMeasurement = measureStackedFragments(sideFragments, sideWidthPx, theme, typography, tocEntries);
+  const mainMeasurement = measureStackedFragments(mainFragments, mainWidthPx, theme, typography, tocEntries);
+
+  return {
+    surfaces: [...sideMeasurement.surfaces, ...mainMeasurement.surfaces],
+    supported: sideMeasurement.supported && mainMeasurement.supported,
+    heightPx: Math.max(sideMeasurement.heightPx, mainMeasurement.heightPx),
+  };
+}
+
+function splitIntroTailPanels(fragments: LayoutFlowFragment[]): LayoutFlowFragment[][] {
+  const panels: LayoutFlowFragment[][] = [];
+  let currentPanel: LayoutFlowFragment[] = [];
+
+  for (const fragment of sortFragmentsForMeasurement(fragments)) {
+    const startsNewPanel = currentPanel.length > 0 && (
+      fragment.nodeType === 'heading'
+      || fragment.nodeType === 'sidebarCallout'
+      || fragment.nodeType === 'readAloudBox'
+    );
+
+    if (startsNewPanel) {
+      panels.push(currentPanel);
+      currentPanel = [];
+    }
+    currentPanel.push(fragment);
+  }
+
+  if (currentPanel.length > 0) {
+    panels.push(currentPanel);
+  }
+
+  return panels;
+}
+
+function measureIntroTailPanelGroup(
+  fragments: LayoutFlowFragment[],
+  containerWidthPx: number,
+  theme: string | null | undefined,
+  typography: ThemeTypography,
+  tocEntries: ReturnType<typeof extractTocEntriesFromFlow>,
+): UnitMeasurementResult {
+  const panels = splitIntroTailPanels(fragments);
+  if (panels.length <= 1) {
+    const stackMeasurement = measureStackedFragments(fragments, containerWidthPx, theme, typography, tocEntries);
+    return {
+      surfaces: stackMeasurement.surfaces,
+      supported: stackMeasurement.supported,
+      heightPx: stackMeasurement.heightPx,
+    };
+  }
+
+  const innerWidthPx = Math.max(1, containerWidthPx - (INTRO_BAND_PADDING_X_PX * 2));
+  const weightedWidthPx = Math.max(1, innerWidthPx - INTRO_BAND_COLUMN_GAP_PX);
+  let rightWidthPx = Math.max(
+    INTRO_BAND_RIGHT_MIN_WIDTH_PX,
+    weightedWidthPx * (INTRO_BAND_RIGHT_RATIO / (INTRO_BAND_LEFT_RATIO + INTRO_BAND_RIGHT_RATIO)),
+  );
+  if (rightWidthPx >= weightedWidthPx) {
+    rightWidthPx = weightedWidthPx * (INTRO_BAND_RIGHT_RATIO / (INTRO_BAND_LEFT_RATIO + INTRO_BAND_RIGHT_RATIO));
+  }
+  const leftWidthPx = Math.max(1, weightedWidthPx - rightWidthPx);
+
+  const panelMeasurements = panels.map((panel, index) => (
+    measureStackedFragments(
+      panel,
+      index % 2 === 0 ? leftWidthPx : rightWidthPx,
+      theme,
+      typography,
+      tocEntries,
+    )
+  ));
+
+  let heightPx = INTRO_BAND_PADDING_TOP_PX + INTRO_BAND_PADDING_BOTTOM_PX + INTRO_BAND_BORDER_PX;
+  for (let index = 0; index < panelMeasurements.length; index += 2) {
+    const row = panelMeasurements.slice(index, index + 2);
+    if (index > 0) heightPx += INTRO_BAND_ROW_GAP_PX;
+    heightPx += Math.max(...row.map((measurement) => measurement.heightPx));
+  }
+
+  return {
+    surfaces: panelMeasurements.flatMap((measurement) => measurement.surfaces),
+    supported: panelMeasurements.every((measurement) => measurement.supported),
+    heightPx,
+  };
+}
+
+function measureGroupedUnit(
+  flow: LayoutFlowModel,
+  unit: LayoutFlowUnit,
+  fragments: LayoutFlowFragment[],
+  options: MeasureFlowTextUnitsOptions,
+  typography: ThemeTypography,
+  tocEntries: ReturnType<typeof extractTocEntriesFromFlow>,
+): UnitMeasurementResult {
+  const containerWidthPx = resolveGroupContainerWidth(flow, unit, options);
+  const ordered = sortFragmentsForMeasurement(fragments);
+  let result: UnitMeasurementResult;
+
+  if (unit.groupId?.startsWith('npc-roster')) {
+    result = measureNpcRosterGroup(ordered, containerWidthPx, options.theme, typography, tocEntries);
+  } else if (unit.groupId?.startsWith('encounter-packet') || unit.groupId?.startsWith('utility-table')) {
+    result = measurePacketGroup(ordered, containerWidthPx, options.theme, typography, tocEntries);
+  } else if (unit.groupId?.startsWith('intro-tail-panel')) {
+    result = measureIntroTailPanelGroup(ordered, containerWidthPx, options.theme, typography, tocEntries);
+  } else {
+    const stackMeasurement = measureStackedFragments(ordered, containerWidthPx, options.theme, typography, tocEntries);
+    result = {
+      surfaces: stackMeasurement.surfaces,
+      supported: stackMeasurement.supported,
+      heightPx: stackMeasurement.heightPx,
+    };
+  }
+
+  return {
+    surfaces: result.surfaces,
+    supported: result.supported,
+    heightPx: result.supported ? applyUnitMinimums(fragments, result.heightPx ?? 0) : null,
+  };
+}
+
+function measureSimpleUnit(
+  fragments: LayoutFlowFragment[],
+  widthPx: number,
+  theme: string | null | undefined,
+  typography: ThemeTypography,
+  tocEntries: ReturnType<typeof extractTocEntriesFromFlow>,
+): UnitMeasurementResult {
+  const fragmentResults = fragments.map((fragment) => extractFragmentSurfaces(fragment, theme, widthPx, typography, tocEntries));
+  const unitSurfaces = fragmentResults.flatMap((result) => result.surfaces);
+  const supported = fragmentResults.length > 0 && fragmentResults.every((result) => result.supported);
+  const heightPx = supported
+    ? applyUnitMinimums(
+      fragments,
+      sumUnitMeasurementHeights(unitSurfaces.length > 0 ? measureTextSurfaces(unitSurfaces) : []),
+    )
+    : null;
+
+  return {
+    surfaces: unitSurfaces,
+    supported,
+    heightPx,
+  };
+}
+
+function isManualPageBreakUnit(fragments: LayoutFlowFragment[]): boolean {
+  return fragments.length > 0 && fragments.every((fragment) => fragment.nodeType === 'pageBreak');
+}
+
 export function buildFlowTextLayoutShadowTelemetry(args: {
   legacyMeasurements: MeasuredLayoutUnitMetric[];
   engineMeasurements: MeasuredLayoutUnitMetric[];
@@ -1273,50 +1578,43 @@ export function measureFlowTextUnits(
     (options.fallbackMeasurements ?? []).map((measurement) => [measurement.unitId, measurement.heightPx] as const),
   );
   const surfaces: TextLayoutSurface[] = [];
-  const surfacesByUnit = new Map<string, TextLayoutSurface[]>();
   const supportedUnitIds = new Set<string>();
   const unsupportedUnitIds = new Set<string>();
+  const measuredHeightByUnit = new Map<string, number>();
 
   for (const unit of flow.units) {
     const fragments = getUnitFragments(flow, unit);
-    const widthPx = resolveUnitWidth(flow, unit, options);
-
-    if (unit.groupId) {
-      unsupportedUnitIds.add(unit.id);
+    if (isManualPageBreakUnit(fragments)) {
+      supportedUnitIds.add(unit.id);
+      measuredHeightByUnit.set(unit.id, 1);
       continue;
     }
 
-    const fragmentResults = fragments.map((fragment) => extractFragmentSurfaces(fragment, options.theme, widthPx, typography, tocEntries));
-    const unitSurfaces = fragmentResults.flatMap((result) => result.surfaces);
-    const supported = fragmentResults.length > 0 && fragmentResults.every((result) => result.supported);
+    const unitResult = unit.groupId
+      ? measureGroupedUnit(flow, unit, fragments, options, typography, tocEntries)
+      : measureSimpleUnit(
+        fragments,
+        resolveUnitWidth(flow, unit, options),
+        options.theme,
+        typography,
+        tocEntries,
+      );
 
-    surfaces.push(...unitSurfaces);
-    if (unitSurfaces.length > 0) {
-      surfacesByUnit.set(unit.id, unitSurfaces);
-    }
+    surfaces.push(...unitResult.surfaces);
 
-    if (supported && unitSurfaces.length > 0) {
+    if (unitResult.supported && unitResult.heightPx !== null) {
       supportedUnitIds.add(unit.id);
+      measuredHeightByUnit.set(unit.id, unitResult.heightPx);
     } else {
       unsupportedUnitIds.add(unit.id);
     }
   }
 
-  const surfaceMeasurements = measureTextSurfaces(surfaces);
-  const measurementsByUnit = new Map<string, TextSurfaceMeasurement[]>();
-  for (const measurement of surfaceMeasurements) {
-    const entry = measurementsByUnit.get(measurement.unitId) ?? [];
-    entry.push(measurement);
-    measurementsByUnit.set(measurement.unitId, entry);
-  }
-
   const measurements: MeasuredLayoutUnitMetric[] = flow.units.map((unit) => {
-    const fragments = getUnitFragments(flow, unit);
-    if (supportedUnitIds.has(unit.id)) {
-      const unitMeasurements = measurementsByUnit.get(unit.id) ?? [];
+    if (measuredHeightByUnit.has(unit.id)) {
       return {
         unitId: unit.id,
-        heightPx: applyUnitMinimums(fragments, sumUnitMeasurementHeights(unitMeasurements)),
+        heightPx: measuredHeightByUnit.get(unit.id) ?? 1,
       };
     }
 

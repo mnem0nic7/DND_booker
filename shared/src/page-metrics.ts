@@ -66,13 +66,41 @@ function getFragmentHeading(fragment: PageModelFragment): string | null {
 
 function getBoundaryType(
   page: PageModel['pages'][number],
-  pageIndex: number,
-  totalPages: number,
 ): PageMetric['boundaryType'] {
-  if (pageIndex === totalPages - 1) return 'end';
+  if (page.boundaryType === 'pageBreak' || page.boundaryType === 'end') {
+    return page.boundaryType;
+  }
+
   return page.fragments.some((fragment) => fragment.nodeType === 'pageBreak')
     ? 'pageBreak'
     : 'autoGap';
+}
+
+function buildBoundaryNode(
+  page: PageModel['pages'][number],
+  pageHeightPx: number,
+  sectionHeading: string | null,
+): LayoutNodeMetric | null {
+  if (page.boundaryType !== 'pageBreak' || page.boundarySourceIndex === null) {
+    return null;
+  }
+
+  return {
+    nodeIndex: page.boundarySourceIndex,
+    nodeType: 'pageBreak',
+    page: page.index,
+    column: null,
+    topPx: pageHeightPx,
+    bottomPx: pageHeightPx,
+    heightPx: 0,
+    isColumnSpanning: true,
+    isNearPageTop: false,
+    isNearPageBottom: true,
+    isSplit: false,
+    textPreview: null,
+    label: 'pageBreak',
+    sectionHeading,
+  };
 }
 
 export function buildPageMetricsSnapshotFromPageModel(
@@ -91,14 +119,8 @@ export function buildPageMetricsSnapshotFromPageModel(
     },
     pageModel.flow.sectionRecipe,
   );
-  const nodeOccurrences = new Map<number, number>();
-
-  for (const fragment of pageModel.fragments) {
-    nodeOccurrences.set(fragment.sourceIndex, (nodeOccurrences.get(fragment.sourceIndex) ?? 0) + 1);
-  }
-
   let currentSectionHeading: string | null = null;
-  const nodes = [...pageModel.fragments]
+  const fragmentNodes = [...pageModel.fragments]
     .sort((left, right) => (
       left.sourceIndex - right.sourceIndex
       || left.pageIndex - right.pageIndex
@@ -124,7 +146,7 @@ export function buildPageMetricsSnapshotFromPageModel(
           || (fragment.region !== 'column_left' && fragment.region !== 'column_right'),
         isNearPageTop: fragment.bounds.y <= NEAR_PAGE_EDGE_THRESHOLD_PX,
         isNearPageBottom: frame.contentHeightPx - (fragment.bounds.y + fragment.bounds.height) <= NEAR_PAGE_EDGE_THRESHOLD_PX,
-        isSplit: (nodeOccurrences.get(fragment.sourceIndex) ?? 0) > 1,
+        isSplit: false,
         headingLevel,
         textPreview,
         label: buildNodeLabel(fragment.nodeType, textPreview, fragment.content.attrs as Record<string, unknown> | null | undefined),
@@ -139,9 +161,45 @@ export function buildPageMetricsSnapshotFromPageModel(
       return node;
     });
 
+  const sectionHeadingByPage = new Map<number, string | null>();
+  let lastSectionHeading: string | null = null;
+  for (const page of pageModel.pages) {
+    for (const fragment of page.fragments) {
+      const heading = getFragmentHeading(fragment);
+      if (heading) {
+        lastSectionHeading = heading;
+      }
+    }
+    sectionHeadingByPage.set(page.index, lastSectionHeading);
+  }
+
+  const fragmentNodeLookup = new Map(fragmentNodes.map((node) => [node.nodeIndex, node] as const));
+  const boundaryNodes = pageModel.pages
+    .map((page) => buildBoundaryNode(page, frame.contentHeightPx, sectionHeadingByPage.get(page.index) ?? null))
+    .filter((node): node is LayoutNodeMetric => Boolean(node))
+    .filter((node) => !fragmentNodeLookup.has(node.nodeIndex));
+  const nodeOccurrences = new Map<number, number>();
+
+  for (const node of fragmentNodes) {
+    nodeOccurrences.set(node.nodeIndex, (nodeOccurrences.get(node.nodeIndex) ?? 0) + 1);
+  }
+
+  const nodes = [...fragmentNodes, ...boundaryNodes]
+    .map((node) => node.nodeType === 'pageBreak'
+      ? node
+      : {
+        ...node,
+        isSplit: (nodeOccurrences.get(node.nodeIndex) ?? 0) > 1,
+      })
+    .sort((left, right) => left.nodeIndex - right.nodeIndex || left.page - right.page);
+
   const nodeLookup = new Map(nodes.map((node) => [node.nodeIndex, node] as const));
-  const pages = pageModel.pages.map((page, pageIndex): PageMetric => {
+  const pages = pageModel.pages.map((page): PageMetric => {
     const nodeIndices = [...new Set(page.fragments.map((fragment) => fragment.sourceIndex))].sort((left, right) => left - right);
+    if (page.boundaryType === 'pageBreak' && page.boundarySourceIndex !== null && !nodeIndices.includes(page.boundarySourceIndex)) {
+      nodeIndices.push(page.boundarySourceIndex);
+      nodeIndices.sort((left, right) => left - right);
+    }
     const pageNodes = nodeIndices
       .map((nodeIndex) => nodeLookup.get(nodeIndex))
       .filter((node): node is LayoutNodeMetric => Boolean(node));
@@ -161,7 +219,7 @@ export function buildPageMetricsSnapshotFromPageModel(
       fillPercent,
       isBlank: fillPercent < 5,
       isNearlyBlank: fillPercent < 15,
-      boundaryType: getBoundaryType(page, pageIndex, pageModel.pages.length),
+      boundaryType: getBoundaryType(page),
       nodeTypes: pageNodes.slice(0, 10).map((node) => node.nodeType),
       nodeIndices,
       nodeSummaries: pageNodes.slice(0, NODE_SUMMARY_LIMIT).map((node) => buildNodeSummary(node)),

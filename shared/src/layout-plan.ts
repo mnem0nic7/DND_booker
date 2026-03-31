@@ -10,6 +10,7 @@ import type {
   LayoutPlan,
   LayoutPlanBlock,
   LayoutPlanValidationResult,
+  PageBoundaryType,
   LayoutRecipe,
   LayoutSpan,
   MeasuredLayoutUnitMetric,
@@ -1411,6 +1412,9 @@ function createPage(
     nodeIds: [],
     documentIds: [],
     openerDocumentId: null,
+    boundaryType: 'end',
+    boundaryNodeId: null,
+    boundarySourceIndex: null,
   };
 }
 
@@ -1525,6 +1529,20 @@ function chooseColumn(
   return leftHeight <= rightHeight ? 1 : 2;
 }
 
+function getUnitFragmentsForPageModel(flow: LayoutFlowModel, unit: LayoutFlowUnit): LayoutFlowFragment[] {
+  const fragmentSet = new Set(unit.fragmentNodeIds);
+  return flow.fragments.filter((fragment) => fragmentSet.has(fragment.nodeId));
+}
+
+function getManualPageBreakFragment(flow: LayoutFlowModel, unit: LayoutFlowUnit): LayoutFlowFragment | null {
+  const fragments = getUnitFragmentsForPageModel(flow, unit);
+  if (fragments.length === 0) return null;
+
+  return fragments.every((fragment) => fragment.nodeType === 'pageBreak')
+    ? fragments[0] ?? null
+    : null;
+}
+
 export function compileMeasuredPageModel(
   flow: LayoutFlowModel,
   measurements: MeasuredLayoutUnitMetric[] | null | undefined,
@@ -1545,6 +1563,9 @@ export function compileMeasuredPageModel(
     const page = createPage(1, flow.preset, flow.sectionRecipe, contentHeight);
     let cursorY = 0;
     for (const unit of flow.units) {
+      if (options.respectManualPageBreaks && getManualPageBreakFragment(flow, unit)) {
+        continue;
+      }
       const height = measuredHeights.get(unit.id) ?? 120;
       const reserve = getUnitLayoutReserve(unit, flow);
       assignUnitToPage({
@@ -1589,19 +1610,30 @@ export function compileMeasuredPageModel(
   let rightHeight = 0;
   let reservedTop = 0;
 
-  const flushPage = () => {
-    if (currentPage.fragments.length === 0 && pages.length > 0) return;
+  const flushPage = (
+    boundaryType: PageBoundaryType = 'end',
+    boundaryFragment: LayoutFlowFragment | null = null,
+    force = false,
+  ) => {
+    if (currentPage.fragments.length === 0 && pages.length > 0 && !force) return;
     currentPage.fillRatio = Math.max(leftHeight, rightHeight, reservedTop) / contentHeight;
     currentPage.columnMetrics = {
       leftFillRatio: presetMetrics.columnCount >= 1 ? leftHeight / contentHeight : null,
       rightFillRatio: presetMetrics.columnCount >= 2 ? rightHeight / contentHeight : null,
       deltaRatio: presetMetrics.columnCount >= 2 ? Math.abs(leftHeight - rightHeight) / contentHeight : null,
     };
+    currentPage.boundaryType = boundaryType;
+    currentPage.boundaryNodeId = boundaryFragment?.nodeId ?? null;
+    currentPage.boundarySourceIndex = boundaryFragment?.sourceIndex ?? null;
     pages.push(currentPage);
   };
 
-  const startNewPage = () => {
-    flushPage();
+  const startNewPage = (
+    boundaryType: Exclude<PageBoundaryType, 'end'> = 'autoGap',
+    boundaryFragment: LayoutFlowFragment | null = null,
+    force = false,
+  ) => {
+    flushPage(boundaryType, boundaryFragment, force);
     currentPage = createPage(currentPage.index + 1, flow.preset, flow.sectionRecipe, contentHeight);
     leftHeight = 0;
     rightHeight = 0;
@@ -1609,6 +1641,14 @@ export function compileMeasuredPageModel(
   };
 
   for (const unit of flow.units) {
+    const manualPageBreakFragment = options.respectManualPageBreaks
+      ? getManualPageBreakFragment(flow, unit)
+      : null;
+    if (manualPageBreakFragment) {
+      startNewPage('pageBreak', manualPageBreakFragment, true);
+      continue;
+    }
+
     const height = measuredHeights.get(unit.id) ?? 120;
     const reserve = getUnitLayoutReserve(unit, flow);
 

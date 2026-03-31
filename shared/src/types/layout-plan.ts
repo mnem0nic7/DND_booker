@@ -17,6 +17,7 @@ export type LayoutRecipe =
 export type LayoutColumnBalanceTarget = 'balanced' | 'dense_left' | 'dense_right';
 export type PagePreset = 'standard_pdf' | 'print_pdf' | 'editor_preview' | 'epub';
 export type PageRegionKind = 'hero' | 'full_width' | 'column_left' | 'column_right' | 'full_page';
+export type PageBoundaryType = 'pageBreak' | 'autoGap' | 'end';
 
 export interface LayoutPlanBlock {
   nodeId: string;
@@ -131,6 +132,9 @@ export interface PageModelPage {
   nodeIds: string[];
   documentIds: string[];
   openerDocumentId: string | null;
+  boundaryType: PageBoundaryType;
+  boundaryNodeId: string | null;
+  boundarySourceIndex: number | null;
 }
 
 export interface PageModel {
@@ -156,4 +160,5 @@ export interface ResolveLayoutPlanOptions {
   documentKind?: string | null;
   documentTitle?: string | null;
   preferRecipe?: LayoutRecipe | null;
+  respectManualPageBreaks?: boolean;
 }

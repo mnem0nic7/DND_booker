@@ -304,11 +304,17 @@ export function analyzeEstimatedArtifactLayout(content: unknown): EstimatedLayou
       const engineResult = measureFlowTextUnits(flow.flow, {
         theme: process.env.TEXT_LAYOUT_THEME ?? 'gilded-folio',
       });
-      const enginePageModel = compileMeasuredPageModel(flow.flow, engineResult.measurements, {});
+      const enginePageModel = compileMeasuredPageModel(flow.flow, engineResult.measurements, {
+        respectManualPageBreaks: true,
+      });
       const engineSummaries = enginePageModel.pages.map((page, index) => ({
         page: page.index,
         fillPercent: toFillPercent(page.fillRatio * PAGE_HEIGHT),
-        boundary: index === enginePageModel.pages.length - 1 ? 'end' as const : 'auto' as const,
+        boundary: page.boundaryType === 'pageBreak'
+          ? 'pageBreak' as const
+          : index === enginePageModel.pages.length - 1
+            ? 'end' as const
+            : 'auto' as const,
       }));
 
       if (textLayoutMode === 'shadow') {
