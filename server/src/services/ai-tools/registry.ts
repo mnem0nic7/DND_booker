@@ -1,6 +1,6 @@
 import { tool, type Tool } from 'ai';
 import { createHash } from 'crypto';
-import type { ToolContext, ToolResult, ToolDefinition } from './types.js';
+import type { ToolContext, ToolResult, ToolDefinition, ToolScope } from './types.js';
 import { prisma } from '../../config/database.js';
 
 export class ToolRegistry {
@@ -12,12 +12,19 @@ export class ToolRegistry {
 
   /** Get Vercel AI SDK tool definitions filtered by context. */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  getToolsForContext(context: string, ctx: ToolContext): Record<string, Tool<any, any>> {
+  getToolsForContext(context: ToolScope, ctx: ToolContext): Record<string, Tool<any, any>> {
+    return this.getToolsForContexts([context], ctx);
+  }
+
+  /** Get Vercel AI SDK tool definitions filtered by one or more contexts. */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  getToolsForContexts(contexts: ToolScope[], ctx: ToolContext): Record<string, Tool<any, any>> {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const result: Record<string, Tool<any, any>> = {};
+    const allowedContexts = new Set(contexts);
 
     for (const [name, def] of this.tools) {
-      if (!def.contexts.includes(context as ToolDefinition['contexts'][number])) continue;
+      if (!def.contexts.some((context) => allowedContexts.has(context))) continue;
 
       result[name] = tool({
         description: def.description,

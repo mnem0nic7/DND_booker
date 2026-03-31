@@ -110,4 +110,37 @@ describe('ToolRegistry', () => {
     expect(chatTools).toHaveProperty('everywhere');
     expect(globalTools).toHaveProperty('everywhere');
   });
+
+  it('should merge tools across multiple requested contexts', () => {
+    registry.register({
+      name: 'chatOnly',
+      description: 'Chat only',
+      parameters: z.object({}),
+      contexts: ['project-chat'],
+      execute: async () => ({ success: true }),
+    });
+    registry.register({
+      name: 'globalOnly',
+      description: 'Global only',
+      parameters: z.object({}),
+      contexts: ['global'],
+      execute: async () => ({ success: true }),
+    });
+    registry.register({
+      name: 'everywhere',
+      description: 'Available everywhere',
+      parameters: z.object({}),
+      contexts: ['project-chat', 'global'],
+      execute: async () => ({ success: true }),
+    });
+
+    const tools = registry.getToolsForContexts(['project-chat', 'global'], {
+      userId: 'u1', projectId: 'p1', requestId: 'r1',
+    });
+
+    expect(tools).toHaveProperty('chatOnly');
+    expect(tools).toHaveProperty('globalOnly');
+    expect(tools).toHaveProperty('everywhere');
+    expect(Object.keys(tools)).toHaveLength(3);
+  });
 });

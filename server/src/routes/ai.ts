@@ -577,7 +577,7 @@ aiChatRoutes.post('/ai/chat', validateUuid('projectId'), chatRateLimit, asyncHan
     const requestId = randomUUID();
     const toolCtx = { userId: req.userId!, projectId, requestId };
     const tools = toolsEnabled
-      ? globalRegistry.getToolsForContext('project-chat', toolCtx)
+      ? globalRegistry.getToolsForContexts(['project-chat', 'global'], toolCtx)
       : undefined;
 
     if (userSettings?.provider === 'ollama' && !toolsEnabled) {
