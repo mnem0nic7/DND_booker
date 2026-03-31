@@ -2,6 +2,8 @@ import { chromium, type Page } from 'playwright-core';
 import {
   compileFlowModel,
   compileMeasuredPageModel,
+  measureFlowTextUnits,
+  parseTextLayoutEngineMode,
   type DocumentContent,
   type DocumentKind,
   type LayoutPlan,
@@ -9,6 +11,7 @@ import {
   type PageModel,
   type PagePreset,
 } from '@dnd-booker/shared';
+import { ensureNodeCanvasMeasurementBackend } from '@dnd-booker/text-layout/node';
 import { assembleHtml } from '../renderers/html-assembler.js';
 
 const DEFAULT_EXECUTABLE_PATHS = [
@@ -66,6 +69,11 @@ export async function measureDocumentPageModels(input: {
   theme: string;
   pagePreset: PagePreset;
 }): Promise<Array<PageModel | null>> {
+  const textLayoutMode = parseTextLayoutEngineMode(process.env.TEXT_LAYOUT_ENGINE_MODE);
+  if (textLayoutMode !== 'legacy') {
+    ensureNodeCanvasMeasurementBackend();
+  }
+
   const browser = await chromium.launch({
     executablePath: resolveChromiumExecutablePath(),
     args: ['--no-sandbox', '--disable-setuid-sandbox', '--allow-file-access-from-files'],
@@ -105,8 +113,48 @@ export async function measureDocumentPageModels(input: {
 
       await page.setContent(html, { waitUntil: 'load' });
       await waitForDocumentReady(page);
-      const measurements = await page.evaluate(collectMeasurements);
-      models.push(compileMeasuredPageModel(flow.flow, measurements, {
+      const legacyMeasurements = await page.evaluate(collectMeasurements);
+      let finalMeasurements = legacyMeasurements;
+
+      if (textLayoutMode !== 'legacy') {
+        const engineResult = measureFlowTextUnits(flow.flow, {
+          theme: input.theme,
+          documentKind: document.kind ?? null,
+          documentTitle: document.title,
+          fallbackMeasurements: legacyMeasurements,
+        });
+        const legacyPageModel = compileMeasuredPageModel(flow.flow, legacyMeasurements, {
+          documentKind: document.kind ?? null,
+          documentTitle: document.title,
+        });
+        const enginePageModel = compileMeasuredPageModel(flow.flow, engineResult.measurements, {
+          documentKind: document.kind ?? null,
+          documentTitle: document.title,
+        });
+
+        if (textLayoutMode === 'shadow') {
+          const legacyByUnit = new Map(legacyMeasurements.map((measurement) => [measurement.unitId, measurement.heightPx] as const));
+          const heightDeltaPx = engineResult.measurements.reduce((total, measurement) => (
+            total + Math.abs(measurement.heightPx - (legacyByUnit.get(measurement.unitId) ?? measurement.heightPx))
+          ), 0);
+          console.info('[text-layout:shadow]', {
+            scope: 'worker-html-pdf',
+            documentTitle: document.title,
+            pagePreset: input.pagePreset,
+            heightDeltaPx,
+            legacyPageCount: legacyPageModel.pages.length,
+            pretextPageCount: enginePageModel.pages.length,
+            unsupportedUnitCount: engineResult.telemetry.unsupportedUnitCount,
+            supportedUnitCount: engineResult.telemetry.supportedUnitCount,
+          });
+        }
+
+        if (textLayoutMode === 'pretext') {
+          finalMeasurements = engineResult.measurements;
+        }
+      }
+
+      models.push(compileMeasuredPageModel(flow.flow, finalMeasurements, {
         documentKind: document.kind ?? null,
         documentTitle: document.title,
       }));

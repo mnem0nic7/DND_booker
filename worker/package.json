@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@dnd-booker/shared": "*",
+    "@dnd-booker/text-layout": "*",
     "@myriaddreamin/typst-ts-node-compiler": "^0.7.0-rc2",
     "@prisma/client": "^6.0.0",
     "bullmq": "^5.0.0",

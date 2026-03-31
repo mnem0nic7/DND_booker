@@ -1,4 +1,12 @@
-import type { EvaluationFinding } from '@dnd-booker/shared';
+import {
+  compileFlowModel,
+  compileMeasuredPageModel,
+  measureFlowTextUnits,
+  parseTextLayoutEngineMode,
+  type DocumentContent,
+  type EvaluationFinding,
+} from '@dnd-booker/shared';
+import { ensureNodeCanvasMeasurementBackend } from '@dnd-booker/text-layout/node';
 
 interface TipTapNode {
   type: string;
@@ -132,6 +140,11 @@ export function analyzeEstimatedArtifactLayout(content: unknown): EstimatedLayou
 
   const doc = content as TipTapNode;
   if (!Array.isArray(doc.content) || doc.content.length === 0) return null;
+  const textLayoutMode = parseTextLayoutEngineMode(process.env.TEXT_LAYOUT_ENGINE_MODE);
+
+  if (textLayoutMode !== 'legacy') {
+    ensureNodeCanvasMeasurementBackend();
+  }
 
   const pageSummaries: EstimatedPageSummary[] = [];
   const findings: EvaluationFinding[] = [];
@@ -276,14 +289,49 @@ export function analyzeEstimatedArtifactLayout(content: unknown): EstimatedLayou
   flushColumnBuffer();
   finalizePage('end');
 
+  let resolvedPageSummaries = pageSummaries;
+  let estimatedPages = pageSummaries.length;
+
+  if (textLayoutMode !== 'legacy') {
+    try {
+      const flow = compileFlowModel(doc as unknown as DocumentContent, null, 'standard_pdf', {});
+      const engineResult = measureFlowTextUnits(flow.flow, {
+        theme: process.env.TEXT_LAYOUT_THEME ?? 'gilded-folio',
+      });
+      const enginePageModel = compileMeasuredPageModel(flow.flow, engineResult.measurements, {});
+      const engineSummaries = enginePageModel.pages.map((page, index) => ({
+        page: page.index,
+        fillPercent: toFillPercent(page.fillRatio * PAGE_HEIGHT),
+        boundary: index === enginePageModel.pages.length - 1 ? 'end' as const : 'auto' as const,
+      }));
+
+      if (textLayoutMode === 'shadow') {
+        console.info('[text-layout:shadow]', {
+          scope: 'server-layout-estimate',
+          legacyPageCount: pageSummaries.length,
+          pretextPageCount: engineSummaries.length,
+          unsupportedUnitCount: engineResult.telemetry.unsupportedUnitCount,
+          supportedUnitCount: engineResult.telemetry.supportedUnitCount,
+        });
+      }
+
+      if (textLayoutMode === 'pretext') {
+        resolvedPageSummaries = engineSummaries;
+        estimatedPages = engineSummaries.length;
+      }
+    } catch (error) {
+      console.warn('[text-layout] failed to measure estimated artifact layout', error);
+    }
+  }
+
   const summary = [
-    `Estimated pagination: ~${pageSummaries.length} page(s).`,
-    ...pageSummaries.map((page) => `P${page.page}: ${page.fillPercent}% → ${page.boundary}`),
+    `Estimated pagination: ~${estimatedPages} page(s).`,
+    ...resolvedPageSummaries.map((page) => `P${page.page}: ${page.fillPercent}% → ${page.boundary}`),
   ].join('\n');
 
   return {
-    estimatedPages: pageSummaries.length,
-    pageSummaries,
+    estimatedPages,
+    pageSummaries: resolvedPageSummaries,
     findings: uniqueFindings(findings),
     summary,
   };

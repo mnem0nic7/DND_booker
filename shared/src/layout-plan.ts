@@ -5,6 +5,7 @@ import type {
   LayoutFlowFragment,
   LayoutFlowModel,
   LayoutFlowUnit,
+  LayoutMeasurementFrame,
   LayoutPlacement,
   LayoutPlan,
   LayoutPlanBlock,
@@ -1262,6 +1263,10 @@ function estimateUnitHeight(unit: LayoutFlowUnit, fragments: LayoutFlowFragment[
   return Math.max(52, 32 + Math.ceil(textChars / 90) * 18);
 }
 
+export function estimateFlowUnitHeight(unit: LayoutFlowUnit, fragments: LayoutFlowFragment[]): number {
+  return estimateUnitHeight(unit, fragments);
+}
+
 function getUnitLayoutReserve(unit: LayoutFlowUnit, flow: LayoutFlowModel): number {
   const nodeTypes = getUnitNodeTypes(unit, flow);
   if (nodeTypes.has('npcProfile')) {
@@ -1283,6 +1288,32 @@ function getUnitLayoutReserve(unit: LayoutFlowUnit, flow: LayoutFlowModel): numb
   }
 
   return 0;
+}
+
+export function getLayoutMeasurementFrame(
+  preset: PagePreset,
+  options: ResolveLayoutPlanOptions = {},
+  sectionRecipe: LayoutRecipe | null = null,
+): LayoutMeasurementFrame {
+  const presetMetrics = getPagePresetMetrics(preset, options, sectionRecipe);
+  const contentWidthPx = Math.max(1, presetMetrics.pageWidthPx - (presetMetrics.pagePaddingX * 2));
+  const contentHeightPx = Math.max(
+    1,
+    presetMetrics.pageHeightPx - (presetMetrics.pagePaddingY * 2) - presetMetrics.footerReservePx,
+  );
+  const columnWidthPx = presetMetrics.columnCount === 1
+    ? contentWidthPx
+    : (contentWidthPx - ((presetMetrics.columnCount - 1) * presetMetrics.columnGapPx)) / presetMetrics.columnCount;
+
+  return {
+    pageWidthPx: presetMetrics.pageWidthPx,
+    pageHeightPx: presetMetrics.pageHeightPx,
+    contentWidthPx,
+    contentHeightPx,
+    columnWidthPx,
+    columnCount: presetMetrics.columnCount,
+    columnGapPx: presetMetrics.columnGapPx,
+  };
 }
 
 function unitMeasurementMap(

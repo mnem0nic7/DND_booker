@@ -7,10 +7,12 @@ WORKDIR /app
 COPY package*.json ./
 COPY worker/package.json worker/
 COPY shared/package.json shared/
+COPY text-layout/package.json text-layout/
 COPY server/package.json server/
 RUN npm ci
 COPY tsconfig.json ./
 COPY shared/ shared/
+COPY text-layout/ text-layout/
 COPY worker/ worker/
 # Copy server source (generation-orchestrator imports server services at runtime)
 COPY server/ server/
@@ -22,6 +24,16 @@ WORKDIR /app/shared
 RUN npm run build
 RUN sed -i 's|"main": "src/index.ts"|"main": "dist/index.js"|' package.json && \
     sed -i 's|"types": "src/index.ts"|"types": "dist/index.d.ts"|' package.json
+WORKDIR /app/text-layout
+RUN npm run build
+RUN sed -i 's|"main": "src/index.ts"|"main": "dist/index.js"|' package.json && \
+    sed -i 's|"types": "src/index.ts"|"types": "dist/index.d.ts"|' package.json && \
+    sed -i 's|"types": "./src/index.ts"|"types": "./dist/index.d.ts"|' package.json && \
+    sed -i 's|"import": "./src/index.ts"|"import": "./dist/index.js"|' package.json && \
+    sed -i 's|"default": "./src/index.ts"|"default": "./dist/index.js"|' package.json && \
+    sed -i 's|"types": "./src/node.ts"|"types": "./dist/node.d.ts"|' package.json && \
+    sed -i 's|"import": "./src/node.ts"|"import": "./dist/node.js"|' package.json && \
+    sed -i 's|"default": "./src/node.ts"|"default": "./dist/node.js"|' package.json
 WORKDIR /app/worker
 
 # Run as non-root user for security

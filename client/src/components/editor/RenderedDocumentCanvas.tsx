@@ -43,6 +43,7 @@ export function RenderedDocumentCanvas({
     measurementRef,
   } = useMeasuredLayoutDocument({
     editor,
+    theme,
     layoutPlan,
     documentKind,
     documentTitle,
@@ -154,7 +155,7 @@ export function RenderedDocumentCanvas({
     <div className="editor-outer parity-editor-outer relative" data-theme={theme}>
       <style>{getCanonicalLayoutCss()}</style>
       <div className="parity-measure-host" aria-hidden="true">
-        <div ref={measurementRef} className="page-canvas editor-themed-content parity-measure-canvas" dangerouslySetInnerHTML={measurementMarkup} />
+        <div ref={measurementRef} className="page-canvas editor-themed-content parity-measure-canvas" data-theme={theme} dangerouslySetInnerHTML={measurementMarkup} />
       </div>
       <div className="editor-themed-content parity-page-canvas">
         <div

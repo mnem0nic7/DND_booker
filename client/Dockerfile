@@ -4,9 +4,11 @@ WORKDIR /app
 COPY package*.json ./
 COPY client/package.json client/
 COPY shared/package.json shared/
+COPY text-layout/package.json text-layout/
 RUN npm ci
 COPY tsconfig.json ./
 COPY shared/ shared/
+COPY text-layout/ text-layout/
 COPY client/ client/
 WORKDIR /app/client
 RUN npm run build

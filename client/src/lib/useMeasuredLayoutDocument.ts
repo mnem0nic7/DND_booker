@@ -2,6 +2,8 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObje
 import type { Editor } from '@tiptap/react';
 import {
   compileMeasuredPageModel,
+  measureFlowTextUnits,
+  parseTextLayoutEngineMode,
   renderContentWithLayoutPlan,
   renderFlowContentWithLayoutPlan,
   type DocumentContent,
@@ -14,6 +16,7 @@ import {
 
 interface UseMeasuredLayoutDocumentOptions {
   editor: Editor | null;
+  theme?: string | null;
   layoutPlan?: LayoutPlan | null;
   documentKind?: string | null;
   documentTitle?: string | null;
@@ -51,12 +54,14 @@ function collectUnitMeasurements(root: HTMLElement): MeasuredLayoutUnitMetric[] 
 
 export function useMeasuredLayoutDocument({
   editor,
+  theme = 'gilded-folio',
   layoutPlan = null,
   documentKind = null,
   documentTitle = null,
   preset,
   footerTitle = null,
 }: UseMeasuredLayoutDocumentOptions): MeasuredLayoutDocumentResult {
+  const textLayoutMode = parseTextLayoutEngineMode(import.meta.env.VITE_TEXT_LAYOUT_ENGINE_MODE);
   const measurementRef = useRef<HTMLDivElement>(null);
   const flowModelRef = useRef<LayoutFlowModel | null>(null);
   const contentRef = useRef<DocumentContent | null>(null);
@@ -110,11 +115,53 @@ export function useMeasuredLayoutDocument({
     if (!measurementHtml || !measurementRef.current || !flowModelRef.current || !contentRef.current) return;
 
     const handle = window.requestAnimationFrame(() => {
-      const measurements = collectUnitMeasurements(measurementRef.current!);
-      const measuredPageModel = compileMeasuredPageModel(flowModelRef.current!, measurements, {
+      const legacyMeasurements = collectUnitMeasurements(measurementRef.current!);
+      const legacyPageModel = compileMeasuredPageModel(flowModelRef.current!, legacyMeasurements, {
         documentKind,
         documentTitle,
       });
+      let finalMeasurements = legacyMeasurements;
+
+      if (textLayoutMode !== 'legacy') {
+        const engineResult = measureFlowTextUnits(flowModelRef.current!, {
+          theme,
+          documentKind,
+          documentTitle,
+          fallbackMeasurements: legacyMeasurements,
+        });
+        const enginePageModel = compileMeasuredPageModel(flowModelRef.current!, engineResult.measurements, {
+          documentKind,
+          documentTitle,
+        });
+
+        if (textLayoutMode === 'shadow') {
+          const legacyByUnit = new Map(legacyMeasurements.map((measurement) => [measurement.unitId, measurement.heightPx] as const));
+          const heightDeltaPx = engineResult.measurements.reduce((total, measurement) => (
+            total + Math.abs(measurement.heightPx - (legacyByUnit.get(measurement.unitId) ?? measurement.heightPx))
+          ), 0);
+          console.info('[text-layout:shadow]', {
+            mode: textLayoutMode,
+            documentTitle,
+            preset,
+            heightDeltaPx,
+            legacyPageCount: legacyPageModel.pages.length,
+            pretextPageCount: enginePageModel.pages.length,
+            unsupportedUnitCount: engineResult.telemetry.unsupportedUnitCount,
+            supportedUnitCount: engineResult.telemetry.supportedUnitCount,
+          });
+        }
+
+        if (textLayoutMode === 'pretext') {
+          finalMeasurements = engineResult.measurements;
+        }
+      }
+
+      const measuredPageModel = textLayoutMode === 'legacy'
+        ? legacyPageModel
+        : compileMeasuredPageModel(flowModelRef.current!, finalMeasurements, {
+          documentKind,
+          documentTitle,
+        });
       setPageModel(measuredPageModel);
       setRenderedHtml(
         renderContentWithLayoutPlan({
@@ -134,7 +181,7 @@ export function useMeasuredLayoutDocument({
     return () => {
       window.cancelAnimationFrame(handle);
     };
-  }, [documentKind, documentTitle, footerTitle, layoutPlan, measurementHtml, preset]);
+  }, [documentKind, documentTitle, footerTitle, layoutPlan, measurementHtml, preset, textLayoutMode, theme]);
 
   return {
     measurementHtml,

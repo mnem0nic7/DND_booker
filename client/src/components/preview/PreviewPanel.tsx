@@ -35,6 +35,7 @@ export function PreviewPanel({
   const containerRef = useRef<HTMLDivElement>(null);
   const { measurementHtml, renderedHtml, measurementRef, pageModel } = useMeasuredLayoutDocument({
     editor,
+    theme,
     layoutPlan,
     documentKind,
     documentTitle,

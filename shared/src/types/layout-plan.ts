@@ -84,6 +84,16 @@ export interface MeasuredLayoutUnitMetric {
   heightPx: number;
 }
 
+export interface LayoutMeasurementFrame {
+  pageWidthPx: number;
+  pageHeightPx: number;
+  contentWidthPx: number;
+  contentHeightPx: number;
+  columnWidthPx: number;
+  columnCount: number;
+  columnGapPx: number;
+}
+
 export interface PageModelFragment {
   nodeId: string;
   sourceIndex: number;

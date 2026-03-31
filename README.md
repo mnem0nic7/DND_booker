@@ -17,6 +17,7 @@ Client (React + TipTap)  -->  API Server (Express + Prisma)  -->  PDF Worker (Pu
 | `server/` | Express 5, Prisma 6, JWT, Zod, Vercel AI SDK | REST API, auth & AI |
 | `worker/` | Puppeteer 24, Pandoc, BullMQ | PDF/ePub generation |
 | `shared/` | TypeScript | Shared types & constants |
+| `text-layout/` | Pretext fork + `@napi-rs/canvas` | Flagged text measurement engine |
 
 ## Quick Start (Docker)
 
@@ -169,6 +170,9 @@ See [.env.example](.env.example) for all configuration options.
 | `CLIENT_URL` | No | Frontend URL (default: http://localhost:3000) |
 | `AI_KEY_ENCRYPTION_SECRET` | Yes | 64-char hex string for encrypting user API keys. Generate with `openssl rand -hex 32` |
 | `S3_BUCKET` / `S3_REGION` | No | Asset storage (S3-compatible) |
+| `TEXT_LAYOUT_ENGINE_MODE` | No | Server/worker text layout mode: `legacy`, `shadow`, or `pretext` |
+| `VITE_TEXT_LAYOUT_ENGINE_MODE` | No | Client preview text layout mode: `legacy`, `shadow`, or `pretext` |
+| `TEXT_LAYOUT_THEME` | No | Theme used by server-side text layout estimation (default: `gilded-folio`) |
 
 ## Project Structure
 
@@ -210,6 +214,7 @@ DND_booker/
 │   │   └── renderers/        # TipTap JSON-to-HTML, HTML assembler
 │   └── Dockerfile
 ├── shared/                   # Shared TypeScript types
+├── text-layout/              # Local Pretext fork and adapter
 ├── docker-compose.yml        # Full stack: Postgres, Redis, server, worker, client
 └── docs/plans/               # Design doc & implementation plan
 ```

@@ -27,4 +27,5 @@ export * from './types/chapter-plan.js';
 export * from './types/reference-artifacts.js';
 export * from './layout-analysis.js';
 export * from './layout-plan.js';
+export * from './text-layout.js';
 export * from './toc.js';
