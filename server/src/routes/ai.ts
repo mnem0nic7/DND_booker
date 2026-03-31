@@ -15,7 +15,7 @@ import * as aiPlanner from '../services/ai-planner.service.js';
 import * as aiMemoryService from '../services/ai-memory.service.js';
 import * as aiImage from '../services/ai-image.service.js';
 import * as assetService from '../services/asset.service.js';
-import { createModel, validateApiKey, validateConnection, SUPPORTED_MODELS, fetchOpenAiModels, resolveOllamaModelId, streamOllamaChatText, type AiProvider } from '../services/ai-provider.service.js';
+import { createModel, validateApiKey, validateConnection, SUPPORTED_MODELS, fetchOpenAiModels, resolveOllamaModelId, type AiProvider } from '../services/ai-provider.service.js';
 import { getCanonicalProjectContent } from '../services/project-document-content.service.js';
 import { prisma } from '../config/database.js';
 import type { WizardEvent, WizardGeneratedSection } from '@dnd-booker/shared';
@@ -34,17 +34,8 @@ const MAX_OLLAMA_RESPONSE_TOKENS = Number.isFinite(parsedOllamaResponseTokenLimi
 const MAX_STORED_CONTENT = 100_000;
 const MAX_SSE_BYTES = 512_000; // 500KB cap on SSE stream output
 
-function shouldEnableProjectChatTools(provider: AiProvider | null | undefined, message: string): boolean {
-  if (provider !== 'ollama') return true;
-
-  return [
-    /\b(edit|update|replace|remove|delete|move|insert|reorder|fix)\b.*\b(document|content|layout|formatting|page|pages|section|chapter|heading|block|stat block|magic item|npc|encounter|table)\b/i,
-    /\b(evaluate|review|critique|check|score)\b.*\b(document|content|layout|formatting|page|pages)\b/i,
-    /\b(remember|store|save|forget)\b.*\b(memory|fact|preference|decision)\b/i,
-    /\b(update|reset|show|rebuild)\b.*\b(plan|working memory)\b/i,
-    /\b(generate|create|make)\b.*\b(image|images|cover art|illustration|map|maps|banner)\b/i,
-    /\b(create|update|delete|list|get)\b.*\bproject\b/i,
-  ].some((pattern) => pattern.test(message));
+export function shouldEnableProjectChatTools(_provider?: AiProvider | null, _message?: string): boolean {
+  return true;
 }
 
 // --- Settings routes (no project context) ---
@@ -540,8 +531,7 @@ aiChatRoutes.post('/ai/chat', validateUuid('projectId'), chatRateLimit, asyncHan
     savedUserMsgId = savedMsg.id;
 
     const userSettings = await aiSettings.getAiSettings(req.userId!);
-    const toolsEnabled = shouldEnableProjectChatTools(userSettings?.provider as AiProvider | null | undefined, parsed.data.message);
-    const useCompactOllamaPrompt = userSettings?.provider === 'ollama' && !toolsEnabled;
+    const toolsEnabled = shouldEnableProjectChatTools();
 
     // Build message history — limited to recent messages for context window safety
     const history = await aiChat.getRecentMessages(session.id, MAX_CHAT_CONTEXT_MESSAGES);
@@ -550,20 +540,14 @@ aiChatRoutes.post('/ai/chat', validateUuid('projectId'), chatRateLimit, asyncHan
       content: m.content,
     }));
 
-    const planningCtx = useCompactOllamaPrompt
-      ? null
-      : await aiPlanner.buildPlanningContext(projectId, req.userId!);
-    const documentOutline = useCompactOllamaPrompt
-      ? null
-      : aiContent.buildDocumentOutline(projectContent);
-    const documentTextSample = useCompactOllamaPrompt
-      ? null
-      : aiContent.buildDocumentTextSample(projectContent);
+    const planningCtx = await aiPlanner.buildPlanningContext(projectId, req.userId!);
+    const documentOutline = aiContent.buildDocumentOutline(projectContent);
+    const documentTextSample = aiContent.buildDocumentTextSample(projectContent);
     const systemPrompt = aiContent.buildSystemPrompt(
       project.title,
       documentOutline,
       documentTextSample,
-      useCompactOllamaPrompt ? undefined : parsed.data.pageMetrics,
+      parsed.data.pageMetrics,
       userSettings?.provider,
       toolsEnabled,
     )
@@ -579,50 +563,6 @@ aiChatRoutes.post('/ai/chat', validateUuid('projectId'), chatRateLimit, asyncHan
     const tools = toolsEnabled
       ? globalRegistry.getToolsForContexts(['project-chat', 'global'], toolCtx)
       : undefined;
-
-    if (userSettings?.provider === 'ollama' && !toolsEnabled) {
-      let fullResponse = '';
-      let totalBytes = 0;
-
-      res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-      res.setHeader('Transfer-Encoding', 'chunked');
-
-      for await (const chunk of streamOllamaChatText({
-        model: resolveOllamaModelId(userSettings.model ?? undefined),
-        baseUrl: userSettings.baseUrl ?? undefined,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          ...messages,
-        ],
-        maxOutputTokens: userModel.maxOutputTokens,
-        abortSignal: abortController.signal,
-      })) {
-        if (abortController.signal.aborted) break;
-        totalBytes += Buffer.byteLength(chunk, 'utf8');
-        if (totalBytes > MAX_SSE_BYTES) {
-          res.write('\n\n[Stream limit reached]');
-          break;
-        }
-        fullResponse += chunk;
-        res.write(chunk);
-      }
-
-      res.end();
-
-      try {
-        const { visibleText } = await aiPlanner.processAssistantResponse(
-          fullResponse, projectId, req.userId!,
-        );
-        await aiChat.addMessage(session.id, 'assistant', visibleText.slice(0, MAX_STORED_CONTENT));
-      } catch (postErr) {
-        console.error('[AI] Post-stream processing failed:', postErr);
-        await aiChat.addMessage(session.id, 'assistant', fullResponse.slice(0, MAX_STORED_CONTENT)).catch((saveErr) => {
-          console.error('[AI] Failed to save fallback message:', saveErr);
-        });
-      }
-
-      return;
-    }
 
     // Stream the response — tools execute server-side mid-stream
     const streamResult = streamText({

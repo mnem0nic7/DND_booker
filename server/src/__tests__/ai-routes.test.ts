@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import request from 'supertest';
 import app from '../index.js';
 import { prisma } from '../config/database.js';
+import { shouldEnableProjectChatTools } from '../routes/ai.js';
 
 // Integration tests for AI routes.
 // Requires running PostgreSQL. AI provider calls are NOT tested here
@@ -17,6 +18,15 @@ let accessToken: string;
 let projectId: string;
 
 describe('AI Routes', () => {
+  describe('shouldEnableProjectChatTools', () => {
+    it('should keep tools enabled for all in-app chat providers and prompts', () => {
+      expect(shouldEnableProjectChatTools('anthropic', 'Hello')).toBe(true);
+      expect(shouldEnableProjectChatTools('openai', 'Draft a chapter intro')).toBe(true);
+      expect(shouldEnableProjectChatTools('ollama', 'Hello')).toBe(true);
+      expect(shouldEnableProjectChatTools('ollama', 'What should happen next in this scene?')).toBe(true);
+    });
+  });
+
   beforeAll(async () => {
     // Clean up any existing test data
     const existingUser = await prisma.user.findUnique({ where: { email: TEST_USER.email } });
