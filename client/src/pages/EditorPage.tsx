@@ -4,6 +4,10 @@ import type { DocumentContent, LayoutPlan } from '@dnd-booker/shared';
 import { useProjectStore } from '../stores/projectStore';
 import { useAuthStore } from '../stores/authStore';
 import { useThemeStore } from '../stores/themeStore';
+import {
+  countDocumentTextLayoutFallbackScopes,
+  getDocumentTextLayoutFallbackScopeIds,
+} from '../lib/projectSettings';
 import { EditorLayout } from '../components/editor/EditorLayout';
 import { DocumentNavigator } from '../components/editor/DocumentNavigator';
 
@@ -29,6 +33,7 @@ export default function EditorPage() {
     fetchDocuments,
     updateDocumentContent,
     updateDocumentLayoutPlan,
+    clearDocumentTextLayoutFallbacks,
     clearActiveDocument,
   } = useProjectStore();
 
@@ -84,17 +89,11 @@ export default function EditorPage() {
   );
 
   const activeDocumentFallbackScopeIds = activeDocument
-    ? (() => {
-      const fallbackMap = currentProject?.settings?.textLayoutFallbacks;
-      if (!fallbackMap || typeof fallbackMap !== 'object') return [];
-      const entry = (fallbackMap as Record<string, unknown>)[activeDocument.id];
-      if (!entry || typeof entry !== 'object') return [];
-      const rawScopeIds = (entry as { scopeIds?: unknown }).scopeIds;
-      return Array.isArray(rawScopeIds)
-        ? rawScopeIds.filter((scopeId): scopeId is string => typeof scopeId === 'string')
-        : [];
-    })()
+    ? getDocumentTextLayoutFallbackScopeIds(currentProject?.settings, activeDocument.id)
     : [];
+  const activeDocumentFallbackScopeCount = activeDocument
+    ? countDocumentTextLayoutFallbackScopes(currentProject?.settings, activeDocument.id)
+    : 0;
 
   return (
     <div className="h-screen flex flex-col bg-gray-50">
@@ -175,8 +174,10 @@ export default function EditorPage() {
               content={activeDocument.content as DocumentContent}
               layoutPlan={activeDocument.layoutPlan}
               textLayoutFallbackScopeIds={activeDocumentFallbackScopeIds}
+              textLayoutFallbackScopeCount={activeDocumentFallbackScopeCount}
               documentKind={activeDocument.kind}
               documentTitle={activeDocument.title}
+              onClearTextLayoutFallbacks={() => clearDocumentTextLayoutFallbacks(activeDocument.id)}
               onUpdate={handleDocumentContentUpdate}
               onLayoutPlanUpdate={handleDocumentLayoutPlanUpdate}
             />

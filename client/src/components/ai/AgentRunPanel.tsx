@@ -26,6 +26,18 @@ const ACTIVE_STATUSES: AgentRunStatus[] = [
   'checkpointing',
 ];
 
+const ACTION_LABELS: Partial<Record<AgentAction['actionType'], string>> = {
+  audit_layout_parity: 'Audit layout parity',
+  refresh_layout_plan: 'Refresh layout plan',
+  create_export_review: 'Create export review',
+  create_design_profile: 'Create design profile',
+  observe_project: 'Observe project',
+  expand_random_tables: 'Expand random tables',
+  repair_stat_blocks: 'Repair stat blocks',
+  densify_section_utility: 'Densify section utility',
+  finalize_output: 'Finalize output',
+};
+
 function formatEvent(event: AgentEvent): string | null {
   switch (event.type) {
     case 'design_profile_created':
@@ -56,7 +68,12 @@ function formatEvent(event: AgentEvent): string | null {
 }
 
 function formatAction(action: AgentAction): string {
-  const base = action.actionType.replace(/_/g, ' ');
+  const base = ACTION_LABELS[action.actionType] ?? action.actionType.replace(/_/g, ' ');
+  const resultSummary = action.result && typeof action.result === 'object' && 'summary' in action.result
+    && typeof (action.result as { summary?: unknown }).summary === 'string'
+    ? (action.result as { summary: string }).summary
+    : null;
+  if (resultSummary) return `${base}: ${resultSummary}`;
   if (action.rationale) return `${base}: ${action.rationale}`;
   return base;
 }

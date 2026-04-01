@@ -7,9 +7,15 @@ import type {
   ArtifactEvaluation,
   FindingSeverity,
   ExportReview,
+  ExportReviewFinding,
   ExportReviewSeverity,
 } from '@dnd-booker/shared';
 import { ARTIFACT_CATEGORY_MAP } from '@dnd-booker/shared';
+import {
+  getExportReviewFindingDocumentTitle,
+  getTextLayoutParityScopeLabels,
+  splitExportReviewFindings,
+} from '../../lib/exportReview';
 
 const CATEGORY_LABELS: Record<ArtifactCategory, string> = {
   planning: 'Planning',
@@ -51,6 +57,38 @@ function getExportReview(artifact: Pick<GeneratedArtifact, 'artifactType' | 'jso
   if (typeof review !== 'object' || review == null) return null;
   if (!Array.isArray(review.findings) || typeof review.score !== 'number' || !review.metrics) return null;
   return review as ExportReview;
+}
+
+function formatSignedDelta(value: number): string {
+  if (value === 0) return '0';
+  return value > 0 ? `+${value}` : String(value);
+}
+
+function renderFindingContext(finding: ExportReviewFinding) {
+  const title = getExportReviewFindingDocumentTitle(finding);
+  const scopeLabels = getTextLayoutParityScopeLabels(finding);
+
+  if (!title && scopeLabels.length === 0) return null;
+
+  return (
+    <div className="mt-1 space-y-1 text-[11px] text-purple-900">
+      {title && <div>Document: {title}</div>}
+      {scopeLabels.length > 0 && (
+        <div className="flex flex-wrap gap-1">
+          {scopeLabels.slice(0, 3).map((label) => (
+            <span key={label} className="rounded-full border border-purple-200 bg-white/80 px-1.5 py-0.5">
+              {label}
+            </span>
+          ))}
+          {scopeLabels.length > 3 && (
+            <span className="rounded-full border border-purple-200 bg-white/80 px-1.5 py-0.5">
+              +{scopeLabels.length - 3} more
+            </span>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 interface Props {
@@ -210,6 +248,11 @@ export function ArtifactReviewPanel({ projectId, runId }: Props) {
 
         {exportReview && (
           <div className="border border-gray-200 rounded-lg p-2 mb-3">
+            {(() => {
+              const { parityFindings, generalFindings } = splitExportReviewFindings(exportReview);
+              const parityMetrics = exportReview.metrics.textLayoutParity;
+              return (
+                <>
             <div className="flex items-center gap-2 mb-1">
               <div
                 className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white ${
@@ -249,9 +292,40 @@ export function ArtifactReviewPanel({ projectId, runId }: Props) {
               </div>
             )}
 
-            {exportReview.findings.length > 0 ? (
+            {parityMetrics && (
+              <div className="mb-2 rounded-lg border border-purple-200 bg-purple-50 px-2 py-2">
+                <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-purple-800">Text layout parity</div>
+                <div className="grid grid-cols-2 gap-1 text-[10px] text-purple-900">
+                  <span>Mode: {parityMetrics.mode}</span>
+                  <span>Pages: {parityMetrics.legacyPageCount} / {parityMetrics.enginePageCount}</span>
+                  <span>Supported: {parityMetrics.supportedUnitCount}</span>
+                  <span>Unsupported: {parityMetrics.unsupportedUnitCount}</span>
+                  <span>Height delta: {formatSignedDelta(Math.round(parityMetrics.totalHeightDeltaPx))} px</span>
+                  <span>Drift scopes: {parityMetrics.driftScopeIds.length}</span>
+                </div>
+              </div>
+            )}
+
+            {parityFindings.length > 0 && (
+              <div className="mb-2">
+                <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-purple-800">Text layout parity findings</div>
+                <div className="space-y-1">
+                  {parityFindings.map((finding, i) => (
+                    <div
+                      key={`${finding.code}-${finding.page ?? 'na'}-${i}`}
+                      className="text-xs px-2 py-1 rounded border bg-purple-50 text-purple-800 border-purple-200"
+                    >
+                      <span className="font-medium">{finding.code}</span>: {finding.message}
+                      {renderFindingContext(finding)}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {generalFindings.length > 0 ? (
               <div className="space-y-1">
-                {exportReview.findings.map((finding, i) => (
+                {generalFindings.map((finding, i) => (
                   <div
                     key={`${finding.code}-${finding.page ?? 'na'}-${i}`}
                     className={`text-xs px-2 py-1 rounded border ${EXPORT_SEVERITY_COLORS[finding.severity]}`}
@@ -262,8 +336,13 @@ export function ArtifactReviewPanel({ projectId, runId }: Props) {
                 ))}
               </div>
             ) : (
-              <div className="text-xs text-gray-500">No export-review findings.</div>
+              <div className="text-xs text-gray-500">
+                {parityFindings.length > 0 ? 'No non-parity export-review findings.' : 'No export-review findings.'}
+              </div>
             )}
+                </>
+              );
+            })()}
           </div>
         )}
 

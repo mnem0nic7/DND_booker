@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import type { ProjectSettings } from '@dnd-booker/shared';
 import api from '../lib/api';
 
 export type ThemeName =
@@ -15,7 +16,7 @@ interface ThemeState {
   currentTheme: ThemeName;
   _projectId: string | null;
   setTheme: (theme: ThemeName) => void;
-  loadProjectTheme: (projectId: string, settings: Record<string, unknown> | null) => void;
+  loadProjectTheme: (projectId: string, settings: ProjectSettings | null) => void;
 }
 
 export const useThemeStore = create<ThemeState>()(

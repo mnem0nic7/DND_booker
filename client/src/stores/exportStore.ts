@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { AxiosError } from 'axios';
-import type { ExportJob, ExportReviewFixResult } from '@dnd-booker/shared';
+import type { ExportJob, ExportReviewFixChange, ExportReviewFixResult } from '@dnd-booker/shared';
 import api from '../lib/api';
 
 interface ExportState {
@@ -10,6 +10,7 @@ interface ExportState {
   isApplyingFixes: boolean;
   error: string | null;
   fixSummary: string | null;
+  fixChanges: ExportReviewFixChange[];
   exportHistory: ExportJob[];
   openDialog: () => void;
   closeDialog: () => void;
@@ -39,6 +40,7 @@ export const useExportStore = create<ExportState>((set, get) => ({
   isApplyingFixes: false,
   error: null,
   fixSummary: null,
+  fixChanges: [],
   exportHistory: [],
 
   openDialog: () => set({ isOpen: true }),
@@ -50,7 +52,7 @@ export const useExportStore = create<ExportState>((set, get) => ({
 
   startExport: async (projectId: string, format: string) => {
     clearPollTimer();
-    set({ isExporting: true, isApplyingFixes: false, error: null, fixSummary: null, job: null });
+    set({ isExporting: true, isApplyingFixes: false, error: null, fixSummary: null, fixChanges: [], job: null });
 
     try {
       const { data } = await api.post(`/projects/${projectId}/export`, { format });
@@ -65,7 +67,7 @@ export const useExportStore = create<ExportState>((set, get) => ({
 
   applyReviewFixes: async (projectId, exportJobId) => {
     clearPollTimer();
-    set({ isApplyingFixes: true, error: null, fixSummary: null });
+    set({ isApplyingFixes: true, error: null, fixSummary: null, fixChanges: [] });
 
     try {
       const { data } = await api.post<ExportReviewFixResult>(`/export-jobs/${exportJobId}/fix`);
@@ -73,6 +75,7 @@ export const useExportStore = create<ExportState>((set, get) => ({
         set({
           isApplyingFixes: false,
           error: data.summary || 'No automatic export fixes were available.',
+          fixChanges: data.changes ?? [],
         });
         return;
       }
@@ -81,6 +84,7 @@ export const useExportStore = create<ExportState>((set, get) => ({
         job: data.exportJob,
         isApplyingFixes: false,
         fixSummary: data.summary,
+        fixChanges: data.changes ?? [],
       });
       get().pollJobStatus(data.exportJob.id);
       get().fetchExportHistory(projectId);
@@ -89,6 +93,7 @@ export const useExportStore = create<ExportState>((set, get) => ({
       set({
         isApplyingFixes: false,
         error: message || 'Failed to apply export fixes',
+        fixChanges: [],
       });
     }
   },
@@ -138,6 +143,6 @@ export const useExportStore = create<ExportState>((set, get) => ({
 
   reset: () => {
     clearPollTimer();
-    set({ job: null, isExporting: false, isApplyingFixes: false, error: null, fixSummary: null });
+    set({ job: null, isExporting: false, isApplyingFixes: false, error: null, fixSummary: null, fixChanges: [] });
   },
 }));

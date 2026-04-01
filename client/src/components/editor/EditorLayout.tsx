@@ -26,8 +26,10 @@ interface EditorLayoutProps {
   content: DocumentContent;
   layoutPlan?: LayoutPlan | null;
   textLayoutFallbackScopeIds?: string[];
+  textLayoutFallbackScopeCount?: number;
   documentKind?: string | null;
   documentTitle?: string | null;
+  onClearTextLayoutFallbacks?: () => Promise<void> | void;
   onUpdate: (content: DocumentContent) => void;
   onLayoutPlanUpdate?: (layoutPlan: LayoutPlan) => Promise<void> | void;
 }
@@ -37,8 +39,10 @@ export function EditorLayout({
   content,
   layoutPlan = null,
   textLayoutFallbackScopeIds = [],
+  textLayoutFallbackScopeCount = 0,
   documentKind = null,
   documentTitle = null,
+  onClearTextLayoutFallbacks,
   onUpdate,
   onLayoutPlanUpdate,
 }: EditorLayoutProps) {
@@ -58,6 +62,7 @@ export function EditorLayout({
   const [sectionName, setSectionName] = useState('');
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [localLayoutPlan, setLocalLayoutPlan] = useState<LayoutPlan | null>(layoutPlan);
+  const [isClearingTextLayoutFallbacks, setIsClearingTextLayoutFallbacks] = useState(false);
 
   const editor = useEditor({
     extensions: buildEditorExtensions(),
@@ -160,6 +165,16 @@ export function EditorLayout({
       setLocalLayoutPlan(localLayoutPlan);
     }
   }, [localLayoutPlan, onLayoutPlanUpdate]);
+
+  const handleClearTextLayoutFallbacks = useCallback(async () => {
+    if (!onClearTextLayoutFallbacks || isClearingTextLayoutFallbacks) return;
+    setIsClearingTextLayoutFallbacks(true);
+    try {
+      await onClearTextLayoutFallbacks();
+    } finally {
+      setIsClearingTextLayoutFallbacks(false);
+    }
+  }, [isClearingTextLayoutFallbacks, onClearTextLayoutFallbacks]);
 
   return (
     <div className="flex h-full overflow-hidden">
@@ -291,6 +306,26 @@ export function EditorLayout({
         <div className="sr-only" aria-hidden="true">
           {editor && <EditorContent editor={editor} />}
         </div>
+
+        {textLayoutFallbackScopeCount > 0 && (
+          <div className="mx-4 mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="text-sm font-semibold text-amber-900">Legacy fallback is active for this document</div>
+                <p className="mt-1 text-xs text-amber-800">
+                  {textLayoutFallbackScopeCount} scoped fallback{textLayoutFallbackScopeCount === 1 ? '' : 's'} are stabilizing preview, export, and server-side pagination for this document.
+                </p>
+              </div>
+              <button
+                onClick={() => { void handleClearTextLayoutFallbacks(); }}
+                disabled={isClearingTextLayoutFallbacks}
+                className="shrink-0 rounded-md border border-amber-300 bg-white px-3 py-1.5 text-xs font-medium text-amber-900 transition-colors hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isClearingTextLayoutFallbacks ? 'Clearing...' : 'Clear fallback'}
+              </button>
+            </div>
+          </div>
+        )}
 
         <RenderedDocumentCanvas
           theme={currentTheme}

@@ -1,7 +1,10 @@
 import { create } from 'zustand';
 import axios from 'axios';
-import type { DocumentContent, LayoutPlan, ProjectDocument } from '@dnd-booker/shared';
+import type { DocumentContent, LayoutPlan, ProjectDocument, ProjectSettings } from '@dnd-booker/shared';
 import api from '../lib/api';
+import {
+  clearDocumentTextLayoutFallbacks as clearDocumentTextLayoutFallbacksInSettings,
+} from '../lib/projectSettings';
 
 export interface Project {
   id: string;
@@ -10,7 +13,7 @@ export interface Project {
   type: 'campaign' | 'one_shot' | 'supplement' | 'sourcebook';
   status: 'draft' | 'in_progress' | 'review' | 'published';
   coverImageUrl: string | null;
-  settings: Record<string, unknown>;
+  settings: ProjectSettings;
   content?: DocumentContent;
   createdAt: string;
   updatedAt: string;
@@ -44,6 +47,8 @@ interface ProjectState {
   flushPendingSave: () => Promise<void>;
   cancelPendingSave: () => void;
   retrySave: () => Promise<void>;
+  updateProjectSettings: (settings: Partial<ProjectSettings>) => Promise<void>;
+  clearDocumentTextLayoutFallbacks: (documentId: string) => Promise<void>;
 
   // Per-document editing
   documents: ProjectDocument[];
@@ -352,6 +357,60 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       }
       set({ isSaving: false, saveError: classifySaveError(err) });
     }
+  },
+
+  updateProjectSettings: async (settings) => {
+    const project = get().currentProject;
+    if (!project) return;
+
+    await get().flushPendingSave();
+
+    const previousProject = project;
+    const previousProjects = get().projects;
+    const nextSettings: ProjectSettings = {
+      ...project.settings,
+      ...settings,
+    };
+
+    set((state) => ({
+      currentProject: state.currentProject ? { ...state.currentProject, settings: nextSettings } : state.currentProject,
+      projects: state.projects.map((item) => item.id === project.id ? { ...item, settings: nextSettings } : item),
+      isSaving: true,
+      saveError: null,
+    }));
+
+    try {
+      const { data } = await api.put(`/projects/${project.id}`, { settings });
+      set((state) => ({
+        currentProject: state.currentProject ? {
+          ...state.currentProject,
+          ...data,
+          content: data.content ?? state.currentProject.content,
+          settings: data.settings ?? nextSettings,
+        } : state.currentProject,
+        projects: state.projects.map((item) => item.id === project.id ? {
+          ...item,
+          ...data,
+          settings: data.settings ?? nextSettings,
+        } : item),
+        isSaving: false,
+      }));
+    } catch (err) {
+      set({
+        currentProject: previousProject,
+        projects: previousProjects,
+        isSaving: false,
+        saveError: classifySaveError(err),
+      });
+      throw err;
+    }
+  },
+
+  clearDocumentTextLayoutFallbacks: async (documentId) => {
+    const project = get().currentProject;
+    if (!project) return;
+    const nextFallbacks = clearDocumentTextLayoutFallbacksInSettings(project.settings, documentId);
+    await get().updateProjectSettings({ textLayoutFallbacks: nextFallbacks });
   },
 
   // Per-document editing
