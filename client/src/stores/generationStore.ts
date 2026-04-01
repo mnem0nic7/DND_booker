@@ -146,14 +146,7 @@ export const useGenerationStore = create<GenerationState>((set, get) => ({
       const { data } = await api.get(`/projects/${projectId}/ai/generation-runs`);
       if (data.length > 0) {
         const latest = data[0];
-        const isTerminal = ['completed', 'failed', 'cancelled'].includes(latest.status);
-        set({
-          currentRun: latest,
-          progressPercent: isTerminal && latest.status === 'completed'
-            ? 100
-            : latest.progressPercent ?? 0,
-          currentStage: isTerminal ? null : latest.currentStage,
-        });
+        await get().fetchRun(projectId, latest.id);
         if (ACTIVE_STATUSES.includes(latest.status)) {
           get().subscribeToRun(projectId, latest.id);
         }
