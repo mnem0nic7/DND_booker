@@ -77,6 +77,7 @@ services:
       - REDIS_PASSWORD=${REDIS_PASSWORD:-dev-redis-password}
       - SERVER_BASE_URL=http://server:4000
       - AI_KEY_ENCRYPTION_SECRET=${AI_KEY_ENCRYPTION_SECRET:?AI_KEY_ENCRYPTION_SECRET must be set in .env}
+      - GENERATION_TEXT_TIMEOUT_MS=${GENERATION_TEXT_TIMEOUT_MS:-900000}
       - NODE_ENV=production
       - ASSET_STORAGE_DIR=/app/uploads
     volumes:

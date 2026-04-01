@@ -3,7 +3,7 @@ import { execFile } from 'node:child_process';
 import { mkdir } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { promisify } from 'node:util';
-import { TEST_EMAIL, TEST_OLLAMA_MODEL, TEST_PASSWORD } from './test-account';
+import { TEST_EMAIL, TEST_OLLAMA_BASE_URL, TEST_OLLAMA_MODEL, TEST_PASSWORD } from './test-account';
 
 const AI_PROGRESS_POLL_MS = 1_000;
 const DEFAULT_AI_STALL_TIMEOUT_MS = 120_000;
@@ -41,6 +41,20 @@ type ProjectExportJob = {
   completedAt: string | null;
 };
 
+type ProjectGenerationRun = {
+  id: string;
+  status: 'queued' | 'planning' | 'generating_assets' | 'generating_prose' | 'evaluating' | 'revising' | 'assembling' | 'completed' | 'failed' | 'cancelled';
+  artifactCount: number;
+  failureReason: string | null;
+  latestExportReview: {
+    status?: string;
+    metrics?: {
+      pageCount?: number;
+    };
+  } | null;
+  createdAt: string;
+};
+
 type AiSettingsInput = {
   provider: 'anthropic' | 'openai' | 'ollama';
   model: string;
@@ -53,6 +67,11 @@ type StoredAiSettings = {
   model: string | null;
   hasApiKey: boolean;
   baseUrl: string | null;
+};
+
+type OllamaValidationResult = {
+  valid: boolean;
+  models: string[];
 };
 
 async function isOllamaGenerationActive(model = TEST_OLLAMA_MODEL): Promise<boolean> {
@@ -309,6 +328,158 @@ export async function configureAiSettings(page: Page, settings: AiSettingsInput)
       `AI settings did not persist as expected. Got provider=${storedSettings.provider ?? 'null'} model=${storedSettings.model ?? 'null'} configured=${String(isConfigured)}.`,
     );
   }
+}
+
+export async function assertOllamaReady(
+  page: Page,
+  options?: {
+    baseUrl?: string;
+    model?: string;
+  },
+) {
+  const baseUrl = options?.baseUrl ?? TEST_OLLAMA_BASE_URL;
+  const model = options?.model ?? TEST_OLLAMA_MODEL;
+  const accessToken = await getAccessToken(page);
+  const result = await page.evaluate(async ({ token, requestedBaseUrl }) => {
+    const response = await fetch('/api/ai/settings/validate-ollama', {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ baseUrl: requestedBaseUrl }),
+    });
+
+    if (!response.ok) {
+      return {
+        ok: false,
+        status: response.status,
+        body: await response.text(),
+      };
+    }
+
+    return {
+      ok: true,
+      validation: await response.json(),
+    };
+  }, { token: accessToken, requestedBaseUrl: baseUrl });
+
+  if (!result.ok) {
+    throw new Error(`Failed to validate Ollama connection for ${baseUrl}: ${result.status} ${result.body}`);
+  }
+
+  const validation = result.validation as OllamaValidationResult;
+  if (!validation.valid) {
+    throw new Error(`Ollama is not reachable at ${baseUrl}.`);
+  }
+
+  if (!validation.models.includes(model)) {
+    throw new Error(
+      `Ollama is reachable at ${baseUrl}, but model "${model}" is not available. Available models: ${validation.models.join(', ') || '(none)'}.`,
+    );
+  }
+}
+
+export async function getLatestGenerationRunForProject(page: Page, title: string): Promise<ProjectGenerationRun> {
+  const project = await findProjectByTitle(page, title);
+  if (!project) {
+    throw new Error(`Project "${title}" was not found`);
+  }
+
+  const accessToken = await getAccessToken(page);
+  const listResult = await page.evaluate(async ({ projectId, token }) => {
+    const response = await fetch(`/api/projects/${projectId}/ai/generation-runs`, {
+      credentials: 'include',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      return {
+        ok: false,
+        step: 'list-runs',
+        status: response.status,
+        body: await response.text(),
+      };
+    }
+
+    const runs = await response.json() as Array<{ id: string; createdAt: string }>;
+    return {
+      ok: true,
+      runs,
+    };
+  }, { projectId: project.id, token: accessToken });
+
+  if (!listResult.ok) {
+    throw new Error(`Failed to load generation runs during ${listResult.step}: ${listResult.status} ${listResult.body}`);
+  }
+
+  const runs = listResult.runs as Array<{ id: string; createdAt: string }>;
+  if (!Array.isArray(runs) || runs.length === 0) {
+    throw new Error(`Project "${title}" has no generation runs`);
+  }
+
+  const latestRunId = runs
+    .slice()
+    .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())[0]
+    .id;
+
+  const detailResult = await page.evaluate(async ({ projectId, runId, token }) => {
+    const response = await fetch(`/api/projects/${projectId}/ai/generation-runs/${runId}`, {
+      credentials: 'include',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      return {
+        ok: false,
+        step: 'run-detail',
+        status: response.status,
+        body: await response.text(),
+      };
+    }
+
+    return {
+      ok: true,
+      run: await response.json(),
+    };
+  }, { projectId: project.id, runId: latestRunId, token: accessToken });
+
+  if (!detailResult.ok) {
+    throw new Error(`Failed to load generation run during ${detailResult.step}: ${detailResult.status} ${detailResult.body}`);
+  }
+
+  return detailResult.run as ProjectGenerationRun;
+}
+
+export async function waitForLatestGenerationRunForProject(
+  page: Page,
+  title: string,
+  timeoutMs = 60 * 60 * 1000,
+) {
+  const startTime = Date.now();
+  const pollMs = 5_000;
+
+  while (Date.now() - startTime < timeoutMs) {
+    const run = await getLatestGenerationRunForProject(page, title);
+    if (run.status === 'completed') {
+      return run;
+    }
+
+    if (run.status === 'failed' || run.status === 'cancelled') {
+      throw new Error(
+        `Generation run ${run.id} ${run.status}${run.failureReason ? `: ${run.failureReason}` : ''}`,
+      );
+    }
+
+    await page.waitForTimeout(pollMs);
+  }
+
+  throw new Error(`Timed out waiting for generation run for project "${title}" to complete.`);
 }
 
 /**

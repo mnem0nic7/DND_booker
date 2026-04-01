@@ -80,6 +80,7 @@ export async function processGenerationJob(job: Job<GenerationJobData>): Promise
     projectId,
     userId,
     inputPrompt: fullRun.inputPrompt,
+    pageTargetHint: fullRun.estimatedPages ?? null,
     inputParameters: (fullRun.inputParameters && typeof fullRun.inputParameters === 'object' && !Array.isArray(fullRun.inputParameters))
       ? fullRun.inputParameters as Record<string, unknown>
       : null,

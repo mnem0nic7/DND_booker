@@ -74,7 +74,10 @@ describe('Intake Service — executeIntake', () => {
       prompt: 'A level 4 goblin cave adventure',
     });
 
-    const result = await executeIntake(run!, {} as any, 4096);
+    const result = await executeIntake({
+      ...run!,
+      pageTargetHint: 10,
+    }, {} as any, 4096);
 
     expect(result.normalizedInput.title).toBe('The Goblin Caves of Duskhollow');
     expect(result.normalizedInput.inferredMode).toBe('one_shot');
@@ -161,8 +164,57 @@ describe('Intake Service — executeIntake', () => {
       prompt: 'A test adventure',
     });
 
-    const result = await executeIntake(run!, {} as any, 4096);
+    const result = await executeIntake({
+      ...run!,
+      pageTargetHint: 10,
+    }, {} as any, 4096);
     expect(result.normalizedInput.title).toBe(VALID_AI_RESPONSE.title);
+  });
+
+  it('should coerce lightweight local-model schema drift before validation', async () => {
+    const driftedResponse = {
+      ...VALID_AI_RESPONSE,
+      levelRange: 4,
+      themes: 'mystery',
+      pageTarget: undefined,
+      chapterEstimate: undefined,
+      constraints: {
+        strict5e: 'true',
+      },
+      keyElements: {
+        npcs: ['Elder Rowan'],
+        locations: ['Briarford'],
+        plotHooks: ['the ash bell tolling'],
+      },
+    };
+
+    mockGenerateText.mockResolvedValueOnce({
+      text: JSON.stringify(driftedResponse),
+      usage: { inputTokens: 500, outputTokens: 200 },
+    } as any);
+
+    const run = await createRun({
+      projectId: testProject.id,
+      userId: testUser.id,
+      prompt: 'A compact local-model one-shot',
+      pageTarget: 10,
+    });
+
+    const result = await executeIntake({
+      ...run!,
+      pageTargetHint: 10,
+    }, {} as any, 4096);
+
+    expect(result.normalizedInput.levelRange).toEqual({ min: 4, max: 4 });
+    expect(result.normalizedInput.themes).toEqual(['mystery']);
+    expect(result.normalizedInput.constraints).toEqual({
+      strict5e: true,
+      includeHandouts: false,
+      includeMaps: false,
+    });
+    expect(result.normalizedInput.pageTarget).toBe(10);
+    expect(result.normalizedInput.chapterEstimate).toBe(4);
+    expect(result.normalizedInput.keyElements.items).toEqual([]);
   });
 
   it('should record token usage on the artifact', async () => {

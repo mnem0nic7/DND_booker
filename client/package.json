@@ -9,6 +9,8 @@
     "preview": "vite preview",
     "test:unit": "vitest run",
     "test:e2e": "npx playwright test",
+    "test:e2e:one-shot:local": "npx playwright test e2e/ai-one-shot-local.spec.ts",
+    "test:e2e:one-shot:quality": "npx playwright test e2e/ai-one-shot-generation.spec.ts",
     "test:e2e:ui": "npx playwright test --ui"
   },
   "dependencies": {
