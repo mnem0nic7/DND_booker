@@ -489,6 +489,102 @@ describe('Assembler — assembleDocuments', () => {
     expect(result.documentIds).toHaveLength(2);
   });
 
+  it('uses the latest content-bearing chapter draft when the accepted draft is unavailable', async () => {
+    const run = await createRun({
+      projectId: testProject.id,
+      userId: testUser.id,
+      prompt: 'chapter draft fallback test',
+    });
+
+    await prisma.generatedArtifact.create({
+      data: {
+        runId: run!.id,
+        projectId: run!.projectId,
+        artifactType: 'chapter_outline',
+        artifactKey: 'chapter-outline',
+        status: 'accepted',
+        version: 1,
+        title: 'Outline',
+        jsonContent: SAMPLE_OUTLINE as any,
+      },
+    });
+
+    await prisma.generatedArtifact.create({
+      data: {
+        runId: run!.id,
+        projectId: run!.projectId,
+        artifactType: 'chapter_plan',
+        artifactKey: 'chapter-plan-goblin-ambush',
+        status: 'accepted',
+        version: 1,
+        title: 'Plan: The Goblin Ambush',
+        jsonContent: {
+          chapterSlug: 'goblin-ambush',
+          chapterTitle: 'The Goblin Ambush',
+          sections: [{ title: 'Outline Only' }],
+        } as any,
+      },
+    });
+
+    const failedDraft = await prisma.generatedArtifact.create({
+      data: {
+        runId: run!.id,
+        projectId: run!.projectId,
+        artifactType: 'chapter_draft',
+        artifactKey: 'chapter-draft-goblin-ambush',
+        status: 'failed_evaluation',
+        version: 3,
+        title: 'The Goblin Ambush',
+        markdownContent: '## The Goblin Ambush\n\nRecovered draft body.',
+        tiptapContent: {
+          type: 'doc',
+          content: [
+            {
+              type: 'heading',
+              attrs: { level: 2 },
+              content: [{ type: 'text', text: 'The Goblin Ambush' }],
+            },
+            {
+              type: 'paragraph',
+              content: [{ type: 'text', text: 'Recovered draft body.' }],
+            },
+          ],
+        } as any,
+        jsonContent: { chapterSlug: 'goblin-ambush', wordCount: 400 } as any,
+      },
+    });
+
+    await prisma.generatedArtifact.create({
+      data: {
+        runId: run!.id,
+        projectId: run!.projectId,
+        artifactType: 'chapter_draft',
+        artifactKey: 'chapter-draft-dark-forest',
+        status: 'accepted',
+        version: 1,
+        title: 'Into the Dark Forest',
+        tiptapContent: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Dark forest text.' }] }] } as any,
+        jsonContent: { wordCount: 2500 } as any,
+      },
+    });
+
+    const result = await assembleDocuments(run!);
+    expect(result.documentIds).toHaveLength(2);
+
+    const doc = await prisma.projectDocument.findFirstOrThrow({
+      where: { runId: run!.id, slug: 'goblin-ambush' },
+    });
+
+    expect(doc.sourceArtifactId).toBe(failedDraft.id);
+    expect(doc.content).toMatchObject({
+      type: 'doc',
+      content: [
+        expect.objectContaining({ type: 'heading' }),
+        expect.objectContaining({ type: 'paragraph' }),
+      ],
+    });
+  });
+
   it('hydrates markdown-only chapter drafts during assembly', async () => {
     const run = await createRun({
       projectId: testProject.id,

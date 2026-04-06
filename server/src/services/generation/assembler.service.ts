@@ -29,6 +29,14 @@ interface RealizedArtPlacement {
 }
 
 const ASSEMBLY_MARKDOWN_CONVERSION_TIMEOUT_MS = 120_000;
+const ASSEMBLY_FALLBACK_CONTENT_STATUSES = [
+  'generated',
+  'failed_evaluation',
+  'needs_review',
+  'revising',
+  'passed',
+  'evaluating',
+] as const;
 
 async function resolveArtifactContent(
   artifact: {
@@ -100,6 +108,80 @@ async function getAcceptedArtifacts(runId: string) {
     seen.add(a.artifactKey);
     return true;
   });
+}
+
+type AssemblyArtifact = Awaited<ReturnType<typeof getAcceptedArtifacts>>[number];
+
+function hasRecoverableArtifactContent(artifact: Pick<AssemblyArtifact, 'markdownContent' | 'tiptapContent' | 'jsonContent'>): boolean {
+  const recoveredMarkdownFromTipTap = extractMarkdownFromWrappedCodeBlock(artifact.tiptapContent);
+  if (artifact.tiptapContent && !recoveredMarkdownFromTipTap) {
+    return true;
+  }
+
+  if (artifact.markdownContent && normalizeGeneratedMarkdown(artifact.markdownContent)) {
+    return true;
+  }
+
+  if (recoveredMarkdownFromTipTap) {
+    return true;
+  }
+
+  return Boolean(
+    artifact.jsonContent
+    && typeof artifact.jsonContent === 'object'
+    && !Array.isArray(artifact.jsonContent)
+    && (artifact.jsonContent as { type?: unknown }).type === 'doc',
+  );
+}
+
+function resolvePrimaryDraftKey(spec: AssemblyDocumentSpec): string | null {
+  switch (spec.kind) {
+    case 'front_matter':
+      return 'front-matter';
+    case 'chapter':
+      return `chapter-draft-${spec.documentSlug}`;
+    case 'appendix':
+      return `appendix-draft-${spec.documentSlug}`;
+    default:
+      return null;
+  }
+}
+
+async function resolveAssemblySourceArtifact(
+  runId: string,
+  spec: AssemblyDocumentSpec,
+  acceptedByKey: Map<string, AssemblyArtifact>,
+): Promise<{ artifact: AssemblyArtifact | null; accepted: boolean }> {
+  const primaryDraftKey = resolvePrimaryDraftKey(spec);
+  if (primaryDraftKey) {
+    const acceptedDraft = acceptedByKey.get(primaryDraftKey);
+    if (acceptedDraft) {
+      return { artifact: acceptedDraft, accepted: true };
+    }
+
+    const fallbackArtifacts = await prisma.generatedArtifact.findMany({
+      where: {
+        runId,
+        artifactKey: primaryDraftKey,
+        status: { in: [...ASSEMBLY_FALLBACK_CONTENT_STATUSES] },
+      },
+      orderBy: { version: 'desc' },
+    });
+
+    const fallback = fallbackArtifacts.find(hasRecoverableArtifactContent) ?? null;
+    if (fallback) {
+      return { artifact: fallback, accepted: false };
+    }
+  }
+
+  for (const key of spec.artifactKeys) {
+    const accepted = acceptedByKey.get(key);
+    if (accepted) {
+      return { artifact: accepted, accepted: true };
+    }
+  }
+
+  return { artifact: null, accepted: false };
 }
 
 async function getAcceptedGeneratedImages(runId: string): Promise<RealizedArtPlacement[]> {
@@ -273,9 +355,15 @@ export async function assembleDocuments(
   }> = [];
 
   for (const spec of manifestDocs) {
-    // Find the primary content artifact (draft > plan)
-    const draftKey = spec.artifactKeys[0];
-    const artifact = acceptedByKey.get(draftKey);
+    const { artifact, accepted } = await resolveAssemblySourceArtifact(run.id, spec, acceptedByKey);
+    if (artifact && !accepted) {
+      await publishGenerationEvent(run.id, {
+        type: 'run_warning',
+        runId: run.id,
+        message: `Assembly used ${artifact.artifactType} "${artifact.title}" with status "${artifact.status}" because no accepted draft was available for "${spec.title}".`,
+        severity: 'warning',
+      });
+    }
 
     const content = await resolveArtifactContent(artifact ? {
       id: artifact.id,
