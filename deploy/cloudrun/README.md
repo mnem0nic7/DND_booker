@@ -125,11 +125,12 @@ npm run deploy:cloudrun
 
 `npm run deploy:cloudrun` wraps the safest repeatable production flow for this repo:
 
-1. `gcloud builds submit --config deploy/cloudrun/cloudbuild.yaml --substitutions _REGION=us-west4,_REPO=dnd-booker,_TAG=latest`
-2. `gcloud run services replace deploy/cloudrun/service.yaml --region=us-west4`
+1. `gcloud builds submit --config deploy/cloudrun/cloudbuild.yaml --substitutions _REGION=us-west4,_REPO=dnd-booker,_TAG=<git-sha>`
+2. render a temporary service manifest with that same image tag
+3. `gcloud run services replace <rendered-manifest> --region=us-west4`
 3. `gcloud run services describe dnd-booker --region=us-west4 --format='value(status.url)'`
 
-Override `PROJECT_ID`, `REGION`, `REPOSITORY`, `TAG`, or `SERVICE` in the environment if you need a non-default deploy target.
+`TAG` defaults to `git rev-parse --short HEAD`. Override `PROJECT_ID`, `REGION`, `REPOSITORY`, `TAG`, or `SERVICE` in the environment if you need a non-default deploy target.
 
 If you set these before deploy, the wrapper also runs an authenticated `api/v1` smoke test after the health check:
 

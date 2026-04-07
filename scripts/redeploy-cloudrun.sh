@@ -4,8 +4,15 @@ set -euo pipefail
 PROJECT_ID="${PROJECT_ID:-dnd-booker}"
 REGION="${REGION:-us-west4}"
 REPOSITORY="${REPOSITORY:-dnd-booker}"
-TAG="${TAG:-latest}"
+TAG="${TAG:-$(git rev-parse --short HEAD)}"
 SERVICE="${SERVICE:-dnd-booker}"
+TEMP_SERVICE_YAML="$(mktemp)"
+
+cleanup() {
+  rm -f "${TEMP_SERVICE_YAML}"
+}
+
+trap cleanup EXIT
 
 echo "Using project=${PROJECT_ID} region=${REGION} repo=${REPOSITORY} tag=${TAG} service=${SERVICE}"
 if ! command -v gcloud >/dev/null 2>&1; then
@@ -19,7 +26,13 @@ gcloud builds submit \
   --config deploy/cloudrun/cloudbuild.yaml \
   --substitutions "_REGION=${REGION},_REPO=${REPOSITORY},_TAG=${TAG}"
 
-gcloud run services replace deploy/cloudrun/service.yaml \
+sed \
+  -e "s|dnd-booker-client:latest|dnd-booker-client:${TAG}|g" \
+  -e "s|dnd-booker-server:latest|dnd-booker-server:${TAG}|g" \
+  -e "s|dnd-booker-worker:latest|dnd-booker-worker:${TAG}|g" \
+  deploy/cloudrun/service.yaml > "${TEMP_SERVICE_YAML}"
+
+gcloud run services replace "${TEMP_SERVICE_YAML}" \
   --project "${PROJECT_ID}" \
   --region "${REGION}"
 
