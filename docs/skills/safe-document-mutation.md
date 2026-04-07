@@ -18,6 +18,9 @@ Use this skill whenever an automated path edits document content or layout-beari
 - persist both content and layout-plan changes when the resolver changes them
 - mark the document `edited`
 - record a concise action summary for the run log
+- run the relevant document API and editor regression checks
+- update document or editor docs if persistence semantics changed
+- redeploy the affected runtime if the change is production-facing
 
 ## High-Risk Mutation Families
 

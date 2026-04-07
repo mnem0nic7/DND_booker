@@ -91,6 +91,7 @@ export async function processAgentRun(job: Job<AgentJobData>): Promise<void> {
     transitionAgentRunStatus,
     updateAgentRunProgress,
     updateAgentRunState,
+    updateAgentRunGraphState,
   } = await import('../../../server/src/services/agent/run.service.js');
   const { publishAgentEvent } = await import('../../../server/src/services/agent/pubsub.service.js');
   const { createAgentCheckpoint, markBestCheckpoint, restoreAgentCheckpoint } = await import('../../../server/src/services/agent/checkpoint.service.js');
@@ -153,6 +154,18 @@ export async function processAgentRun(job: Job<AgentJobData>): Promise<void> {
       ...(input.isBest ? { bestCheckpointId: checkpoint.id } : {}),
     });
 
+    await updateAgentRunGraphState({
+      runId: agentRunId,
+      userId,
+      patch: {
+        latestCheckpointId: checkpoint.id,
+        ...(input.isBest ? { bestCheckpointId: checkpoint.id } : {}),
+        lastCheckpointLabel: checkpoint.label,
+        cycleIndex: input.cycleIndex,
+        updatedAt: new Date().toISOString(),
+      },
+    });
+
     await publishAgentEvent(agentRunId, {
       type: 'checkpoint_created',
       runId: agentRunId,
@@ -175,6 +188,20 @@ export async function processAgentRun(job: Job<AgentJobData>): Promise<void> {
   let projectChangedSinceLastExport = false;
 
   try {
+    await updateAgentRunGraphState({
+      runId: agentRunId,
+      userId,
+      patch: {
+        jobName: job.name,
+        attemptsMade: job.attemptsMade,
+        queueName: 'agent',
+        status: currentRun.status,
+        currentStage: currentRun.currentStage,
+        progressPercent: currentRun.progressPercent,
+        resumedFromCheckpoint: Boolean(currentRun.latestCheckpointId),
+      },
+    });
+
     if (currentRun.mode === 'background_producer' && !currentRun.linkedGenerationRunId) {
       await setStatus('seeding', 4);
 
@@ -208,7 +235,7 @@ export async function processAgentRun(job: Job<AgentJobData>): Promise<void> {
         runId: agentRunId,
         linkedGenerationRunId: seedRun.id,
       });
-      await enqueueGenerationRun(seedRun.id, userId, projectId);
+      await enqueueGenerationRun(seedRun.id, userId, projectId, { priority: 10 });
       await waitForGenerationRunCompletion(seedRun.id);
 
       await completeAgentAction({

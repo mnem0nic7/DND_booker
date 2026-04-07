@@ -92,27 +92,27 @@ enum DocumentKind {
 }
 
 model User {
-  id           String      @id @default(uuid())
-  email        String      @unique
-  passwordHash String      @map("password_hash")
-  displayName  String      @map("display_name")
-  avatarUrl    String?     @map("avatar_url")
-  tokenVersion Int         @default(0) @map("token_version")
-  aiProvider   String?     @map("ai_provider")
-  aiModel      String?     @map("ai_model")
-  aiApiKeyEnc  String?     @map("ai_api_key_enc")
-  aiApiKeyIv   String?     @map("ai_api_key_iv")
-  aiApiKeyTag  String?     @map("ai_api_key_tag")
-  aiBaseUrl    String?     @map("ai_base_url")
-  createdAt    DateTime    @default(now()) @map("created_at")
-  updatedAt    DateTime    @updatedAt @map("updated_at")
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  displayName  String   @map("display_name")
+  avatarUrl    String?  @map("avatar_url")
+  tokenVersion Int      @default(0) @map("token_version")
+  aiProvider   String?  @map("ai_provider")
+  aiModel      String?  @map("ai_model")
+  aiApiKeyEnc  String?  @map("ai_api_key_enc")
+  aiApiKeyIv   String?  @map("ai_api_key_iv")
+  aiApiKeyTag  String?  @map("ai_api_key_tag")
+  aiBaseUrl    String?  @map("ai_base_url")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
 
-  projects       Project[]
-  exportJobs     ExportJob[]
-  assets         Asset[]
-  templates      Template[]
-  chatSessions   AiChatSession[]
-  wizardSessions AiWizardSession[]
+  projects        Project[]
+  exportJobs      ExportJob[]
+  assets          Asset[]
+  templates       Template[]
+  chatSessions    AiChatSession[]
+  wizardSessions  AiWizardSession[]
   workingMemories AiWorkingMemory[]
   memoryItems     AiMemoryItem[]
   taskPlans       AiTaskPlan[]
@@ -137,52 +137,51 @@ enum ProjectStatus {
 }
 
 model Project {
-  id             String        @id @default(uuid())
-  userId         String        @map("user_id")
-  title          String
-  description    String        @default("")
-  type           ProjectType   @default(campaign)
-  status         ProjectStatus @default(draft)
-  coverImageUrl  String?       @map("cover_image_url")
-  settings       Json          @default("{}")
-  content        Json          @default("{}")
-  createdAt      DateTime      @default(now()) @map("created_at")
-  updatedAt      DateTime      @updatedAt @map("updated_at")
+  id            String        @id @default(uuid())
+  userId        String        @map("user_id")
+  title         String
+  description   String        @default("")
+  type          ProjectType   @default(campaign)
+  status        ProjectStatus @default(draft)
+  coverImageUrl String?       @map("cover_image_url")
+  settings      Json          @default("{}")
+  content       Json          @default("{}")
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
 
-  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  exportJobs     ExportJob[]
-  chatSessions   AiChatSession[]
-  wizardSessions AiWizardSession[]
-  assets         Asset[]
-  workingMemories AiWorkingMemory[]
-  memoryItems     AiMemoryItem[]
-  taskPlans       AiTaskPlan[]
-  contentChunks   ContentChunk[]
-  generationRuns  GenerationRun[]
-  agentRuns       AgentRun[]
+  user             User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  exportJobs       ExportJob[]
+  chatSessions     AiChatSession[]
+  wizardSessions   AiWizardSession[]
+  assets           Asset[]
+  workingMemories  AiWorkingMemory[]
+  memoryItems      AiMemoryItem[]
+  taskPlans        AiTaskPlan[]
+  contentChunks    ContentChunk[]
+  generationRuns   GenerationRun[]
+  agentRuns        AgentRun[]
   agentCheckpoints AgentCheckpoint[]
-  campaignBibles  CampaignBible[]
-  canonEntities   CanonEntity[]
-  artifacts       GeneratedArtifact[]
-  documents       ProjectDocument[]
+  campaignBibles   CampaignBible[]
+  canonEntities    CanonEntity[]
+  artifacts        GeneratedArtifact[]
+  documents        ProjectDocument[]
 
   @@index([userId])
   @@map("projects")
 }
 
-
 model Template {
-  id            String      @id @default(uuid())
-  name          String
-  description   String      @default("")
-  type          ProjectType @default(campaign)
-  content       Json        @default("{}")
-  thumbnailUrl  String?     @map("thumbnail_url")
-  isSystem      Boolean     @default(false) @map("is_system")
-  userId        String?     @map("user_id")
-  createdAt     DateTime    @default(now()) @map("created_at")
+  id           String      @id @default(uuid())
+  name         String
+  description  String      @default("")
+  type         ProjectType @default(campaign)
+  content      Json        @default("{}")
+  thumbnailUrl String?     @map("thumbnail_url")
+  isSystem     Boolean     @default(false) @map("is_system")
+  userId       String?     @map("user_id")
+  createdAt    DateTime    @default(now()) @map("created_at")
 
-  user          User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([userId])
   @@map("templates")
@@ -202,20 +201,20 @@ enum ExportStatus {
 }
 
 model ExportJob {
-  id            String       @id @default(uuid())
-  projectId     String       @map("project_id")
-  userId        String       @map("user_id")
-  format        ExportFormat
-  status        ExportStatus @default(queued)
-  progress      Int          @default(0)
-  outputUrl     String?      @map("output_url")
-  errorMessage  String?      @map("error_message")
-  reviewJson    Json?        @map("review_json")
-  createdAt     DateTime     @default(now()) @map("created_at")
-  completedAt   DateTime?    @map("completed_at")
+  id           String       @id @default(uuid())
+  projectId    String       @map("project_id")
+  userId       String       @map("user_id")
+  format       ExportFormat
+  status       ExportStatus @default(queued)
+  progress     Int          @default(0)
+  outputUrl    String?      @map("output_url")
+  errorMessage String?      @map("error_message")
+  reviewJson   Json?        @map("review_json")
+  createdAt    DateTime     @default(now()) @map("created_at")
+  completedAt  DateTime?    @map("completed_at")
 
-  project       Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([projectId])
   @@index([userId])
@@ -223,17 +222,17 @@ model ExportJob {
 }
 
 model Asset {
-  id          String   @id @default(uuid())
-  userId      String   @map("user_id")
-  projectId   String?  @map("project_id")
-  filename    String
-  mimeType    String   @map("mime_type")
-  url         String
-  sizeBytes   Int      @map("size_bytes")
-  createdAt   DateTime @default(now()) @map("created_at")
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  projectId String?  @map("project_id")
+  filename  String
+  mimeType  String   @map("mime_type")
+  url       String
+  sizeBytes Int      @map("size_bytes")
+  createdAt DateTime @default(now()) @map("created_at")
 
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  project     Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
 
   @@index([userId])
   @@index([projectId])
@@ -241,14 +240,14 @@ model Asset {
 }
 
 model AiChatSession {
-  id        String          @id @default(uuid())
-  projectId String          @map("project_id")
-  userId    String          @map("user_id")
-  createdAt DateTime        @default(now()) @map("created_at")
+  id        String   @id @default(uuid())
+  projectId String   @map("project_id")
+  userId    String   @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at")
 
-  project   Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  messages  AiChatMessage[]
+  project  Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user     User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages AiChatMessage[]
 
   @@unique([projectId, userId])
   @@map("ai_chat_sessions")
@@ -267,8 +266,8 @@ model AiWizardSession {
   createdAt  DateTime @default(now()) @map("created_at")
   updatedAt  DateTime @updatedAt @map("updated_at")
 
-  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([projectId, userId])
   @@index([projectId])
@@ -277,14 +276,14 @@ model AiWizardSession {
 }
 
 model AiChatMessage {
-  id        String        @id @default(uuid())
-  sessionId String        @map("session_id")
+  id        String   @id @default(uuid())
+  sessionId String   @map("session_id")
   role      String
   content   String
   blocks    Json?
-  createdAt DateTime      @default(now()) @map("created_at")
+  createdAt DateTime @default(now()) @map("created_at")
 
-  session   AiChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  session AiChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
   @@index([sessionId])
   @@map("ai_chat_messages")
@@ -297,8 +296,8 @@ model AiWorkingMemory {
   bullets   Json     @default("[]")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([projectId, userId])
   @@map("ai_working_memories")
@@ -314,8 +313,8 @@ model AiMemoryItem {
   source     String?
   createdAt  DateTime @default(now()) @map("created_at")
 
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  project    Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
 
   @@index([userId])
   @@index([userId, projectId])
@@ -329,27 +328,27 @@ model AiTaskPlan {
   tasks     Json     @default("[]")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([projectId, userId])
   @@map("ai_task_plans")
 }
 
 model AiToolAudit {
-  id              String    @id @default(uuid())
-  requestId       String    @map("request_id")
-  userId          String    @map("user_id")
-  projectId       String?   @map("project_id")
-  toolName        String    @map("tool_name")
-  inputHash       String    @map("input_hash")
-  resultStatus    String    @map("result_status")
-  oldContentHash  String?   @map("old_content_hash")
-  newContentHash  String?   @map("new_content_hash")
-  oldUpdatedAt    DateTime? @map("old_updated_at")
-  newUpdatedAt    DateTime? @map("new_updated_at")
-  latencyMs       Int       @map("latency_ms")
-  createdAt       DateTime  @default(now()) @map("created_at")
+  id             String    @id @default(uuid())
+  requestId      String    @map("request_id")
+  userId         String    @map("user_id")
+  projectId      String?   @map("project_id")
+  toolName       String    @map("tool_name")
+  inputHash      String    @map("input_hash")
+  resultStatus   String    @map("result_status")
+  oldContentHash String?   @map("old_content_hash")
+  newContentHash String?   @map("new_content_hash")
+  oldUpdatedAt   DateTime? @map("old_updated_at")
+  newUpdatedAt   DateTime? @map("new_updated_at")
+  latencyMs      Int       @map("latency_ms")
+  createdAt      DateTime  @default(now()) @map("created_at")
 
   @@index([userId])
   @@index([projectId])
@@ -369,7 +368,7 @@ model ContentChunk {
   nodeIndex   Int      @map("node_index")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
-  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@unique([projectId, chunkId])
   @@index([projectId])
@@ -377,99 +376,111 @@ model ContentChunk {
 }
 
 model GenerationRun {
-  id              String            @id @default(uuid())
-  projectId       String            @map("project_id")
-  userId          String            @map("user_id")
-  mode            GenerationMode
-  quality         GenerationQuality @default(quick)
-  status          RunStatus         @default(queued)
-  currentStage    String?           @map("current_stage")
-  inputPrompt     String            @map("input_prompt")
-  inputParameters Json?             @map("input_parameters")
-  progressPercent Int               @default(0) @map("progress_percent")
-  estimatedPages  Int?              @map("estimated_pages")
-  estimatedTokens Int?              @map("estimated_tokens")
-  estimatedCost   Float?            @map("estimated_cost")
-  actualTokens    Int               @default(0) @map("actual_tokens")
-  actualCost      Float             @default(0) @map("actual_cost")
-  failureReason   String?           @map("failure_reason")
-  metricsJson     Json?             @map("metrics_json")
-  createdAt       DateTime          @default(now()) @map("created_at")
-  updatedAt       DateTime          @updatedAt @map("updated_at")
-  startedAt       DateTime?         @map("started_at")
-  completedAt     DateTime?         @map("completed_at")
+  id                 String            @id @default(uuid())
+  projectId          String            @map("project_id")
+  userId             String            @map("user_id")
+  mode               GenerationMode
+  quality            GenerationQuality @default(quick)
+  status             RunStatus         @default(queued)
+  currentStage       String?           @map("current_stage")
+  graphThreadId      String?           @map("graph_thread_id")
+  graphCheckpointKey String?           @map("graph_checkpoint_key")
+  graphStateJson     Json?             @map("graph_state_json")
+  resumeToken        String?           @map("resume_token")
+  inputPrompt        String            @map("input_prompt")
+  inputParameters    Json?             @map("input_parameters")
+  progressPercent    Int               @default(0) @map("progress_percent")
+  estimatedPages     Int?              @map("estimated_pages")
+  estimatedTokens    Int?              @map("estimated_tokens")
+  estimatedCost      Float?            @map("estimated_cost")
+  actualTokens       Int               @default(0) @map("actual_tokens")
+  actualCost         Float             @default(0) @map("actual_cost")
+  failureReason      String?           @map("failure_reason")
+  metricsJson        Json?             @map("metrics_json")
+  createdAt          DateTime          @default(now()) @map("created_at")
+  updatedAt          DateTime          @updatedAt @map("updated_at")
+  startedAt          DateTime?         @map("started_at")
+  completedAt        DateTime?         @map("completed_at")
 
-  project         Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project         Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user            User                @relation(fields: [userId], references: [id], onDelete: Cascade)
   tasks           GenerationTask[]
   bible           CampaignBible?
   artifacts       GeneratedArtifact[]
   canonEntities   CanonEntity[]
   manifests       AssemblyManifest[]
-  linkedAgentRuns AgentRun[]        @relation("LinkedGenerationRun")
+  linkedAgentRuns AgentRun[]          @relation("LinkedGenerationRun")
 
   @@index([projectId])
   @@index([userId])
   @@index([status])
+  @@index([graphThreadId])
+  @@index([graphCheckpointKey])
   @@map("generation_runs")
 }
 
 model AgentRun {
-  id                   String         @id @default(uuid())
-  projectId            String         @map("project_id")
-  userId               String         @map("user_id")
-  linkedGenerationRunId String?       @map("linked_generation_run_id")
-  mode                 AgentRunMode
-  status               AgentRunStatus @default(queued)
-  currentStage         String?        @map("current_stage")
-  progressPercent      Int            @default(0) @map("progress_percent")
-  goalJson             Json           @map("goal_json")
-  budgetJson           Json           @map("budget_json")
-  critiqueBacklogJson  Json           @default("[]") @map("critique_backlog_json")
-  latestScorecardJson  Json?          @map("latest_scorecard_json")
-  designProfileJson    Json?          @map("design_profile_json")
-  bestCheckpointId     String?        @map("best_checkpoint_id")
-  latestCheckpointId   String?        @map("latest_checkpoint_id")
-  currentStrategy      String?        @map("current_strategy")
-  cycleCount           Int            @default(0) @map("cycle_count")
-  exportCount          Int            @default(0) @map("export_count")
-  noImprovementStreak  Int            @default(0) @map("no_improvement_streak")
-  failureReason        String?        @map("failure_reason")
-  createdAt            DateTime       @default(now()) @map("created_at")
-  updatedAt            DateTime       @updatedAt @map("updated_at")
-  startedAt            DateTime?      @map("started_at")
-  completedAt          DateTime?      @map("completed_at")
+  id                    String         @id @default(uuid())
+  projectId             String         @map("project_id")
+  userId                String         @map("user_id")
+  linkedGenerationRunId String?        @map("linked_generation_run_id")
+  mode                  AgentRunMode
+  status                AgentRunStatus @default(queued)
+  currentStage          String?        @map("current_stage")
+  graphThreadId         String?        @map("graph_thread_id")
+  graphCheckpointKey    String?        @map("graph_checkpoint_key")
+  graphStateJson        Json?          @map("graph_state_json")
+  resumeToken           String?        @map("resume_token")
+  progressPercent       Int            @default(0) @map("progress_percent")
+  goalJson              Json           @map("goal_json")
+  budgetJson            Json           @map("budget_json")
+  critiqueBacklogJson   Json           @default("[]") @map("critique_backlog_json")
+  latestScorecardJson   Json?          @map("latest_scorecard_json")
+  designProfileJson     Json?          @map("design_profile_json")
+  bestCheckpointId      String?        @map("best_checkpoint_id")
+  latestCheckpointId    String?        @map("latest_checkpoint_id")
+  currentStrategy       String?        @map("current_strategy")
+  cycleCount            Int            @default(0) @map("cycle_count")
+  exportCount           Int            @default(0) @map("export_count")
+  noImprovementStreak   Int            @default(0) @map("no_improvement_streak")
+  failureReason         String?        @map("failure_reason")
+  createdAt             DateTime       @default(now()) @map("created_at")
+  updatedAt             DateTime       @updatedAt @map("updated_at")
+  startedAt             DateTime?      @map("started_at")
+  completedAt           DateTime?      @map("completed_at")
 
-  project              Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  user                 User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  linkedGenerationRun  GenerationRun? @relation("LinkedGenerationRun", fields: [linkedGenerationRunId], references: [id], onDelete: SetNull)
-  checkpoints          AgentCheckpoint[]
-  actions              AgentAction[]
-  observations         AgentObservation[]
-  decisions            AgentDecision[]
+  project             Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user                User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  linkedGenerationRun GenerationRun?     @relation("LinkedGenerationRun", fields: [linkedGenerationRunId], references: [id], onDelete: SetNull)
+  checkpoints         AgentCheckpoint[]
+  actions             AgentAction[]
+  observations        AgentObservation[]
+  decisions           AgentDecision[]
 
   @@index([projectId])
   @@index([userId])
   @@index([status])
+  @@index([graphThreadId])
+  @@index([graphCheckpointKey])
   @@map("agent_runs")
 }
 
 model AgentCheckpoint {
-  id                   String    @id @default(uuid())
-  runId                String    @map("run_id")
-  projectId            String    @map("project_id")
-  label                String
-  summary              String?
-  cycleIndex           Int       @default(0) @map("cycle_index")
-  isBest               Boolean   @default(false) @map("is_best")
-  scorecardJson        Json?     @map("scorecard_json")
-  projectSnapshotJson  Json      @map("project_snapshot_json")
+  id                    String   @id @default(uuid())
+  runId                 String   @map("run_id")
+  projectId             String   @map("project_id")
+  label                 String
+  summary               String?
+  cycleIndex            Int      @default(0) @map("cycle_index")
+  isBest                Boolean  @default(false) @map("is_best")
+  scorecardJson         Json?    @map("scorecard_json")
+  projectSnapshotJson   Json     @map("project_snapshot_json")
   documentsSnapshotJson Json     @map("documents_snapshot_json")
-  assetsSnapshotJson   Json      @map("assets_snapshot_json")
-  createdAt            DateTime  @default(now()) @map("created_at")
+  assetsSnapshotJson    Json     @map("assets_snapshot_json")
+  createdAt             DateTime @default(now()) @map("created_at")
 
-  run                  AgentRun  @relation(fields: [runId], references: [id], onDelete: Cascade)
-  project              Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  run     AgentRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  project Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@index([runId])
   @@index([projectId])
@@ -478,20 +489,20 @@ model AgentCheckpoint {
 }
 
 model AgentAction {
-  id              String            @id @default(uuid())
-  runId           String            @map("run_id")
-  cycleIndex      Int               @default(0) @map("cycle_index")
-  actionType      String            @map("action_type")
-  status          AgentActionStatus @default(queued)
-  rationale       String?
-  inputJson       Json?             @map("input_json")
-  resultJson      Json?             @map("result_json")
-  scoreDelta      Float?            @map("score_delta")
-  startedAt       DateTime?         @map("started_at")
-  completedAt     DateTime?         @map("completed_at")
-  createdAt       DateTime          @default(now()) @map("created_at")
+  id          String            @id @default(uuid())
+  runId       String            @map("run_id")
+  cycleIndex  Int               @default(0) @map("cycle_index")
+  actionType  String            @map("action_type")
+  status      AgentActionStatus @default(queued)
+  rationale   String?
+  inputJson   Json?             @map("input_json")
+  resultJson  Json?             @map("result_json")
+  scoreDelta  Float?            @map("score_delta")
+  startedAt   DateTime?         @map("started_at")
+  completedAt DateTime?         @map("completed_at")
+  createdAt   DateTime          @default(now()) @map("created_at")
 
-  run             AgentRun          @relation(fields: [runId], references: [id], onDelete: Cascade)
+  run AgentRun @relation(fields: [runId], references: [id], onDelete: Cascade)
 
   @@index([runId])
   @@index([runId, cycleIndex])
@@ -499,15 +510,15 @@ model AgentAction {
 }
 
 model AgentObservation {
-  id              String    @id @default(uuid())
-  runId           String    @map("run_id")
-  cycleIndex      Int       @default(0) @map("cycle_index")
-  observationType String    @map("observation_type")
+  id              String   @id @default(uuid())
+  runId           String   @map("run_id")
+  cycleIndex      Int      @default(0) @map("cycle_index")
+  observationType String   @map("observation_type")
   summary         String
-  payloadJson     Json?     @map("payload_json")
-  createdAt       DateTime  @default(now()) @map("created_at")
+  payloadJson     Json?    @map("payload_json")
+  createdAt       DateTime @default(now()) @map("created_at")
 
-  run             AgentRun  @relation(fields: [runId], references: [id], onDelete: Cascade)
+  run AgentRun @relation(fields: [runId], references: [id], onDelete: Cascade)
 
   @@index([runId])
   @@index([runId, cycleIndex])
@@ -515,16 +526,16 @@ model AgentObservation {
 }
 
 model AgentDecision {
-  id               String    @id @default(uuid())
-  runId            String    @map("run_id")
-  cycleIndex       Int       @default(0) @map("cycle_index")
-  decisionType     String    @map("decision_type")
-  chosenActionType String?   @map("chosen_action_type")
+  id               String   @id @default(uuid())
+  runId            String   @map("run_id")
+  cycleIndex       Int      @default(0) @map("cycle_index")
+  decisionType     String   @map("decision_type")
+  chosenActionType String?  @map("chosen_action_type")
   rationale        String
-  payloadJson      Json?     @map("payload_json")
-  createdAt        DateTime  @default(now()) @map("created_at")
+  payloadJson      Json?    @map("payload_json")
+  createdAt        DateTime @default(now()) @map("created_at")
 
-  run              AgentRun  @relation(fields: [runId], references: [id], onDelete: Cascade)
+  run AgentRun @relation(fields: [runId], references: [id], onDelete: Cascade)
 
   @@index([runId])
   @@index([runId, cycleIndex])
@@ -532,30 +543,30 @@ model AgentDecision {
 }
 
 model GenerationTask {
-  id              String      @id @default(uuid())
-  runId           String      @map("run_id")
-  parentTaskId    String?     @map("parent_task_id")
-  taskType        String      @map("task_type")
-  artifactType    String?     @map("artifact_type")
-  artifactKey     String?     @map("artifact_key")
-  status          TaskStatus  @default(queued)
-  priority        Int         @default(0)
-  attemptCount    Int         @default(0) @map("attempt_count")
-  maxAttempts     Int         @default(2) @map("max_attempts")
-  dependsOn       Json        @default("[]") @map("depends_on")
-  inputPayload    Json?       @map("input_payload")
-  resultPayload   Json?       @map("result_payload")
-  errorMessage    String?     @map("error_message")
-  tokenCount      Int?        @map("token_count")
-  costEstimate    Float?      @map("cost_estimate")
-  startedAt       DateTime?   @map("started_at")
-  completedAt     DateTime?   @map("completed_at")
-  createdAt       DateTime    @default(now()) @map("created_at")
-  updatedAt       DateTime    @updatedAt @map("updated_at")
+  id            String     @id @default(uuid())
+  runId         String     @map("run_id")
+  parentTaskId  String?    @map("parent_task_id")
+  taskType      String     @map("task_type")
+  artifactType  String?    @map("artifact_type")
+  artifactKey   String?    @map("artifact_key")
+  status        TaskStatus @default(queued)
+  priority      Int        @default(0)
+  attemptCount  Int        @default(0) @map("attempt_count")
+  maxAttempts   Int        @default(2) @map("max_attempts")
+  dependsOn     Json       @default("[]") @map("depends_on")
+  inputPayload  Json?      @map("input_payload")
+  resultPayload Json?      @map("result_payload")
+  errorMessage  String?    @map("error_message")
+  tokenCount    Int?       @map("token_count")
+  costEstimate  Float?     @map("cost_estimate")
+  startedAt     DateTime?  @map("started_at")
+  completedAt   DateTime?  @map("completed_at")
+  createdAt     DateTime   @default(now()) @map("created_at")
+  updatedAt     DateTime   @updatedAt @map("updated_at")
 
-  run             GenerationRun  @relation(fields: [runId], references: [id], onDelete: Cascade)
-  parentTask      GenerationTask? @relation("TaskParent", fields: [parentTaskId], references: [id])
-  childTasks      GenerationTask[] @relation("TaskParent")
+  run        GenerationRun    @relation(fields: [runId], references: [id], onDelete: Cascade)
+  parentTask GenerationTask?  @relation("TaskParent", fields: [parentTaskId], references: [id])
+  childTasks GenerationTask[] @relation("TaskParent")
 
   @@index([runId])
   @@index([runId, status])
@@ -564,49 +575,49 @@ model GenerationTask {
 }
 
 model CampaignBible {
-  id              String    @id @default(uuid())
-  runId           String    @unique @map("run_id")
-  projectId       String    @map("project_id")
-  version         Int       @default(1)
-  title           String
-  summary         String
-  premise         String?
-  worldRules      Json?     @map("world_rules")
-  actStructure    Json?     @map("act_structure")
-  timeline        Json?
+  id               String   @id @default(uuid())
+  runId            String   @unique @map("run_id")
+  projectId        String   @map("project_id")
+  version          Int      @default(1)
+  title            String
+  summary          String
+  premise          String?
+  worldRules       Json?    @map("world_rules")
+  actStructure     Json?    @map("act_structure")
+  timeline         Json?
   levelProgression Json?    @map("level_progression")
-  pageBudget      Json?     @map("page_budget")
-  styleGuide      Json?     @map("style_guide")
-  openThreads     Json?     @map("open_threads")
-  status          String    @default("draft")
-  createdAt       DateTime  @default(now()) @map("created_at")
-  updatedAt       DateTime  @updatedAt @map("updated_at")
+  pageBudget       Json?    @map("page_budget")
+  styleGuide       Json?    @map("style_guide")
+  openThreads      Json?    @map("open_threads")
+  status           String   @default("draft")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
 
-  run             GenerationRun @relation(fields: [runId], references: [id], onDelete: Cascade)
-  project         Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  run     GenerationRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  project Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@index([projectId])
   @@map("campaign_bibles")
 }
 
 model CanonEntity {
-  id              String    @id @default(uuid())
-  projectId       String    @map("project_id")
-  runId           String    @map("run_id")
-  entityType      String    @map("entity_type")
-  slug            String
-  canonicalName   String    @map("canonical_name")
-  aliases         Json      @default("[]")
-  canonicalData   Json      @map("canonical_data")
-  summary         String
+  id               String   @id @default(uuid())
+  projectId        String   @map("project_id")
+  runId            String   @map("run_id")
+  entityType       String   @map("entity_type")
+  slug             String
+  canonicalName    String   @map("canonical_name")
+  aliases          Json     @default("[]")
+  canonicalData    Json     @map("canonical_data")
+  summary          String
   sourceArtifactId String?  @map("source_artifact_id")
-  status          String    @default("active")
-  createdAt       DateTime  @default(now()) @map("created_at")
-  updatedAt       DateTime  @updatedAt @map("updated_at")
+  status           String   @default("active")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
 
-  project         Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  run             GenerationRun @relation(fields: [runId], references: [id], onDelete: Cascade)
-  references      CanonReference[]
+  project    Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  run        GenerationRun    @relation(fields: [runId], references: [id], onDelete: Cascade)
+  references CanonReference[]
 
   @@unique([runId, entityType, slug])
   @@index([projectId])
@@ -616,14 +627,14 @@ model CanonEntity {
 }
 
 model CanonReference {
-  id              String    @id @default(uuid())
-  entityId        String    @map("entity_id")
-  artifactId      String    @map("artifact_id")
-  referenceType   String    @map("reference_type")
-  metadata        Json?
+  id            String @id @default(uuid())
+  entityId      String @map("entity_id")
+  artifactId    String @map("artifact_id")
+  referenceType String @map("reference_type")
+  metadata      Json?
 
-  entity          CanonEntity @relation(fields: [entityId], references: [id], onDelete: Cascade)
-  artifact        GeneratedArtifact @relation(fields: [artifactId], references: [id], onDelete: Cascade)
+  entity   CanonEntity       @relation(fields: [entityId], references: [id], onDelete: Cascade)
+  artifact GeneratedArtifact @relation(fields: [artifactId], references: [id], onDelete: Cascade)
 
   @@index([entityId])
   @@index([artifactId])
@@ -651,13 +662,13 @@ model GeneratedArtifact {
   createdAt        DateTime       @default(now()) @map("created_at")
   updatedAt        DateTime       @updatedAt @map("updated_at")
 
-  run              GenerationRun  @relation(fields: [runId], references: [id], onDelete: Cascade)
-  project          Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  parentArtifact   GeneratedArtifact? @relation("ArtifactParent", fields: [parentArtifactId], references: [id])
-  childArtifacts   GeneratedArtifact[] @relation("ArtifactParent")
-  evaluations      ArtifactEvaluation[]
-  revisions        ArtifactRevision[] @relation("RevisionTarget")
-  canonReferences  CanonReference[]
+  run             GenerationRun        @relation(fields: [runId], references: [id], onDelete: Cascade)
+  project         Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  parentArtifact  GeneratedArtifact?   @relation("ArtifactParent", fields: [parentArtifactId], references: [id])
+  childArtifacts  GeneratedArtifact[]  @relation("ArtifactParent")
+  evaluations     ArtifactEvaluation[]
+  revisions       ArtifactRevision[]   @relation("RevisionTarget")
+  canonReferences CanonReference[]
 
   @@unique([runId, artifactType, artifactKey, version])
   @@index([runId])
@@ -685,64 +696,70 @@ model ArtifactEvaluation {
   tokenCount             Int?     @map("token_count")
   createdAt              DateTime @default(now()) @map("created_at")
 
-  artifact               GeneratedArtifact @relation(fields: [artifactId], references: [id], onDelete: Cascade)
+  artifact GeneratedArtifact @relation(fields: [artifactId], references: [id], onDelete: Cascade)
 
   @@index([artifactId])
   @@map("artifact_evaluations")
 }
 
 model ArtifactRevision {
-  id              String   @id @default(uuid())
-  artifactId      String   @map("artifact_id")
-  fromVersion     Int      @map("from_version")
-  toVersion       Int      @map("to_version")
-  reason          String
-  findingCodes    Json?    @map("finding_codes")
-  revisionPrompt  String?  @map("revision_prompt")
-  tokenCount      Int?     @map("token_count")
-  createdAt       DateTime @default(now()) @map("created_at")
+  id             String   @id @default(uuid())
+  artifactId     String   @map("artifact_id")
+  fromVersion    Int      @map("from_version")
+  toVersion      Int      @map("to_version")
+  reason         String
+  findingCodes   Json?    @map("finding_codes")
+  revisionPrompt String?  @map("revision_prompt")
+  tokenCount     Int?     @map("token_count")
+  createdAt      DateTime @default(now()) @map("created_at")
 
-  artifact        GeneratedArtifact @relation("RevisionTarget", fields: [artifactId], references: [id], onDelete: Cascade)
+  artifact GeneratedArtifact @relation("RevisionTarget", fields: [artifactId], references: [id], onDelete: Cascade)
 
   @@index([artifactId])
   @@map("artifact_revisions")
 }
 
 model AssemblyManifest {
-  id            String    @id @default(uuid())
-  runId         String    @map("run_id")
-  projectId     String    @map("project_id")
-  version       Int       @default(1)
+  id            String   @id @default(uuid())
+  runId         String   @map("run_id")
+  projectId     String   @map("project_id")
+  version       Int      @default(1)
   documents     Json
-  assemblyRules Json?     @map("assembly_rules")
-  status        String    @default("draft")
-  createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime  @updatedAt @map("updated_at")
+  assemblyRules Json?    @map("assembly_rules")
+  status        String   @default("draft")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
 
-  run           GenerationRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  run GenerationRun @relation(fields: [runId], references: [id], onDelete: Cascade)
 
   @@index([runId])
   @@map("assembly_manifests")
 }
 
 model ProjectDocument {
-  id               String       @id @default(uuid())
-  projectId        String       @map("project_id")
-  runId            String?      @map("run_id")
-  kind             DocumentKind
-  title            String
-  slug             String
-  sortOrder        Int          @map("sort_order")
-  targetPageCount  Int?         @map("target_page_count")
-  outlineJson      Json?        @map("outline_json")
-  layoutPlan       Json?        @map("layout_json")
-  content          Json         @default("{}")
-  status           String       @default("draft")
-  sourceArtifactId String?      @map("source_artifact_id")
-  createdAt        DateTime     @default(now()) @map("created_at")
-  updatedAt        DateTime     @updatedAt @map("updated_at")
+  id                      String       @id @default(uuid())
+  projectId               String       @map("project_id")
+  runId                   String?      @map("run_id")
+  kind                    DocumentKind
+  title                   String
+  slug                    String
+  sortOrder               Int          @map("sort_order")
+  targetPageCount         Int?         @map("target_page_count")
+  outlineJson             Json?        @map("outline_json")
+  layoutPlan              Json?        @map("layout_json")
+  content                 Json         @default("{}")
+  canonicalDocJson        Json?        @map("canonical_doc_json")
+  editorProjectionJson    Json?        @map("editor_projection_json")
+  typstSource             String?      @map("typst_source")
+  canonicalVersion        Int          @default(1) @map("canonical_version")
+  editorProjectionVersion Int          @default(1) @map("editor_projection_version")
+  typstVersion            Int          @default(1) @map("typst_version")
+  status                  String       @default("draft")
+  sourceArtifactId        String?      @map("source_artifact_id")
+  createdAt               DateTime     @default(now()) @map("created_at")
+  updatedAt               DateTime     @updatedAt @map("updated_at")
 
-  project          Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@unique([projectId, slug])
   @@index([projectId])

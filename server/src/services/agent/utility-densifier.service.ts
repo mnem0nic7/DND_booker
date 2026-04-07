@@ -200,7 +200,9 @@ async function generateUtilityPacketWithModel(input: {
   documentTitle: string;
   documentSample: string;
 }) {
-  const { model, maxOutputTokens } = await resolveAgentModelForUser(input.userId);
+  const { model, maxOutputTokens } = await resolveAgentModelForUser(input.userId, {
+    agentKey: 'agent.utility_densifier',
+  });
 
   const system = [
     'You improve D&D adventure chapters for Dungeon Masters.',

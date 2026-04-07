@@ -1,23 +1,24 @@
 # DND Booker
 
-A web application for creating D&D campaign material formatted for publication on DriveThruRPG and DMsGuild. Features a WYSIWYG block editor with 22 custom D&D block types, 5 visual themes, multi-format export (PDF, print-ready PDF, ePub), and an AI assistant that generates D&D content.
+A web application for creating D&D campaign material formatted for publication on DriveThruRPG and DMsGuild. Features a WYSIWYG block editor with 22 custom D&D block types, AI-assisted generation, canonical Typst-backed publication documents, and Cloud Run deployment.
 
 ## Architecture
 
 ```
-Client (React + TipTap)  -->  API Server (Express + Prisma)  -->  PDF Worker (Puppeteer + Pandoc)
-       :3000                         :4000                              BullMQ
-                                       |
+Client (React + TipTap)  -->  API Server (Express + Prisma)  -->  Worker (BullMQ + Typst + Playwright)
+       :3000                         :4000                                      |
+                                       |                                  GCS artifacts
                               PostgreSQL + Redis
 ```
 
 | Package | Tech | Purpose |
 |---------|------|---------|
 | `client/` | React, TipTap v3, Zustand, Tailwind CSS v4, Vite | WYSIWYG editor & UI |
-| `server/` | Express 5, Prisma 6, JWT, Zod, Vercel AI SDK | REST API, auth & AI |
-| `worker/` | Puppeteer 24, Pandoc, BullMQ | PDF/ePub generation |
+| `server/` | Express 4.21, Prisma 6, JWT, Zod, Vercel AI SDK | REST API, auth, AI, canonical document APIs |
+| `worker/` | BullMQ, Typst, Playwright Core, GCS | Export and background orchestration |
 | `shared/` | TypeScript | Shared types & constants |
 | `text-layout/` | Pretext fork + `@napi-rs/canvas` | Flagged text measurement engine |
+| `sdk/` | TypeScript + generated OpenAPI client | Typed `api/v1` client and checked-in spec |
 
 ## Quick Start (Docker)
 
@@ -87,6 +88,29 @@ docker compose up -d server worker client
 
 If a change touches `shared/`, rebuild every app service that imports it. If a change touches both generation logic and export rendering, treat it as a `server` + `worker` redeploy even when the UI also changed.
 
+## Default Ship Flow
+
+The default finish sequence for repo changes is:
+
+```bash
+# 1. Regenerate the typed SDK/spec and run the core build matrix
+npm run verify
+
+# 2. Review the diff, commit, and push
+git status
+git add <intended paths>
+git commit -m "<message>"
+git push origin main
+
+# 3. Redeploy Cloud Run
+npm run deploy:cloudrun
+```
+
+Notes:
+- `npm run verify` regenerates the v1 SDK/OpenAPI output and builds `shared`, `sdk`, `server`, and `client`.
+- If integration tests need local Postgres or Redis and those services are unavailable, record that blocker explicitly before shipping.
+- `npm run deploy:cloudrun` uses the checked-in Cloud Build manifest and Cloud Run service manifest, with defaults for `dnd-booker` in `us-west4`.
+
 ## Features
 
 ### Block Editor
@@ -107,9 +131,9 @@ If a change touches `shared/`, rebuild every app service that imports it. If a c
 - **Infernal** - Demon/hell theme (Pirata One/Bitter)
 
 ### Export
-- **PDF** - Letter-sized with page numbers
-- **Print-Ready PDF** - With 0.125" bleed margins and crop marks
-- **ePub** - Via Pandoc conversion
+- **PDF** - Typst-based multi-container export pipeline
+- **Print-Ready PDF** - With bleed/crop support through the export pipeline
+- **ePub** - Alternate worker export format
 
 ### AI Assistant
 Built-in AI assistant powered by the Vercel AI SDK with support for **Anthropic Claude** and **OpenAI GPT** models. Users bring their own API keys (stored encrypted with AES-256-GCM).

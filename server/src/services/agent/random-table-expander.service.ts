@@ -23,7 +23,9 @@ async function expandEntriesWithModel(input: {
   tableTitle: string;
   entries: NormalizedRandomTableEntry[];
 }) {
-  const { model, maxOutputTokens } = await resolveAgentModelForUser(input.userId);
+  const { model, maxOutputTokens } = await resolveAgentModelForUser(input.userId, {
+    agentKey: 'agent.random_table_expansion',
+  });
   const system = [
     'You improve D&D random encounter and complication tables for Dungeon Masters.',
     'Return JSON only.',

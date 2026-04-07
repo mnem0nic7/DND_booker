@@ -1,5 +1,6 @@
 import { Queue, type ConnectionOptions } from 'bullmq';
 import { redis } from '../../config/redis.js';
+import { resolveQueueDispatchOptions, type QueueDispatchOverrides } from '../queue/config.js';
 
 export interface GenerationJobData {
   runId: string;
@@ -18,14 +19,18 @@ export async function enqueueGenerationRun(
   runId: string,
   userId: string,
   projectId: string,
+  overrides: QueueDispatchOverrides = {},
 ): Promise<string | undefined> {
+  const dispatchOptions = resolveQueueDispatchOptions('generation', overrides);
   const job = await generationQueue.add(
     'orchestrate',
     { runId, userId, projectId } satisfies GenerationJobData,
     {
-      attempts: 1,
-      removeOnComplete: { age: 86400 },
-      removeOnFail: { age: 604800 },
+      attempts: dispatchOptions.attempts,
+      priority: dispatchOptions.priority,
+      removeOnComplete: dispatchOptions.removeOnComplete,
+      removeOnFail: dispatchOptions.removeOnFail,
+      ...(dispatchOptions.backoff ? { backoff: dispatchOptions.backoff } : {}),
     },
   );
   return job.id;

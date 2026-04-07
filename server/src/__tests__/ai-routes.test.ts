@@ -21,6 +21,7 @@ describe('AI Routes', () => {
   describe('shouldEnableProjectChatTools', () => {
     it('should keep tools enabled for all in-app chat providers and prompts', () => {
       expect(shouldEnableProjectChatTools('anthropic', 'Hello')).toBe(true);
+      expect(shouldEnableProjectChatTools('google', 'Outline this encounter')).toBe(true);
       expect(shouldEnableProjectChatTools('openai', 'Draft a chapter intro')).toBe(true);
       expect(shouldEnableProjectChatTools('ollama', 'Hello')).toBe(true);
       expect(shouldEnableProjectChatTools('ollama', 'What should happen next in this scene?')).toBe(true);
@@ -78,6 +79,7 @@ describe('AI Routes', () => {
       expect(res.body.hasApiKey).toBe(false);
       expect(res.body.supportedModels).toBeDefined();
       expect(res.body.supportedModels.anthropic).toBeDefined();
+      expect(res.body.supportedModels.google).toBeDefined();
       expect(res.body.supportedModels.openai).toBeDefined();
       expect(res.body.supportedModels.ollama).toBeDefined();
     });
@@ -125,6 +127,37 @@ describe('AI Routes', () => {
       expect(getRes.body.provider).toBe('openai');
       expect(getRes.body.model).toBe('gpt-4o');
       expect(getRes.body.hasApiKey).toBe(true);
+    });
+
+    it('should save Gemini settings with API key', async () => {
+      const res = await request(app)
+        .post('/api/ai/settings')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({
+          provider: 'google',
+          model: 'gemini-2.5-pro',
+          apiKey: 'google-test-fake-key-1234567890',
+        });
+
+      expect(res.status).toBe(200);
+
+      const getRes = await request(app)
+        .get('/api/ai/settings')
+        .set('Authorization', `Bearer ${accessToken}`);
+      expect(getRes.body.provider).toBe('google');
+      expect(getRes.body.model).toBe('gemini-2.5-pro');
+      expect(getRes.body.hasApiKey).toBe(true);
+    });
+
+    it('should return google models from the models route', async () => {
+      const res = await request(app)
+        .post('/api/ai/settings/models')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({ provider: 'google', apiKey: 'google-test-fake-key-1234567890' });
+
+      expect(res.status).toBe(200);
+      expect(Array.isArray(res.body.models)).toBe(true);
+      expect(res.body.models.length).toBeGreaterThan(0);
     });
 
     it('should reject invalid provider', async () => {
@@ -210,6 +243,15 @@ describe('AI Routes', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.valid).toBe(false);
+    });
+
+    it('should accept google provider for key validation route', async () => {
+      const res = await request(app)
+        .post('/api/ai/settings/validate')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({ provider: 'google', apiKey: 'google-fake-key-that-wont-work-123456' });
+
+      expect([200, 500]).toContain(res.status);
     });
 
     it('should return 401 without auth token', async () => {

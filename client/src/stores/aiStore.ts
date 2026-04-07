@@ -3,7 +3,7 @@ import api, { setAccessToken, getAccessToken } from '../lib/api';
 import axios from 'axios';
 import type { WizardEvent, WizardGeneratedSection, WizardOutline, PlanningState, PageMetricsSnapshot, ImageGenBatch } from '@dnd-booker/shared';
 
-export type AiProvider = 'anthropic' | 'openai' | 'ollama';
+export type AiProvider = 'anthropic' | 'google' | 'openai' | 'ollama';
 
 interface ChatMessage {
   id: string;

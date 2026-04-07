@@ -849,7 +849,7 @@ export async function realizeSparsePageArt(
   }
 
   const settings = await getAiSettings(input.userId);
-  if (!settings?.provider || settings.provider !== 'openai' || !settings.hasApiKey) {
+  if (!settings?.provider || (settings.provider !== 'openai' && settings.provider !== 'google') || !settings.hasApiKey) {
     return {
       content: input.content,
       changed: false,
@@ -888,6 +888,7 @@ export async function realizeSparsePageArt(
 
     try {
       const image = await generateAiImage(apiKey, {
+        provider: settings.provider,
         prompt,
         model,
         size,

@@ -2,6 +2,7 @@ import { Prisma } from '@prisma/client';
 import type { DocumentContent, DocumentKind } from '@dnd-booker/shared';
 import { prisma } from '../config/database.js';
 import { resolveDocumentLayout } from './layout-plan.service.js';
+import { buildPublicationDocumentStorageFields } from './document-publication.service.js';
 
 const BLANK_DOC: DocumentContent = { type: 'doc', content: [{ type: 'paragraph' }] };
 const FRONT_MATTER_BLOCK_TITLES: Record<string, string> = {
@@ -242,6 +243,7 @@ async function materializeProjectDocuments(
       kind: doc.kind,
       title: doc.title,
     });
+    const publicationFields = buildPublicationDocumentStorageFields({ content: resolvedLayout.content });
 
     await tx.projectDocument.create({
       data: {
@@ -255,6 +257,12 @@ async function materializeProjectDocuments(
         outlineJson: Prisma.JsonNull,
         layoutPlan: resolvedLayout.layoutPlan as unknown as Prisma.InputJsonValue,
         content: resolvedLayout.content as unknown as Prisma.InputJsonValue,
+        canonicalDocJson: publicationFields.canonicalDocJson,
+        editorProjectionJson: publicationFields.editorProjectionJson,
+        typstSource: publicationFields.typstSource,
+        canonicalVersion: publicationFields.canonicalVersion,
+        editorProjectionVersion: publicationFields.editorProjectionVersion,
+        typstVersion: publicationFields.typstVersion,
         status: doc.status,
         sourceArtifactId: null,
       },

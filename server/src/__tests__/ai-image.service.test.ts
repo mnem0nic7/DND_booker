@@ -1,11 +1,27 @@
 import { describe, expect, it } from 'vitest';
-import { normalizeImageQuality, sanitizeImagePrompt, stripImageTextRenderingInstructions } from '../services/ai-image.service.js';
+import {
+  normalizeImageModel,
+  normalizeImageQuality,
+  normalizeImageSize,
+  sanitizeImagePrompt,
+  stripImageTextRenderingInstructions,
+} from '../services/ai-image.service.js';
 
 describe('ai-image prompt sanitization', () => {
   it('maps legacy standard quality to a valid gpt-image-1 value', () => {
     expect(normalizeImageQuality('gpt-image-1', 'standard')).toBe('medium');
     expect(normalizeImageQuality('gpt-image-1', 'high')).toBe('high');
     expect(normalizeImageQuality('gpt-image-1', 'hd')).toBeUndefined();
+  });
+
+  it('maps generic image requests onto the active provider image model', () => {
+    expect(normalizeImageModel('openai', 'gpt-image-1')).toBe('gpt-image-1');
+    expect(normalizeImageModel('google', 'gpt-image-1')).toBe('gemini-2.5-flash-image');
+  });
+
+  it('accepts Gemini image sizes through the shared validator', () => {
+    expect(normalizeImageSize('google', 'gemini-2.5-flash-image', '1024x1024')).toBe('1024x1024');
+    expect(() => normalizeImageSize('google', 'gemini-2.5-flash-image', '2048x2048')).toThrow(/Invalid size/);
   });
 
   it('removes direct requests for visible words and lettering', () => {

@@ -14,6 +14,12 @@ export interface ProjectDocument {
   outlineJson: unknown | null;
   layoutPlan: LayoutPlan | null;
   content: unknown;
+  canonicalDocJson?: unknown | null;
+  editorProjectionJson?: unknown | null;
+  typstSource?: string | null;
+  canonicalVersion?: number;
+  editorProjectionVersion?: number;
+  typstVersion?: number;
   status: string;
   sourceArtifactId: string | null;
   createdAt: string;

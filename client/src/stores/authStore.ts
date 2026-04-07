@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import api, { setAccessToken } from '../lib/api';
+import { setAccessToken, v1Client } from '../lib/api';
 
 interface User {
   id: string;
@@ -22,26 +22,26 @@ export const useAuthStore = create<AuthState>((set) => ({
   isLoading: true,
 
   login: async (email, password) => {
-    const { data } = await api.post('/auth/login', { email, password });
+    const data = await v1Client.auth.login({ email, password });
     setAccessToken(data.accessToken);
     set({ user: data.user });
   },
 
   register: async (email, password, displayName) => {
-    const { data } = await api.post('/auth/register', { email, password, displayName });
+    const data = await v1Client.auth.register({ email, password, displayName });
     setAccessToken(data.accessToken);
     set({ user: data.user });
   },
 
   logout: async () => {
-    await api.post('/auth/logout');
+    await v1Client.auth.logout();
     setAccessToken(null);
     set({ user: null });
   },
 
   refresh: async () => {
     try {
-      const { data } = await api.post('/auth/refresh');
+      const data = await v1Client.auth.refresh();
       setAccessToken(data.accessToken);
       set({ user: data.user, isLoading: false });
     } catch {

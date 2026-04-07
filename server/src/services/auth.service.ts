@@ -18,6 +18,13 @@ function requireEnvSecret(name: string): string {
 const JWT_SECRET = requireEnvSecret('JWT_SECRET');
 const JWT_REFRESH_SECRET = requireEnvSecret('JWT_REFRESH_SECRET');
 
+function getAllowedRegistrationEmails(): string[] {
+  return (process.env.REGISTRATION_ALLOWED_EMAILS || '')
+    .split(',')
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean);
+}
+
 export function generateAccessToken(userId: string): string {
   return jwt.sign({ userId }, JWT_SECRET, { expiresIn: '15m' });
 }
@@ -41,7 +48,15 @@ export function verifyRefreshToken(token: string): { userId: string; tokenVersio
 export async function getUserById(userId: string) {
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { id: true, email: true, displayName: true, avatarUrl: true, tokenVersion: true },
+    select: {
+      id: true,
+      email: true,
+      displayName: true,
+      avatarUrl: true,
+      tokenVersion: true,
+      createdAt: true,
+      updatedAt: true,
+    },
   });
   return user;
 }
@@ -56,14 +71,20 @@ export async function incrementTokenVersion(userId: string): Promise<number> {
 }
 
 export async function registerUser(email: string, password: string, displayName: string) {
-  const existing = await prisma.user.findUnique({ where: { email } });
+  const normalizedEmail = email.trim().toLowerCase();
+  const allowedEmails = getAllowedRegistrationEmails();
+  if (allowedEmails.length > 0 && !allowedEmails.includes(normalizedEmail)) {
+    throw new Error('REGISTRATION_NOT_ALLOWED');
+  }
+
+  const existing = await prisma.user.findUnique({ where: { email: normalizedEmail } });
   if (existing) {
     throw new Error('EMAIL_EXISTS');
   }
 
   const passwordHash = await bcrypt.hash(password, 12);
   const user = await prisma.user.create({
-    data: { email, passwordHash, displayName },
+    data: { email: normalizedEmail, passwordHash, displayName },
     select: { id: true, email: true, displayName: true, avatarUrl: true, createdAt: true, updatedAt: true },
   });
 

@@ -30,6 +30,10 @@ import {
   getProjectAssetRelativePath,
   parseProjectAssetUrl,
 } from '../../../server/src/services/asset-paths.service.js';
+import {
+  readProjectAssetBuffer,
+  saveExportArtifact,
+} from '../../../server/src/services/object-storage.service.js';
 import { materializeSparsePageArt, realizeSparsePageArt } from '../../../server/src/services/layout-art.service.js';
 
 interface ExportJobData {
@@ -459,13 +463,19 @@ export async function processExportJob(job: Job<ExportJobData>): Promise<void> {
 
       await job.updateProgress(80);
 
+      const outputUrl = await saveExportArtifact({
+        filename,
+        buffer,
+        contentType: 'application/pdf',
+      });
+
       // Update export job with success
       await prisma.exportJob.update({
         where: { id: exportJobId },
         data: {
           status: 'completed',
           progress: 100,
-          outputUrl: `/output/${filename}`,
+          outputUrl,
           reviewJson: review as any,
           completedAt: new Date(),
         },
@@ -492,14 +502,13 @@ export async function processExportJob(job: Job<ExportJobData>): Promise<void> {
 
     await job.updateProgress(80);
 
-    // Save to local storage (replace with S3 in production)
-    const outputDir = path.join(process.cwd(), 'output');
-    await fs.mkdir(outputDir, { recursive: true });
-
     const ext = format === 'epub' ? 'epub' : 'pdf';
     const filename = `${exportJob.projectId}-${Date.now()}.${ext}`;
-    const filepath = path.join(outputDir, filename);
-    await fs.writeFile(filepath, buffer);
+    const outputUrl = await saveExportArtifact({
+      filename,
+      buffer,
+      contentType: format === 'epub' ? 'application/epub+zip' : 'application/pdf',
+    });
 
     // Update export job with success
     await prisma.exportJob.update({
@@ -507,14 +516,14 @@ export async function processExportJob(job: Job<ExportJobData>): Promise<void> {
       data: {
         status: 'completed',
         progress: 100,
-        outputUrl: `/output/${filename}`,
+        outputUrl,
         completedAt: new Date(),
       },
     });
 
     await job.updateProgress(100);
 
-    console.log(`[export.job] Export ${exportJobId} completed -> ${filepath}`);
+    console.log(`[export.job] Export ${exportJobId} completed -> ${outputUrl}`);
   } catch (error: unknown) {
     const message = (error instanceof Error ? error.message : String(error)).slice(0, 500);
 
@@ -660,7 +669,6 @@ function getAssetMimeType(filename: string): string {
 }
 
 async function rewriteUploadUrlsToEmbeddedDataUrls(html: string): Promise<string> {
-  const uploadsRoot = getAssetStorageDir();
   const matches = html.match(/\/uploads\/[^"'()\s]+/g);
   if (!matches || matches.length === 0) return html;
 
@@ -670,9 +678,8 @@ async function rewriteUploadUrlsToEmbeddedDataUrls(html: string): Promise<string
     const parsed = parseProjectAssetUrl(relativePath);
     if (!parsed) continue;
 
-    const absolutePath = path.join(uploadsRoot, parsed.projectId, parsed.filename);
     try {
-      const fileBuffer = await fs.readFile(absolutePath);
+      const fileBuffer = await readProjectAssetBuffer(relativePath);
       const mimeType = getAssetMimeType(parsed.filename);
       const dataUrl = `data:${mimeType};base64,${fileBuffer.toString('base64')}`;
       nextHtml = nextHtml.split(relativePath).join(dataUrl);

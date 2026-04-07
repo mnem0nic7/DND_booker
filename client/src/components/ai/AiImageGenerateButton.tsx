@@ -1,10 +1,15 @@
 import { useEffect, useState } from 'react';
 import { useAiStore } from '../../stores/aiStore';
 
-type ImageModel = 'gpt-image-1';
+type ImageModel = 'gpt-image-1' | 'gemini-2.5-flash-image';
 
 const MODEL_SIZES: Record<ImageModel, { label: string; value: string }[]> = {
   'gpt-image-1': [
+    { label: 'Square (1024x1024)', value: '1024x1024' },
+    { label: 'Landscape (1536x1024)', value: '1536x1024' },
+    { label: 'Portrait (1024x1536)', value: '1024x1536' },
+  ],
+  'gemini-2.5-flash-image': [
     { label: 'Square (1024x1024)', value: '1024x1024' },
     { label: 'Landscape (1536x1024)', value: '1536x1024' },
     { label: 'Portrait (1024x1536)', value: '1024x1536' },
@@ -57,7 +62,7 @@ export function AiImageGenerateButton({
 
   const [isOpen, setIsOpen] = useState(false);
   const [prompt, setPrompt] = useState(initialPrompt || '');
-  const model: ImageModel = 'gpt-image-1';
+  const model: ImageModel = settings?.provider === 'google' ? 'gemini-2.5-flash-image' : 'gpt-image-1';
   const [size, setSize] = useState(defaults.size);
   const [quality, setQuality] = useState('medium');
   const [error, setError] = useState('');
@@ -68,8 +73,7 @@ export function AiImageGenerateButton({
     }
   }, [initialPrompt, isOpen]);
 
-  // Only show when provider is OpenAI with an API key
-  const isAvailable = settings?.provider === 'openai' && settings?.hasApiKey;
+  const isAvailable = (settings?.provider === 'openai' || settings?.provider === 'google') && settings?.hasApiKey;
   if (!isAvailable) return null;
 
   async function handleGenerate() {
@@ -130,19 +134,21 @@ export function AiImageGenerateButton({
           </select>
         </label>
 
-        <label style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1, minWidth: '100px' }}>
-          <span style={{ fontSize: '11px', opacity: 0.7 }}>Quality</span>
-          <select
-            value={quality}
-            onChange={(e) => setQuality(e.target.value)}
-            className="ai-generate-input"
-            style={{ padding: '4px 6px', minHeight: 'unset' }}
-          >
-            <option value="auto">Auto</option>
-            <option value="medium">Medium</option>
-            <option value="high">High</option>
-          </select>
-        </label>
+        {settings?.provider === 'openai' && (
+          <label style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1, minWidth: '100px' }}>
+            <span style={{ fontSize: '11px', opacity: 0.7 }}>Quality</span>
+            <select
+              value={quality}
+              onChange={(e) => setQuality(e.target.value)}
+              className="ai-generate-input"
+              style={{ padding: '4px 6px', minHeight: 'unset' }}
+            >
+              <option value="auto">Auto</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
+            </select>
+          </label>
+        )}
       </div>
 
       {error && <p className="ai-generate-error">{error}</p>}

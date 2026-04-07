@@ -3,6 +3,7 @@ import type { DocumentContent } from '@dnd-booker/shared';
 import { prisma } from '../config/database.js';
 import { splitProjectContentIntoDocuments } from './project-document-bootstrap.service.js';
 import { resolveDocumentLayout } from './layout-plan.service.js';
+import { buildPublicationDocumentStorageFields } from './document-publication.service.js';
 
 const BLANK_DOC: DocumentContent = { type: 'doc', content: [{ type: 'paragraph' }] };
 
@@ -137,6 +138,7 @@ export async function saveCanonicalProjectContent(
         kind: document.kind,
         title: document.title,
       });
+      const publicationFields = buildPublicationDocumentStorageFields({ content: resolvedLayout.content });
 
       await tx.projectDocument.create({
         data: {
@@ -150,6 +152,12 @@ export async function saveCanonicalProjectContent(
           outlineJson: Prisma.JsonNull,
           layoutPlan: resolvedLayout.layoutPlan as unknown as Prisma.InputJsonValue,
           content: resolvedLayout.content as unknown as Prisma.InputJsonValue,
+          canonicalDocJson: publicationFields.canonicalDocJson,
+          editorProjectionJson: publicationFields.editorProjectionJson,
+          typstSource: publicationFields.typstSource,
+          canonicalVersion: publicationFields.canonicalVersion,
+          editorProjectionVersion: publicationFields.editorProjectionVersion,
+          typstVersion: publicationFields.typstVersion,
           status: document.status,
           sourceArtifactId: null,
         },

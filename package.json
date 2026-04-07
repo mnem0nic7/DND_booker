@@ -1,5 +1,10 @@
 {
   "name": "dnd-booker",
   "private": true,
-  "workspaces": ["client", "server", "worker", "shared", "text-layout"]
+  "workspaces": ["client", "server", "worker", "shared", "text-layout", "sdk"],
+  "scripts": {
+    "generate:sdk": "npm run generate --workspace=sdk",
+    "verify": "npm run generate --workspace=sdk && npm run build --workspace=shared && npm run build --workspace=sdk && npm run build --workspace=server && npm run build --workspace=client",
+    "deploy:cloudrun": "bash ./scripts/redeploy-cloudrun.sh"
+  }
 }

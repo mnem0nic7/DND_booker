@@ -2,6 +2,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '../config/database.js';
 import { ensureProjectDocuments } from './project-document-bootstrap.service.js';
 import { resolveDocumentLayout } from './layout-plan.service.js';
+import { buildPublicationDocumentStorageFields } from './document-publication.service.js';
 
 /**
  * List all documents for a project (excluding large content/outline fields).
@@ -48,12 +49,27 @@ export async function updateDocumentContent(
     kind: doc.kind,
     title: doc.title,
   });
+  const publicationFields = buildPublicationDocumentStorageFields(
+    { content: resolvedLayout.content },
+    {
+      canonicalVersion: doc.canonicalVersion,
+      editorProjectionVersion: doc.editorProjectionVersion,
+      typstVersion: doc.typstVersion,
+    },
+    { bumpVersions: true },
+  );
 
   return prisma.projectDocument.update({
     where: { id: documentId },
     data: {
       content: resolvedLayout.content as unknown as Prisma.InputJsonValue,
       layoutPlan: resolvedLayout.layoutPlan as unknown as Prisma.InputJsonValue,
+      canonicalDocJson: publicationFields.canonicalDocJson,
+      editorProjectionJson: publicationFields.editorProjectionJson,
+      typstSource: publicationFields.typstSource,
+      canonicalVersion: publicationFields.canonicalVersion,
+      editorProjectionVersion: publicationFields.editorProjectionVersion,
+      typstVersion: publicationFields.typstVersion,
       status: 'edited',
     },
   });
@@ -80,12 +96,26 @@ export async function updateDocumentLayout(
     kind: doc.kind,
     title: doc.title,
   });
+  const publicationFields = buildPublicationDocumentStorageFields(
+    { content: resolvedLayout.content },
+    {
+      canonicalVersion: doc.canonicalVersion,
+      editorProjectionVersion: doc.editorProjectionVersion,
+      typstVersion: doc.typstVersion,
+    },
+  );
 
   return prisma.projectDocument.update({
     where: { id: documentId },
     data: {
       content: resolvedLayout.content as unknown as Prisma.InputJsonValue,
       layoutPlan: resolvedLayout.layoutPlan as unknown as Prisma.InputJsonValue,
+      canonicalDocJson: publicationFields.canonicalDocJson,
+      editorProjectionJson: publicationFields.editorProjectionJson,
+      typstSource: publicationFields.typstSource,
+      canonicalVersion: publicationFields.canonicalVersion,
+      editorProjectionVersion: publicationFields.editorProjectionVersion,
+      typstVersion: publicationFields.typstVersion,
       status: 'edited',
     },
   });

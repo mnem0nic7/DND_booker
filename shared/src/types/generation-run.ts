@@ -49,6 +49,10 @@ export interface GenerationRun {
   actualTokens: number;
   actualCost: number;
   failureReason: string | null;
+  graphThreadId?: string | null;
+  graphCheckpointKey?: string | null;
+  graphStateJson?: Record<string, unknown> | null;
+  resumeToken?: string | null;
   createdAt: string;
   updatedAt: string;
   startedAt: string | null;
@@ -63,6 +67,10 @@ export interface GenerationRunSummary {
   currentStage: string | null;
   progressPercent: number;
   inputPrompt: string;
+  graphThreadId?: string | null;
+  graphCheckpointKey?: string | null;
+  graphStateJson?: Record<string, unknown> | null;
+  resumeToken?: string | null;
   createdAt: string;
   updatedAt: string;
 }

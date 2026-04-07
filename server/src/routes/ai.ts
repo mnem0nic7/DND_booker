@@ -15,7 +15,7 @@ import * as aiPlanner from '../services/ai-planner.service.js';
 import * as aiMemoryService from '../services/ai-memory.service.js';
 import * as aiImage from '../services/ai-image.service.js';
 import * as assetService from '../services/asset.service.js';
-import { createModel, validateApiKey, validateConnection, SUPPORTED_MODELS, fetchOpenAiModels, resolveOllamaModelId, type AiProvider } from '../services/ai-provider.service.js';
+import { createModel, validateApiKey, validateConnection, SUPPORTED_MODELS, fetchGoogleModels, fetchOpenAiModels, resolveOllamaModelId, type AiProvider } from '../services/ai-provider.service.js';
 import { getCanonicalProjectContent } from '../services/project-document-content.service.js';
 import { prisma } from '../config/database.js';
 import type { WizardEvent, WizardGeneratedSection } from '@dnd-booker/shared';
@@ -53,12 +53,16 @@ aiSettingsRoutes.get('/settings', asyncHandler(async (req: AuthRequest, res: Res
     // Build dynamic model lists
     const supportedModels = { ...SUPPORTED_MODELS };
 
-    // Fetch live OpenAI models if user has an OpenAI key
-    if (settings.provider === 'openai' && settings.hasApiKey) {
+    // Fetch live provider models when the user has a saved hosted-model key.
+    if ((settings.provider === 'openai' || settings.provider === 'google') && settings.hasApiKey) {
       try {
         const apiKey = await aiSettings.getDecryptedApiKey(req.userId!);
         if (apiKey) {
-          supportedModels.openai = await fetchOpenAiModels(apiKey);
+          if (settings.provider === 'openai') {
+            supportedModels.openai = await fetchOpenAiModels(apiKey);
+          } else {
+            supportedModels.google = await fetchGoogleModels(apiKey);
+          }
         }
       } catch {
         // Fall back to hardcoded list on error
@@ -73,7 +77,7 @@ aiSettingsRoutes.get('/settings', asyncHandler(async (req: AuthRequest, res: Res
 }));
 
 const saveSettingsSchema = z.object({
-  provider: z.enum(['anthropic', 'openai', 'ollama']),
+  provider: z.enum(['anthropic', 'google', 'openai', 'ollama']),
   model: z.string().min(1).max(100),
   apiKey: z.string().min(10).max(300).optional(),
   baseUrl: z.string().url().max(500).optional(),
@@ -97,7 +101,7 @@ aiSettingsRoutes.post('/settings', asyncHandler(async (req: AuthRequest, res: Re
 
 // Fetch live model list for a provider using an API key
 const fetchModelsSchema = z.object({
-  provider: z.enum(['anthropic', 'openai']),
+  provider: z.enum(['anthropic', 'google', 'openai']),
   apiKey: z.string().min(10).max(300),
 });
 
@@ -112,6 +116,9 @@ aiSettingsRoutes.post('/settings/models', asyncHandler(async (req: AuthRequest, 
 
   if (provider === 'openai') {
     const models = await fetchOpenAiModels(apiKey);
+    res.json({ models });
+  } else if (provider === 'google') {
+    const models = await fetchGoogleModels(apiKey);
     res.json({ models });
   } else {
     // Anthropic doesn't have a model list API — return curated list
@@ -131,7 +138,7 @@ aiSettingsRoutes.delete('/settings/key', asyncHandler(async (req: AuthRequest, r
 }));
 
 const validateKeySchema = z.object({
-  provider: z.enum(['anthropic', 'openai']),
+  provider: z.enum(['anthropic', 'google', 'openai']),
   apiKey: z.string().min(10).max(300),
 });
 
@@ -333,7 +340,7 @@ aiGenerateRoutes.post('/autofill', autoFillRateLimit, asyncHandler(async (req: A
 const generateImageSchema = z.object({
   projectId: z.string().uuid(),
   prompt: z.string().min(1).max(4000),
-  model: z.enum(['dall-e-3', 'gpt-image-1']),
+  model: z.string().min(1).max(100),
   size: z.string().regex(/^\d+x\d+$/).max(20),
   quality: z.string().max(20).optional(),
 });
@@ -356,14 +363,14 @@ aiGenerateRoutes.post('/generate-image', imageGenRateLimit, asyncHandler(async (
     return;
   }
 
-  // Image generation requires OpenAI provider
   const settings = await aiSettings.getAiSettings(req.userId!);
-  if (!settings || settings.provider !== 'openai') {
-    res.status(400).json({ error: 'Image generation requires OpenAI as your AI provider.' });
+  if (!settings || (settings.provider !== 'openai' && settings.provider !== 'google')) {
+    res.status(400).json({ error: 'Image generation requires OpenAI or Google Gemini as your AI provider.' });
     return;
   }
   if (!settings.hasApiKey) {
-    res.status(400).json({ error: 'No API key configured. Please add your OpenAI key in AI settings.' });
+    const providerLabel = settings.provider === 'google' ? 'Gemini' : 'OpenAI';
+    res.status(400).json({ error: `No API key configured. Please add your ${providerLabel} key in AI settings.` });
     return;
   }
 
@@ -374,7 +381,13 @@ aiGenerateRoutes.post('/generate-image', imageGenRateLimit, asyncHandler(async (
   }
 
   try {
-    const result = await aiImage.generateAiImage(apiKey, { prompt, model, size, quality });
+    const result = await aiImage.generateAiImage(apiKey, {
+      provider: settings.provider,
+      prompt,
+      model,
+      size,
+      quality,
+    });
 
     // Decode base64 to Buffer and save as asset
     const buffer = Buffer.from(result.base64, 'base64');
@@ -405,8 +418,9 @@ aiGenerateRoutes.post('/generate-image', imageGenRateLimit, asyncHandler(async (
     }
 
     // Auth errors
-    if (message.includes('401') || message.includes('403') || message.includes('Unauthorized')) {
-      res.status(401).json({ error: 'Invalid API key. Please check your OpenAI key in AI settings.' });
+    if (message.includes('401') || message.includes('403') || message.includes('Unauthorized') || /api key/i.test(message)) {
+      const providerLabel = settings.provider === 'google' ? 'Gemini' : 'OpenAI';
+      res.status(401).json({ error: `Invalid API key. Please check your ${providerLabel} key in AI settings.` });
       return;
     }
 

@@ -1,21 +1,37 @@
 import { generateImage } from 'ai';
 import { createOpenAI } from '@ai-sdk/openai';
 
-export type ImageModel = 'dall-e-3' | 'gpt-image-1';
+export type OpenAiImageModel = 'dall-e-3' | 'gpt-image-1';
+export type GoogleImageModel = 'gemini-2.5-flash-image' | 'gemini-3.1-flash-image-preview' | 'gemini-3-pro-image-preview';
+export type ImageModel = OpenAiImageModel | GoogleImageModel;
+export type ImageProvider = 'openai' | 'google';
 
 const TEXTLESS_IMAGE_PROMPT_SUFFIX = 'No visible words, no letters, no typography, no captions, no labels, no logos, no watermark.';
+const DEFAULT_OPENAI_IMAGE_MODEL: OpenAiImageModel = 'gpt-image-1';
+const DEFAULT_GOOGLE_IMAGE_MODEL: GoogleImageModel = 'gemini-2.5-flash-image';
+const OPENAI_IMAGE_MODELS: OpenAiImageModel[] = ['dall-e-3', 'gpt-image-1'];
+const GOOGLE_IMAGE_MODELS: GoogleImageModel[] = ['gemini-2.5-flash-image', 'gemini-3.1-flash-image-preview', 'gemini-3-pro-image-preview'];
 
-const ALLOWED_SIZES: Record<ImageModel, string[]> = {
+const ALLOWED_SIZES: Record<OpenAiImageModel, string[]> = {
   'dall-e-3': ['1024x1024', '1792x1024', '1024x1792'],
   'gpt-image-1': ['1024x1024', '1536x1024', '1024x1536'],
 };
 
+const GOOGLE_ASPECT_RATIO_BY_SIZE: Record<string, string> = {
+  '1024x1024': '1:1',
+  '1024x1536': '2:3',
+  '1024x1792': '9:16',
+  '1536x1024': '3:2',
+  '1792x1024': '16:9',
+};
+
 interface GenerateImageOptions {
   prompt: string;
-  model: ImageModel;
+  model: string;
   size: string;
   quality?: string;
   timeoutMs?: number;
+  provider?: ImageProvider;
 }
 
 const DEFAULT_IMAGE_TIMEOUT_MS = 90_000;
@@ -81,6 +97,49 @@ export function normalizeImageQuality(model: ImageModel, quality?: string): stri
   return undefined;
 }
 
+export function isOpenAiImageModel(model: string): model is OpenAiImageModel {
+  return OPENAI_IMAGE_MODELS.includes(model as OpenAiImageModel);
+}
+
+export function isGoogleImageModel(model: string): model is GoogleImageModel {
+  return GOOGLE_IMAGE_MODELS.includes(model as GoogleImageModel);
+}
+
+export function resolveImageProvider(provider?: string, model?: string): ImageProvider {
+  if (provider === 'google' || provider === 'openai') return provider;
+  if (model && isGoogleImageModel(model)) return 'google';
+  return 'openai';
+}
+
+export function normalizeImageModel(provider: ImageProvider, model?: string): ImageModel {
+  if (provider === 'google') {
+    return model && isGoogleImageModel(model) ? model : DEFAULT_GOOGLE_IMAGE_MODEL;
+  }
+  return model && isOpenAiImageModel(model) ? model : DEFAULT_OPENAI_IMAGE_MODEL;
+}
+
+export function normalizeImageSize(provider: ImageProvider, model: ImageModel, size: string): string {
+  if (provider === 'google') {
+    if (GOOGLE_ASPECT_RATIO_BY_SIZE[size]) return size;
+    throw new Error(`Invalid size "${size}" for ${model}. Allowed: ${Object.keys(GOOGLE_ASPECT_RATIO_BY_SIZE).join(', ')}`);
+  }
+
+  const openAiModel = normalizeImageModel('openai', model) as OpenAiImageModel;
+  const sizes = ALLOWED_SIZES[openAiModel];
+  if (!sizes.includes(size)) {
+    throw new Error(`Invalid size "${size}" for ${openAiModel}. Allowed: ${sizes.join(', ')}`);
+  }
+  return size;
+}
+
+function resolveGoogleAspectRatio(size: string): string {
+  const aspectRatio = GOOGLE_ASPECT_RATIO_BY_SIZE[size];
+  if (!aspectRatio) {
+    throw new Error(`Invalid Gemini image size "${size}". Allowed: ${Object.keys(GOOGLE_ASPECT_RATIO_BY_SIZE).join(', ')}`);
+  }
+  return aspectRatio;
+}
+
 function isAbortLikeImageError(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
   return error.name === 'AbortError'
@@ -120,17 +179,76 @@ export async function generateAiImage(
   apiKey: string,
   options: GenerateImageOptions,
 ): Promise<{ base64: string; mimeType: string }> {
-  const { prompt, model, size, quality, timeoutMs: explicitTimeoutMs } = options;
+  const { prompt, model: rawModel, size: rawSize, quality, timeoutMs: explicitTimeoutMs } = options;
+  const provider = resolveImageProvider(options.provider, rawModel);
+  const model = normalizeImageModel(provider, rawModel);
+  const size = normalizeImageSize(provider, model, rawSize);
   const sanitizedPrompt = sanitizeImagePrompt(prompt);
   const normalizedQuality = normalizeImageQuality(model, quality);
 
-  const sizes = ALLOWED_SIZES[model];
-  if (!sizes.includes(size)) {
-    throw new Error(`Invalid size "${size}" for ${model}. Allowed: ${sizes.join(', ')}`);
+  const timeoutMs = explicitTimeoutMs && explicitTimeoutMs > 0
+    ? explicitTimeoutMs
+    : resolveImageTimeoutMs();
+
+  if (provider === 'google') {
+    return await withHardImageTimeout(timeoutMs, async (signal) => {
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-goog-api-key': apiKey,
+          },
+          body: JSON.stringify({
+            contents: [{
+              parts: [{ text: sanitizedPrompt }],
+            }],
+            generationConfig: {
+              responseModalities: ['IMAGE'],
+              imageConfig: {
+                aspectRatio: resolveGoogleAspectRatio(size),
+              },
+            },
+          }),
+          signal,
+        },
+      );
+
+      const data = await response.json().catch(() => null) as
+        | {
+          error?: { message?: string };
+          candidates?: Array<{
+            content?: {
+              parts?: Array<{
+                inlineData?: { data?: string; mimeType?: string };
+                inline_data?: { data?: string; mimeType?: string };
+              }>;
+            };
+          }>;
+        }
+        | null;
+
+      if (!response.ok) {
+        throw new Error(data?.error?.message || `Gemini image generation failed with ${response.status}`);
+      }
+
+      const parts = data?.candidates?.[0]?.content?.parts ?? [];
+      for (const part of parts) {
+        const inlineData = part.inlineData ?? part.inline_data;
+        if (inlineData?.data) {
+          return {
+            base64: inlineData.data,
+            mimeType: inlineData.mimeType || 'image/png',
+          };
+        }
+      }
+
+      throw new Error('Gemini image generation returned no image data.');
+    });
   }
 
   const openai = createOpenAI({ apiKey });
-
   const providerOptions: Record<string, Record<string, string>> = {};
   if (model === 'dall-e-3') {
     providerOptions.openai = { style: 'vivid', ...(normalizedQuality ? { quality: normalizedQuality } : {}) };
@@ -138,9 +256,6 @@ export async function generateAiImage(
     providerOptions.openai = { quality: normalizedQuality };
   }
 
-  const timeoutMs = explicitTimeoutMs && explicitTimeoutMs > 0
-    ? explicitTimeoutMs
-    : resolveImageTimeoutMs();
   const image = await withHardImageTimeout(timeoutMs, async (signal) => {
     const result = await generateImage({
       model: openai.image(model),

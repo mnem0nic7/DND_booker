@@ -13,6 +13,40 @@ import type {
 } from '@dnd-booker/shared';
 import { AGENT_STATUS_TRANSITIONS } from '@dnd-booker/shared';
 import { prisma } from '../../config/database.js';
+import { randomUUID } from 'node:crypto';
+import type { Prisma } from '@prisma/client';
+
+function createGraphMetadata(kind: 'agent') {
+  const graphThreadId = `${kind}:${randomUUID()}`;
+  const graphCheckpointKey = `${kind}:${randomUUID()}`;
+  const resumeToken = `${graphCheckpointKey}:queued`;
+
+  return {
+    graphThreadId,
+    graphCheckpointKey,
+    resumeToken,
+    graphStateJson: {
+      kind,
+      graphThreadId,
+      graphCheckpointKey,
+      resumeToken,
+      status: 'queued',
+      currentStage: 'queued',
+      progressPercent: 0,
+      updatedAt: new Date().toISOString(),
+    } as Prisma.InputJsonValue,
+  };
+}
+
+function mergeGraphState(existing: unknown, patch: Record<string, unknown>): Prisma.InputJsonValue {
+  const current = existing && typeof existing === 'object' && !Array.isArray(existing)
+    ? existing as Record<string, unknown>
+    : {};
+  return {
+    ...current,
+    ...patch,
+  } as Prisma.InputJsonValue;
+}
 
 interface CreateAgentRunInput {
   projectId: string;
@@ -56,6 +90,10 @@ function serializeRun(run: any): AgentRun {
     exportCount: run.exportCount,
     noImprovementStreak: run.noImprovementStreak,
     failureReason: run.failureReason ?? null,
+    graphThreadId: run.graphThreadId ?? null,
+    graphCheckpointKey: run.graphCheckpointKey ?? null,
+    graphStateJson: (run.graphStateJson as Record<string, unknown> | null) ?? null,
+    resumeToken: run.resumeToken ?? null,
     createdAt: run.createdAt.toISOString(),
     updatedAt: run.updatedAt.toISOString(),
     startedAt: run.startedAt?.toISOString() ?? null,
@@ -73,6 +111,10 @@ function serializeSummary(run: any): AgentRunSummary {
     currentStrategy: run.currentStrategy ?? null,
     cycleCount: run.cycleCount,
     exportCount: run.exportCount,
+    graphThreadId: run.graphThreadId ?? null,
+    graphCheckpointKey: run.graphCheckpointKey ?? null,
+    graphStateJson: (run.graphStateJson as Record<string, unknown> | null) ?? null,
+    resumeToken: run.resumeToken ?? null,
     createdAt: run.createdAt.toISOString(),
     updatedAt: run.updatedAt.toISOString(),
   };
@@ -107,6 +149,7 @@ export async function createAgentRun(input: CreateAgentRunInput): Promise<AgentR
       projectId: input.projectId,
       userId: input.userId,
       mode,
+      ...createGraphMetadata('agent'),
       goalJson: goal as any,
       budgetJson: budget as any,
     },
@@ -146,6 +189,9 @@ export async function transitionAgentRunStatus(
 
   const now = new Date();
   const data: Record<string, unknown> = { status: newStatus };
+  const nextStage = !['completed', 'failed', 'cancelled', 'paused', 'queued'].includes(newStatus)
+    ? newStatus
+    : (newStatus === 'queued' ? 'queued' : null);
 
   if (run.status === 'queued' && !run.startedAt) {
     data.startedAt = now;
@@ -164,9 +210,25 @@ export async function transitionAgentRunStatus(
     data.progressPercent = 100;
   }
 
-  if (!['completed', 'failed', 'cancelled', 'paused', 'queued'].includes(newStatus)) {
-    data.currentStage = newStatus;
+  if (nextStage !== null) {
+    data.currentStage = nextStage;
   }
+
+  const currentProgress = typeof data.progressPercent === 'number'
+    ? data.progressPercent
+    : run.progressPercent;
+  const resumeToken = `${run.id}:${newStatus}:${currentProgress}`;
+  data.resumeToken = resumeToken;
+  data.graphStateJson = mergeGraphState(run.graphStateJson, {
+    status: newStatus,
+    currentStage: nextStage,
+    progressPercent: currentProgress,
+    failureReason: newStatus === 'failed' ? (failureReason ?? run.failureReason ?? null) : run.failureReason ?? null,
+    startedAt: data.startedAt instanceof Date ? data.startedAt.toISOString() : run.startedAt?.toISOString() ?? null,
+    completedAt: data.completedAt instanceof Date ? data.completedAt.toISOString() : run.completedAt?.toISOString() ?? null,
+    resumeToken,
+    updatedAt: now.toISOString(),
+  });
 
   const updated = await prisma.agentRun.update({
     where: { id: runId },
@@ -182,14 +244,50 @@ export async function updateAgentRunProgress(
   currentStage: string | null,
   progressPercent: number,
 ) {
-  const run = await prisma.agentRun.findFirst({ where: { id: runId, userId }, select: { id: true } });
+  const run = await prisma.agentRun.findFirst({ where: { id: runId, userId }, select: { id: true, graphStateJson: true } });
   if (!run) return null;
+
+  const nextProgress = Math.max(0, Math.min(100, Math.round(progressPercent)));
 
   const updated = await prisma.agentRun.update({
     where: { id: runId },
     data: {
       currentStage,
-      progressPercent: Math.max(0, Math.min(100, Math.round(progressPercent))),
+      progressPercent: nextProgress,
+      resumeToken: `${runId}:${currentStage ?? 'unknown'}:${nextProgress}`,
+      graphStateJson: mergeGraphState(run.graphStateJson, {
+        currentStage,
+        progressPercent: nextProgress,
+        resumeToken: `${runId}:${currentStage ?? 'unknown'}:${nextProgress}`,
+        updatedAt: new Date().toISOString(),
+      }),
+    },
+  });
+
+  return serializeRun(updated);
+}
+
+export async function updateAgentRunGraphState(input: {
+  runId: string;
+  userId: string;
+  patch: Record<string, unknown>;
+}) {
+  const run = await prisma.agentRun.findFirst({
+    where: { id: input.runId, userId: input.userId },
+    select: { graphStateJson: true },
+  });
+  if (!run) return null;
+
+  const updated = await prisma.agentRun.update({
+    where: { id: input.runId },
+    data: {
+      graphStateJson: mergeGraphState(run.graphStateJson, {
+        ...input.patch,
+        updatedAt: new Date().toISOString(),
+      }),
+      ...(typeof input.patch['resumeToken'] === 'string' ? { resumeToken: input.patch['resumeToken'] } : {}),
+      ...(typeof input.patch['graphThreadId'] === 'string' ? { graphThreadId: input.patch['graphThreadId'] } : {}),
+      ...(typeof input.patch['graphCheckpointKey'] === 'string' ? { graphCheckpointKey: input.patch['graphCheckpointKey'] } : {}),
     },
   });
 
@@ -209,6 +307,12 @@ export async function updateAgentRunState(input: {
   exportCount?: number;
   noImprovementStreak?: number;
 }) {
+  const current = await prisma.agentRun.findUnique({
+    where: { id: input.runId },
+    select: { graphStateJson: true },
+  });
+  if (!current) return null;
+
   const updated = await prisma.agentRun.update({
     where: { id: input.runId },
     data: {
@@ -222,6 +326,19 @@ export async function updateAgentRunState(input: {
       ...(input.cycleCount !== undefined ? { cycleCount: input.cycleCount } : {}),
       ...(input.exportCount !== undefined ? { exportCount: input.exportCount } : {}),
       ...(input.noImprovementStreak !== undefined ? { noImprovementStreak: input.noImprovementStreak } : {}),
+      graphStateJson: mergeGraphState(current.graphStateJson, {
+        ...(input.currentStrategy !== undefined ? { currentStrategy: input.currentStrategy } : {}),
+        ...(input.latestScorecard !== undefined ? { latestScorecard: input.latestScorecard } : {}),
+        ...(input.critiqueBacklog !== undefined ? { critiqueBacklog: input.critiqueBacklog } : {}),
+        ...(input.designProfile !== undefined ? { designProfile: input.designProfile } : {}),
+        ...(input.bestCheckpointId !== undefined ? { bestCheckpointId: input.bestCheckpointId } : {}),
+        ...(input.latestCheckpointId !== undefined ? { latestCheckpointId: input.latestCheckpointId } : {}),
+        ...(input.linkedGenerationRunId !== undefined ? { linkedGenerationRunId: input.linkedGenerationRunId } : {}),
+        ...(input.cycleCount !== undefined ? { cycleCount: input.cycleCount } : {}),
+        ...(input.exportCount !== undefined ? { exportCount: input.exportCount } : {}),
+        ...(input.noImprovementStreak !== undefined ? { noImprovementStreak: input.noImprovementStreak } : {}),
+        updatedAt: new Date().toISOString(),
+      }),
     },
   });
 

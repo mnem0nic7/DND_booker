@@ -50,13 +50,13 @@ export function AiSettingsModal() {
       } else {
         setModel('');
       }
-    } else if (settings?.supportedModels) {
-      const models = settings.supportedModels[provider];
-      if (models?.length && !models.includes(model)) {
-        setModel(models[0]);
+    } else {
+      const providerModels = liveModels[provider] ?? settings?.supportedModels?.[provider] ?? [];
+      if (providerModels.length && !providerModels.includes(model)) {
+        setModel(providerModels[0]);
       }
     }
-  }, [provider, settings?.supportedModels, model, ollamaModels]);
+  }, [provider, settings?.supportedModels, liveModels, model, ollamaModels]);
 
   if (!isSettingsModalOpen) return null;
 
@@ -173,6 +173,17 @@ export function AiSettingsModal() {
                 className="text-purple-600"
               />
               <span className="text-sm">Anthropic Claude</span>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="radio"
+                name="provider"
+                value="google"
+                checked={provider === 'google'}
+                onChange={() => { setProvider('google'); setValidationResult(null); setError(''); }}
+                className="text-purple-600"
+              />
+              <span className="text-sm">Google Gemini</span>
             </label>
             <label className="flex items-center gap-2 cursor-pointer">
               <input

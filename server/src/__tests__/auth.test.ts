@@ -25,6 +25,17 @@ describe('Auth API', () => {
   });
 
   describe('POST /api/auth/register', () => {
+    it('should reject registration when email is not allowlisted', async () => {
+      process.env.REGISTRATION_ALLOWED_EMAILS = 'm7.ga.77@gmail.com';
+
+      const res = await request(app).post('/api/auth/register').send(TEST_USER);
+
+      expect(res.status).toBe(403);
+      expect(res.body.error).toBe('Registration is not allowed for this email');
+
+      delete process.env.REGISTRATION_ALLOWED_EMAILS;
+    });
+
     it('should register a new user and return tokens', async () => {
       const res = await request(app).post('/api/auth/register').send(TEST_USER);
 

@@ -1,0 +1,155 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: dnd-booker
+  annotations:
+    run.googleapis.com/ingress: all
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/minScale: "1"
+        autoscaling.knative.dev/maxScale: "1"
+        run.googleapis.com/execution-environment: gen2
+        run.googleapis.com/cpu-throttling: "false"
+        run.googleapis.com/startup-cpu-boost: "true"
+        run.googleapis.com/network-interfaces: '[{"network":"default","subnetwork":"default"}]'
+        run.googleapis.com/vpc-access-egress: private-ranges-only
+        run.googleapis.com/container-dependencies: '{"server":["cloudsql-proxy"],"worker":["cloudsql-proxy","server"],"client":["server"]}'
+    spec:
+      containerConcurrency: 20
+      timeoutSeconds: 3600
+      serviceAccountName: dnd-booker-run@dnd-booker.iam.gserviceaccount.com
+      containers:
+        - name: cloudsql-proxy
+          image: gcr.io/cloud-sql-connectors/cloud-sql-proxy:latest
+          args:
+            - --address=0.0.0.0
+            - --port=5432
+            - dnd-booker:us-west4:dnd-booker-db
+          resources:
+            limits:
+              cpu: "1"
+              memory: 256Mi
+          startupProbe:
+            tcpSocket:
+              port: 5432
+            failureThreshold: 30
+            periodSeconds: 2
+        - name: server
+          image: us-west4-docker.pkg.dev/dnd-booker/dnd-booker/dnd-booker-server:latest
+          command:
+            - sh
+            - -c
+          args:
+            - |
+              for i in $(seq 1 20); do
+                npx prisma migrate deploy && exec node dist/index.js
+                echo "prisma migrate deploy failed; retrying in 5s" >&2
+                sleep 5
+              done
+              exit 1
+          env:
+            - name: NODE_ENV
+              value: production
+            - name: PORT
+              value: "4000"
+            - name: REDIS_HOST
+              value: 10.46.177.11
+            - name: REDIS_PORT
+              value: "6379"
+            - name: CLIENT_URL
+              value: https://dnd-booker-npbu4x44pq-wn.a.run.app,https://dnd-booker-1036722360072.us-west4.run.app
+            - name: REGISTRATION_ALLOWED_EMAILS
+              value: m7.ga.77@gmail.com
+            - name: GCS_BUCKET
+              value: dnd-booker-prod-assets
+            - name: GCS_ASSET_PREFIX
+              value: uploads
+            - name: GCS_EXPORT_PREFIX
+              value: output
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: dnd-booker-database-url
+                  key: latest
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: dnd-booker-redis-password
+                  key: latest
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: dnd-booker-jwt-secret
+                  key: latest
+            - name: JWT_REFRESH_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: dnd-booker-jwt-refresh-secret
+                  key: latest
+            - name: AI_KEY_ENCRYPTION_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: dnd-booker-ai-key-encryption-secret
+                  key: latest
+          resources:
+            limits:
+              cpu: "1"
+              memory: 1Gi
+          startupProbe:
+            httpGet:
+              path: /api/health
+              port: 4000
+            failureThreshold: 30
+            periodSeconds: 2
+        - name: worker
+          image: us-west4-docker.pkg.dev/dnd-booker/dnd-booker/dnd-booker-worker:latest
+          env:
+            - name: NODE_ENV
+              value: production
+            - name: REDIS_HOST
+              value: 10.46.177.11
+            - name: REDIS_PORT
+              value: "6379"
+            - name: SERVER_BASE_URL
+              value: http://localhost:4000
+            - name: GCS_BUCKET
+              value: dnd-booker-prod-assets
+            - name: GCS_ASSET_PREFIX
+              value: uploads
+            - name: GCS_EXPORT_PREFIX
+              value: output
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: dnd-booker-database-url
+                  key: latest
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: dnd-booker-redis-password
+                  key: latest
+            - name: AI_KEY_ENCRYPTION_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: dnd-booker-ai-key-encryption-secret
+                  key: latest
+          resources:
+            limits:
+              cpu: "2"
+              memory: 4Gi
+        - name: client
+          image: us-west4-docker.pkg.dev/dnd-booker/dnd-booker/dnd-booker-client:latest
+          ports:
+            - containerPort: 8080
+          env:
+            - name: API_UPSTREAM
+              value: localhost:4000
+          resources:
+            limits:
+              cpu: "1"
+              memory: 512Mi
+  traffic:
+    - percent: 100
+      latestRevision: true

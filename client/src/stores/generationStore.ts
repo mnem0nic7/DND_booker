@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import api from '../lib/api';
-import { getAccessToken } from '../lib/api';
+import { getAccessToken, v1Client } from '../lib/api';
 import type {
   GenerationRunSummary,
   GenerationEvent,
@@ -53,8 +53,8 @@ interface GenerationState {
   startRun: (
     projectId: string,
     prompt: string,
-    mode?: string,
-    quality?: string,
+    mode?: 'one_shot' | 'module' | 'campaign' | 'sourcebook',
+    quality?: 'quick' | 'polished',
     pageTarget?: number,
   ) => Promise<void>;
   fetchRun: (projectId: string, runId: string) => Promise<void>;
@@ -103,7 +103,7 @@ export const useGenerationStore = create<GenerationState>((set, get) => ({
       artifactCount: 0,
     });
     try {
-      const { data } = await api.post(`/projects/${projectId}/ai/generation-runs`, {
+      const data = await v1Client.generationRuns.createGenerationRun({ projectId }, {
         prompt,
         mode,
         quality,
@@ -122,7 +122,7 @@ export const useGenerationStore = create<GenerationState>((set, get) => ({
 
   fetchRun: async (projectId, runId) => {
     try {
-      const { data } = await api.get(`/projects/${projectId}/ai/generation-runs/${runId}`);
+      const data = await v1Client.generationRuns.getGenerationRun({ projectId, runId });
       const isTerminal = ['completed', 'failed', 'cancelled'].includes(data.status);
       set({
         currentRun: data,
@@ -143,7 +143,7 @@ export const useGenerationStore = create<GenerationState>((set, get) => ({
 
   fetchLatestRun: async (projectId) => {
     try {
-      const { data } = await api.get(`/projects/${projectId}/ai/generation-runs`);
+      const data = await v1Client.generationRuns.listGenerationRuns({ projectId });
       if (data.length > 0) {
         const latest = data[0];
         await get().fetchRun(projectId, latest.id);
@@ -158,9 +158,7 @@ export const useGenerationStore = create<GenerationState>((set, get) => ({
 
   pauseRun: async (projectId, runId) => {
     try {
-      const { data } = await api.post(
-        `/projects/${projectId}/ai/generation-runs/${runId}/pause`,
-      );
+      const data = await v1Client.generationRuns.pauseGenerationRun({ projectId, runId });
       set({ currentRun: data });
     } catch (err: unknown) {
       const message =
@@ -173,9 +171,7 @@ export const useGenerationStore = create<GenerationState>((set, get) => ({
 
   cancelRun: async (projectId, runId) => {
     try {
-      const { data } = await api.post(
-        `/projects/${projectId}/ai/generation-runs/${runId}/cancel`,
-      );
+      const data = await v1Client.generationRuns.cancelGenerationRun({ projectId, runId });
       set({ currentRun: data });
       get().unsubscribe();
     } catch (err: unknown) {
@@ -189,9 +185,7 @@ export const useGenerationStore = create<GenerationState>((set, get) => ({
 
   resumeRun: async (projectId, runId) => {
     try {
-      const { data } = await api.post(
-        `/projects/${projectId}/ai/generation-runs/${runId}/resume`,
-      );
+      const data = await v1Client.generationRuns.resumeGenerationRun({ projectId, runId });
       set({ currentRun: data });
       get().subscribeToRun(projectId, data.id);
     } catch (err: unknown) {
@@ -215,7 +209,7 @@ export const useGenerationStore = create<GenerationState>((set, get) => ({
     };
 
     const token = getAccessToken();
-    const url = `/api/projects/${projectId}/ai/generation-runs/${runId}/stream`;
+    const url = `/api/v1/projects/${projectId}/generation-runs/${runId}/events`;
 
     fetch(url, {
       headers: {

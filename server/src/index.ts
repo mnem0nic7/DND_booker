@@ -1,6 +1,4 @@
 import express, { type Request, type Response, type NextFunction } from 'express';
-import path from 'path';
-import { getAssetStorageDir } from './services/asset-paths.service.js';
 import cors from 'cors';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
@@ -14,8 +12,14 @@ import { aiSettingsRoutes, aiGenerateRoutes, aiChatRoutes, aiWizardRoutes } from
 import generationRoutes from './routes/generation.js';
 import documentRoutes from './routes/documents.js';
 import agentRoutes from './routes/agent-runs.js';
+import v1AuthRoutes from './routes/v1/auth.js';
+import v1DocumentRoutes from './routes/v1/documents.js';
+import v1RunRoutes from './routes/v1/runs.js';
+import v1SpecRoutes from './routes/v1/spec.js';
 import { publicRateLimit } from './middleware/ai-rate-limit.js';
 import { requireAuth, requireAuthOrRefreshCookie, type AuthRequest } from './middleware/auth.js';
+import { buildProjectAssetUrl } from './services/asset-paths.service.js';
+import { openProjectAssetStream } from './services/object-storage.service.js';
 
 // Validate required env vars in production
 if (process.env.NODE_ENV === 'production') {
@@ -79,6 +83,8 @@ app.get('/api/health', publicRateLimit, (_req, res) => {
 });
 
 app.use('/api/auth', authRoutes);
+app.use('/api/v1/auth', v1AuthRoutes);
+app.use('/api/v1', v1SpecRoutes);
 app.use('/api/projects', projectRoutes);
 app.use('/api/projects/:projectId/assets', projectAssetRoutes);
 app.use('/api/assets', assetRoutes);
@@ -91,6 +97,8 @@ app.use('/api/projects/:projectId', aiWizardRoutes);
 app.use('/api/projects/:projectId', generationRoutes);
 app.use('/api/projects/:projectId', agentRoutes);
 app.use('/api/projects/:projectId', documentRoutes);
+app.use('/api/v1/projects/:projectId', v1DocumentRoutes);
+app.use('/api/v1/projects/:projectId', v1RunRoutes);
 
 // Serve uploaded files with auth — verify the requesting user owns the project
 app.use('/uploads/:projectId/:filename', requireAuthOrRefreshCookie, async (req: express.Request, res: express.Response, next: express.NextFunction) => {
@@ -108,13 +116,30 @@ app.use('/uploads/:projectId/:filename', requireAuthOrRefreshCookie, async (req:
     return;
   }
 
-  // Serve the file with security headers
-  const filePath = path.resolve(getAssetStorageDir(), projectId, filename);
+  const asset = await db.asset.findFirst({
+    where: {
+      projectId,
+      userId: authReq.userId!,
+      url: buildProjectAssetUrl(projectId, filename),
+    },
+    select: { mimeType: true },
+  });
+  if (!asset) {
+    res.status(404).json({ error: 'Not found' });
+    return;
+  }
+
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('Content-Security-Policy', "default-src 'none'; img-src 'self'; style-src 'none'; script-src 'none'");
-  res.sendFile(filePath, (err) => {
-    if (err) next();
-  });
+  res.setHeader('Content-Type', asset.mimeType);
+
+  try {
+    const { stream } = await openProjectAssetStream({ projectId, filename });
+    stream.on('error', () => next());
+    stream.pipe(res);
+  } catch {
+    next();
+  }
 });
 
 // Global error handler — catches unhandled errors from async route handlers

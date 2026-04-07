@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { createV1Client } from '@dnd-booker/sdk';
 
 const api = axios.create({ baseURL: '/api', withCredentials: true });
 
@@ -22,11 +23,17 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (res) => res,
   async (error) => {
-    const isRefreshRequest = error.config?.url === '/auth/refresh';
+    const requestUrl = String(error.config?.url ?? '');
+    const isRefreshRequest = [
+      '/auth/refresh',
+      '/api/auth/refresh',
+      '/v1/auth/refresh',
+      '/api/v1/auth/refresh',
+    ].includes(requestUrl);
     if (error.response?.status === 401 && !error.config._retry && !isRefreshRequest) {
       error.config._retry = true;
       try {
-        const { data } = await axios.post('/api/auth/refresh', {}, { withCredentials: true });
+        const { data } = await axios.post('/api/v1/auth/refresh', {}, { withCredentials: true });
         setAccessToken(data.accessToken);
         error.config.headers.Authorization = `Bearer ${data.accessToken}`;
         return api(error.config);
@@ -37,5 +44,7 @@ api.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
+export const v1Client = createV1Client(api);
 
 export default api;

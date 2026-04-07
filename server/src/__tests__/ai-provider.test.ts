@@ -13,8 +13,9 @@ import {
 
 describe('AI Provider Service', () => {
   describe('SUPPORTED_MODELS', () => {
-    it('should have entries for all three providers', () => {
+    it('should have entries for all providers', () => {
       expect(SUPPORTED_MODELS).toHaveProperty('anthropic');
+      expect(SUPPORTED_MODELS).toHaveProperty('google');
       expect(SUPPORTED_MODELS).toHaveProperty('openai');
       expect(SUPPORTED_MODELS).toHaveProperty('ollama');
     });
@@ -45,6 +46,11 @@ describe('AI Provider Service', () => {
       expect(createModel('openai', 'sk-test-key')).toBeDefined();
     });
 
+    it('should create a Google model without throwing', () => {
+      expect(() => createModel('google', 'google-test-key')).not.toThrow();
+      expect(createModel('google', 'google-test-key')).toBeDefined();
+    });
+
     it('should create an Ollama model without throwing', () => {
       expect(() => createModel('ollama', 'ollama')).not.toThrow();
       expect(createModel('ollama', 'ollama')).toBeDefined();
@@ -56,6 +62,7 @@ describe('AI Provider Service', () => {
 
     it('should accept custom model names', () => {
       expect(() => createModel('openai', 'sk-test', 'gpt-4o-mini')).not.toThrow();
+      expect(() => createModel('google', 'google-test', 'gemini-2.5-flash')).not.toThrow();
       expect(() => createModel('anthropic', 'sk-ant-test', 'claude-haiku-4-20250414')).not.toThrow();
     });
   });
@@ -114,3 +121,7 @@ describe('AI Provider Service', () => {
     });
   });
 });
+    it('should have Google models', () => {
+      expect(SUPPORTED_MODELS.google.length).toBeGreaterThan(0);
+      expect(SUPPORTED_MODELS.google).toContain('gemini-2.5-pro');
+    });

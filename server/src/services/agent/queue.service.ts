@@ -1,5 +1,6 @@
 import { Queue, type ConnectionOptions } from 'bullmq';
 import { redis } from '../../config/redis.js';
+import { resolveQueueDispatchOptions, type QueueDispatchOverrides } from '../queue/config.js';
 
 export interface AgentJobData {
   agentRunId: string;
@@ -11,14 +12,22 @@ const agentQueue = new Queue('agent', {
   connection: redis as unknown as ConnectionOptions,
 });
 
-export async function enqueueAgentRun(agentRunId: string, userId: string, projectId: string) {
+export async function enqueueAgentRun(
+  agentRunId: string,
+  userId: string,
+  projectId: string,
+  overrides: QueueDispatchOverrides = {},
+) {
+  const dispatchOptions = resolveQueueDispatchOptions('agent', overrides);
   const job = await agentQueue.add(
     'operate',
     { agentRunId, userId, projectId } satisfies AgentJobData,
     {
-      attempts: 1,
-      removeOnComplete: { age: 86400 },
-      removeOnFail: { age: 604800 },
+      attempts: dispatchOptions.attempts,
+      priority: dispatchOptions.priority,
+      removeOnComplete: dispatchOptions.removeOnComplete,
+      removeOnFail: dispatchOptions.removeOnFail,
+      ...(dispatchOptions.backoff ? { backoff: dispatchOptions.backoff } : {}),
     },
   );
 

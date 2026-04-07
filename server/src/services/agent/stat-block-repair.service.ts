@@ -92,7 +92,9 @@ async function repairStatBlockWithModel(input: {
   documentSample: string;
   currentAttrs: StatBlockAttrs;
 }) {
-  const { model, maxOutputTokens } = await resolveAgentModelForUser(input.userId);
+  const { model, maxOutputTokens } = await resolveAgentModelForUser(input.userId, {
+    agentKey: 'agent.stat_block_repair',
+  });
   const assessment = assessStatBlockAttrs(input.currentAttrs);
   const prompt = buildBlockPrompt(
     'statBlock',

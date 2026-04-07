@@ -5,7 +5,7 @@ import { prisma } from '../../config/database.js';
 import { publishGenerationEvent } from './pubsub.service.js';
 import { parseJsonResponse } from './parse-json.js';
 import { getAiSettings, getDecryptedApiKey } from '../ai-settings.service.js';
-import { generateAiImage, stripImageTextRenderingInstructions } from '../ai-image.service.js';
+import { generateAiImage, stripImageTextRenderingInstructions, type ImageModel } from '../ai-image.service.js';
 import { createAsset } from '../asset.service.js';
 import { generateTextWithTimeout } from './model-timeouts.js';
 import { resolveDocumentLayout } from '../layout-plan.service.js';
@@ -26,7 +26,7 @@ interface ImageSlot {
   blockType: ImageCapableBlockType;
   nodeIndex: number;
   context: string;
-  preferredModel?: 'dall-e-3' | 'gpt-image-1';
+  preferredModel?: ImageModel;
   preferredSize?: string;
 }
 
@@ -37,7 +37,7 @@ interface AutomaticPlacementSeed {
   nodeIndex: number;
   blockType: ImageCapableBlockType;
   context: string;
-  model: 'dall-e-3' | 'gpt-image-1';
+  model: string;
   size: string;
 }
 
@@ -46,7 +46,7 @@ interface RealizedImagePlacement {
   nodeIndex: number;
   blockType: ImageCapableBlockType;
   prompt: string;
-  model: 'dall-e-3' | 'gpt-image-1';
+  model: string;
   size: string;
   assetId: string;
   assetUrl: string;
@@ -69,7 +69,7 @@ const IMAGE_ATTR_BY_BLOCK: Record<ImageCapableBlockType, string> = {
   npcProfile: 'portraitUrl',
 };
 
-const RECOMMENDED_MODEL_BY_BLOCK: Record<ImageCapableBlockType, 'dall-e-3' | 'gpt-image-1'> = {
+const RECOMMENDED_MODEL_BY_BLOCK: Record<ImageCapableBlockType, ImageModel> = {
   titlePage: 'gpt-image-1',
   chapterHeader: 'gpt-image-1',
   fullBleedImage: 'gpt-image-1',
@@ -111,7 +111,7 @@ const PlacementSchema = z.object({
   blockType: z.enum(['titlePage', 'chapterHeader', 'fullBleedImage', 'mapBlock', 'backCover', 'npcProfile']),
   prompt: z.string().min(20).max(4000),
   rationale: z.string().min(10).max(500),
-  model: z.enum(['dall-e-3', 'gpt-image-1']),
+  model: z.string().min(1).max(100),
   size: z.string().min(3).max(20),
 });
 
@@ -791,11 +791,11 @@ async function realizeArtPlacements(input: {
   }
 
   const settings = await getAiSettings(input.userId);
-  if (!settings?.provider || settings.provider !== 'openai' || !settings.hasApiKey) {
+  if (!settings?.provider || (settings.provider !== 'openai' && settings.provider !== 'google') || !settings.hasApiKey) {
     return {
       successfulPlacements: [],
       failedPlacements: [],
-      skippedReason: 'Automatic image generation requires OpenAI AI settings with a saved API key.',
+      skippedReason: 'Automatic image generation requires OpenAI or Google Gemini AI settings with a saved API key.',
     };
   }
 
@@ -814,6 +814,7 @@ async function realizeArtPlacements(input: {
   for (const placement of input.placements) {
     try {
       const image = await generateAiImage(apiKey, {
+        provider: settings.provider,
         prompt: placement.prompt,
         model: placement.model,
         size: placement.size,

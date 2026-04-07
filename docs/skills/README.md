@@ -11,6 +11,7 @@ These are not end-user features. They are execution guides for making safe chang
 
 Current skills:
 
+- [Change Completion Workflow](./change-completion-workflow.md)
 - [Pretext Layout Regression](./pretext-layout-regression.md)
 - [Layout Review Triage](./layout-review-triage.md)
 - [Safe Document Mutation](./safe-document-mutation.md)

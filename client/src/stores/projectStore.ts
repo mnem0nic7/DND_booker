@@ -1,7 +1,14 @@
 import { create } from 'zustand';
 import axios from 'axios';
-import type { DocumentContent, LayoutPlan, ProjectDocument, ProjectSettings } from '@dnd-booker/shared';
-import api from '../lib/api';
+import type {
+  DocumentContent,
+  LayoutPlan,
+  ProjectDocument,
+  ProjectSettings,
+  PublicationDocumentDetail,
+  PublicationDocumentSummary,
+} from '@dnd-booker/shared';
+import api, { v1Client } from '../lib/api';
 import {
   clearDocumentTextLayoutFallbacks as clearDocumentTextLayoutFallbacksInSettings,
 } from '../lib/projectSettings';
@@ -137,15 +144,21 @@ async function saveDocContentWithRetry(
   projectId: string,
   docId: string,
   content: DocumentContent,
+  expectedUpdatedAt?: string,
   maxAttempts = 3,
-): Promise<void> {
+): Promise<PublicationDocumentDetail> {
   const backoffMs = [1000, 2000, 4000];
   let lastError: unknown;
 
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     try {
-      await api.put(`/projects/${projectId}/documents/${docId}/content`, content);
-      return;
+      return await v1Client.documents.updateDocument(
+        { projectId, docId },
+        {
+          editorProjectionJson: content,
+          ...(expectedUpdatedAt ? { expectedUpdatedAt } : {}),
+        },
+      );
     } catch (err) {
       lastError = err;
       if (attempt < maxAttempts - 1) {
@@ -154,6 +167,42 @@ async function saveDocContentWithRetry(
     }
   }
   throw lastError;
+}
+
+function toProjectDocumentFromV1(
+  document: PublicationDocumentDetail | PublicationDocumentSummary,
+): ProjectDocument {
+  const documentId = 'documentId' in document ? document.documentId : document.id;
+  const content = 'editorProjectionJson' in document ? document.editorProjectionJson : null;
+  const canonicalDocJson = 'canonicalDocJson' in document ? document.canonicalDocJson : null;
+  const editorProjectionJson = 'editorProjectionJson' in document ? document.editorProjectionJson : null;
+  const typstSource = 'typstSource' in document ? document.typstSource : null;
+
+  return {
+    id: documentId,
+    projectId: document.projectId,
+    runId: 'runId' in document ? document.runId ?? null : null,
+    kind: document.kind,
+    title: document.title,
+    slug: document.slug,
+    sortOrder: document.sortOrder,
+    targetPageCount: document.targetPageCount,
+    outlineJson: null,
+    layoutPlan: null,
+    content,
+    canonicalDocJson,
+    editorProjectionJson,
+    typstSource,
+    canonicalVersion: document.canonicalVersion,
+    editorProjectionVersion: document.editorProjectionVersion,
+    typstVersion: document.typstVersion,
+    status: document.status,
+    sourceArtifactId: document.sourceArtifactId,
+    createdAt: 'createdAt' in document && typeof document.createdAt === 'string'
+      ? document.createdAt
+      : document.updatedAt,
+    updatedAt: document.updatedAt,
+  };
 }
 
 /* ─── localStorage backup helpers for documents ─── */
@@ -184,9 +233,11 @@ let saveTimeout: ReturnType<typeof setTimeout> | null = null;
 let pendingSaveId: string | null = null;
 let pendingSaveContent: DocumentContent | null = null;
 let pendingSaveDocId: string | null = null;
+let pendingSaveDocUpdatedAt: string | null = null;
 let failedSaveId: string | null = null;
 let failedSaveContent: DocumentContent | null = null;
 let failedSaveDocId: string | null = null;
+let failedSaveDocUpdatedAt: string | null = null;
 
 export const useProjectStore = create<ProjectState>((set, get) => ({
   // Dashboard list
@@ -259,6 +310,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       pendingSaveId = null;
       pendingSaveContent = null;
       pendingSaveDocId = null;
+      pendingSaveDocUpdatedAt = null;
       saveTimeout = null;
 
       if (!saveId || !saveContent) return;
@@ -289,13 +341,20 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     pendingSaveId = null;
     pendingSaveContent = null;
     pendingSaveDocId = null;
+    const saveDocUpdatedAt = pendingSaveDocUpdatedAt;
+    pendingSaveDocUpdatedAt = null;
 
     if (!saveId || !saveContent) return;
     set({ isSaving: true, saveError: null });
     try {
       if (saveDocId) {
-        await saveDocContentWithRetry(saveId, saveDocId, saveContent);
+        const updatedDoc = await saveDocContentWithRetry(saveId, saveDocId, saveContent, saveDocUpdatedAt ?? undefined);
         clearDocBackup(saveDocId);
+        const nextDoc = toProjectDocumentFromV1(updatedDoc);
+        set((state) => ({
+          activeDocument: state.activeDocument?.id === nextDoc.id ? nextDoc : state.activeDocument,
+          documents: state.documents.map((item) => item.id === nextDoc.id ? { ...item, ...nextDoc } : item),
+        }));
       } else {
         await saveContentWithRetry(saveId, saveContent);
         clearBackup(saveId);
@@ -303,6 +362,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       failedSaveId = null;
       failedSaveContent = null;
       failedSaveDocId = null;
+      failedSaveDocUpdatedAt = null;
       set({ isSaving: false, hasPendingChanges: false });
     } catch (err) {
       if (saveDocId) {
@@ -310,6 +370,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         failedSaveId = saveId;
         failedSaveContent = saveContent;
         failedSaveDocId = saveDocId;
+        failedSaveDocUpdatedAt = saveDocUpdatedAt;
       } else {
         saveBackup(saveId, saveContent);
         failedSaveId = saveId;
@@ -327,6 +388,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     pendingSaveId = null;
     pendingSaveContent = null;
     pendingSaveDocId = null;
+    pendingSaveDocUpdatedAt = null;
     set({ hasPendingChanges: false });
   },
 
@@ -334,13 +396,19 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     const saveId = failedSaveId;
     const saveContent = failedSaveContent;
     const saveDocId = failedSaveDocId;
+    const saveDocUpdatedAt = failedSaveDocUpdatedAt;
     if (!saveId || !saveContent) return;
 
     set({ isSaving: true, saveError: null });
     try {
       if (saveDocId) {
-        await saveDocContentWithRetry(saveId, saveDocId, saveContent);
+        const updatedDoc = await saveDocContentWithRetry(saveId, saveDocId, saveContent, saveDocUpdatedAt ?? undefined);
         clearDocBackup(saveDocId);
+        const nextDoc = toProjectDocumentFromV1(updatedDoc);
+        set((state) => ({
+          activeDocument: state.activeDocument?.id === nextDoc.id ? nextDoc : state.activeDocument,
+          documents: state.documents.map((item) => item.id === nextDoc.id ? { ...item, ...nextDoc } : item),
+        }));
       } else {
         await saveContentWithRetry(saveId, saveContent);
         clearBackup(saveId);
@@ -348,6 +416,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       failedSaveId = null;
       failedSaveContent = null;
       failedSaveDocId = null;
+      failedSaveDocUpdatedAt = null;
       set({ isSaving: false, hasPendingChanges: false });
     } catch (err) {
       if (saveDocId) {
@@ -422,8 +491,8 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   fetchDocuments: async (projectId) => {
     set({ isLoadingDocuments: true });
     try {
-      const { data } = await api.get(`/projects/${projectId}/documents`);
-      set({ documents: data, isLoadingDocuments: false });
+      const data = await v1Client.documents.listDocuments({ projectId });
+      set({ documents: data.map((document) => toProjectDocumentFromV1(document)), isLoadingDocuments: false });
     } catch {
       set({ isLoadingDocuments: false });
     }
@@ -435,8 +504,8 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
 
     set({ isLoadingDocument: true });
     try {
-      const { data } = await api.get(`/projects/${projectId}/documents/${docId}`);
-      set({ activeDocument: data, isLoadingDocument: false });
+      const data = await v1Client.documents.getDocument({ projectId, docId });
+      set({ activeDocument: toProjectDocumentFromV1(data), isLoadingDocument: false });
     } catch {
       set({ isLoadingDocument: false });
     }
@@ -454,6 +523,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     pendingSaveId = project.id;
     pendingSaveContent = content;
     pendingSaveDocId = doc.id;
+    pendingSaveDocUpdatedAt = doc.updatedAt;
 
     // Debounced save to server (1 second)
     if (saveTimeout) clearTimeout(saveTimeout);
@@ -462,25 +532,40 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       const saveProjectId = pendingSaveId;
       const saveContent = pendingSaveContent;
       const saveDocId = pendingSaveDocId;
+      const saveDocUpdatedAt = pendingSaveDocUpdatedAt;
       pendingSaveId = null;
       pendingSaveContent = null;
       pendingSaveDocId = null;
+      pendingSaveDocUpdatedAt = null;
       saveTimeout = null;
 
       if (!saveProjectId || !saveContent || !saveDocId) return;
       set({ isSaving: true, saveError: null });
       try {
-        await saveDocContentWithRetry(saveProjectId, saveDocId, saveContent);
+        const updatedDoc = await saveDocContentWithRetry(
+          saveProjectId,
+          saveDocId,
+          saveContent,
+          saveDocUpdatedAt ?? undefined,
+        );
         clearDocBackup(saveDocId);
         failedSaveId = null;
         failedSaveContent = null;
         failedSaveDocId = null;
-        set({ isSaving: false, hasPendingChanges: false });
+        failedSaveDocUpdatedAt = null;
+        const nextDoc = toProjectDocumentFromV1(updatedDoc);
+        set((state) => ({
+          activeDocument: state.activeDocument?.id === nextDoc.id ? nextDoc : state.activeDocument,
+          documents: state.documents.map((item) => item.id === nextDoc.id ? { ...item, ...nextDoc } : item),
+          isSaving: false,
+          hasPendingChanges: false,
+        }));
       } catch (err) {
         saveDocBackup(saveDocId, saveContent);
         failedSaveId = saveProjectId;
         failedSaveContent = saveContent;
         failedSaveDocId = saveDocId;
+        failedSaveDocUpdatedAt = saveDocUpdatedAt;
         set({ isSaving: false, saveError: classifySaveError(err) });
       }
     }, 1000);

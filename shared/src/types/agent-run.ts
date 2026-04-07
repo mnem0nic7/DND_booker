@@ -139,6 +139,10 @@ export interface AgentRun {
   exportCount: number;
   noImprovementStreak: number;
   failureReason: string | null;
+  graphThreadId?: string | null;
+  graphCheckpointKey?: string | null;
+  graphStateJson?: Record<string, unknown> | null;
+  resumeToken?: string | null;
   createdAt: string;
   updatedAt: string;
   startedAt: string | null;
@@ -154,6 +158,10 @@ export interface AgentRunSummary {
   currentStrategy: string | null;
   cycleCount: number;
   exportCount: number;
+  graphThreadId?: string | null;
+  graphCheckpointKey?: string | null;
+  graphStateJson?: Record<string, unknown> | null;
+  resumeToken?: string | null;
   createdAt: string;
   updatedAt: string;
 }

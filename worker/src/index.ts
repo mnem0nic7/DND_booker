@@ -1,9 +1,11 @@
+import { createServer } from 'node:http';
 import { Worker, Queue, type ConnectionOptions } from 'bullmq';
 import IORedis from 'ioredis';
 import { processExportJob } from './jobs/export.job.js';
 import { cleanupExportFiles } from './jobs/cleanup.job.js';
 import { processGenerationJob } from './jobs/generation-orchestrator.job.js';
 import { processAgentRun } from './jobs/agent-orchestrator.job.js';
+import { resolveWorkerConcurrency, resolveWorkerTiming } from './runtime-config.js';
 
 const connection = new IORedis({
   host: process.env.REDIS_HOST || 'localhost',
@@ -12,12 +14,27 @@ const connection = new IORedis({
   maxRetriesPerRequest: null,
 });
 
-const LONG_RUNNING_JOB_LOCK_MS = 15 * 60 * 1000;
-const STALLED_CHECK_INTERVAL_MS = 60 * 1000;
+const healthPort = Number(process.env.PORT);
+const healthServer = Number.isFinite(healthPort) && healthPort > 0
+  ? createServer((_req, res) => {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ status: 'ok', service: 'worker' }));
+  })
+  : null;
+
+const { longRunningJobLockMs: LONG_RUNNING_JOB_LOCK_MS, stalledCheckIntervalMs: STALLED_CHECK_INTERVAL_MS } = resolveWorkerTiming();
+const DEFAULT_WORKER_CONCURRENCY = Number.parseInt(process.env.WORKER_CONCURRENCY ?? '', 10);
+const BASE_WORKER_CONCURRENCY = Number.isFinite(DEFAULT_WORKER_CONCURRENCY) && DEFAULT_WORKER_CONCURRENCY > 0
+  ? DEFAULT_WORKER_CONCURRENCY
+  : 1;
+const EXPORT_WORKER_CONCURRENCY = resolveWorkerConcurrency('export', BASE_WORKER_CONCURRENCY + 1);
+const CLEANUP_WORKER_CONCURRENCY = resolveWorkerConcurrency('cleanup', BASE_WORKER_CONCURRENCY);
+const GENERATION_WORKER_CONCURRENCY = resolveWorkerConcurrency('generation', BASE_WORKER_CONCURRENCY);
+const AGENT_WORKER_CONCURRENCY = resolveWorkerConcurrency('agent', BASE_WORKER_CONCURRENCY);
 
 const worker = new Worker('export', processExportJob, {
   connection: connection as unknown as ConnectionOptions,
-  concurrency: 2,
+  concurrency: EXPORT_WORKER_CONCURRENCY,
 });
 
 // Cleanup worker: runs the export file cleanup job on a schedule
@@ -25,12 +42,12 @@ const cleanupWorker = new Worker('cleanup', async () => {
   await cleanupExportFiles();
 }, {
   connection: connection as unknown as ConnectionOptions,
-  concurrency: 1,
+  concurrency: CLEANUP_WORKER_CONCURRENCY,
 });
 
 const generationWorker = new Worker('generation', processGenerationJob, {
   connection: connection as unknown as ConnectionOptions,
-  concurrency: 1,
+  concurrency: GENERATION_WORKER_CONCURRENCY,
   lockDuration: LONG_RUNNING_JOB_LOCK_MS,
   stalledInterval: STALLED_CHECK_INTERVAL_MS,
   maxStalledCount: 2,
@@ -38,7 +55,7 @@ const generationWorker = new Worker('generation', processGenerationJob, {
 
 const agentWorker = new Worker('agent', processAgentRun, {
   connection: connection as unknown as ConnectionOptions,
-  concurrency: 1,
+  concurrency: AGENT_WORKER_CONCURRENCY,
   lockDuration: LONG_RUNNING_JOB_LOCK_MS,
   stalledInterval: STALLED_CHECK_INTERVAL_MS,
   maxStalledCount: 2,
@@ -77,6 +94,16 @@ async function shutdown() {
   forceExit.unref();
 
   try {
+    await new Promise<void>((resolve, reject) => {
+      if (!healthServer) {
+        resolve();
+        return;
+      }
+      healthServer.close((err) => {
+        if (err) reject(err);
+        else resolve();
+      });
+    });
     await agentWorker.close();
     await generationWorker.close();
     await worker.close();
@@ -91,5 +118,11 @@ async function shutdown() {
 
 process.on('SIGTERM', shutdown);
 process.on('SIGINT', shutdown);
+
+if (healthServer) {
+  healthServer.listen(healthPort, '0.0.0.0', () => {
+    console.log(`Worker health server listening on port ${healthPort}`);
+  });
+}
 
 console.log('Workers running (export + generation + agent)...');

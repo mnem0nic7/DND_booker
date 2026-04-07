@@ -4,10 +4,16 @@ import type { ExportJob as PrismaExportJob } from '@prisma/client';
 import { prisma } from '../config/database.js';
 import { redis } from '../config/redis.js';
 import { applySafeExportReviewFixes } from './export-fix.service.js';
+import { resolveQueueDispatchOptions, type QueueDispatchOverrides } from './queue/config.js';
 
 const exportQueue = new Queue('export', { connection: redis as unknown as ConnectionOptions });
 
-export async function createExportJob(projectId: string, userId: string, format: 'pdf' | 'epub' | 'print_pdf') {
+export async function createExportJob(
+  projectId: string,
+  userId: string,
+  format: 'pdf' | 'epub' | 'print_pdf',
+  overrides: QueueDispatchOverrides = {},
+) {
   const project = await prisma.project.findFirst({ where: { id: projectId, userId } });
   if (!project) return null;
 
@@ -15,9 +21,13 @@ export async function createExportJob(projectId: string, userId: string, format:
     data: { projectId, userId, format },
   });
 
+  const dispatchOptions = resolveQueueDispatchOptions('export', overrides);
   await exportQueue.add('generate', { exportJobId: job.id, format }, {
-    attempts: 3,
-    backoff: { type: 'exponential', delay: 2000 },
+    attempts: dispatchOptions.attempts,
+    priority: dispatchOptions.priority,
+    removeOnComplete: dispatchOptions.removeOnComplete,
+    removeOnFail: dispatchOptions.removeOnFail,
+    ...(dispatchOptions.backoff ? { backoff: dispatchOptions.backoff } : {}),
   });
 
   return serializeExportJob(job);

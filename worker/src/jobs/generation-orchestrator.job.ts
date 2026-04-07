@@ -38,29 +38,6 @@ async function withOptionalStageTimeout<T>(label: string, task: Promise<T>): Pro
   });
 }
 
-async function resetRunStateForRetry(runId: string, projectId: string): Promise<void> {
-  await prisma.$transaction([
-    prisma.projectDocument.deleteMany({
-      where: { runId, projectId },
-    }),
-    prisma.assemblyManifest.deleteMany({
-      where: { runId, projectId },
-    }),
-    prisma.generationTask.deleteMany({
-      where: { runId },
-    }),
-    prisma.generatedArtifact.deleteMany({
-      where: { runId, projectId },
-    }),
-    prisma.canonEntity.deleteMany({
-      where: { runId, projectId },
-    }),
-    prisma.campaignBible.deleteMany({
-      where: { runId, projectId },
-    }),
-  ]);
-}
-
 /**
  * Main orchestrator job for autonomous generation.
  *
@@ -87,14 +64,9 @@ export async function processGenerationJob(job: Job<GenerationJobData>): Promise
   };
   const isPolished = fullRun.quality === 'polished';
   const isOneShot = fullRun.mode === 'one_shot';
-  const shouldResetForRetry = fullRun.progressPercent > 0 || fullRun.startedAt !== null;
-
-  if (shouldResetForRetry) {
-    await resetRunStateForRetry(runId, projectId);
-  }
 
   // Dynamic imports to avoid cross-package resolution issues at module load time
-  const { transitionRunStatus, updateRunProgress } = await import('../../../server/src/services/generation/run.service.js');
+  const { transitionRunStatus, updateRunProgress, updateRunGraphState } = await import('../../../server/src/services/generation/run.service.js');
   const { publishGenerationEvent } = await import('../../../server/src/services/generation/pubsub.service.js');
   const { executeBibleGeneration } = await import('../../../server/src/services/generation/bible.service.js');
   const { executeOutlineGeneration } = await import('../../../server/src/services/generation/outline.service.js');
@@ -155,6 +127,16 @@ export async function processGenerationJob(job: Job<GenerationJobData>): Promise
   }
 
   try {
+    await updateRunGraphState(runId, userId, {
+      jobName: job.name,
+      attemptsMade: job.attemptsMade,
+      queueName: 'generation',
+      status: fullRun.status,
+      currentStage: fullRun.currentStage,
+      progressPercent: fullRun.progressPercent,
+      resumedFromCheckpoint: Boolean(fullRun.resumeToken),
+    });
+
     const { model, maxOutputTokens } = await resolveModelForUser(userId);
 
     // Stage 1: Planning

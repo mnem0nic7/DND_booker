@@ -439,8 +439,7 @@ export function AiChatPanel({ projectId, editor, pageMetrics = null }: AiChatPan
     const images = extractImageGenBlock(lastMsg.content);
     if (!images || images.length === 0) return;
 
-    // Only process if user has OpenAI configured (image gen requires it)
-    if (settings.provider !== 'openai') return;
+    if (settings.provider !== 'openai' && settings.provider !== 'google') return;
 
     _processedImageGens.add(lastIdx);
 

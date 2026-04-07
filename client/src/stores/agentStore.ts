@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import api, { getAccessToken } from '../lib/api';
+import api, { getAccessToken, v1Client } from '../lib/api';
 import { useProjectStore } from './projectStore';
 import type {
   AgentAction,
@@ -74,7 +74,7 @@ export const useAgentStore = create<AgentState>((set, get) => ({
       actions: [],
     });
     try {
-      const { data } = await api.post(`/projects/${projectId}/ai/agent-runs`, input);
+      const data = await v1Client.agentRuns.createAgentRun({ projectId }, input);
       set({ currentRun: data, isStarting: false });
       get().subscribeToRun(projectId, data.id);
       await Promise.all([
@@ -88,7 +88,7 @@ export const useAgentStore = create<AgentState>((set, get) => ({
 
   fetchRun: async (projectId, runId) => {
     try {
-      const { data } = await api.get(`/projects/${projectId}/ai/agent-runs/${runId}`);
+      const data = await v1Client.agentRuns.getAgentRun({ projectId, runId });
       const isTerminal = ['completed', 'failed', 'cancelled'].includes(data.status);
       set({
         currentRun: data,
@@ -102,7 +102,7 @@ export const useAgentStore = create<AgentState>((set, get) => ({
 
   fetchLatestRun: async (projectId) => {
     try {
-      const { data } = await api.get(`/projects/${projectId}/ai/agent-runs`);
+      const data = await v1Client.agentRuns.listAgentRuns({ projectId });
       if (data.length > 0) {
         const latest = data[0];
         await get().fetchRun(projectId, latest.id);
@@ -122,7 +122,7 @@ export const useAgentStore = create<AgentState>((set, get) => ({
 
   pauseRun: async (projectId, runId) => {
     try {
-      const { data } = await api.post(`/projects/${projectId}/ai/agent-runs/${runId}/pause`);
+      const data = await v1Client.agentRuns.pauseAgentRun({ projectId, runId });
       set({ currentRun: data });
     } catch (err: unknown) {
       set({ error: toErrorMessage(err, 'Failed to pause creative director') });
@@ -131,7 +131,7 @@ export const useAgentStore = create<AgentState>((set, get) => ({
 
   cancelRun: async (projectId, runId) => {
     try {
-      const { data } = await api.post(`/projects/${projectId}/ai/agent-runs/${runId}/cancel`);
+      const data = await v1Client.agentRuns.cancelAgentRun({ projectId, runId });
       set({ currentRun: data });
       get().unsubscribe();
     } catch (err: unknown) {
@@ -141,7 +141,7 @@ export const useAgentStore = create<AgentState>((set, get) => ({
 
   resumeRun: async (projectId, runId) => {
     try {
-      const { data } = await api.post(`/projects/${projectId}/ai/agent-runs/${runId}/resume`);
+      const data = await v1Client.agentRuns.resumeAgentRun({ projectId, runId });
       set({ currentRun: data });
       get().subscribeToRun(projectId, data.id);
     } catch (err: unknown) {
@@ -164,7 +164,7 @@ export const useAgentStore = create<AgentState>((set, get) => ({
     };
 
     const token = getAccessToken();
-    const url = `/api/projects/${projectId}/ai/agent-runs/${runId}/stream`;
+    const url = `/api/v1/projects/${projectId}/agent-runs/${runId}/events`;
     fetch(url, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
       credentials: 'include',
@@ -245,7 +245,7 @@ export const useAgentStore = create<AgentState>((set, get) => ({
 
   fetchCheckpoints: async (projectId, runId) => {
     try {
-      const { data } = await api.get(`/projects/${projectId}/ai/agent-runs/${runId}/checkpoints`);
+      const data = await v1Client.agentRuns.listAgentCheckpoints({ projectId, runId });
       set({ checkpoints: data });
     } catch (err: unknown) {
       set({ error: toErrorMessage(err, 'Failed to load checkpoints') });
@@ -254,7 +254,7 @@ export const useAgentStore = create<AgentState>((set, get) => ({
 
   fetchActions: async (projectId, runId) => {
     try {
-      const { data } = await api.get(`/projects/${projectId}/ai/agent-runs/${runId}/actions`);
+      const data = await v1Client.agentRuns.listAgentActions({ projectId, runId });
       set({ actions: data });
     } catch (err: unknown) {
       set({ error: toErrorMessage(err, 'Failed to load action log') });
@@ -263,7 +263,7 @@ export const useAgentStore = create<AgentState>((set, get) => ({
 
   restoreCheckpoint: async (projectId, runId, checkpointId) => {
     try {
-      await api.post(`/projects/${projectId}/ai/agent-runs/${runId}/checkpoints/${checkpointId}/restore`);
+      await v1Client.agentRuns.restoreAgentCheckpoint({ projectId, runId, checkpointId });
       await Promise.all([
         get().fetchCheckpoints(projectId, runId),
         get().fetchRun(projectId, runId),

@@ -1,8 +1,5 @@
-import fs from 'fs/promises';
-import path from 'path';
 import { prisma } from '../config/database.js';
-
-const OUTPUT_DIR = path.join(process.cwd(), 'output');
+import { deleteExportArtifactByUrl } from '../../../server/src/services/object-storage.service.js';
 const MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 /**
@@ -28,15 +25,13 @@ export async function cleanupExportFiles(): Promise<void> {
   for (const job of staleJobs) {
     if (!job.outputUrl) continue;
 
-    // Delete the file from disk
-    const filename = path.basename(job.outputUrl);
-    const filePath = path.join(OUTPUT_DIR, filename);
+    // Delete the file from storage
     try {
-      await fs.unlink(filePath);
+      await deleteExportArtifactByUrl(job.outputUrl);
       deleted++;
     } catch (err: unknown) {
       if (err instanceof Error && (err as NodeJS.ErrnoException).code !== 'ENOENT') {
-        console.error(`[cleanup] Failed to delete ${filePath}:`, (err as Error).message);
+        console.error(`[cleanup] Failed to delete ${job.outputUrl}:`, (err as Error).message);
       }
     }
 

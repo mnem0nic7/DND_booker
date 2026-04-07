@@ -112,6 +112,10 @@ router.post('/register', authRateLimit, asyncHandler(async (req: Request, res: R
       res.status(409).json({ error: 'Email already registered' });
       return;
     }
+    if (err instanceof Error && err.message === 'REGISTRATION_NOT_ALLOWED') {
+      res.status(403).json({ error: 'Registration is not allowed for this email' });
+      return;
+    }
     res.status(500).json({ error: 'Registration failed' });
   }
 }));

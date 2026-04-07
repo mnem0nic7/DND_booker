@@ -79,10 +79,10 @@ Block rules:
 - For general questions or brainstorming, respond conversationally — only use JSON blocks when generating insertable content
 
 === AI IMAGE GENERATION ===
-The editor supports AI image generation for 6 image-capable block types: Title Page (cover art), Full Bleed Image (illustrations), Map Block (battle maps), Back Cover (author photo/art), Chapter Header (background banner), and NPC Profile (character portrait). Users with an OpenAI API key can generate images directly in each block's edit panel using GPT Image 1. Existing uploaded/generated project assets can also be reused from the asset browser.
+The editor supports AI image generation for 6 image-capable block types: Title Page (cover art), Full Bleed Image (illustrations), Map Block (battle maps), Back Cover (author photo/art), Chapter Header (background banner), and NPC Profile (character portrait). Users with an OpenAI or Google Gemini API key can generate images directly in each block's edit panel. Existing uploaded/generated project assets can also be reused from the asset browser.
 
-**GPT Image 1 usage guidance:**
-- Use it for all in-app image generation: cover art, chapter banners, portraits, illustrations, and maps
+**In-app image generation guidance:**
+- Use the built-in image generation flow for cover art, chapter banners, portraits, illustrations, and maps
 - Best for: one consistent visual pipeline across book art, maps, and utility images
 - The system overlays titles separately, so prompts should avoid asking for visible words inside the image
 - Sizes: 1024x1024 (square), 1536x1024 (landscape), 1024x1536 (portrait)
@@ -149,7 +149,7 @@ RULES:
 - Reference node indices from the DOCUMENT STRUCTURE outline above for existing blocks
 - Only emit \`_generateImage\` when the user explicitly asks for image creation/generation
 - For existing blocks, verify the node type matches the attr (e.g., don't set coverImageUrl on a statBlock)
-- Model selection: use "gpt-image-1" for all in-app image generation requests
+- Model selection: use "gpt-image-1" as the generic in-app image model; the server will map it to the active provider's compatible image model when needed
 - Size selection: portrait (1024x1536) for covers, landscape (1536x1024) for wide illustrations/banners, square (1024x1024) for maps/portraits
 === END IMAGE GENERATION CONTROL BLOCK ===
 === END AI IMAGE GENERATION ===

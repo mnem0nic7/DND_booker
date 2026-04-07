@@ -4,6 +4,7 @@ import { prisma } from '../../config/database.js';
 import { publishGenerationEvent } from './pubsub.service.js';
 import { resolveOutlineArtifact } from './outline-artifact.service.js';
 import { resolveDocumentLayout } from '../layout-plan.service.js';
+import { buildPublicationDocumentStorageFields } from '../document-publication.service.js';
 import { convertMarkdownToTipTapWithTimeout } from './markdown-artifact-conversion.service.js';
 import { applyRealizedArtToDocuments } from './art-direction.service.js';
 import type { ImageModel } from '../ai-image.service.js';
@@ -377,6 +378,7 @@ export async function assembleDocuments(
       kind: spec.kind,
       title: spec.title,
     });
+    const publicationFields = buildPublicationDocumentStorageFields({ content: resolvedLayout.content });
 
     const doc = await prisma.projectDocument.create({
       data: {
@@ -390,6 +392,12 @@ export async function assembleDocuments(
         outlineJson: (artifact?.jsonContent as any) ?? Prisma.JsonNull,
         layoutPlan: resolvedLayout.layoutPlan as any,
         content: resolvedLayout.content as any,
+        canonicalDocJson: publicationFields.canonicalDocJson,
+        editorProjectionJson: publicationFields.editorProjectionJson,
+        typstSource: publicationFields.typstSource,
+        canonicalVersion: publicationFields.canonicalVersion,
+        editorProjectionVersion: publicationFields.editorProjectionVersion,
+        typstVersion: publicationFields.typstVersion,
         status: 'draft',
         sourceArtifactId: artifact?.id ?? null,
       },
@@ -427,12 +435,23 @@ export async function assembleDocuments(
           kind: existing.kind,
           title: existing.title,
         });
+        const publicationFields = buildPublicationDocumentStorageFields({ content: resolvedLayout.content }, {
+          canonicalVersion: (existing as { canonicalVersion?: number | null }).canonicalVersion,
+          editorProjectionVersion: (existing as { editorProjectionVersion?: number | null }).editorProjectionVersion,
+          typstVersion: (existing as { typstVersion?: number | null }).typstVersion,
+        });
 
         return prisma.projectDocument.update({
           where: { id: document.id },
           data: {
             content: resolvedLayout.content as any,
             layoutPlan: resolvedLayout.layoutPlan as any,
+            canonicalDocJson: publicationFields.canonicalDocJson,
+            editorProjectionJson: publicationFields.editorProjectionJson,
+            typstSource: publicationFields.typstSource,
+            canonicalVersion: publicationFields.canonicalVersion,
+            editorProjectionVersion: publicationFields.editorProjectionVersion,
+            typstVersion: publicationFields.typstVersion,
           },
         });
       }),

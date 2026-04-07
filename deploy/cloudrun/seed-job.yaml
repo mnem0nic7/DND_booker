@@ -1,0 +1,44 @@
+apiVersion: run.googleapis.com/v1
+kind: Job
+metadata:
+  name: dnd-booker-seed
+spec:
+  template:
+    metadata:
+      annotations:
+        run.googleapis.com/container-dependencies: '{"seed":["cloudsql-proxy"]}'
+        run.googleapis.com/secrets: dnd-booker-database-url:projects/1036722360072/secrets/dnd-booker-database-url
+    spec:
+      taskCount: 1
+      template:
+        spec:
+          serviceAccountName: dnd-booker-run@dnd-booker.iam.gserviceaccount.com
+          timeoutSeconds: "1800"
+          maxRetries: 0
+          containers:
+            - name: cloudsql-proxy
+              image: gcr.io/cloud-sql-connectors/cloud-sql-proxy:latest
+              args:
+                - --address=0.0.0.0
+                - --port=5432
+                - dnd-booker:us-west4:dnd-booker-db
+              startupProbe:
+                tcpSocket:
+                  port: 5432
+                failureThreshold: 30
+                periodSeconds: 2
+            - name: seed
+              image: us-west4-docker.pkg.dev/dnd-booker/dnd-booker/dnd-booker-server:latest
+              command:
+                - sh
+                - -c
+              args:
+                - npx prisma db seed
+              env:
+                - name: NODE_ENV
+                  value: production
+                - name: DATABASE_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: dnd-booker-database-url
+                      key: latest

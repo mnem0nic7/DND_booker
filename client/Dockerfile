@@ -16,6 +16,8 @@ RUN npm run build
 # Stage 2: Serve with Nginx
 FROM nginx:alpine
 COPY --from=build /app/client/dist /usr/share/nginx/html
-COPY client/nginx.conf /etc/nginx/conf.d/default.conf
-EXPOSE 80
+COPY client/nginx.conf /etc/nginx/templates/default.conf.template
+ENV PORT=8080
+ENV API_UPSTREAM=server:4000
+EXPOSE 8080
 CMD ["nginx", "-g", "daemon off;"]

@@ -134,7 +134,7 @@ export interface ImageTargetInsert {
 export interface ImageGenerationRequest {
   id: string;
   prompt: string;
-  model: 'dall-e-3' | 'gpt-image-1';
+  model: string;
   size: string;
   target: ImageTargetUpdate | ImageTargetInsert;
 }

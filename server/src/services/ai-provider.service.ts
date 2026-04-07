@@ -1,13 +1,15 @@
 import { createAnthropic } from '@ai-sdk/anthropic';
+import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { createOpenAI } from '@ai-sdk/openai';
 import { generateText, type LanguageModel } from 'ai';
 import { existsSync } from 'fs';
 import { Agent, fetch as undiciFetch } from 'undici';
 
-export type AiProvider = 'anthropic' | 'openai' | 'ollama';
+export type AiProvider = 'anthropic' | 'google' | 'openai' | 'ollama';
 
 const DEFAULT_MODELS: Record<AiProvider, string> = {
   anthropic: 'claude-sonnet-4-6',
+  google: 'gemini-2.5-pro',
   openai: 'gpt-4o',
   ollama: 'llama3.2:3b',
 };
@@ -21,6 +23,13 @@ export const SUPPORTED_MODELS: Record<AiProvider, string[]> = {
     'claude-sonnet-4-20250514',
     'claude-3-7-sonnet-20250219',
     'claude-3-5-haiku-20241022',
+  ],
+  google: [
+    'gemini-2.5-pro',
+    'gemini-2.5-flash',
+    'gemini-2.5-flash-lite',
+    'gemini-2.0-flash',
+    'gemini-2.0-flash-lite',
   ],
   openai: [
     'gpt-5.4',
@@ -40,9 +49,12 @@ export const SUPPORTED_MODELS: Record<AiProvider, string[]> = {
 
 // --- Dynamic OpenAI model fetching with cache ---
 let _openAiModelCache: { models: string[]; expiresAt: number } | null = null;
+let _googleModelCache: { apiKey: string; models: string[]; expiresAt: number } | null = null;
 const OPENAI_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
+const GOOGLE_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 
 const OPENAI_CHAT_PREFIXES = ['gpt-', 'o1', 'o3', 'o4', 'chatgpt-'];
+const GOOGLE_TEXT_PREFIXES = ['gemini-'];
 const OLLAMA_CONNECT_TIMEOUT_MS = 30_000;
 const LOOPBACK_OLLAMA_PORT = '11434';
 const DEFAULT_OLLAMA_BASE_URL = 'http://localhost:11434';
@@ -211,9 +223,40 @@ export async function fetchOpenAiModels(apiKey: string): Promise<string[]> {
   }
 }
 
+export async function fetchGoogleModels(apiKey: string): Promise<string[]> {
+  if (_googleModelCache && _googleModelCache.apiKey === apiKey && Date.now() < _googleModelCache.expiresAt) {
+    return _googleModelCache.models;
+  }
+
+  try {
+    const res = await fetch('https://generativelanguage.googleapis.com/v1beta/models', {
+      headers: {
+        'x-goog-api-key': apiKey,
+      },
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!res.ok) return SUPPORTED_MODELS.google;
+
+    const data = (await res.json()) as { models?: { name?: string; supportedGenerationMethods?: string[] }[] };
+    const models = (data.models ?? [])
+      .filter((model) => model.supportedGenerationMethods?.includes('generateContent'))
+      .map((model) => String(model.name || '').replace(/^models\//, ''))
+      .filter((id) => GOOGLE_TEXT_PREFIXES.some((prefix) => id.startsWith(prefix)))
+      .sort((a, b) => a.localeCompare(b));
+
+    const deduped = [...new Set(models)];
+    const result = deduped.length > 0 ? deduped : SUPPORTED_MODELS.google;
+    _googleModelCache = { apiKey, models: result, expiresAt: Date.now() + GOOGLE_CACHE_TTL_MS };
+    return result;
+  } catch {
+    return SUPPORTED_MODELS.google;
+  }
+}
+
 /** @internal — exposed for tests */
 export function _resetModelCache() {
   _openAiModelCache = null;
+  _googleModelCache = null;
 }
 
 export function createModel(
@@ -227,6 +270,11 @@ export function createModel(
   if (provider === 'anthropic') {
     const anthropic = createAnthropic({ apiKey });
     return anthropic(modelId);
+  }
+
+  if (provider === 'google') {
+    const google = createGoogleGenerativeAI({ apiKey });
+    return google(modelId);
   }
 
   if (provider === 'ollama') {

@@ -24,6 +24,7 @@ Use this skill when operating, debugging, or documenting the persistent agent ru
 - keep budgets explicit for long runs
 - publish and observe checkpoints for any action that may degrade quality
 - prefer restore over ad hoc reversal when a run regresses
+- after agent-runtime changes, run the scoped verification, update the relevant docs or runbooks, and redeploy the affected runtime
 
 ## What To Capture In Documentation Or Incident Notes
 

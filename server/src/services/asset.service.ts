@@ -1,27 +1,8 @@
-import path from 'path';
-import fs from 'fs/promises';
 import { prisma } from '../config/database.js';
-import {
-  buildProjectAssetUrl,
-  getAssetStorageDir,
-  getProjectAssetDir,
-  resolveProjectAssetPathFromUrl,
-} from './asset-paths.service.js';
-
-const UPLOADS_DIR = getAssetStorageDir();
-
-/** Ensure the uploads directory exists. */
-async function ensureUploadsDir(): Promise<void> {
-  await fs.mkdir(UPLOADS_DIR, { recursive: true });
-}
-
-/** Build a project-scoped directory path inside uploads/. */
-function projectDir(projectId: string): string {
-  return getProjectAssetDir(projectId);
-}
+import { deleteProjectAssetByUrl, saveProjectAsset } from './object-storage.service.js';
 
 /**
- * Save an uploaded file to disk and create an Asset record.
+ * Save an uploaded file to storage and create an Asset record.
  * Returns the created Asset.
  */
 export async function createAsset(
@@ -33,20 +14,17 @@ export async function createAsset(
   const project = await prisma.project.findFirst({ where: { id: projectId, userId } });
   if (!project) return null;
 
-  await ensureUploadsDir();
-  const dir = projectDir(projectId);
-  await fs.mkdir(dir, { recursive: true });
-
   // Generate a unique filename to avoid collisions
+  const path = await import('node:path');
   const ext = path.extname(file.originalname);
   const baseName = path.basename(file.originalname, ext).replace(/[^a-zA-Z0-9_-]/g, '_');
   const uniqueName = `${baseName}_${Date.now()}${ext}`;
-  const filePath = path.join(dir, uniqueName);
-
-  await fs.writeFile(filePath, file.buffer);
-
-  // Build a URL that can be served statically
-  const url = buildProjectAssetUrl(projectId, uniqueName);
+  const url = await saveProjectAsset({
+    projectId,
+    filename: uniqueName,
+    buffer: file.buffer,
+    contentType: file.mimetype,
+  });
 
   const asset = await prisma.asset.create({
     data: {
@@ -77,7 +55,7 @@ export async function listAssets(projectId: string, userId: string) {
 }
 
 /**
- * Delete an asset record and its file from disk.
+ * Delete an asset record and its file from storage.
  * Returns the deleted asset, or null if not found / not authorized.
  */
 export async function deleteAsset(assetId: string, userId: string) {
@@ -89,14 +67,11 @@ export async function deleteAsset(assetId: string, userId: string) {
 
   // Remove file from disk (best-effort)
   try {
-    const filePath = resolveProjectAssetPathFromUrl(asset.url);
-    if (filePath) {
-      await fs.unlink(filePath);
-    }
+    await deleteProjectAssetByUrl(asset.url);
   } catch (err: unknown) {
     // Only swallow ENOENT (file already gone); log everything else
     if (err instanceof Error && (err as NodeJS.ErrnoException).code !== 'ENOENT') {
-      console.error('[Asset] Failed to delete file from disk:', err.message);
+      console.error('[Asset] Failed to delete file from storage:', err.message);
     }
   }
 

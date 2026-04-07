@@ -8,17 +8,19 @@ DND Booker is a D&D content creation tool — a rich editor for campaigns, one-s
 
 ## Architecture
 
-NPM workspaces monorepo with four packages:
+NPM workspaces monorepo with six packages:
 
 - **`client/`** — React 19 + Vite 6 + TipTap v3 editor + Tailwind CSS 4 + Zustand 5. Dev server on `:3000`, proxies `/api` to `:4000`.
-- **`server/`** — Express 5 + Prisma 6 + Vercel AI SDK. JWT auth, AES-256-GCM encrypted API keys, rate limiting. Runs on `:4000`.
-- **`worker/`** — BullMQ job processor for PDF (Puppeteer) and EPUB (Pandoc) export. Connects to Redis queue.
-- **`shared/`** — Pure TypeScript types and constants. No build output. Imported as `@dnd-booker/shared`.
+- **`server/`** — Express 4.21 + Prisma 6 + Vercel AI SDK. JWT auth, AES-256-GCM encrypted API keys, rate limiting. Runs on `:4000`.
+- **`worker/`** — BullMQ job processor for export and long-running generation/agent orchestration. Uses Typst + Playwright Core and writes durable artifacts to GCS in production.
+- **`shared/`** — Shared types, Zod contracts, publication-document schemas, and route metadata. Imported as `@dnd-booker/shared`.
+- **`text-layout/`** — Local layout engine and rendering helpers.
+- **`sdk/`** — Generated `api/v1` OpenAPI spec and typed client built from the shared route catalog.
 
 ```
-Client (:3000) → API proxy → Server (:4000) → PostgreSQL + Redis
+Client (:3000) → API proxy → Server (:4000) → PostgreSQL + Redis + GCS
                                     ↓ BullMQ
-                              Worker (PDF/EPUB)
+                           Worker (export + orchestration)
 ```
 
 ## Common Commands
@@ -101,6 +103,22 @@ Docker Compose runs `postgres`, `redis`, `server`, `worker`, and `client`. Rebui
 - `shared/` or cross-package changes: `docker compose build server worker client && docker compose up -d server worker client`
 
 Ship flow for requested production updates: validate the touched paths, commit, push, and redeploy the affected services.
+
+## Default Finish Flow
+
+Unless the user explicitly says not to, treat this as the default after every code change:
+
+1. Inspect the changed paths and sanity-check the diff.
+2. Run the repo verification flow:
+   - `npm run verify`
+   - If a targeted integration test matters and local infra is unavailable, run what you can and record the exact blocker.
+3. Update repo memory and docs when behavior, workflow, deployment steps, or architecture changed.
+   - Memory: this file and any other standing repo guidance.
+   - Docs: `README.md`, `deploy/cloudrun/README.md`, or the closest feature/runbook doc.
+4. Review `git status`, commit the intended changes, and push the current branch.
+5. Redeploy production with `npm run deploy:cloudrun` unless the user asked to skip deploys.
+
+Do not stop after code edits if the task implies shipping. Verification, docs, commit, push, and redeploy are part of the normal completion path.
 
 ## Environment
 
