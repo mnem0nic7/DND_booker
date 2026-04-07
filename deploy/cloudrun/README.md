@@ -65,6 +65,8 @@ gcloud builds submit --tag "$REGION-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/dnd-b
 gcloud builds submit --tag "$REGION-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/dnd-booker-worker:$TAG" -f worker/Dockerfile .
 ```
 
+If a container build starts failing on a missing workspace package such as `@dnd-booker/sdk`, check the Dockerfile first. The runtime Dockerfiles install root NPM workspaces, so each one must copy the relevant workspace `package.json` before `npm ci` and the workspace source tree afterward.
+
 ## Provision Backing Services
 
 1. Create a Cloud SQL PostgreSQL instance and database.

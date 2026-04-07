@@ -6,7 +6,7 @@ import { server } from '../test/msw/server';
 describe('generationStore.fetchLatestRun', () => {
   it('hydrates terminal runs from the detail endpoint so artifact counts stay current', async () => {
     server.use(
-      http.get('/api/projects/:projectId/ai/generation-runs', () => HttpResponse.json([
+      http.get('/api/v1/projects/:projectId/generation-runs', () => HttpResponse.json([
         {
           id: 'run-1',
           mode: 'campaign',
@@ -19,7 +19,7 @@ describe('generationStore.fetchLatestRun', () => {
           updatedAt: '2026-04-01T16:05:00.000Z',
         },
       ])),
-      http.get('/api/projects/:projectId/ai/generation-runs/:runId', () => HttpResponse.json({
+      http.get('/api/v1/projects/:projectId/generation-runs/:runId', () => HttpResponse.json({
         id: 'run-1',
         projectId: 'project-1',
         userId: 'user-1',

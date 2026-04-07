@@ -492,7 +492,10 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     set({ isLoadingDocuments: true });
     try {
       const data = await v1Client.documents.listDocuments({ projectId });
-      set({ documents: data.map((document) => toProjectDocumentFromV1(document)), isLoadingDocuments: false });
+      set({
+        documents: data.map((document: PublicationDocumentSummary) => toProjectDocumentFromV1(document)),
+        isLoadingDocuments: false,
+      });
     } catch {
       set({ isLoadingDocuments: false });
     }

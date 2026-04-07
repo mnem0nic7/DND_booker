@@ -111,6 +111,7 @@ Unless the user explicitly says not to, treat this as the default after every co
 1. Inspect the changed paths and sanity-check the diff.
 2. Run the repo verification flow:
    - `npm run verify`
+   - When `client/`, `sdk/`, or shared route contracts changed, also run `npm run test:unit --workspace=client`.
    - If a targeted integration test matters and local infra is unavailable, run what you can and record the exact blocker.
 3. Update repo memory and docs when behavior, workflow, deployment steps, or architecture changed.
    - Memory: this file and any other standing repo guidance.
@@ -119,6 +120,8 @@ Unless the user explicitly says not to, treat this as the default after every co
 5. Redeploy production with `npm run deploy:cloudrun` unless the user asked to skip deploys.
 
 Do not stop after code edits if the task implies shipping. Verification, docs, commit, push, and redeploy are part of the normal completion path.
+
+Cloud Run image builds install root NPM workspaces. If you add or rename a workspace dependency used by a runtime package, make sure the relevant Dockerfiles copy that workspace's `package.json` before `npm ci` and its source after.
 
 ## Environment
 

@@ -19,6 +19,7 @@ Do not stop after code edits unless the user explicitly says not to ship.
 
 - prefer package-scoped verification over a blind full-repo sweep
 - regenerate checked-in SDK or spec output before shipping when route contracts changed
+- when `client/`, `sdk/`, or shared API contract code changed, run `npm run test:unit --workspace=client` in addition to the build flow
 - remove accidental compiled artifacts from source directories before commit
 - if infrastructure blocks a test or deploy, record the exact blocker
 
