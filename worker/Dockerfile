@@ -6,11 +6,13 @@ RUN apk add --no-cache pandoc poppler-utils su-exec chromium nss freetype harfbu
 WORKDIR /app
 COPY package*.json ./
 COPY worker/package.json worker/
+COPY sdk/package.json sdk/
 COPY shared/package.json shared/
 COPY text-layout/package.json text-layout/
 COPY server/package.json server/
 RUN npm ci
 COPY tsconfig.json ./
+COPY sdk/ sdk/
 COPY shared/ shared/
 COPY text-layout/ text-layout/
 COPY worker/ worker/

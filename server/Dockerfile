@@ -3,10 +3,12 @@ RUN apk add --no-cache su-exec
 WORKDIR /app
 COPY package*.json ./
 COPY server/package.json server/
+COPY sdk/package.json sdk/
 COPY shared/package.json shared/
 COPY text-layout/package.json text-layout/
 RUN npm ci
 COPY tsconfig.json ./
+COPY sdk/ sdk/
 COPY shared/ shared/
 COPY text-layout/ text-layout/
 COPY server/ server/

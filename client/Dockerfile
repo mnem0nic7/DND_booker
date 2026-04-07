@@ -3,10 +3,12 @@ FROM node:20-alpine AS build
 WORKDIR /app
 COPY package*.json ./
 COPY client/package.json client/
+COPY sdk/package.json sdk/
 COPY shared/package.json shared/
 COPY text-layout/package.json text-layout/
 RUN npm ci
 COPY tsconfig.json ./
+COPY sdk/ sdk/
 COPY shared/ shared/
 COPY text-layout/ text-layout/
 COPY client/ client/
