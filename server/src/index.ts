@@ -14,6 +14,7 @@ import documentRoutes from './routes/documents.js';
 import agentRoutes from './routes/agent-runs.js';
 import v1AuthRoutes from './routes/v1/auth.js';
 import v1DocumentRoutes from './routes/v1/documents.js';
+import v1ExportRoutes from './routes/v1/exports.js';
 import v1RunRoutes from './routes/v1/runs.js';
 import v1SpecRoutes from './routes/v1/spec.js';
 import { publicRateLimit } from './middleware/ai-rate-limit.js';
@@ -85,6 +86,7 @@ app.get('/api/health', publicRateLimit, (_req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/v1/auth', v1AuthRoutes);
 app.use('/api/v1', v1SpecRoutes);
+app.use('/api/v1', v1ExportRoutes);
 app.use('/api/projects', projectRoutes);
 app.use('/api/projects/:projectId/assets', projectAssetRoutes);
 app.use('/api/assets', assetRoutes);

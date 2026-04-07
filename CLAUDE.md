@@ -31,10 +31,11 @@ npm run dev --workspace=server     # Express with tsx watch
 npm run dev --workspace=client     # Vite dev server
 npm run dev --workspace=worker     # Export worker
 
-# Tests (Vitest + Supertest, requires running PostgreSQL + Redis)
-npm test --workspace=server                          # All server tests
-cd server && npx vitest run src/__tests__/auth.test.ts  # Single test file
-cd server && npx vitest run --testNamePattern="should register"  # Single test
+# Tests
+npm run test:unit --workspace=client                      # Client unit tests
+npm test --workspace=server                               # All server tests
+npm run test:server:local -- documents.v1.test.ts         # Server integration test with Cloud SQL Proxy + local Redis
+cd server && npm test -- src/__tests__/auth.test.ts       # Single server test file
 
 # Database
 DATABASE_URL="..." npx prisma generate --schema=server/prisma/schema.prisma
@@ -110,14 +111,15 @@ Unless the user explicitly says not to, treat this as the default after every co
 
 1. Inspect the changed paths and sanity-check the diff.
 2. Run the repo verification flow:
-   - `npm run verify`
-   - When `client/`, `sdk/`, or shared route contracts changed, also run `npm run test:unit --workspace=client`.
-   - If a targeted integration test matters and local infra is unavailable, run what you can and record the exact blocker.
+   - `npm run verify:ship` for the normal shippable path.
+   - `npm run verify` is the lighter build-only pass when you explicitly do not need the full ship checks.
+   - If cloud-backed server integration is unavailable, record the exact blocker instead of silently skipping it.
 3. Update repo memory and docs when behavior, workflow, deployment steps, or architecture changed.
    - Memory: this file and any other standing repo guidance.
    - Docs: `README.md`, `deploy/cloudrun/README.md`, or the closest feature/runbook doc.
 4. Review `git status`, commit the intended changes, and push the current branch.
 5. Redeploy production with `npm run deploy:cloudrun` unless the user asked to skip deploys.
+   - Set `SMOKE_TEST_EMAIL`, `SMOKE_TEST_PASSWORD`, and optionally `SMOKE_TEST_PROJECT_ID` so the redeploy script also runs the authenticated `api/v1` smoke check automatically.
 
 Do not stop after code edits if the task implies shipping. Verification, docs, commit, push, and redeploy are part of the normal completion path.
 

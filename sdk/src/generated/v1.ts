@@ -8,11 +8,20 @@ import type {
   AgentRunDetail,
   AgentRunIdParams,
   AgentRunSummary,
+  ArtifactEvaluation,
+  AssemblyManifest,
   AuthLoginRequest,
   AuthLogoutResponse,
   AuthRegisterRequest,
   AuthSessionResponse,
+  CanonEntity,
   DocumentIdParams,
+  ExportJob,
+  ExportJobIdParams,
+  ExportRequest,
+  ExportReviewFixResult,
+  GeneratedArtifact,
+  GenerationArtifactIdParams,
   GenerationRun,
   GenerationRunCreateRequest,
   GenerationRunDetail,
@@ -52,6 +61,11 @@ export interface V1Client {
     pauseGenerationRun(params: GenerationRunIdParams, config?: AxiosRequestConfig): Promise<GenerationRun>;
     resumeGenerationRun(params: GenerationRunIdParams, config?: AxiosRequestConfig): Promise<GenerationRun>;
     cancelGenerationRun(params: GenerationRunIdParams, config?: AxiosRequestConfig): Promise<GenerationRun>;
+    listGenerationArtifacts(params: GenerationRunIdParams, config?: AxiosRequestConfig): Promise<GeneratedArtifact[]>;
+    getGenerationArtifact(params: GenerationArtifactIdParams, config?: AxiosRequestConfig): Promise<GeneratedArtifact & { evaluations?: ArtifactEvaluation[] }>;
+    listGenerationCanonEntities(params: GenerationRunIdParams, config?: AxiosRequestConfig): Promise<CanonEntity[]>;
+    listGenerationEvaluations(params: GenerationRunIdParams, config?: AxiosRequestConfig): Promise<ArtifactEvaluation[]>;
+    getGenerationAssemblyManifest(params: GenerationRunIdParams, config?: AxiosRequestConfig): Promise<AssemblyManifest>;
   };
   agentRuns: {
     createAgentRun(params: ProjectIdParams, body: AgentRunCreateRequest, config?: AxiosRequestConfig): Promise<AgentRun>;
@@ -63,6 +77,13 @@ export interface V1Client {
     listAgentCheckpoints(params: AgentRunIdParams, config?: AxiosRequestConfig): Promise<AgentCheckpoint[]>;
     restoreAgentCheckpoint(params: AgentCheckpointIdParams, config?: AxiosRequestConfig): Promise<AgentCheckpoint>;
     listAgentActions(params: AgentRunIdParams, config?: AxiosRequestConfig): Promise<AgentAction[]>;
+  };
+  exports: {
+    createExportJob(params: ProjectIdParams, body: ExportRequest, config?: AxiosRequestConfig): Promise<ExportJob>;
+    listExportJobs(params: ProjectIdParams, config?: AxiosRequestConfig): Promise<ExportJob[]>;
+    getExportJob(params: ExportJobIdParams, config?: AxiosRequestConfig): Promise<ExportJob>;
+    applyExportJobFixes(params: ExportJobIdParams, config?: AxiosRequestConfig): Promise<ExportReviewFixResult>;
+    downloadExportJob(params: ExportJobIdParams, config?: AxiosRequestConfig): Promise<Blob>;
   };
 }
 
@@ -137,6 +158,26 @@ export function createV1Client(axios: AxiosInstance): V1Client {
         const { data } = await axios.post<GenerationRun>(buildPath('/v1/projects/{projectId}/generation-runs/{runId}/cancel', params as Record<string, string | number | undefined>), undefined, config);
         return data;
       },
+      async listGenerationArtifacts(params: GenerationRunIdParams, config?: AxiosRequestConfig) {
+        const { data } = await axios.get<GeneratedArtifact[]>(buildPath('/v1/projects/{projectId}/generation-runs/{runId}/artifacts', params as Record<string, string | number | undefined>), config);
+        return data;
+      },
+      async getGenerationArtifact(params: GenerationArtifactIdParams, config?: AxiosRequestConfig) {
+        const { data } = await axios.get<GeneratedArtifact & { evaluations?: ArtifactEvaluation[] }>(buildPath('/v1/projects/{projectId}/generation-runs/{runId}/artifacts/{artifactId}', params as Record<string, string | number | undefined>), config);
+        return data;
+      },
+      async listGenerationCanonEntities(params: GenerationRunIdParams, config?: AxiosRequestConfig) {
+        const { data } = await axios.get<CanonEntity[]>(buildPath('/v1/projects/{projectId}/generation-runs/{runId}/canon', params as Record<string, string | number | undefined>), config);
+        return data;
+      },
+      async listGenerationEvaluations(params: GenerationRunIdParams, config?: AxiosRequestConfig) {
+        const { data } = await axios.get<ArtifactEvaluation[]>(buildPath('/v1/projects/{projectId}/generation-runs/{runId}/evaluations', params as Record<string, string | number | undefined>), config);
+        return data;
+      },
+      async getGenerationAssemblyManifest(params: GenerationRunIdParams, config?: AxiosRequestConfig) {
+        const { data } = await axios.get<AssemblyManifest>(buildPath('/v1/projects/{projectId}/generation-runs/{runId}/assembly', params as Record<string, string | number | undefined>), config);
+        return data;
+      },
     },
     agentRuns: {
       async createAgentRun(params: ProjectIdParams, body: AgentRunCreateRequest, config?: AxiosRequestConfig) {
@@ -173,6 +214,28 @@ export function createV1Client(axios: AxiosInstance): V1Client {
       },
       async listAgentActions(params: AgentRunIdParams, config?: AxiosRequestConfig) {
         const { data } = await axios.get<AgentAction[]>(buildPath('/v1/projects/{projectId}/agent-runs/{runId}/actions', params as Record<string, string | number | undefined>), config);
+        return data;
+      },
+    },
+    exports: {
+      async createExportJob(params: ProjectIdParams, body: ExportRequest, config?: AxiosRequestConfig) {
+        const { data } = await axios.post<ExportJob>(buildPath('/v1/projects/{projectId}/export-jobs', params as Record<string, string | number | undefined>), body, config);
+        return data;
+      },
+      async listExportJobs(params: ProjectIdParams, config?: AxiosRequestConfig) {
+        const { data } = await axios.get<ExportJob[]>(buildPath('/v1/projects/{projectId}/export-jobs', params as Record<string, string | number | undefined>), config);
+        return data;
+      },
+      async getExportJob(params: ExportJobIdParams, config?: AxiosRequestConfig) {
+        const { data } = await axios.get<ExportJob>(buildPath('/v1/export-jobs/{jobId}', params as Record<string, string | number | undefined>), config);
+        return data;
+      },
+      async applyExportJobFixes(params: ExportJobIdParams, config?: AxiosRequestConfig) {
+        const { data } = await axios.post<ExportReviewFixResult>(buildPath('/v1/export-jobs/{jobId}/fix', params as Record<string, string | number | undefined>), undefined, config);
+        return data;
+      },
+      async downloadExportJob(params: ExportJobIdParams, config?: AxiosRequestConfig) {
+        const { data } = await axios.get<Blob>(buildPath('/v1/export-jobs/{jobId}/download', params as Record<string, string | number | undefined>), { ...(config ?? {}), responseType: 'blob' });
         return data;
       },
     },

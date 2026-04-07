@@ -78,7 +78,7 @@ function buildJob(review: ExportReview): ExportJob {
     format: 'pdf',
     status: 'completed',
     progress: 100,
-    outputUrl: '/api/export-jobs/export-job-1/download',
+    outputUrl: '/api/v1/export-jobs/export-job-1/download',
     errorMessage: null,
     review,
     createdAt: '2026-03-31T20:00:00.000Z',

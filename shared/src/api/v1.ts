@@ -465,6 +465,137 @@ export const PublicationDocumentTypstSchema = z.object({
   updatedAt: z.string().datetime(),
 });
 
+export const ExportFormatSchema = z.enum(['pdf', 'epub', 'print_pdf']);
+export const ExportStatusSchema = z.enum(['queued', 'processing', 'completed', 'failed']);
+export const ExportReviewStatusSchema = z.enum(['passed', 'needs_attention', 'unavailable']);
+export const ExportReviewSeveritySchema = z.enum(['info', 'warning', 'error']);
+export const ExportReviewCodeSchema = z.enum([
+  'EXPORT_CHAPTER_OPENER_LOW',
+  'EXPORT_SECTION_TITLE_WRAP',
+  'EXPORT_LAST_PAGE_UNDERFILLED',
+  'EXPORT_UNUSED_PAGE_REGION',
+  'EXPORT_MISSED_ART_OPPORTUNITY',
+  'EXPORT_WEAK_HERO_PLACEMENT',
+  'EXPORT_SPLIT_SCENE_PACKET',
+  'EXPORT_UNBALANCED_COLUMNS',
+  'EXPORT_MARGIN_COLLISION',
+  'EXPORT_FOOTER_COLLISION',
+  'EXPORT_ORPHAN_TAIL_PARAGRAPH',
+  'EXPORT_EMPTY_ENCOUNTER_TABLE',
+  'EXPORT_INCOMPLETE_ENCOUNTER_PACKET',
+  'EXPORT_EMPTY_RANDOM_TABLE',
+  'EXPORT_THIN_RANDOM_TABLE',
+  'EXPORT_PLACEHOLDER_STAT_BLOCK',
+  'EXPORT_INCOMPLETE_STAT_BLOCK',
+  'EXPORT_SUSPICIOUS_STAT_BLOCK',
+  'EXPORT_OVERSIZED_DISPLAY_HEADING',
+  'EXPORT_LOW_UTILITY_DENSITY',
+  'EXPORT_TEXT_LAYOUT_PAGE_COUNT_DRIFT',
+  'EXPORT_TEXT_LAYOUT_GROUP_SPLIT_DRIFT',
+  'EXPORT_TEXT_LAYOUT_MANUAL_BREAK_DRIFT',
+  'EXPORT_TEXT_LAYOUT_FALLBACK_RECOMMENDED',
+  'EXPORT_REVIEW_UNAVAILABLE',
+]);
+export const ExportReviewAutoFixSchema = z.enum([
+  'shrink_h1_headings',
+  'dedicated_end_page',
+  'dedicated_chapter_openers',
+  'refresh_layout_plan',
+]);
+export const ExportReviewSafeFixActionSchema = z.enum([
+  'remove_empty_encounter_tables',
+  'remove_empty_random_tables',
+  'remove_placeholder_stat_blocks',
+  'demote_oversized_display_headings',
+  'generate_spot_art',
+  'normalize_page_breaks',
+  'configure_text_layout_fallbacks',
+  'refresh_layout_plan',
+]);
+export const ExportReviewTextLayoutParityMetricsSchema = z.object({
+  mode: z.enum(['legacy', 'shadow', 'pretext']),
+  legacyPageCount: z.number().int(),
+  enginePageCount: z.number().int(),
+  supportedUnitCount: z.number().int(),
+  unsupportedUnitCount: z.number().int(),
+  totalHeightDeltaPx: z.number(),
+  driftScopeIds: z.array(z.string()),
+  unsupportedScopeIds: z.array(z.string()),
+});
+export const ExportSectionReviewMetricSchema = z.object({
+  title: z.string(),
+  kind: z.enum(['front_matter', 'chapter', 'appendix', 'back_matter']).nullable(),
+  page: z.number().int().nullable(),
+  topRatio: z.number().nullable(),
+  lineCount: z.number().int().nullable(),
+  hyphenated: z.boolean(),
+});
+export const ExportUtilityReviewMetricSchema = z.object({
+  title: z.string(),
+  kind: z.enum(['front_matter', 'chapter', 'appendix', 'back_matter']).nullable(),
+  utilityBlockCount: z.number().int(),
+  referenceBlockCount: z.number().int(),
+  proseParagraphCount: z.number().int(),
+  utilityDensity: z.number(),
+});
+export const ExportReviewMetricsSchema = z.object({
+  pageCount: z.number().int(),
+  pageWidthPts: z.number().nullable(),
+  pageHeightPts: z.number().nullable(),
+  lastPageFillRatio: z.number().nullable(),
+  sectionStarts: z.array(ExportSectionReviewMetricSchema),
+  utilityCoverage: z.array(ExportUtilityReviewMetricSchema),
+  textLayoutParity: ExportReviewTextLayoutParityMetricsSchema.nullable().optional(),
+});
+export const ExportReviewFindingSchema = z.object({
+  code: ExportReviewCodeSchema,
+  severity: ExportReviewSeveritySchema,
+  page: z.number().int().nullable(),
+  message: z.string(),
+  details: z.record(z.unknown()).nullable(),
+});
+export const ExportReviewSchema = z.object({
+  status: ExportReviewStatusSchema,
+  score: z.number(),
+  generatedAt: z.string().datetime(),
+  summary: z.string(),
+  passCount: z.number().int(),
+  appliedFixes: z.array(ExportReviewAutoFixSchema),
+  findings: z.array(ExportReviewFindingSchema),
+  metrics: ExportReviewMetricsSchema,
+});
+export const ExportJobResponseSchema = z.object({
+  id: z.string().uuid(),
+  projectId: z.string().uuid(),
+  userId: z.string().uuid(),
+  format: ExportFormatSchema,
+  status: ExportStatusSchema,
+  progress: z.number().int(),
+  outputUrl: z.string().nullable(),
+  errorMessage: z.string().nullable(),
+  review: ExportReviewSchema.nullable(),
+  createdAt: z.string().datetime(),
+  completedAt: z.string().datetime().nullable(),
+});
+export const ExportReviewFixChangeSchema = z.object({
+  code: ExportReviewCodeSchema,
+  action: ExportReviewSafeFixActionSchema,
+  title: z.string().nullable(),
+  count: z.number().int(),
+});
+export const ExportReviewFixResultSchema = z.object({
+  status: z.enum(['started', 'no_review', 'no_fixes']),
+  summary: z.string(),
+  appliedFixCount: z.number().int(),
+  documentsUpdated: z.number().int(),
+  changes: z.array(ExportReviewFixChangeSchema),
+  unsupportedFindingCount: z.number().int(),
+  exportJob: ExportJobResponseSchema.nullable(),
+});
+export const ExportCreateRequestSchema = z.object({
+  format: ExportFormatSchema,
+});
+
 export const GenerationRunCreateSchema = V1CreateGenerationRunRequestSchema;
 export const GenerationRunSchema = V1GenerationRunSchema;
 export const GenerationRunSummarySchema = V1GenerationRunSchema;
@@ -500,12 +631,20 @@ export const AgentRunIdParamsSchema = ProjectIdParamsSchema.extend({
 export const AgentCheckpointIdParamsSchema = AgentRunIdParamsSchema.extend({
   checkpointId: z.string().uuid(),
 });
+export const GenerationArtifactIdParamsSchema = GenerationRunIdParamsSchema.extend({
+  artifactId: z.string().min(1),
+});
+export const ExportJobIdParamsSchema = z.object({
+  jobId: z.string().uuid(),
+});
 
 export type ProjectIdParams = z.infer<typeof ProjectIdParamsSchema>;
 export type DocumentIdParams = z.infer<typeof DocumentIdParamsSchema>;
 export type GenerationRunIdParams = z.infer<typeof GenerationRunIdParamsSchema>;
 export type AgentRunIdParams = z.infer<typeof AgentRunIdParamsSchema>;
 export type AgentCheckpointIdParams = z.infer<typeof AgentCheckpointIdParamsSchema>;
+export type GenerationArtifactIdParams = z.infer<typeof GenerationArtifactIdParamsSchema>;
+export type ExportJobIdParams = z.infer<typeof ExportJobIdParamsSchema>;
 
 export const PublicationDocumentDetailSchema = V1PublicationDocumentSchema;
 
@@ -521,7 +660,7 @@ export type AgentRun = V1AgentRun;
 export type AgentRunDetail = V1AgentRunDetail;
 
 export interface ApiV1RouteContract {
-  tag: 'auth' | 'documents' | 'generationRuns' | 'agentRuns';
+  tag: 'auth' | 'documents' | 'generationRuns' | 'agentRuns' | 'exports';
   operationId: string;
   method: 'get' | 'post' | 'patch';
   path: string;
@@ -529,6 +668,7 @@ export interface ApiV1RouteContract {
   paramsSchema?: z.ZodTypeAny;
   requestBodySchema?: z.ZodTypeAny;
   responseSchema?: z.ZodTypeAny;
+  axiosResponseType?: 'blob';
   paramsTypeName?: string;
   requestTypeName?: string;
   responseTypeName?: string;
@@ -712,6 +852,61 @@ export const V1_ROUTE_CONTRACTS: ApiV1RouteContract[] = [
     responseTypeName: 'GenerationRun',
   },
   {
+    tag: 'generationRuns',
+    operationId: 'listGenerationArtifacts',
+    method: 'get',
+    path: '/api/v1/projects/{projectId}/generation-runs/{runId}/artifacts',
+    summary: 'List generated artifacts for a run.',
+    paramsSchema: GenerationRunIdParamsSchema,
+    responseSchema: z.array(V1GeneratedArtifactSchema),
+    paramsTypeName: 'GenerationRunIdParams',
+    responseTypeName: 'GeneratedArtifact[]',
+  },
+  {
+    tag: 'generationRuns',
+    operationId: 'getGenerationArtifact',
+    method: 'get',
+    path: '/api/v1/projects/{projectId}/generation-runs/{runId}/artifacts/{artifactId}',
+    summary: 'Get generated artifact detail and evaluations.',
+    paramsSchema: GenerationArtifactIdParamsSchema,
+    responseSchema: V1GeneratedArtifactDetailSchema,
+    paramsTypeName: 'GenerationArtifactIdParams',
+    responseTypeName: 'GeneratedArtifact & { evaluations?: ArtifactEvaluation[] }',
+  },
+  {
+    tag: 'generationRuns',
+    operationId: 'listGenerationCanonEntities',
+    method: 'get',
+    path: '/api/v1/projects/{projectId}/generation-runs/{runId}/canon',
+    summary: 'List canon entities for a run.',
+    paramsSchema: GenerationRunIdParamsSchema,
+    responseSchema: z.array(CanonEntitySchema),
+    paramsTypeName: 'GenerationRunIdParams',
+    responseTypeName: 'CanonEntity[]',
+  },
+  {
+    tag: 'generationRuns',
+    operationId: 'listGenerationEvaluations',
+    method: 'get',
+    path: '/api/v1/projects/{projectId}/generation-runs/{runId}/evaluations',
+    summary: 'List evaluations for a run.',
+    paramsSchema: GenerationRunIdParamsSchema,
+    responseSchema: z.array(ArtifactEvaluationSchema),
+    paramsTypeName: 'GenerationRunIdParams',
+    responseTypeName: 'ArtifactEvaluation[]',
+  },
+  {
+    tag: 'generationRuns',
+    operationId: 'getGenerationAssemblyManifest',
+    method: 'get',
+    path: '/api/v1/projects/{projectId}/generation-runs/{runId}/assembly',
+    summary: 'Get the latest assembly manifest for a run.',
+    paramsSchema: GenerationRunIdParamsSchema,
+    responseSchema: AssemblyManifestSchema,
+    paramsTypeName: 'GenerationRunIdParams',
+    responseTypeName: 'AssemblyManifest',
+  },
+  {
     tag: 'agentRuns',
     operationId: 'createAgentRun',
     method: 'post',
@@ -811,5 +1006,62 @@ export const V1_ROUTE_CONTRACTS: ApiV1RouteContract[] = [
     responseSchema: z.array(AgentActionSchema),
     paramsTypeName: 'AgentRunIdParams',
     responseTypeName: 'AgentAction[]',
+  },
+  {
+    tag: 'exports',
+    operationId: 'createExportJob',
+    method: 'post',
+    path: '/api/v1/projects/{projectId}/export-jobs',
+    summary: 'Create and enqueue an export job.',
+    paramsSchema: ProjectIdParamsSchema,
+    requestBodySchema: ExportCreateRequestSchema,
+    responseSchema: ExportJobResponseSchema,
+    paramsTypeName: 'ProjectIdParams',
+    requestTypeName: 'ExportRequest',
+    responseTypeName: 'ExportJob',
+  },
+  {
+    tag: 'exports',
+    operationId: 'listExportJobs',
+    method: 'get',
+    path: '/api/v1/projects/{projectId}/export-jobs',
+    summary: 'List export jobs for a project.',
+    paramsSchema: ProjectIdParamsSchema,
+    responseSchema: z.array(ExportJobResponseSchema),
+    paramsTypeName: 'ProjectIdParams',
+    responseTypeName: 'ExportJob[]',
+  },
+  {
+    tag: 'exports',
+    operationId: 'getExportJob',
+    method: 'get',
+    path: '/api/v1/export-jobs/{jobId}',
+    summary: 'Get export job status.',
+    paramsSchema: ExportJobIdParamsSchema,
+    responseSchema: ExportJobResponseSchema,
+    paramsTypeName: 'ExportJobIdParams',
+    responseTypeName: 'ExportJob',
+  },
+  {
+    tag: 'exports',
+    operationId: 'applyExportJobFixes',
+    method: 'post',
+    path: '/api/v1/export-jobs/{jobId}/fix',
+    summary: 'Apply safe fixes from an export review and queue a re-export.',
+    paramsSchema: ExportJobIdParamsSchema,
+    responseSchema: ExportReviewFixResultSchema,
+    paramsTypeName: 'ExportJobIdParams',
+    responseTypeName: 'ExportReviewFixResult',
+  },
+  {
+    tag: 'exports',
+    operationId: 'downloadExportJob',
+    method: 'get',
+    path: '/api/v1/export-jobs/{jobId}/download',
+    summary: 'Download a completed export artifact.',
+    paramsSchema: ExportJobIdParamsSchema,
+    axiosResponseType: 'blob',
+    paramsTypeName: 'ExportJobIdParams',
+    responseTypeName: 'Blob',
   },
 ];

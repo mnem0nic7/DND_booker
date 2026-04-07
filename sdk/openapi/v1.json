@@ -3072,6 +3072,983 @@
         ]
       }
     },
+    "/api/v1/projects/{projectId}/generation-runs/{runId}/artifacts": {
+      "get": {
+        "operationId": "listGenerationArtifacts",
+        "summary": "List generated artifacts for a run.",
+        "tags": [
+          "generationRuns"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "runId": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "projectId": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "sourceTaskId": {
+                        "type": "string",
+                        "format": "uuid",
+                        "nullable": true
+                      },
+                      "artifactType": {
+                        "type": "string"
+                      },
+                      "artifactKey": {
+                        "type": "string"
+                      },
+                      "parentArtifactId": {
+                        "type": "string",
+                        "format": "uuid",
+                        "nullable": true
+                      },
+                      "status": {
+                        "type": "string"
+                      },
+                      "version": {
+                        "type": "integer"
+                      },
+                      "title": {
+                        "type": "string"
+                      },
+                      "summary": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "jsonContent": {
+                        "nullable": true
+                      },
+                      "markdownContent": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "tiptapContent": {
+                        "nullable": true
+                      },
+                      "metadata": {
+                        "nullable": true
+                      },
+                      "pageEstimate": {
+                        "type": "integer",
+                        "nullable": true
+                      },
+                      "tokenCount": {
+                        "type": "integer",
+                        "nullable": true
+                      },
+                      "createdAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "updatedAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "runId",
+                      "projectId",
+                      "sourceTaskId",
+                      "artifactType",
+                      "artifactKey",
+                      "parentArtifactId",
+                      "status",
+                      "version",
+                      "title",
+                      "summary",
+                      "markdownContent",
+                      "pageEstimate",
+                      "tokenCount",
+                      "createdAt",
+                      "updatedAt"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer"
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "instance": {
+                      "type": "string"
+                    },
+                    "errors": {
+                      "type": "object",
+                      "additionalProperties": {}
+                    }
+                  },
+                  "required": [
+                    "title",
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "runId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/projects/{projectId}/generation-runs/{runId}/artifacts/{artifactId}": {
+      "get": {
+        "operationId": "getGenerationArtifact",
+        "summary": "Get generated artifact detail and evaluations.",
+        "tags": [
+          "generationRuns"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "runId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "projectId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "sourceTaskId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "nullable": true
+                    },
+                    "artifactType": {
+                      "type": "string"
+                    },
+                    "artifactKey": {
+                      "type": "string"
+                    },
+                    "parentArtifactId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "nullable": true
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "version": {
+                      "type": "integer"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "summary": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "jsonContent": {
+                      "nullable": true
+                    },
+                    "markdownContent": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "tiptapContent": {
+                      "nullable": true
+                    },
+                    "metadata": {
+                      "nullable": true
+                    },
+                    "pageEstimate": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "tokenCount": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "evaluations": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "artifactId": {
+                            "type": "string"
+                          },
+                          "artifactVersion": {
+                            "type": "integer"
+                          },
+                          "evaluationType": {
+                            "type": "string"
+                          },
+                          "overallScore": {
+                            "type": "number"
+                          },
+                          "structuralCompleteness": {
+                            "type": "number",
+                            "nullable": true
+                          },
+                          "continuityScore": {
+                            "type": "number",
+                            "nullable": true
+                          },
+                          "dndSanity": {
+                            "type": "number",
+                            "nullable": true
+                          },
+                          "editorialQuality": {
+                            "type": "number",
+                            "nullable": true
+                          },
+                          "publicationFit": {
+                            "type": "number",
+                            "nullable": true
+                          },
+                          "passed": {
+                            "type": "boolean"
+                          },
+                          "findings": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "severity": {
+                                  "type": "string",
+                                  "enum": [
+                                    "critical",
+                                    "major",
+                                    "minor",
+                                    "informational"
+                                  ]
+                                },
+                                "code": {
+                                  "type": "string"
+                                },
+                                "message": {
+                                  "type": "string"
+                                },
+                                "affectedScope": {
+                                  "type": "string"
+                                },
+                                "suggestedFix": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "severity",
+                                "code",
+                                "message",
+                                "affectedScope"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
+                          "recommendedActions": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            },
+                            "nullable": true
+                          },
+                          "evaluatorModel": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "tokenCount": {
+                            "type": "integer",
+                            "nullable": true
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "artifactId",
+                          "artifactVersion",
+                          "evaluationType",
+                          "overallScore",
+                          "structuralCompleteness",
+                          "continuityScore",
+                          "dndSanity",
+                          "editorialQuality",
+                          "publicationFit",
+                          "passed",
+                          "findings",
+                          "recommendedActions",
+                          "evaluatorModel",
+                          "tokenCount",
+                          "createdAt"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "runId",
+                    "projectId",
+                    "sourceTaskId",
+                    "artifactType",
+                    "artifactKey",
+                    "parentArtifactId",
+                    "status",
+                    "version",
+                    "title",
+                    "summary",
+                    "markdownContent",
+                    "pageEstimate",
+                    "tokenCount",
+                    "createdAt",
+                    "updatedAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer"
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "instance": {
+                      "type": "string"
+                    },
+                    "errors": {
+                      "type": "object",
+                      "additionalProperties": {}
+                    }
+                  },
+                  "required": [
+                    "title",
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "runId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "artifactId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/projects/{projectId}/generation-runs/{runId}/canon": {
+      "get": {
+        "operationId": "listGenerationCanonEntities",
+        "summary": "List canon entities for a run.",
+        "tags": [
+          "generationRuns"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "projectId": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "runId": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "entityType": {
+                        "type": "string",
+                        "enum": [
+                          "npc",
+                          "location",
+                          "faction",
+                          "item",
+                          "quest",
+                          "monster",
+                          "encounter"
+                        ]
+                      },
+                      "slug": {
+                        "type": "string"
+                      },
+                      "canonicalName": {
+                        "type": "string"
+                      },
+                      "aliases": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "canonicalData": {},
+                      "summary": {
+                        "type": "string"
+                      },
+                      "sourceArtifactId": {
+                        "type": "string",
+                        "format": "uuid",
+                        "nullable": true
+                      },
+                      "status": {
+                        "type": "string"
+                      },
+                      "createdAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "updatedAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "projectId",
+                      "runId",
+                      "entityType",
+                      "slug",
+                      "canonicalName",
+                      "aliases",
+                      "summary",
+                      "sourceArtifactId",
+                      "status",
+                      "createdAt",
+                      "updatedAt"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer"
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "instance": {
+                      "type": "string"
+                    },
+                    "errors": {
+                      "type": "object",
+                      "additionalProperties": {}
+                    }
+                  },
+                  "required": [
+                    "title",
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "runId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/projects/{projectId}/generation-runs/{runId}/evaluations": {
+      "get": {
+        "operationId": "listGenerationEvaluations",
+        "summary": "List evaluations for a run.",
+        "tags": [
+          "generationRuns"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "artifactId": {
+                        "type": "string"
+                      },
+                      "artifactVersion": {
+                        "type": "integer"
+                      },
+                      "evaluationType": {
+                        "type": "string"
+                      },
+                      "overallScore": {
+                        "type": "number"
+                      },
+                      "structuralCompleteness": {
+                        "type": "number",
+                        "nullable": true
+                      },
+                      "continuityScore": {
+                        "type": "number",
+                        "nullable": true
+                      },
+                      "dndSanity": {
+                        "type": "number",
+                        "nullable": true
+                      },
+                      "editorialQuality": {
+                        "type": "number",
+                        "nullable": true
+                      },
+                      "publicationFit": {
+                        "type": "number",
+                        "nullable": true
+                      },
+                      "passed": {
+                        "type": "boolean"
+                      },
+                      "findings": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "severity": {
+                              "type": "string",
+                              "enum": [
+                                "critical",
+                                "major",
+                                "minor",
+                                "informational"
+                              ]
+                            },
+                            "code": {
+                              "type": "string"
+                            },
+                            "message": {
+                              "type": "string"
+                            },
+                            "affectedScope": {
+                              "type": "string"
+                            },
+                            "suggestedFix": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "severity",
+                            "code",
+                            "message",
+                            "affectedScope"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "recommendedActions": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        },
+                        "nullable": true
+                      },
+                      "evaluatorModel": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "tokenCount": {
+                        "type": "integer",
+                        "nullable": true
+                      },
+                      "createdAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "artifactId",
+                      "artifactVersion",
+                      "evaluationType",
+                      "overallScore",
+                      "structuralCompleteness",
+                      "continuityScore",
+                      "dndSanity",
+                      "editorialQuality",
+                      "publicationFit",
+                      "passed",
+                      "findings",
+                      "recommendedActions",
+                      "evaluatorModel",
+                      "tokenCount",
+                      "createdAt"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer"
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "instance": {
+                      "type": "string"
+                    },
+                    "errors": {
+                      "type": "object",
+                      "additionalProperties": {}
+                    }
+                  },
+                  "required": [
+                    "title",
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "runId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/projects/{projectId}/generation-runs/{runId}/assembly": {
+      "get": {
+        "operationId": "getGenerationAssemblyManifest",
+        "summary": "Get the latest assembly manifest for a run.",
+        "tags": [
+          "generationRuns"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "runId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "projectId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "version": {
+                      "type": "integer"
+                    },
+                    "documents": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "documentSlug": {
+                            "type": "string"
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "front_matter",
+                              "chapter",
+                              "appendix",
+                              "back_matter"
+                            ]
+                          },
+                          "artifactKeys": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "sortOrder": {
+                            "type": "integer"
+                          },
+                          "targetPageCount": {
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "documentSlug",
+                          "title",
+                          "kind",
+                          "artifactKeys",
+                          "sortOrder"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "assemblyRules": {
+                      "nullable": true
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "runId",
+                    "projectId",
+                    "version",
+                    "documents",
+                    "status",
+                    "createdAt",
+                    "updatedAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer"
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "instance": {
+                      "type": "string"
+                    },
+                    "errors": {
+                      "type": "object",
+                      "additionalProperties": {}
+                    }
+                  },
+                  "required": [
+                    "title",
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "runId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
     "/api/v1/projects/{projectId}/agent-runs": {
       "post": {
         "operationId": "createAgentRun",
@@ -6965,6 +7942,1869 @@
           },
           {
             "name": "runId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/projects/{projectId}/export-jobs": {
+      "post": {
+        "operationId": "createExportJob",
+        "summary": "Create and enqueue an export job.",
+        "tags": [
+          "exports"
+        ],
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "projectId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "userId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "format": {
+                      "type": "string",
+                      "enum": [
+                        "pdf",
+                        "epub",
+                        "print_pdf"
+                      ]
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "queued",
+                        "processing",
+                        "completed",
+                        "failed"
+                      ]
+                    },
+                    "progress": {
+                      "type": "integer"
+                    },
+                    "outputUrl": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "errorMessage": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "review": {
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "passed",
+                            "needs_attention",
+                            "unavailable"
+                          ]
+                        },
+                        "score": {
+                          "type": "number"
+                        },
+                        "generatedAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "summary": {
+                          "type": "string"
+                        },
+                        "passCount": {
+                          "type": "integer"
+                        },
+                        "appliedFixes": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": [
+                              "shrink_h1_headings",
+                              "dedicated_end_page",
+                              "dedicated_chapter_openers",
+                              "refresh_layout_plan"
+                            ]
+                          }
+                        },
+                        "findings": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "code": {
+                                "type": "string",
+                                "enum": [
+                                  "EXPORT_CHAPTER_OPENER_LOW",
+                                  "EXPORT_SECTION_TITLE_WRAP",
+                                  "EXPORT_LAST_PAGE_UNDERFILLED",
+                                  "EXPORT_UNUSED_PAGE_REGION",
+                                  "EXPORT_MISSED_ART_OPPORTUNITY",
+                                  "EXPORT_WEAK_HERO_PLACEMENT",
+                                  "EXPORT_SPLIT_SCENE_PACKET",
+                                  "EXPORT_UNBALANCED_COLUMNS",
+                                  "EXPORT_MARGIN_COLLISION",
+                                  "EXPORT_FOOTER_COLLISION",
+                                  "EXPORT_ORPHAN_TAIL_PARAGRAPH",
+                                  "EXPORT_EMPTY_ENCOUNTER_TABLE",
+                                  "EXPORT_INCOMPLETE_ENCOUNTER_PACKET",
+                                  "EXPORT_EMPTY_RANDOM_TABLE",
+                                  "EXPORT_THIN_RANDOM_TABLE",
+                                  "EXPORT_PLACEHOLDER_STAT_BLOCK",
+                                  "EXPORT_INCOMPLETE_STAT_BLOCK",
+                                  "EXPORT_SUSPICIOUS_STAT_BLOCK",
+                                  "EXPORT_OVERSIZED_DISPLAY_HEADING",
+                                  "EXPORT_LOW_UTILITY_DENSITY",
+                                  "EXPORT_TEXT_LAYOUT_PAGE_COUNT_DRIFT",
+                                  "EXPORT_TEXT_LAYOUT_GROUP_SPLIT_DRIFT",
+                                  "EXPORT_TEXT_LAYOUT_MANUAL_BREAK_DRIFT",
+                                  "EXPORT_TEXT_LAYOUT_FALLBACK_RECOMMENDED",
+                                  "EXPORT_REVIEW_UNAVAILABLE"
+                                ]
+                              },
+                              "severity": {
+                                "type": "string",
+                                "enum": [
+                                  "info",
+                                  "warning",
+                                  "error"
+                                ]
+                              },
+                              "page": {
+                                "type": "integer",
+                                "nullable": true
+                              },
+                              "message": {
+                                "type": "string"
+                              },
+                              "details": {
+                                "type": "object",
+                                "additionalProperties": {},
+                                "nullable": true
+                              }
+                            },
+                            "required": [
+                              "code",
+                              "severity",
+                              "page",
+                              "message",
+                              "details"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "metrics": {
+                          "type": "object",
+                          "properties": {
+                            "pageCount": {
+                              "type": "integer"
+                            },
+                            "pageWidthPts": {
+                              "type": "number",
+                              "nullable": true
+                            },
+                            "pageHeightPts": {
+                              "type": "number",
+                              "nullable": true
+                            },
+                            "lastPageFillRatio": {
+                              "type": "number",
+                              "nullable": true
+                            },
+                            "sectionStarts": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "title": {
+                                    "type": "string"
+                                  },
+                                  "kind": {
+                                    "type": "string",
+                                    "enum": [
+                                      "front_matter",
+                                      "chapter",
+                                      "appendix",
+                                      "back_matter"
+                                    ],
+                                    "nullable": true
+                                  },
+                                  "page": {
+                                    "type": "integer",
+                                    "nullable": true
+                                  },
+                                  "topRatio": {
+                                    "type": "number",
+                                    "nullable": true
+                                  },
+                                  "lineCount": {
+                                    "type": "integer",
+                                    "nullable": true
+                                  },
+                                  "hyphenated": {
+                                    "type": "boolean"
+                                  }
+                                },
+                                "required": [
+                                  "title",
+                                  "kind",
+                                  "page",
+                                  "topRatio",
+                                  "lineCount",
+                                  "hyphenated"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "utilityCoverage": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "title": {
+                                    "type": "string"
+                                  },
+                                  "kind": {
+                                    "type": "string",
+                                    "enum": [
+                                      "front_matter",
+                                      "chapter",
+                                      "appendix",
+                                      "back_matter"
+                                    ],
+                                    "nullable": true
+                                  },
+                                  "utilityBlockCount": {
+                                    "type": "integer"
+                                  },
+                                  "referenceBlockCount": {
+                                    "type": "integer"
+                                  },
+                                  "proseParagraphCount": {
+                                    "type": "integer"
+                                  },
+                                  "utilityDensity": {
+                                    "type": "number"
+                                  }
+                                },
+                                "required": [
+                                  "title",
+                                  "kind",
+                                  "utilityBlockCount",
+                                  "referenceBlockCount",
+                                  "proseParagraphCount",
+                                  "utilityDensity"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "textLayoutParity": {
+                              "type": "object",
+                              "properties": {
+                                "mode": {
+                                  "type": "string",
+                                  "enum": [
+                                    "legacy",
+                                    "shadow",
+                                    "pretext"
+                                  ]
+                                },
+                                "legacyPageCount": {
+                                  "type": "integer"
+                                },
+                                "enginePageCount": {
+                                  "type": "integer"
+                                },
+                                "supportedUnitCount": {
+                                  "type": "integer"
+                                },
+                                "unsupportedUnitCount": {
+                                  "type": "integer"
+                                },
+                                "totalHeightDeltaPx": {
+                                  "type": "number"
+                                },
+                                "driftScopeIds": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
+                                "unsupportedScopeIds": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                }
+                              },
+                              "required": [
+                                "mode",
+                                "legacyPageCount",
+                                "enginePageCount",
+                                "supportedUnitCount",
+                                "unsupportedUnitCount",
+                                "totalHeightDeltaPx",
+                                "driftScopeIds",
+                                "unsupportedScopeIds"
+                              ],
+                              "additionalProperties": false,
+                              "nullable": true
+                            }
+                          },
+                          "required": [
+                            "pageCount",
+                            "pageWidthPts",
+                            "pageHeightPts",
+                            "lastPageFillRatio",
+                            "sectionStarts",
+                            "utilityCoverage"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "status",
+                        "score",
+                        "generatedAt",
+                        "summary",
+                        "passCount",
+                        "appliedFixes",
+                        "findings",
+                        "metrics"
+                      ],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "completedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "projectId",
+                    "userId",
+                    "format",
+                    "status",
+                    "progress",
+                    "outputUrl",
+                    "errorMessage",
+                    "review",
+                    "createdAt",
+                    "completedAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer"
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "instance": {
+                      "type": "string"
+                    },
+                    "errors": {
+                      "type": "object",
+                      "additionalProperties": {}
+                    }
+                  },
+                  "required": [
+                    "title",
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "format": {
+                    "type": "string",
+                    "enum": [
+                      "pdf",
+                      "epub",
+                      "print_pdf"
+                    ]
+                  }
+                },
+                "required": [
+                  "format"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "operationId": "listExportJobs",
+        "summary": "List export jobs for a project.",
+        "tags": [
+          "exports"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "projectId": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "userId": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "format": {
+                        "type": "string",
+                        "enum": [
+                          "pdf",
+                          "epub",
+                          "print_pdf"
+                        ]
+                      },
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "queued",
+                          "processing",
+                          "completed",
+                          "failed"
+                        ]
+                      },
+                      "progress": {
+                        "type": "integer"
+                      },
+                      "outputUrl": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "errorMessage": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "review": {
+                        "type": "object",
+                        "properties": {
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "passed",
+                              "needs_attention",
+                              "unavailable"
+                            ]
+                          },
+                          "score": {
+                            "type": "number"
+                          },
+                          "generatedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "summary": {
+                            "type": "string"
+                          },
+                          "passCount": {
+                            "type": "integer"
+                          },
+                          "appliedFixes": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "enum": [
+                                "shrink_h1_headings",
+                                "dedicated_end_page",
+                                "dedicated_chapter_openers",
+                                "refresh_layout_plan"
+                              ]
+                            }
+                          },
+                          "findings": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "code": {
+                                  "type": "string",
+                                  "enum": [
+                                    "EXPORT_CHAPTER_OPENER_LOW",
+                                    "EXPORT_SECTION_TITLE_WRAP",
+                                    "EXPORT_LAST_PAGE_UNDERFILLED",
+                                    "EXPORT_UNUSED_PAGE_REGION",
+                                    "EXPORT_MISSED_ART_OPPORTUNITY",
+                                    "EXPORT_WEAK_HERO_PLACEMENT",
+                                    "EXPORT_SPLIT_SCENE_PACKET",
+                                    "EXPORT_UNBALANCED_COLUMNS",
+                                    "EXPORT_MARGIN_COLLISION",
+                                    "EXPORT_FOOTER_COLLISION",
+                                    "EXPORT_ORPHAN_TAIL_PARAGRAPH",
+                                    "EXPORT_EMPTY_ENCOUNTER_TABLE",
+                                    "EXPORT_INCOMPLETE_ENCOUNTER_PACKET",
+                                    "EXPORT_EMPTY_RANDOM_TABLE",
+                                    "EXPORT_THIN_RANDOM_TABLE",
+                                    "EXPORT_PLACEHOLDER_STAT_BLOCK",
+                                    "EXPORT_INCOMPLETE_STAT_BLOCK",
+                                    "EXPORT_SUSPICIOUS_STAT_BLOCK",
+                                    "EXPORT_OVERSIZED_DISPLAY_HEADING",
+                                    "EXPORT_LOW_UTILITY_DENSITY",
+                                    "EXPORT_TEXT_LAYOUT_PAGE_COUNT_DRIFT",
+                                    "EXPORT_TEXT_LAYOUT_GROUP_SPLIT_DRIFT",
+                                    "EXPORT_TEXT_LAYOUT_MANUAL_BREAK_DRIFT",
+                                    "EXPORT_TEXT_LAYOUT_FALLBACK_RECOMMENDED",
+                                    "EXPORT_REVIEW_UNAVAILABLE"
+                                  ]
+                                },
+                                "severity": {
+                                  "type": "string",
+                                  "enum": [
+                                    "info",
+                                    "warning",
+                                    "error"
+                                  ]
+                                },
+                                "page": {
+                                  "type": "integer",
+                                  "nullable": true
+                                },
+                                "message": {
+                                  "type": "string"
+                                },
+                                "details": {
+                                  "type": "object",
+                                  "additionalProperties": {},
+                                  "nullable": true
+                                }
+                              },
+                              "required": [
+                                "code",
+                                "severity",
+                                "page",
+                                "message",
+                                "details"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
+                          "metrics": {
+                            "type": "object",
+                            "properties": {
+                              "pageCount": {
+                                "type": "integer"
+                              },
+                              "pageWidthPts": {
+                                "type": "number",
+                                "nullable": true
+                              },
+                              "pageHeightPts": {
+                                "type": "number",
+                                "nullable": true
+                              },
+                              "lastPageFillRatio": {
+                                "type": "number",
+                                "nullable": true
+                              },
+                              "sectionStarts": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "title": {
+                                      "type": "string"
+                                    },
+                                    "kind": {
+                                      "type": "string",
+                                      "enum": [
+                                        "front_matter",
+                                        "chapter",
+                                        "appendix",
+                                        "back_matter"
+                                      ],
+                                      "nullable": true
+                                    },
+                                    "page": {
+                                      "type": "integer",
+                                      "nullable": true
+                                    },
+                                    "topRatio": {
+                                      "type": "number",
+                                      "nullable": true
+                                    },
+                                    "lineCount": {
+                                      "type": "integer",
+                                      "nullable": true
+                                    },
+                                    "hyphenated": {
+                                      "type": "boolean"
+                                    }
+                                  },
+                                  "required": [
+                                    "title",
+                                    "kind",
+                                    "page",
+                                    "topRatio",
+                                    "lineCount",
+                                    "hyphenated"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "utilityCoverage": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "title": {
+                                      "type": "string"
+                                    },
+                                    "kind": {
+                                      "type": "string",
+                                      "enum": [
+                                        "front_matter",
+                                        "chapter",
+                                        "appendix",
+                                        "back_matter"
+                                      ],
+                                      "nullable": true
+                                    },
+                                    "utilityBlockCount": {
+                                      "type": "integer"
+                                    },
+                                    "referenceBlockCount": {
+                                      "type": "integer"
+                                    },
+                                    "proseParagraphCount": {
+                                      "type": "integer"
+                                    },
+                                    "utilityDensity": {
+                                      "type": "number"
+                                    }
+                                  },
+                                  "required": [
+                                    "title",
+                                    "kind",
+                                    "utilityBlockCount",
+                                    "referenceBlockCount",
+                                    "proseParagraphCount",
+                                    "utilityDensity"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "textLayoutParity": {
+                                "type": "object",
+                                "properties": {
+                                  "mode": {
+                                    "type": "string",
+                                    "enum": [
+                                      "legacy",
+                                      "shadow",
+                                      "pretext"
+                                    ]
+                                  },
+                                  "legacyPageCount": {
+                                    "type": "integer"
+                                  },
+                                  "enginePageCount": {
+                                    "type": "integer"
+                                  },
+                                  "supportedUnitCount": {
+                                    "type": "integer"
+                                  },
+                                  "unsupportedUnitCount": {
+                                    "type": "integer"
+                                  },
+                                  "totalHeightDeltaPx": {
+                                    "type": "number"
+                                  },
+                                  "driftScopeIds": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "unsupportedScopeIds": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  }
+                                },
+                                "required": [
+                                  "mode",
+                                  "legacyPageCount",
+                                  "enginePageCount",
+                                  "supportedUnitCount",
+                                  "unsupportedUnitCount",
+                                  "totalHeightDeltaPx",
+                                  "driftScopeIds",
+                                  "unsupportedScopeIds"
+                                ],
+                                "additionalProperties": false,
+                                "nullable": true
+                              }
+                            },
+                            "required": [
+                              "pageCount",
+                              "pageWidthPts",
+                              "pageHeightPts",
+                              "lastPageFillRatio",
+                              "sectionStarts",
+                              "utilityCoverage"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": [
+                          "status",
+                          "score",
+                          "generatedAt",
+                          "summary",
+                          "passCount",
+                          "appliedFixes",
+                          "findings",
+                          "metrics"
+                        ],
+                        "additionalProperties": false,
+                        "nullable": true
+                      },
+                      "createdAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "completedAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "projectId",
+                      "userId",
+                      "format",
+                      "status",
+                      "progress",
+                      "outputUrl",
+                      "errorMessage",
+                      "review",
+                      "createdAt",
+                      "completedAt"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer"
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "instance": {
+                      "type": "string"
+                    },
+                    "errors": {
+                      "type": "object",
+                      "additionalProperties": {}
+                    }
+                  },
+                  "required": [
+                    "title",
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/export-jobs/{jobId}": {
+      "get": {
+        "operationId": "getExportJob",
+        "summary": "Get export job status.",
+        "tags": [
+          "exports"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "projectId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "userId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "format": {
+                      "type": "string",
+                      "enum": [
+                        "pdf",
+                        "epub",
+                        "print_pdf"
+                      ]
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "queued",
+                        "processing",
+                        "completed",
+                        "failed"
+                      ]
+                    },
+                    "progress": {
+                      "type": "integer"
+                    },
+                    "outputUrl": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "errorMessage": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "review": {
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "passed",
+                            "needs_attention",
+                            "unavailable"
+                          ]
+                        },
+                        "score": {
+                          "type": "number"
+                        },
+                        "generatedAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "summary": {
+                          "type": "string"
+                        },
+                        "passCount": {
+                          "type": "integer"
+                        },
+                        "appliedFixes": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": [
+                              "shrink_h1_headings",
+                              "dedicated_end_page",
+                              "dedicated_chapter_openers",
+                              "refresh_layout_plan"
+                            ]
+                          }
+                        },
+                        "findings": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "code": {
+                                "type": "string",
+                                "enum": [
+                                  "EXPORT_CHAPTER_OPENER_LOW",
+                                  "EXPORT_SECTION_TITLE_WRAP",
+                                  "EXPORT_LAST_PAGE_UNDERFILLED",
+                                  "EXPORT_UNUSED_PAGE_REGION",
+                                  "EXPORT_MISSED_ART_OPPORTUNITY",
+                                  "EXPORT_WEAK_HERO_PLACEMENT",
+                                  "EXPORT_SPLIT_SCENE_PACKET",
+                                  "EXPORT_UNBALANCED_COLUMNS",
+                                  "EXPORT_MARGIN_COLLISION",
+                                  "EXPORT_FOOTER_COLLISION",
+                                  "EXPORT_ORPHAN_TAIL_PARAGRAPH",
+                                  "EXPORT_EMPTY_ENCOUNTER_TABLE",
+                                  "EXPORT_INCOMPLETE_ENCOUNTER_PACKET",
+                                  "EXPORT_EMPTY_RANDOM_TABLE",
+                                  "EXPORT_THIN_RANDOM_TABLE",
+                                  "EXPORT_PLACEHOLDER_STAT_BLOCK",
+                                  "EXPORT_INCOMPLETE_STAT_BLOCK",
+                                  "EXPORT_SUSPICIOUS_STAT_BLOCK",
+                                  "EXPORT_OVERSIZED_DISPLAY_HEADING",
+                                  "EXPORT_LOW_UTILITY_DENSITY",
+                                  "EXPORT_TEXT_LAYOUT_PAGE_COUNT_DRIFT",
+                                  "EXPORT_TEXT_LAYOUT_GROUP_SPLIT_DRIFT",
+                                  "EXPORT_TEXT_LAYOUT_MANUAL_BREAK_DRIFT",
+                                  "EXPORT_TEXT_LAYOUT_FALLBACK_RECOMMENDED",
+                                  "EXPORT_REVIEW_UNAVAILABLE"
+                                ]
+                              },
+                              "severity": {
+                                "type": "string",
+                                "enum": [
+                                  "info",
+                                  "warning",
+                                  "error"
+                                ]
+                              },
+                              "page": {
+                                "type": "integer",
+                                "nullable": true
+                              },
+                              "message": {
+                                "type": "string"
+                              },
+                              "details": {
+                                "type": "object",
+                                "additionalProperties": {},
+                                "nullable": true
+                              }
+                            },
+                            "required": [
+                              "code",
+                              "severity",
+                              "page",
+                              "message",
+                              "details"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "metrics": {
+                          "type": "object",
+                          "properties": {
+                            "pageCount": {
+                              "type": "integer"
+                            },
+                            "pageWidthPts": {
+                              "type": "number",
+                              "nullable": true
+                            },
+                            "pageHeightPts": {
+                              "type": "number",
+                              "nullable": true
+                            },
+                            "lastPageFillRatio": {
+                              "type": "number",
+                              "nullable": true
+                            },
+                            "sectionStarts": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "title": {
+                                    "type": "string"
+                                  },
+                                  "kind": {
+                                    "type": "string",
+                                    "enum": [
+                                      "front_matter",
+                                      "chapter",
+                                      "appendix",
+                                      "back_matter"
+                                    ],
+                                    "nullable": true
+                                  },
+                                  "page": {
+                                    "type": "integer",
+                                    "nullable": true
+                                  },
+                                  "topRatio": {
+                                    "type": "number",
+                                    "nullable": true
+                                  },
+                                  "lineCount": {
+                                    "type": "integer",
+                                    "nullable": true
+                                  },
+                                  "hyphenated": {
+                                    "type": "boolean"
+                                  }
+                                },
+                                "required": [
+                                  "title",
+                                  "kind",
+                                  "page",
+                                  "topRatio",
+                                  "lineCount",
+                                  "hyphenated"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "utilityCoverage": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "title": {
+                                    "type": "string"
+                                  },
+                                  "kind": {
+                                    "type": "string",
+                                    "enum": [
+                                      "front_matter",
+                                      "chapter",
+                                      "appendix",
+                                      "back_matter"
+                                    ],
+                                    "nullable": true
+                                  },
+                                  "utilityBlockCount": {
+                                    "type": "integer"
+                                  },
+                                  "referenceBlockCount": {
+                                    "type": "integer"
+                                  },
+                                  "proseParagraphCount": {
+                                    "type": "integer"
+                                  },
+                                  "utilityDensity": {
+                                    "type": "number"
+                                  }
+                                },
+                                "required": [
+                                  "title",
+                                  "kind",
+                                  "utilityBlockCount",
+                                  "referenceBlockCount",
+                                  "proseParagraphCount",
+                                  "utilityDensity"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "textLayoutParity": {
+                              "type": "object",
+                              "properties": {
+                                "mode": {
+                                  "type": "string",
+                                  "enum": [
+                                    "legacy",
+                                    "shadow",
+                                    "pretext"
+                                  ]
+                                },
+                                "legacyPageCount": {
+                                  "type": "integer"
+                                },
+                                "enginePageCount": {
+                                  "type": "integer"
+                                },
+                                "supportedUnitCount": {
+                                  "type": "integer"
+                                },
+                                "unsupportedUnitCount": {
+                                  "type": "integer"
+                                },
+                                "totalHeightDeltaPx": {
+                                  "type": "number"
+                                },
+                                "driftScopeIds": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
+                                "unsupportedScopeIds": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                }
+                              },
+                              "required": [
+                                "mode",
+                                "legacyPageCount",
+                                "enginePageCount",
+                                "supportedUnitCount",
+                                "unsupportedUnitCount",
+                                "totalHeightDeltaPx",
+                                "driftScopeIds",
+                                "unsupportedScopeIds"
+                              ],
+                              "additionalProperties": false,
+                              "nullable": true
+                            }
+                          },
+                          "required": [
+                            "pageCount",
+                            "pageWidthPts",
+                            "pageHeightPts",
+                            "lastPageFillRatio",
+                            "sectionStarts",
+                            "utilityCoverage"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "status",
+                        "score",
+                        "generatedAt",
+                        "summary",
+                        "passCount",
+                        "appliedFixes",
+                        "findings",
+                        "metrics"
+                      ],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "completedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "projectId",
+                    "userId",
+                    "format",
+                    "status",
+                    "progress",
+                    "outputUrl",
+                    "errorMessage",
+                    "review",
+                    "createdAt",
+                    "completedAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer"
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "instance": {
+                      "type": "string"
+                    },
+                    "errors": {
+                      "type": "object",
+                      "additionalProperties": {}
+                    }
+                  },
+                  "required": [
+                    "title",
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "jobId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/export-jobs/{jobId}/fix": {
+      "post": {
+        "operationId": "applyExportJobFixes",
+        "summary": "Apply safe fixes from an export review and queue a re-export.",
+        "tags": [
+          "exports"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "started",
+                        "no_review",
+                        "no_fixes"
+                      ]
+                    },
+                    "summary": {
+                      "type": "string"
+                    },
+                    "appliedFixCount": {
+                      "type": "integer"
+                    },
+                    "documentsUpdated": {
+                      "type": "integer"
+                    },
+                    "changes": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "code": {
+                            "type": "string",
+                            "enum": [
+                              "EXPORT_CHAPTER_OPENER_LOW",
+                              "EXPORT_SECTION_TITLE_WRAP",
+                              "EXPORT_LAST_PAGE_UNDERFILLED",
+                              "EXPORT_UNUSED_PAGE_REGION",
+                              "EXPORT_MISSED_ART_OPPORTUNITY",
+                              "EXPORT_WEAK_HERO_PLACEMENT",
+                              "EXPORT_SPLIT_SCENE_PACKET",
+                              "EXPORT_UNBALANCED_COLUMNS",
+                              "EXPORT_MARGIN_COLLISION",
+                              "EXPORT_FOOTER_COLLISION",
+                              "EXPORT_ORPHAN_TAIL_PARAGRAPH",
+                              "EXPORT_EMPTY_ENCOUNTER_TABLE",
+                              "EXPORT_INCOMPLETE_ENCOUNTER_PACKET",
+                              "EXPORT_EMPTY_RANDOM_TABLE",
+                              "EXPORT_THIN_RANDOM_TABLE",
+                              "EXPORT_PLACEHOLDER_STAT_BLOCK",
+                              "EXPORT_INCOMPLETE_STAT_BLOCK",
+                              "EXPORT_SUSPICIOUS_STAT_BLOCK",
+                              "EXPORT_OVERSIZED_DISPLAY_HEADING",
+                              "EXPORT_LOW_UTILITY_DENSITY",
+                              "EXPORT_TEXT_LAYOUT_PAGE_COUNT_DRIFT",
+                              "EXPORT_TEXT_LAYOUT_GROUP_SPLIT_DRIFT",
+                              "EXPORT_TEXT_LAYOUT_MANUAL_BREAK_DRIFT",
+                              "EXPORT_TEXT_LAYOUT_FALLBACK_RECOMMENDED",
+                              "EXPORT_REVIEW_UNAVAILABLE"
+                            ]
+                          },
+                          "action": {
+                            "type": "string",
+                            "enum": [
+                              "remove_empty_encounter_tables",
+                              "remove_empty_random_tables",
+                              "remove_placeholder_stat_blocks",
+                              "demote_oversized_display_headings",
+                              "generate_spot_art",
+                              "normalize_page_breaks",
+                              "configure_text_layout_fallbacks",
+                              "refresh_layout_plan"
+                            ]
+                          },
+                          "title": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "count": {
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "code",
+                          "action",
+                          "title",
+                          "count"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "unsupportedFindingCount": {
+                      "type": "integer"
+                    },
+                    "exportJob": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "projectId": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "userId": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "format": {
+                          "type": "string",
+                          "enum": [
+                            "pdf",
+                            "epub",
+                            "print_pdf"
+                          ]
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "queued",
+                            "processing",
+                            "completed",
+                            "failed"
+                          ]
+                        },
+                        "progress": {
+                          "type": "integer"
+                        },
+                        "outputUrl": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "errorMessage": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "review": {
+                          "type": "object",
+                          "properties": {
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "passed",
+                                "needs_attention",
+                                "unavailable"
+                              ]
+                            },
+                            "score": {
+                              "type": "number"
+                            },
+                            "generatedAt": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "summary": {
+                              "type": "string"
+                            },
+                            "passCount": {
+                              "type": "integer"
+                            },
+                            "appliedFixes": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "enum": [
+                                  "shrink_h1_headings",
+                                  "dedicated_end_page",
+                                  "dedicated_chapter_openers",
+                                  "refresh_layout_plan"
+                                ]
+                              }
+                            },
+                            "findings": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "code": {
+                                    "type": "string",
+                                    "enum": [
+                                      "EXPORT_CHAPTER_OPENER_LOW",
+                                      "EXPORT_SECTION_TITLE_WRAP",
+                                      "EXPORT_LAST_PAGE_UNDERFILLED",
+                                      "EXPORT_UNUSED_PAGE_REGION",
+                                      "EXPORT_MISSED_ART_OPPORTUNITY",
+                                      "EXPORT_WEAK_HERO_PLACEMENT",
+                                      "EXPORT_SPLIT_SCENE_PACKET",
+                                      "EXPORT_UNBALANCED_COLUMNS",
+                                      "EXPORT_MARGIN_COLLISION",
+                                      "EXPORT_FOOTER_COLLISION",
+                                      "EXPORT_ORPHAN_TAIL_PARAGRAPH",
+                                      "EXPORT_EMPTY_ENCOUNTER_TABLE",
+                                      "EXPORT_INCOMPLETE_ENCOUNTER_PACKET",
+                                      "EXPORT_EMPTY_RANDOM_TABLE",
+                                      "EXPORT_THIN_RANDOM_TABLE",
+                                      "EXPORT_PLACEHOLDER_STAT_BLOCK",
+                                      "EXPORT_INCOMPLETE_STAT_BLOCK",
+                                      "EXPORT_SUSPICIOUS_STAT_BLOCK",
+                                      "EXPORT_OVERSIZED_DISPLAY_HEADING",
+                                      "EXPORT_LOW_UTILITY_DENSITY",
+                                      "EXPORT_TEXT_LAYOUT_PAGE_COUNT_DRIFT",
+                                      "EXPORT_TEXT_LAYOUT_GROUP_SPLIT_DRIFT",
+                                      "EXPORT_TEXT_LAYOUT_MANUAL_BREAK_DRIFT",
+                                      "EXPORT_TEXT_LAYOUT_FALLBACK_RECOMMENDED",
+                                      "EXPORT_REVIEW_UNAVAILABLE"
+                                    ]
+                                  },
+                                  "severity": {
+                                    "type": "string",
+                                    "enum": [
+                                      "info",
+                                      "warning",
+                                      "error"
+                                    ]
+                                  },
+                                  "page": {
+                                    "type": "integer",
+                                    "nullable": true
+                                  },
+                                  "message": {
+                                    "type": "string"
+                                  },
+                                  "details": {
+                                    "type": "object",
+                                    "additionalProperties": {},
+                                    "nullable": true
+                                  }
+                                },
+                                "required": [
+                                  "code",
+                                  "severity",
+                                  "page",
+                                  "message",
+                                  "details"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "metrics": {
+                              "type": "object",
+                              "properties": {
+                                "pageCount": {
+                                  "type": "integer"
+                                },
+                                "pageWidthPts": {
+                                  "type": "number",
+                                  "nullable": true
+                                },
+                                "pageHeightPts": {
+                                  "type": "number",
+                                  "nullable": true
+                                },
+                                "lastPageFillRatio": {
+                                  "type": "number",
+                                  "nullable": true
+                                },
+                                "sectionStarts": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "title": {
+                                        "type": "string"
+                                      },
+                                      "kind": {
+                                        "type": "string",
+                                        "enum": [
+                                          "front_matter",
+                                          "chapter",
+                                          "appendix",
+                                          "back_matter"
+                                        ],
+                                        "nullable": true
+                                      },
+                                      "page": {
+                                        "type": "integer",
+                                        "nullable": true
+                                      },
+                                      "topRatio": {
+                                        "type": "number",
+                                        "nullable": true
+                                      },
+                                      "lineCount": {
+                                        "type": "integer",
+                                        "nullable": true
+                                      },
+                                      "hyphenated": {
+                                        "type": "boolean"
+                                      }
+                                    },
+                                    "required": [
+                                      "title",
+                                      "kind",
+                                      "page",
+                                      "topRatio",
+                                      "lineCount",
+                                      "hyphenated"
+                                    ],
+                                    "additionalProperties": false
+                                  }
+                                },
+                                "utilityCoverage": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "title": {
+                                        "type": "string"
+                                      },
+                                      "kind": {
+                                        "type": "string",
+                                        "enum": [
+                                          "front_matter",
+                                          "chapter",
+                                          "appendix",
+                                          "back_matter"
+                                        ],
+                                        "nullable": true
+                                      },
+                                      "utilityBlockCount": {
+                                        "type": "integer"
+                                      },
+                                      "referenceBlockCount": {
+                                        "type": "integer"
+                                      },
+                                      "proseParagraphCount": {
+                                        "type": "integer"
+                                      },
+                                      "utilityDensity": {
+                                        "type": "number"
+                                      }
+                                    },
+                                    "required": [
+                                      "title",
+                                      "kind",
+                                      "utilityBlockCount",
+                                      "referenceBlockCount",
+                                      "proseParagraphCount",
+                                      "utilityDensity"
+                                    ],
+                                    "additionalProperties": false
+                                  }
+                                },
+                                "textLayoutParity": {
+                                  "type": "object",
+                                  "properties": {
+                                    "mode": {
+                                      "type": "string",
+                                      "enum": [
+                                        "legacy",
+                                        "shadow",
+                                        "pretext"
+                                      ]
+                                    },
+                                    "legacyPageCount": {
+                                      "type": "integer"
+                                    },
+                                    "enginePageCount": {
+                                      "type": "integer"
+                                    },
+                                    "supportedUnitCount": {
+                                      "type": "integer"
+                                    },
+                                    "unsupportedUnitCount": {
+                                      "type": "integer"
+                                    },
+                                    "totalHeightDeltaPx": {
+                                      "type": "number"
+                                    },
+                                    "driftScopeIds": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "unsupportedScopeIds": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string"
+                                      }
+                                    }
+                                  },
+                                  "required": [
+                                    "mode",
+                                    "legacyPageCount",
+                                    "enginePageCount",
+                                    "supportedUnitCount",
+                                    "unsupportedUnitCount",
+                                    "totalHeightDeltaPx",
+                                    "driftScopeIds",
+                                    "unsupportedScopeIds"
+                                  ],
+                                  "additionalProperties": false,
+                                  "nullable": true
+                                }
+                              },
+                              "required": [
+                                "pageCount",
+                                "pageWidthPts",
+                                "pageHeightPts",
+                                "lastPageFillRatio",
+                                "sectionStarts",
+                                "utilityCoverage"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
+                          "required": [
+                            "status",
+                            "score",
+                            "generatedAt",
+                            "summary",
+                            "passCount",
+                            "appliedFixes",
+                            "findings",
+                            "metrics"
+                          ],
+                          "additionalProperties": false,
+                          "nullable": true
+                        },
+                        "createdAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "completedAt": {
+                          "type": "string",
+                          "format": "date-time",
+                          "nullable": true
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "projectId",
+                        "userId",
+                        "format",
+                        "status",
+                        "progress",
+                        "outputUrl",
+                        "errorMessage",
+                        "review",
+                        "createdAt",
+                        "completedAt"
+                      ],
+                      "additionalProperties": false,
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "summary",
+                    "appliedFixCount",
+                    "documentsUpdated",
+                    "changes",
+                    "unsupportedFindingCount",
+                    "exportJob"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer"
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "instance": {
+                      "type": "string"
+                    },
+                    "errors": {
+                      "type": "object",
+                      "additionalProperties": {}
+                    }
+                  },
+                  "required": [
+                    "title",
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "jobId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/export-jobs/{jobId}/download": {
+      "get": {
+        "operationId": "downloadExportJob",
+        "summary": "Download a completed export artifact.",
+        "tags": [
+          "exports"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer"
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "instance": {
+                      "type": "string"
+                    },
+                    "errors": {
+                      "type": "object",
+                      "additionalProperties": {}
+                    }
+                  },
+                  "required": [
+                    "title",
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "jobId",
             "in": "path",
             "required": true,
             "schema": {

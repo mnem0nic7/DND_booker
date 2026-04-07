@@ -33,6 +33,7 @@ The app still exposes the same authenticated routes:
 
 - `/uploads/:projectId/:filename`
 - `/api/export-jobs/:id/download`
+- `/api/v1/export-jobs/:jobId/download`
 
 That keeps auth and URL shape stable while removing the shared-disk dependency that Cloud Run cannot provide reliably.
 
@@ -114,7 +115,7 @@ gcloud run services describe dnd-booker \
 For normal code changes, use this sequence from the repo root:
 
 ```bash
-npm run verify
+npm run verify:ship
 git status
 git add <intended paths>
 git commit -m "<message>"
@@ -130,11 +131,19 @@ npm run deploy:cloudrun
 
 Override `PROJECT_ID`, `REGION`, `REPOSITORY`, `TAG`, or `SERVICE` in the environment if you need a non-default deploy target.
 
+If you set these before deploy, the wrapper also runs an authenticated `api/v1` smoke test after the health check:
+
+```bash
+export SMOKE_TEST_EMAIL="you@example.com"
+export SMOKE_TEST_PASSWORD="your-password"
+export SMOKE_TEST_PROJECT_ID="optional-project-id"
+```
+
 After deploy, verify:
 
 - `curl -fsS "$URL/api/health"`
 - load `"$URL/"`
-- run one smoke test for the area you changed
+- confirm the authenticated `api/v1` smoke test passed, or run `npm run smoke:cloudrun:v1` manually if you skipped it during deploy
 
 ## Seed Templates
 

@@ -4,7 +4,10 @@
   "workspaces": ["client", "server", "worker", "shared", "text-layout", "sdk"],
   "scripts": {
     "generate:sdk": "npm run generate --workspace=sdk",
-    "verify": "npm run generate --workspace=sdk && npm run build --workspace=shared && npm run build --workspace=sdk && npm run build --workspace=server && npm run build --workspace=client",
+    "test:server:local": "bash ./scripts/run-server-vitest-with-local-services.sh",
+    "smoke:cloudrun:v1": "node ./scripts/smoke-cloudrun-v1.mjs",
+    "verify": "npm run generate --workspace=sdk && npm run build --workspace=shared && npm run build --workspace=sdk && npm run build --workspace=server && npm run build --workspace=worker && npm run build --workspace=client",
+    "verify:ship": "npm run verify && npm run test:unit --workspace=client && npm run test:server:local -- documents.v1.test.ts",
     "deploy:cloudrun": "bash ./scripts/redeploy-cloudrun.sh"
   }
 }

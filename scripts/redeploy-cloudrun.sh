@@ -33,3 +33,10 @@ gcloud run services describe "${SERVICE}" \
 echo "Service URL: ${SERVICE_URL}"
 curl -fsS "${SERVICE_URL}/api/health"
 echo
+
+if [[ -n "${SMOKE_TEST_EMAIL:-}" && -n "${SMOKE_TEST_PASSWORD:-}" ]]; then
+  echo "Running authenticated api/v1 smoke test..."
+  BASE_URL="${SERVICE_URL}" node ./scripts/smoke-cloudrun-v1.mjs
+else
+  echo "Skipping authenticated api/v1 smoke test; set SMOKE_TEST_EMAIL and SMOKE_TEST_PASSWORD to enable it."
+fi

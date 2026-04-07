@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import type { ExportReview, ExportReviewCode, ExportReviewFinding } from '@dnd-booker/shared';
+import type { ExportFormat, ExportReview, ExportReviewCode, ExportReviewFinding } from '@dnd-booker/shared';
 import { useExportStore } from '../../stores/exportStore';
 import { useProjectStore } from '../../stores/projectStore';
+import { v1Client } from '../../lib/api';
 import {
   formatExportReviewFixChange,
   getExportReviewFindingDocumentTitle,
@@ -127,7 +128,7 @@ export function ExportDialog({ projectId }: ExportDialogProps) {
     reset,
   } = useExportStore();
   const { documents, loadDocument } = useProjectStore();
-  const [selectedFormat, setSelectedFormat] = useState<string>('pdf');
+  const [selectedFormat, setSelectedFormat] = useState<ExportFormat>('pdf');
 
   useEffect(() => {
     if (isOpen && projectId) {
@@ -174,20 +175,18 @@ export function ExportDialog({ projectId }: ExportDialogProps) {
 
   const handleDownload = (e: React.MouseEvent, jobId: string, format: string) => {
     e.preventDefault();
-    import('../../lib/api').then(({ default: apiClient }) => {
-      apiClient.get(`/export-jobs/${jobId}/download`, { responseType: 'blob' })
-        .then(({ data }) => {
-          const url = URL.createObjectURL(data);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = `export.${format === 'epub' ? 'epub' : 'pdf'}`;
-          document.body.appendChild(a);
-          a.click();
-          a.remove();
-          URL.revokeObjectURL(url);
-        })
-        .catch((err) => console.error('[Export] Download failed:', err));
-    });
+    v1Client.exports.downloadExportJob({ jobId })
+      .then((data) => {
+        const url = URL.createObjectURL(data);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `export.${format === 'epub' ? 'epub' : 'pdf'}`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      })
+      .catch((err) => console.error('[Export] Download failed:', err));
   };
 
   return (
@@ -255,7 +254,7 @@ export function ExportDialog({ projectId }: ExportDialogProps) {
                       name="exportFormat"
                       value={option.value}
                       checked={selectedFormat === option.value}
-                      onChange={(e) => setSelectedFormat(e.target.value)}
+                      onChange={() => setSelectedFormat(option.value)}
                       className="mt-0.5 text-purple-600 focus:ring-purple-500"
                     />
                     <div>
@@ -440,7 +439,7 @@ export function ExportDialog({ projectId }: ExportDialogProps) {
               )}
               {job.outputUrl && (
                 <a
-                  href={`/api/export-jobs/${job.id}/download`}
+                  href={`/api/v1/export-jobs/${job.id}/download`}
                   onClick={(e) => handleDownload(e, job.id, job.format)}
                   className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 text-white text-sm font-medium rounded-lg hover:bg-purple-700 transition-colors"
                 >
@@ -495,7 +494,7 @@ export function ExportDialog({ projectId }: ExportDialogProps) {
                     </div>
                     {historyJob.status === 'completed' ? (
                       <a
-                        href={`/api/export-jobs/${historyJob.id}/download`}
+                        href={`/api/v1/export-jobs/${historyJob.id}/download`}
                         onClick={(e) => handleDownload(e, historyJob.id, historyJob.format)}
                         className="text-purple-600 hover:text-purple-800 font-medium"
                       >

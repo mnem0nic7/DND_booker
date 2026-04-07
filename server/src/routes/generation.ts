@@ -1,6 +1,5 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import type { ExportReview, GeneratedArtifact } from '@dnd-booker/shared';
 import { requireAuth, type AuthRequest } from '../middleware/auth.js';
 import { asyncHandler } from '../middleware/async-handler.js';
 import { validateUuid } from '../middleware/validate-uuid.js';
@@ -14,127 +13,12 @@ import { listTasksForRun } from '../services/generation/task.service.js';
 import { prisma } from '../config/database.js';
 import { subscribeToRun } from '../services/generation/pubsub.service.js';
 import { enqueueGenerationRun } from '../services/generation/queue.service.js';
+import {
+  getExportReviewArtifactForRun,
+  isExportReviewArtifactId,
+} from '../services/generation/export-review-artifact.service.js';
 
 const generationRoutes = Router({ mergeParams: true });
-const EXPORT_REVIEW_ARTIFACT_PREFIX = 'export-review:';
-
-function isExportReviewArtifactId(artifactId: string): boolean {
-  return artifactId.startsWith(EXPORT_REVIEW_ARTIFACT_PREFIX);
-}
-
-async function getLatestScopedExportJobForRun(run: { id: string; projectId: string; createdAt: Date }, userId: string) {
-  const nextRun = await prisma.generationRun.findFirst({
-    where: {
-      projectId: run.projectId,
-      userId,
-      createdAt: { gt: run.createdAt },
-    },
-    orderBy: { createdAt: 'asc' },
-    select: { createdAt: true },
-  });
-
-  const candidateJobs = await prisma.exportJob.findMany({
-    where: {
-      projectId: run.projectId,
-      userId,
-      status: 'completed',
-      createdAt: {
-        gte: run.createdAt,
-        ...(nextRun ? { lt: nextRun.createdAt } : {}),
-      },
-    },
-    orderBy: [{ completedAt: 'desc' }, { createdAt: 'desc' }],
-    take: 10,
-  });
-
-  return candidateJobs.find((job) => job.reviewJson != null) ?? null;
-}
-
-function buildExportReviewMarkdown(review: ExportReview): string {
-  const findings = review.findings.length > 0
-    ? review.findings.map((finding) => {
-        const pageLabel = finding.page != null ? ` (page ${finding.page})` : '';
-        return `- [${finding.severity}] ${finding.code}${pageLabel}: ${finding.message}`;
-      }).join('\n')
-    : '- No export-review findings.';
-
-  const fixes = review.appliedFixes.length > 0
-    ? review.appliedFixes.map((fix) => `- ${fix}`).join('\n')
-    : '- None';
-
-  return [
-    `# Export Review`,
-    '',
-    review.summary,
-    '',
-    `- Status: ${review.status}`,
-    `- Score: ${review.score}`,
-    `- Passes: ${review.passCount}`,
-    `- Page count: ${review.metrics.pageCount}`,
-    '',
-    '## Applied Fixes',
-    fixes,
-    '',
-    '## Findings',
-    findings,
-  ].join('\n');
-}
-
-function serializeExportReviewArtifact(
-  runId: string,
-  exportJob: {
-    id: string;
-    projectId: string;
-    userId: string;
-    format: string;
-    outputUrl: string | null;
-    createdAt: Date;
-    completedAt: Date | null;
-    reviewJson: unknown;
-  },
-): GeneratedArtifact {
-  const review = exportJob.reviewJson as ExportReview;
-  const timestamp = (exportJob.completedAt ?? exportJob.createdAt).toISOString();
-
-  return {
-    id: `${EXPORT_REVIEW_ARTIFACT_PREFIX}${exportJob.id}`,
-    runId,
-    projectId: exportJob.projectId,
-    sourceTaskId: null,
-    artifactType: 'export_review',
-    artifactKey: `export-review-${exportJob.id}`,
-    parentArtifactId: null,
-    status: review.status === 'passed' ? 'passed' : 'failed_evaluation',
-    version: review.passCount,
-    title: `${exportJob.format.toUpperCase()} Export Review`,
-    summary: review.summary,
-    jsonContent: review,
-    markdownContent: buildExportReviewMarkdown(review),
-    tiptapContent: null,
-    metadata: {
-      exportJobId: exportJob.id,
-      exportFormat: exportJob.format,
-      outputUrl: exportJob.outputUrl,
-      generatedAt: review.generatedAt,
-      reviewStatus: review.status,
-      reviewScore: review.score,
-      source: 'export_job',
-    },
-    pageEstimate: review.metrics.pageCount,
-    tokenCount: null,
-    createdAt: timestamp,
-    updatedAt: timestamp,
-  };
-}
-
-async function getExportReviewArtifactForRun(
-  run: { id: string; projectId: string; createdAt: Date },
-  userId: string,
-): Promise<GeneratedArtifact | null> {
-  const exportJob = await getLatestScopedExportJobForRun(run, userId);
-  if (!exportJob || !exportJob.reviewJson) return null;
-  return serializeExportReviewArtifact(run.id, exportJob);
-}
 
 const createRunSchema = z.object({
   prompt: z.string().min(1).max(5000),

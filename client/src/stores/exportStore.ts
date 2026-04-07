@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { AxiosError } from 'axios';
-import type { ExportJob, ExportReviewFixChange, ExportReviewFixResult } from '@dnd-booker/shared';
-import api from '../lib/api';
+import type { ExportFormat, ExportJob, ExportReviewFixChange } from '@dnd-booker/shared';
+import { v1Client } from '../lib/api';
 
 interface ExportState {
   isOpen: boolean;
@@ -14,7 +14,7 @@ interface ExportState {
   exportHistory: ExportJob[];
   openDialog: () => void;
   closeDialog: () => void;
-  startExport: (projectId: string, format: string) => Promise<void>;
+  startExport: (projectId: string, format: ExportFormat) => Promise<void>;
   applyReviewFixes: (projectId: string, exportJobId: string) => Promise<void>;
   pollJobStatus: (jobId: string) => Promise<void>;
   fetchExportHistory: (projectId: string) => Promise<void>;
@@ -50,14 +50,13 @@ export const useExportStore = create<ExportState>((set, get) => ({
     set({ isOpen: false });
   },
 
-  startExport: async (projectId: string, format: string) => {
+  startExport: async (projectId: string, format: ExportFormat) => {
     clearPollTimer();
     set({ isExporting: true, isApplyingFixes: false, error: null, fixSummary: null, fixChanges: [], job: null });
 
     try {
-      const { data } = await api.post(`/projects/${projectId}/export`, { format });
+      const data = await v1Client.exports.createExportJob({ projectId }, { format });
       set({ job: data, isExporting: false });
-      // Start polling for status updates
       get().pollJobStatus(data.id);
     } catch (err) {
       const message = err instanceof AxiosError ? err.response?.data?.error : null;
@@ -70,7 +69,7 @@ export const useExportStore = create<ExportState>((set, get) => ({
     set({ isApplyingFixes: true, error: null, fixSummary: null, fixChanges: [] });
 
     try {
-      const { data } = await api.post<ExportReviewFixResult>(`/export-jobs/${exportJobId}/fix`);
+      const data = await v1Client.exports.applyExportJobFixes({ jobId: exportJobId });
       if (!data.exportJob) {
         set({
           isApplyingFixes: false,
@@ -100,7 +99,7 @@ export const useExportStore = create<ExportState>((set, get) => ({
 
   pollJobStatus: async (jobId: string) => {
     try {
-      const { data } = await api.get(`/export-jobs/${jobId}`);
+      const data = await v1Client.exports.getExportJob({ jobId });
       set({ job: data });
 
       if (data.status === 'completed' || data.status === 'failed') {
@@ -134,7 +133,7 @@ export const useExportStore = create<ExportState>((set, get) => ({
 
   fetchExportHistory: async (projectId: string) => {
     try {
-      const { data } = await api.get(`/projects/${projectId}/export-jobs`);
+      const data = await v1Client.exports.listExportJobs({ projectId });
       set({ exportHistory: data });
     } catch (err) {
       console.warn('[Export] Failed to load export history:', err);

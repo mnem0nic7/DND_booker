@@ -16,6 +16,35 @@ function toOpenApiSchema(schema: ApiV1RouteContract['responseSchema']) {
   return jsonSchema;
 }
 
+function toSuccessResponse(route: ApiV1RouteContract) {
+  if (route.axiosResponseType === 'blob') {
+    return {
+      description: 'Success',
+      content: {
+        'application/octet-stream': {
+          schema: {
+            type: 'string',
+            format: 'binary',
+          },
+        },
+      },
+    };
+  }
+
+  if (route.responseSchema) {
+    return {
+      description: 'Success',
+      content: {
+        'application/json': {
+          schema: toOpenApiSchema(route.responseSchema),
+        },
+      },
+    };
+  }
+
+  return { description: 'Success' };
+}
+
 function getObjectShape(schema: ApiV1RouteContract['paramsSchema']) {
   if (!schema || typeof schema !== 'object' || !('shape' in schema)) return {};
   return (schema as { shape: Record<string, unknown> }).shape;
@@ -38,16 +67,7 @@ function buildOpenApiDocument() {
       summary: route.summary,
       tags: [route.tag],
       responses: {
-        [route.operationId.startsWith('create') || route.operationId === 'register' ? '201' : '200']: route.responseSchema
-          ? {
-              description: 'Success',
-              content: {
-                'application/json': {
-                  schema: toOpenApiSchema(route.responseSchema),
-                },
-              },
-            }
-          : { description: 'Success' },
+        [route.operationId.startsWith('create') || route.operationId === 'register' ? '201' : '200']: toSuccessResponse(route),
         default: {
           description: 'Error',
           content: {
@@ -90,11 +110,14 @@ function buildOpenApiDocument() {
 
 function getTypeImports() {
   const names = new Set<string>(['Problem']);
+  const globalTypes = new Set(['Blob']);
   for (const route of V1_ROUTE_CONTRACTS) {
     for (const source of [route.paramsTypeName, route.requestTypeName, route.responseTypeName]) {
       if (!source) continue;
       for (const match of source.matchAll(/\b[A-Z][A-Za-z0-9_]*\b/g)) {
-        names.add(match[0]);
+        if (!globalTypes.has(match[0])) {
+          names.add(match[0]);
+        }
       }
     }
   }
@@ -132,11 +155,14 @@ function buildClientSource() {
         ? `buildPath('${clientPath}', params as Record<string, string | number | undefined>)`
         : `'${clientPath}'`;
       const responseType = route.responseTypeName ?? 'void';
+      const configExpr = route.axiosResponseType
+        ? `{ ...(config ?? {}), responseType: '${route.axiosResponseType}' }`
+        : 'config';
       const methodCall = route.method === 'get'
-        ? `axios.get<${responseType}>(${pathExpr}, config)`
+        ? `axios.get<${responseType}>(${pathExpr}, ${configExpr})`
         : hasBody
-          ? `axios.${route.method}<${responseType}>(${pathExpr}, body, config)`
-          : `axios.${route.method}<${responseType}>(${pathExpr}, undefined, config)`;
+          ? `axios.${route.method}<${responseType}>(${pathExpr}, body, ${configExpr})`
+          : `axios.${route.method}<${responseType}>(${pathExpr}, undefined, ${configExpr})`;
       const args: string[] = [];
       if (hasParams) args.push('params');
       if (hasBody) args.push('body');

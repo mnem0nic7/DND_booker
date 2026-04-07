@@ -1,5 +1,4 @@
 import { create } from 'zustand';
-import api from '../lib/api';
 import { getAccessToken, v1Client } from '../lib/api';
 import type {
   GenerationRunSummary,
@@ -308,7 +307,7 @@ export const useGenerationStore = create<GenerationState>((set, get) => ({
   fetchArtifacts: async (projectId, runId) => {
     set({ isLoadingArtifacts: true });
     try {
-      const { data } = await api.get(`/projects/${projectId}/ai/generation-runs/${runId}/artifacts`);
+      const data = await v1Client.generationRuns.listGenerationArtifacts({ projectId, runId });
       set({ artifacts: data, isLoadingArtifacts: false });
     } catch {
       set({ isLoadingArtifacts: false });
@@ -317,9 +316,7 @@ export const useGenerationStore = create<GenerationState>((set, get) => ({
 
   fetchArtifactDetail: async (projectId, runId, artifactId) => {
     try {
-      const { data } = await api.get(
-        `/projects/${projectId}/ai/generation-runs/${runId}/artifacts/${artifactId}`,
-      );
+      const data = await v1Client.generationRuns.getGenerationArtifact({ projectId, runId, artifactId });
       set({ artifactDetail: data, selectedArtifactId: artifactId });
     } catch (err: unknown) {
       const message =
@@ -333,7 +330,7 @@ export const useGenerationStore = create<GenerationState>((set, get) => ({
   fetchCanonEntities: async (projectId, runId) => {
     set({ isLoadingCanon: true });
     try {
-      const { data } = await api.get(`/projects/${projectId}/ai/generation-runs/${runId}/canon`);
+      const data = await v1Client.generationRuns.listGenerationCanonEntities({ projectId, runId });
       set({ canonEntities: data, isLoadingCanon: false });
     } catch {
       set({ isLoadingCanon: false });
@@ -343,7 +340,7 @@ export const useGenerationStore = create<GenerationState>((set, get) => ({
   fetchEvaluations: async (projectId, runId) => {
     set({ isLoadingEvaluations: true });
     try {
-      const { data } = await api.get(`/projects/${projectId}/ai/generation-runs/${runId}/evaluations`);
+      const data = await v1Client.generationRuns.listGenerationEvaluations({ projectId, runId });
       set({ evaluations: data, isLoadingEvaluations: false });
     } catch {
       set({ isLoadingEvaluations: false });
@@ -353,7 +350,7 @@ export const useGenerationStore = create<GenerationState>((set, get) => ({
   fetchAssemblyManifest: async (projectId, runId) => {
     set({ isLoadingAssembly: true });
     try {
-      const { data } = await api.get(`/projects/${projectId}/ai/generation-runs/${runId}/assembly`);
+      const data = await v1Client.generationRuns.getGenerationAssemblyManifest({ projectId, runId });
       set({ assemblyManifest: data, isLoadingAssembly: false });
     } catch {
       set({ isLoadingAssembly: false, assemblyManifest: null });

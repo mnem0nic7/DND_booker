@@ -7,7 +7,7 @@ Use this workflow whenever an accepted code change should be carried through to 
 ## Default Flow
 
 1. inspect the touched code paths and confirm the runtime impact
-2. run scoped verification for the touched packages and features
+2. run the ship-check path unless the user explicitly narrowed the scope
 3. update repo memory and docs when behavior, operations, or workflow expectations changed
 4. commit intentionally
 5. push the branch
@@ -19,7 +19,12 @@ Do not stop after code edits unless the user explicitly says not to ship.
 
 - prefer package-scoped verification over a blind full-repo sweep
 - regenerate checked-in SDK or spec output before shipping when route contracts changed
-- when `client/`, `sdk/`, or shared API contract code changed, run `npm run test:unit --workspace=client` in addition to the build flow
+- default to `npm run verify:ship`
+- `npm run verify:ship` means:
+  - `npm run verify`
+  - `npm run test:unit --workspace=client`
+  - `npm run test:server:local -- documents.v1.test.ts`
+- when the local server integration test depends on Cloud SQL access, record the exact GCP blocker if it cannot run
 - remove accidental compiled artifacts from source directories before commit
 - if infrastructure blocks a test or deploy, record the exact blocker
 

@@ -6,9 +6,14 @@ import {
   AgentRunDetailSchema,
   AgentRunSchema,
   AgentRunSummarySchema,
+  ArtifactEvaluationSchema,
+  AssemblyManifestSchema,
+  CanonEntitySchema,
   GenerationRunCreateSchema,
   GenerationRunDetailSchema,
   GenerationRunSchema,
+  V1GeneratedArtifactDetailSchema,
+  V1GeneratedArtifactSchema,
 } from '@dnd-booker/shared';
 import { prisma } from '../../config/database.js';
 import { asyncHandler } from '../../middleware/async-handler.js';
@@ -22,6 +27,10 @@ import {
 } from '../../services/generation/run.service.js';
 import { enqueueGenerationRun } from '../../services/generation/queue.service.js';
 import { subscribeToRun } from '../../services/generation/pubsub.service.js';
+import {
+  getExportReviewArtifactForRun,
+  isExportReviewArtifactId,
+} from '../../services/generation/export-review-artifact.service.js';
 import {
   createAgentRun,
   getAgentRun,
@@ -100,16 +109,17 @@ v1RunRoutes.get(
       return;
     }
 
-    const [taskCount, artifactCount] = await Promise.all([
+    const [taskCount, artifactCount, exportReviewArtifact] = await Promise.all([
       prisma.generationTask.count({ where: { runId } }),
       prisma.generatedArtifact.count({ where: { runId } }),
+      getExportReviewArtifactForRun(run, authReq.userId!),
     ]);
 
     res.json(GenerationRunDetailSchema.parse({
       ...run,
       taskCount,
-      artifactCount,
-      latestExportReview: null,
+      artifactCount: artifactCount + (exportReviewArtifact ? 1 : 0),
+      latestExportReview: exportReviewArtifact?.jsonContent ?? null,
     }));
   }),
 );
@@ -179,6 +189,146 @@ v1RunRoutes.get(
       void subscription.unsubscribe();
       res.end();
     });
+  }),
+);
+
+v1RunRoutes.get(
+  '/generation-runs/:runId/artifacts',
+  requireAuth,
+  validateUuid('projectId', 'runId'),
+  asyncHandler(async (req, res) => {
+    const authReq = req as AuthRequest;
+    const runId = req.params.runId as string;
+    const run = await getRun(runId, authReq.userId!);
+    if (!run) {
+      res.status(404).json({ error: 'Run not found' });
+      return;
+    }
+
+    const [artifacts, exportReviewArtifact] = await Promise.all([
+      prisma.generatedArtifact.findMany({
+        where: { runId },
+        orderBy: { createdAt: 'asc' },
+      }),
+      getExportReviewArtifactForRun(run, authReq.userId!),
+    ]);
+
+    res.json(V1GeneratedArtifactSchema.array().parse(
+      exportReviewArtifact ? [...artifacts, exportReviewArtifact] : artifacts,
+    ));
+  }),
+);
+
+v1RunRoutes.get(
+  '/generation-runs/:runId/artifacts/:artifactId',
+  requireAuth,
+  validateUuid('projectId', 'runId'),
+  asyncHandler(async (req, res) => {
+    const authReq = req as AuthRequest;
+    const runId = req.params.runId as string;
+    const artifactId = req.params.artifactId as string;
+    const run = await getRun(runId, authReq.userId!);
+    if (!run) {
+      res.status(404).json({ error: 'Run not found' });
+      return;
+    }
+
+    if (isExportReviewArtifactId(artifactId)) {
+      const exportReviewArtifact = await getExportReviewArtifactForRun(run, authReq.userId!);
+      if (!exportReviewArtifact || exportReviewArtifact.id !== artifactId) {
+        res.status(404).json({ error: 'Artifact not found' });
+        return;
+      }
+
+      res.json(V1GeneratedArtifactDetailSchema.parse({
+        ...exportReviewArtifact,
+        evaluations: [],
+      }));
+      return;
+    }
+
+    const artifact = await prisma.generatedArtifact.findFirst({
+      where: { id: artifactId, runId },
+      include: { evaluations: { orderBy: { createdAt: 'desc' } } },
+    });
+
+    if (!artifact) {
+      res.status(404).json({ error: 'Artifact not found' });
+      return;
+    }
+
+    res.json(V1GeneratedArtifactDetailSchema.parse(artifact));
+  }),
+);
+
+v1RunRoutes.get(
+  '/generation-runs/:runId/canon',
+  requireAuth,
+  validateUuid('projectId', 'runId'),
+  asyncHandler(async (req, res) => {
+    const authReq = req as AuthRequest;
+    const runId = req.params.runId as string;
+    const run = await getRun(runId, authReq.userId!);
+    if (!run) {
+      res.status(404).json({ error: 'Run not found' });
+      return;
+    }
+
+    const entities = await prisma.canonEntity.findMany({
+      where: { runId },
+      orderBy: [{ entityType: 'asc' }, { canonicalName: 'asc' }],
+    });
+
+    res.json(CanonEntitySchema.array().parse(entities));
+  }),
+);
+
+v1RunRoutes.get(
+  '/generation-runs/:runId/evaluations',
+  requireAuth,
+  validateUuid('projectId', 'runId'),
+  asyncHandler(async (req, res) => {
+    const authReq = req as AuthRequest;
+    const runId = req.params.runId as string;
+    const run = await getRun(runId, authReq.userId!);
+    if (!run) {
+      res.status(404).json({ error: 'Run not found' });
+      return;
+    }
+
+    const evaluations = await prisma.artifactEvaluation.findMany({
+      where: { artifact: { runId } },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    res.json(ArtifactEvaluationSchema.array().parse(evaluations));
+  }),
+);
+
+v1RunRoutes.get(
+  '/generation-runs/:runId/assembly',
+  requireAuth,
+  validateUuid('projectId', 'runId'),
+  asyncHandler(async (req, res) => {
+    const authReq = req as AuthRequest;
+    const runId = req.params.runId as string;
+    const run = await getRun(runId, authReq.userId!);
+    if (!run) {
+      res.status(404).json({ error: 'Run not found' });
+      return;
+    }
+
+    const manifest = await prisma.assemblyManifest.findFirst({
+      where: { runId },
+      orderBy: { version: 'desc' },
+    });
+
+    if (!manifest) {
+      res.status(404).json({ error: 'No assembly manifest found' });
+      return;
+    }
+
+    res.json(AssemblyManifestSchema.parse(manifest));
   }),
 );
 
