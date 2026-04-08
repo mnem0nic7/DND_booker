@@ -7,6 +7,7 @@ import {
   assessRandomTableEntries,
   strengthenRandomTableEntries,
 } from '@dnd-booker/shared';
+import { buildResolvedPublicationDocumentWriteData } from '../document-publication.service.js';
 
 interface NormalizedRandomTableEntry {
   roll: string;
@@ -182,10 +183,29 @@ export async function expandRandomTablesFromBacklog(input: {
 
     if (!documentUpdated) continue;
 
+    const writeData = buildResolvedPublicationDocumentWriteData({
+      content: updatedContent,
+      layoutPlan: document.layoutPlan,
+      kind: document.kind,
+      title: document.title,
+      versions: {
+        canonicalVersion: document.canonicalVersion,
+        editorProjectionVersion: document.editorProjectionVersion,
+        typstVersion: document.typstVersion,
+      },
+      bumpVersions: true,
+    });
     await prisma.projectDocument.update({
       where: { id: document.id },
       data: {
-        content: updatedContent as any,
+        content: writeData.content,
+        layoutPlan: writeData.layoutPlan,
+        canonicalDocJson: writeData.canonicalDocJson,
+        editorProjectionJson: writeData.editorProjectionJson,
+        typstSource: writeData.typstSource,
+        canonicalVersion: writeData.canonicalVersion,
+        editorProjectionVersion: writeData.editorProjectionVersion,
+        typstVersion: writeData.typstVersion,
         status: 'edited',
       },
     });

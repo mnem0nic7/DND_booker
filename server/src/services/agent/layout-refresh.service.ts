@@ -1,7 +1,7 @@
 import type { ExportReview, LayoutPlan } from '@dnd-booker/shared';
 import { recommendLayoutPlan } from '@dnd-booker/shared';
 import { prisma } from '../../config/database.js';
-import { resolveDocumentLayout } from '../layout-plan.service.js';
+import { buildResolvedPublicationDocumentWriteData } from '../document-publication.service.js';
 
 function extractFindingCodesForTitle(review: ExportReview, title: string): string[] {
   return review.findings
@@ -37,15 +37,20 @@ export async function refreshLayoutPlansFromReview(input: {
     }
     if (findingCodes.length === 0 && !input.targetTitle) continue;
 
-    const resolved = resolveDocumentLayout({
+    const writeData = buildResolvedPublicationDocumentWriteData({
       content: document.content,
       layoutPlan: document.layoutPlan,
       kind: document.kind,
       title: document.title,
+      versions: {
+        canonicalVersion: document.canonicalVersion,
+        editorProjectionVersion: document.editorProjectionVersion,
+        typstVersion: document.typstVersion,
+      },
     });
     const recommendedLayout = recommendLayoutPlan(
-      resolved.content,
-      resolved.layoutPlan,
+      writeData.content as any,
+      writeData.layoutPlan as any,
       {
         reviewCodes: findingCodes,
         documentKind: document.kind,
@@ -60,7 +65,14 @@ export async function refreshLayoutPlansFromReview(input: {
     await prisma.projectDocument.update({
       where: { id: document.id },
       data: {
+        content: writeData.content,
         layoutPlan: recommendedLayout as any,
+        canonicalDocJson: writeData.canonicalDocJson,
+        editorProjectionJson: writeData.editorProjectionJson,
+        typstSource: writeData.typstSource,
+        canonicalVersion: writeData.canonicalVersion,
+        editorProjectionVersion: writeData.editorProjectionVersion,
+        typstVersion: writeData.typstVersion,
         status: 'edited',
       },
     });

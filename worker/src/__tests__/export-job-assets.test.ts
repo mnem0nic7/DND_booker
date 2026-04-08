@@ -6,7 +6,9 @@ import { assembleTypst } from '../renderers/typst-assembler.js';
 import { generateTypstPdf } from '../generators/typst.generator.js';
 import {
   createTypstWorkspace,
+  resolveExportDocumentContent,
   rewriteUploadUrlsInDocs,
+  stageTypstUploadAssets,
 } from '../jobs/export.job.js';
 
 const assetsDir = path.resolve(process.cwd(), 'assets');
@@ -23,6 +25,23 @@ afterEach(async () => {
 });
 
 describe('Export job asset resolution', () => {
+  it('prefers canonical publication content over legacy document content', () => {
+    const resolved = resolveExportDocumentContent({
+      title: 'Canonical Test',
+      content: {
+        type: 'doc',
+        content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Legacy content' }] }],
+      },
+      canonicalDocJson: {
+        type: 'doc',
+        content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Canonical content' }] }],
+      },
+    });
+
+    expect(JSON.stringify(resolved)).toContain('Canonical content');
+    expect(JSON.stringify(resolved)).not.toContain('Legacy content');
+  });
+
   it('rewrites project upload URLs into Typst workspace-relative paths', () => {
     const docs = rewriteUploadUrlsInDocs([
       {
@@ -92,6 +111,7 @@ describe('Export job asset resolution', () => {
     const workspace = await createTypstWorkspace(tempRoot);
 
     try {
+      await stageTypstUploadAssets(workspace, docs);
       const source = assembleTypst({
         documents: docs,
         theme: 'classic-parchment',

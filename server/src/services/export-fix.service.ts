@@ -19,6 +19,7 @@ import {
   applyPublicationPolishEdits,
   derivePublicationPolishEdits,
 } from './generation/publication-polish.helpers.js';
+import { buildResolvedPublicationDocumentWriteData } from './document-publication.service.js';
 import { resolveDocumentLayout } from './layout-plan.service.js';
 import { materializeSparsePageArt, realizeSparsePageArt } from './layout-art.service.js';
 
@@ -80,6 +81,9 @@ type ProjectDocumentRecord = {
   kind?: string | null;
   layoutPlan?: unknown;
   content: DocumentContent | null;
+  canonicalVersion?: number | null;
+  editorProjectionVersion?: number | null;
+  typstVersion?: number | null;
 };
 
 type AppliedFixCounter = {
@@ -460,8 +464,8 @@ function buildFallbackConfigurationChanges(
   }];
 }
 
-function layoutPlanChanged(previous: unknown, next: LayoutPlan): boolean {
-  return JSON.stringify(previous ?? null) !== JSON.stringify(next);
+function layoutPlanChanged(previous: unknown, next: LayoutPlan | null): boolean {
+  return JSON.stringify(previous ?? null) !== JSON.stringify(next ?? null);
 }
 
 function normalizePageBreaksInDocument(
@@ -596,6 +600,9 @@ export async function applySafeExportReviewFixes(
       kind: true,
       layoutPlan: true,
       content: true,
+      canonicalVersion: true,
+      editorProjectionVersion: true,
+      typstVersion: true,
     },
   });
 
@@ -751,8 +758,18 @@ export async function applySafeExportReviewFixes(
       await tx.projectDocument.update({
         where: { id: update.id },
         data: {
-          content: update.nextContent as unknown as Prisma.InputJsonValue,
-          layoutPlan: update.nextLayoutPlan as unknown as Prisma.InputJsonValue,
+          ...buildResolvedPublicationDocumentWriteData({
+            content: update.nextContent,
+            layoutPlan: update.nextLayoutPlan,
+            kind: documents.find((document) => document.id === update.id)?.kind ?? null,
+            title: update.title,
+            versions: {
+              canonicalVersion: documents.find((document) => document.id === update.id)?.canonicalVersion,
+              editorProjectionVersion: documents.find((document) => document.id === update.id)?.editorProjectionVersion,
+              typstVersion: documents.find((document) => document.id === update.id)?.typstVersion,
+            },
+            bumpVersions: update.contentChanged,
+          }),
           status: 'edited',
         },
       });

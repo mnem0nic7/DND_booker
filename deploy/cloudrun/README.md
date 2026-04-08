@@ -39,6 +39,12 @@ That keeps auth and URL shape stable while removing the shared-disk dependency t
 
 The worker still writes short-lived temporary files locally while rendering PDFs for the review pipeline. Those files do not need durable storage.
 
+PDF exports now use a split pipeline:
+
+- HTML/Playwright still measures page models for preflight and export review
+- Typst produces the final PDF artifact that gets uploaded
+- referenced `uploads/...` assets are staged into a temporary Typst workspace before compilation so the export path works with GCS-backed production storage as well as local disk
+
 ## Run Resume Semantics
 
 Generation runs and agent runs now persist their active graph node into each run record's `graphStateJson.runtime`. This matters on Cloud Run because a deploy, crash, or BullMQ retry should resume from the last durable node instead of replaying the full orchestration function.

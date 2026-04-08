@@ -88,6 +88,10 @@ Random tables with 8+ entries are treated as wide in layout planning, but export
 
 When reapplying accepted art placements after document rebuilds, do not trust stored node indices alone. Resolve against the rebuilt document by block type, subject label, empty-image preference, and proximity.
 
+Any server-side `ProjectDocument` mutation that changes document body content should update `content`, `canonicalDocJson`, `editorProjectionJson`, and `typstSource` together. Prefer `buildResolvedPublicationDocumentWriteData(...)` in `server/src/services/document-publication.service.ts` instead of hand-written `projectDocument.update()` payloads.
+
+PDF export now keeps the HTML/Playwright measurement pass for preflight and review, but the final production PDF render is Typst-based. Typst workspaces must stage referenced `uploads/...` assets explicitly because production uploads live in GCS, not a shared local disk.
+
 ### Persisted run graphs
 Generation runs and agent runs now checkpoint the current graph node into `graphStateJson.runtime`. BullMQ retries should resume from that node instead of replaying the whole orchestration function.
 
@@ -106,6 +110,8 @@ The graph runtime now emits real approval gates:
 For generation nodes that own a fixed `version=1` durable row, retries must reuse that row instead of inserting again. Intake, bible, outline, front matter, chapter plan, chapter draft, and assembly now treat their fixed artifact or manifest/document records as replay boundaries.
 
 Assembly is replay-safe by upserting `ProjectDocument` rows on `(projectId, slug)` and reusing the run's `AssemblyManifest` v1 record. Do not reintroduce blanket `deleteMany({ projectId })` behavior for document rebuilds.
+
+Agent checkpoint restore now carries canonical publication fields (`canonicalDocJson`, `editorProjectionJson`, `typstSource`, and their versions) alongside document `content`. Restores should bring publication snapshots back exactly, not rebuild them from stale legacy fields later.
 
 ### Authentication
 JWT access token (15min) + refresh token (7d, httpOnly cookie). Token version incremented on logout. Client axios interceptor auto-refreshes on 401.

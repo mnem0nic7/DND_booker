@@ -28,6 +28,7 @@ Do not stop after code edits unless the user explicitly says not to ship.
 - keep list endpoints on summary schemas and detail endpoints on detail schemas; summary payloads should never be parsed with full-detail contracts
 - when project lifecycle work changes, prefer `/api/v1/projects` plus the generated SDK over the legacy `/api/projects` routes
 - keep aggregate project content saves on `PATCH /api/v1/projects/:projectId` and manual layout saves on `PATCH /api/v1/projects/:projectId/documents/:docId/layout`; do not reintroduce runtime writes against the old project/document content endpoints
+- if a server-side change mutates `ProjectDocument.content`, keep `canonicalDocJson`, `editorProjectionJson`, and `typstSource` in sync in the same write; prefer `buildResolvedPublicationDocumentWriteData(...)` over ad hoc update payloads
 - when the local server integration test depends on Cloud SQL access, record the exact GCP blocker if it cannot run
 - remove accidental compiled artifacts from source directories before commit
 - if infrastructure blocks a test or deploy, record the exact blocker

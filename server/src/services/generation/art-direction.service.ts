@@ -8,7 +8,7 @@ import { getAiSettings, getDecryptedApiKey } from '../ai-settings.service.js';
 import { generateAiImage, stripImageTextRenderingInstructions, type ImageModel } from '../ai-image.service.js';
 import { createAsset } from '../asset.service.js';
 import { generateTextWithTimeout } from './model-timeouts.js';
-import { resolveDocumentLayout } from '../layout-plan.service.js';
+import { buildResolvedPublicationDocumentWriteData } from '../document-publication.service.js';
 
 type ImageCapableBlockType =
   | 'titlePage'
@@ -545,7 +545,11 @@ async function ensureArtDirectionReadyDocuments(input: {
     title: string;
     kind?: DocumentKind | null;
     sortOrder: number;
+    layoutPlan?: unknown;
     content: DocumentContent | null;
+    canonicalVersion?: number | null;
+    editorProjectionVersion?: number | null;
+    typstVersion?: number | null;
   }>;
 }): Promise<Array<{
   id: string;
@@ -555,6 +559,9 @@ async function ensureArtDirectionReadyDocuments(input: {
   sortOrder: number;
   layoutPlan?: unknown;
   content: DocumentContent | null;
+  canonicalVersion?: number | null;
+  editorProjectionVersion?: number | null;
+  typstVersion?: number | null;
 }>> {
   let documents = [...input.documents];
   const chapterLikeCount = documents.filter((doc) => doc.kind === 'chapter' || doc.kind === 'appendix').length;
@@ -569,7 +576,7 @@ async function ensureArtDirectionReadyDocuments(input: {
           : []),
       ],
     };
-    const resolvedLayout = resolveDocumentLayout({
+    const writeData = buildResolvedPublicationDocumentWriteData({
       content: frontMatterContent,
       kind: 'front_matter',
       title: 'Front Matter',
@@ -585,10 +592,27 @@ async function ensureArtDirectionReadyDocuments(input: {
         targetPageCount: null,
         status: 'draft',
         sourceArtifactId: null,
-        layoutPlan: resolvedLayout.layoutPlan as any,
-        content: resolvedLayout.content as any,
+        layoutPlan: writeData.layoutPlan,
+        content: writeData.content,
+        canonicalDocJson: writeData.canonicalDocJson,
+        editorProjectionJson: writeData.editorProjectionJson,
+        typstSource: writeData.typstSource,
+        canonicalVersion: writeData.canonicalVersion,
+        editorProjectionVersion: writeData.editorProjectionVersion,
+        typstVersion: writeData.typstVersion,
       },
-      select: { id: true, slug: true, title: true, kind: true, sortOrder: true, layoutPlan: true, content: true },
+      select: {
+        id: true,
+        slug: true,
+        title: true,
+        kind: true,
+        sortOrder: true,
+        layoutPlan: true,
+        content: true,
+        canonicalVersion: true,
+        editorProjectionVersion: true,
+        typstVersion: true,
+      },
     });
 
     documents = [frontMatterDoc as typeof documents[number], ...documents];
@@ -596,6 +620,10 @@ async function ensureArtDirectionReadyDocuments(input: {
 
   const nextDocuments = await Promise.all(documents.map(async (document) => {
     let nextContent = document.content as DocumentContent | null;
+    let nextLayoutPlan = document.layoutPlan;
+    let nextCanonicalVersion = document.canonicalVersion;
+    let nextEditorProjectionVersion = document.editorProjectionVersion;
+    let nextTypstVersion = document.typstVersion;
 
     if (document.kind === 'front_matter') {
       nextContent = ensureTitlePageSlot(nextContent, input.projectTitle);
@@ -605,24 +633,45 @@ async function ensureArtDirectionReadyDocuments(input: {
 
     const changed = JSON.stringify(nextContent) !== JSON.stringify(document.content);
     if (changed) {
-      const resolvedLayout = resolveDocumentLayout({
+      const writeData = buildResolvedPublicationDocumentWriteData({
         content: nextContent,
-        layoutPlan: (document as { layoutPlan?: unknown }).layoutPlan ?? null,
+        layoutPlan: document.layoutPlan ?? null,
         kind: document.kind,
         title: document.title,
+        versions: {
+          canonicalVersion: document.canonicalVersion,
+          editorProjectionVersion: document.editorProjectionVersion,
+          typstVersion: document.typstVersion,
+        },
+        bumpVersions: true,
       });
       await prisma.projectDocument.update({
         where: { id: document.id },
         data: {
-          content: resolvedLayout.content as any,
-          layoutPlan: resolvedLayout.layoutPlan as any,
+          content: writeData.content,
+          layoutPlan: writeData.layoutPlan,
+          canonicalDocJson: writeData.canonicalDocJson,
+          editorProjectionJson: writeData.editorProjectionJson,
+          typstSource: writeData.typstSource,
+          canonicalVersion: writeData.canonicalVersion,
+          editorProjectionVersion: writeData.editorProjectionVersion,
+          typstVersion: writeData.typstVersion,
         },
       });
+      nextContent = writeData.content as unknown as DocumentContent;
+      nextLayoutPlan = writeData.layoutPlan;
+      nextCanonicalVersion = writeData.canonicalVersion;
+      nextEditorProjectionVersion = writeData.editorProjectionVersion;
+      nextTypstVersion = writeData.typstVersion;
     }
 
     return {
       ...document,
       content: nextContent,
+      layoutPlan: nextLayoutPlan,
+      canonicalVersion: nextCanonicalVersion,
+      editorProjectionVersion: nextEditorProjectionVersion,
+      typstVersion: nextTypstVersion,
     };
   }));
 
@@ -1004,7 +1053,18 @@ export async function executeArtDirectionPass(
     prisma.projectDocument.findMany({
       where: { projectId: run.projectId, runId: run.id },
       orderBy: { sortOrder: 'asc' },
-      select: { id: true, slug: true, title: true, kind: true, sortOrder: true, layoutPlan: true, content: true },
+      select: {
+        id: true,
+        slug: true,
+        title: true,
+        kind: true,
+        sortOrder: true,
+        layoutPlan: true,
+        content: true,
+        canonicalVersion: true,
+        editorProjectionVersion: true,
+        typstVersion: true,
+      },
     }),
   ]);
 
@@ -1031,7 +1091,11 @@ export async function executeArtDirectionPass(
       title: document.title,
       kind: document.kind as DocumentKind | null,
       sortOrder: document.sortOrder,
+      layoutPlan: document.layoutPlan,
       content: document.content as DocumentContent | null,
+      canonicalVersion: document.canonicalVersion,
+      editorProjectionVersion: document.editorProjectionVersion,
+      typstVersion: document.typstVersion,
     })),
   });
 
@@ -1118,17 +1182,29 @@ export async function executeArtDirectionPass(
   await Promise.all(
     fullyUpdatedDocuments.map((document) => {
       const existing = artReadyDocuments.find((candidate) => candidate.id === document.id);
-      const resolvedLayout = resolveDocumentLayout({
+      const writeData = buildResolvedPublicationDocumentWriteData({
         content: document.content,
-        layoutPlan: (existing as { layoutPlan?: unknown } | undefined)?.layoutPlan ?? null,
+        layoutPlan: existing?.layoutPlan ?? null,
         kind: existing?.kind ?? null,
         title: existing?.title ?? null,
+        versions: {
+          canonicalVersion: existing?.canonicalVersion,
+          editorProjectionVersion: existing?.editorProjectionVersion,
+          typstVersion: existing?.typstVersion,
+        },
+        bumpVersions: true,
       });
       return prisma.projectDocument.update({
         where: { id: document.id },
         data: {
-          content: resolvedLayout.content as any,
-          layoutPlan: resolvedLayout.layoutPlan as any,
+          content: writeData.content,
+          layoutPlan: writeData.layoutPlan,
+          canonicalDocJson: writeData.canonicalDocJson,
+          editorProjectionJson: writeData.editorProjectionJson,
+          typstSource: writeData.typstSource,
+          canonicalVersion: writeData.canonicalVersion,
+          editorProjectionVersion: writeData.editorProjectionVersion,
+          typstVersion: writeData.typstVersion,
         },
       });
     }),

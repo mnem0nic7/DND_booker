@@ -2,12 +2,12 @@ import { prisma } from '../../config/database.js';
 import { publishGenerationEvent } from './pubsub.service.js';
 import type { PreflightResult } from './preflight.service.js';
 import { analyzeEstimatedArtifactLayout } from './layout-estimate.service.js';
-import { resolveDocumentLayout } from '../layout-plan.service.js';
 import {
   applyPublicationPolishEdits,
   derivePublicationPolishEdits,
   type PublicationPolishEdit,
 } from './publication-polish.helpers.js';
+import { buildResolvedPublicationDocumentWriteData } from '../document-publication.service.js';
 
 interface ProjectDocumentRecord {
   id: string;
@@ -16,6 +16,9 @@ interface ProjectDocumentRecord {
   kind: string;
   layoutPlan?: unknown;
   content: unknown;
+  canonicalVersion?: number | null;
+  editorProjectionVersion?: number | null;
+  typstVersion?: number | null;
 }
 
 export interface PublicationPolishDocumentReport {
@@ -107,6 +110,9 @@ export async function executePublicationPolish(
       kind: true,
       layoutPlan: true,
       content: true,
+      canonicalVersion: true,
+      editorProjectionVersion: true,
+      typstVersion: true,
     },
   }) as ProjectDocumentRecord[];
 
@@ -125,17 +131,29 @@ export async function executePublicationPolish(
     const updated = operations.length > 0;
 
     if (updated) {
-      const resolvedLayout = resolveDocumentLayout({
+      const writeData = buildResolvedPublicationDocumentWriteData({
         content: updatedContent,
         layoutPlan: doc.layoutPlan ?? null,
         kind: doc.kind,
         title: doc.title,
+        versions: {
+          canonicalVersion: doc.canonicalVersion,
+          editorProjectionVersion: doc.editorProjectionVersion,
+          typstVersion: doc.typstVersion,
+        },
+        bumpVersions: true,
       });
       await prisma.projectDocument.update({
         where: { id: doc.id },
         data: {
-          content: resolvedLayout.content as any,
-          layoutPlan: resolvedLayout.layoutPlan as any,
+          content: writeData.content,
+          layoutPlan: writeData.layoutPlan,
+          canonicalDocJson: writeData.canonicalDocJson,
+          editorProjectionJson: writeData.editorProjectionJson,
+          typstSource: writeData.typstSource,
+          canonicalVersion: writeData.canonicalVersion,
+          editorProjectionVersion: writeData.editorProjectionVersion,
+          typstVersion: writeData.typstVersion,
         },
       });
       documentsUpdated += 1;

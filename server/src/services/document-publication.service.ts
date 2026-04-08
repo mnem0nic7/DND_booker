@@ -78,6 +78,10 @@ export interface PublicationDocumentStorageFields {
   typstVersion: number;
 }
 
+export interface PublicationDocumentWriteData extends PublicationDocumentStorageFields {
+  layoutPlan: Prisma.InputJsonValue;
+}
+
 export interface PublicationDocumentSummary {
   id: string;
   projectId: string;
@@ -127,6 +131,32 @@ export function buildPublicationDocumentStorageFields(
     canonicalVersion: bump ? currentCanonicalVersion + 1 : currentCanonicalVersion,
     editorProjectionVersion: bump ? currentEditorProjectionVersion + 1 : currentEditorProjectionVersion,
     typstVersion: bump ? currentTypstVersion + 1 : currentTypstVersion,
+  };
+}
+
+export function buildResolvedPublicationDocumentWriteData(input: {
+  content: unknown;
+  layoutPlan?: unknown;
+  kind?: string | null;
+  title?: string | null;
+  versions?: PublicationDocumentVersionState;
+  bumpVersions?: boolean;
+}): PublicationDocumentWriteData {
+  const resolvedLayout = resolveDocumentLayout({
+    content: input.content,
+    layoutPlan: input.layoutPlan,
+    kind: input.kind ?? null,
+    title: input.title ?? null,
+  });
+  const publicationFields = buildPublicationDocumentStorageFields(
+    { content: resolvedLayout.content },
+    input.versions,
+    { bumpVersions: input.bumpVersions === true },
+  );
+
+  return {
+    ...publicationFields,
+    layoutPlan: resolvedLayout.layoutPlan as unknown as Prisma.InputJsonValue,
   };
 }
 

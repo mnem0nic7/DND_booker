@@ -26,7 +26,7 @@ export function getProjectAssetRelativePath(projectId: string, filename: string)
 }
 
 export function parseProjectAssetUrl(url: string): { projectId: string; filename: string } | null {
-  const match = url.match(/^\/uploads\/([^/]+)\/([^?#]+)$/);
+  const match = url.match(/^\/?uploads\/([^/]+)\/([^?#]+)$/);
   if (!match) return null;
   return {
     projectId: decodeSegment(match[1]),

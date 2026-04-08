@@ -1,5 +1,6 @@
 import type { AgentCheckpoint, AgentScorecard, DocumentContent, LayoutPlan } from '@dnd-booker/shared';
 import { prisma } from '../../config/database.js';
+import { buildPublicationDocumentStorageFields } from '../document-publication.service.js';
 
 interface ProjectSnapshot {
   title: string;
@@ -23,6 +24,12 @@ interface DocumentSnapshot {
   outlineJson: unknown | null;
   layoutPlan: LayoutPlan | null;
   content: DocumentContent;
+  canonicalDocJson?: unknown | null;
+  editorProjectionJson?: unknown | null;
+  typstSource?: string | null;
+  canonicalVersion?: number | null;
+  editorProjectionVersion?: number | null;
+  typstVersion?: number | null;
   status: string;
   sourceArtifactId: string | null;
 }
@@ -86,6 +93,12 @@ export async function createAgentCheckpoint(input: {
         outlineJson: true,
         layoutPlan: true,
         content: true,
+        canonicalDocJson: true,
+        editorProjectionJson: true,
+        typstSource: true,
+        canonicalVersion: true,
+        editorProjectionVersion: true,
+        typstVersion: true,
         status: true,
         sourceArtifactId: true,
       },
@@ -126,6 +139,12 @@ export async function createAgentCheckpoint(input: {
     outlineJson: document.outlineJson,
     layoutPlan: (document.layoutPlan as LayoutPlan | null) ?? null,
     content: document.content as unknown as DocumentContent,
+    canonicalDocJson: document.canonicalDocJson,
+    editorProjectionJson: document.editorProjectionJson,
+    typstSource: document.typstSource,
+    canonicalVersion: document.canonicalVersion,
+    editorProjectionVersion: document.editorProjectionVersion,
+    typstVersion: document.typstVersion,
     status: document.status,
     sourceArtifactId: document.sourceArtifactId,
   }));
@@ -244,6 +263,19 @@ export async function restoreAgentCheckpoint(runId: string, checkpointId: string
     });
 
     for (const document of documentsSnapshot) {
+      const publicationFields = buildPublicationDocumentStorageFields(
+        {
+          content: document.content,
+          canonicalDocJson: document.canonicalDocJson ?? document.content,
+          editorProjectionJson: document.editorProjectionJson ?? document.canonicalDocJson ?? document.content,
+          typstSource: document.typstSource ?? null,
+        },
+        {
+          canonicalVersion: document.canonicalVersion,
+          editorProjectionVersion: document.editorProjectionVersion,
+          typstVersion: document.typstVersion,
+        },
+      );
       await tx.projectDocument.upsert({
         where: { id: document.id },
         update: {
@@ -255,7 +287,13 @@ export async function restoreAgentCheckpoint(runId: string, checkpointId: string
           targetPageCount: document.targetPageCount,
           outlineJson: document.outlineJson as any,
           layoutPlan: document.layoutPlan as any,
-          content: document.content as any,
+          content: publicationFields.content,
+          canonicalDocJson: publicationFields.canonicalDocJson,
+          editorProjectionJson: publicationFields.editorProjectionJson,
+          typstSource: publicationFields.typstSource,
+          canonicalVersion: publicationFields.canonicalVersion,
+          editorProjectionVersion: publicationFields.editorProjectionVersion,
+          typstVersion: publicationFields.typstVersion,
           status: document.status,
           sourceArtifactId: document.sourceArtifactId,
         },
@@ -270,7 +308,13 @@ export async function restoreAgentCheckpoint(runId: string, checkpointId: string
           targetPageCount: document.targetPageCount,
           outlineJson: document.outlineJson as any,
           layoutPlan: document.layoutPlan as any,
-          content: document.content as any,
+          content: publicationFields.content,
+          canonicalDocJson: publicationFields.canonicalDocJson,
+          editorProjectionJson: publicationFields.editorProjectionJson,
+          typstSource: publicationFields.typstSource,
+          canonicalVersion: publicationFields.canonicalVersion,
+          editorProjectionVersion: publicationFields.editorProjectionVersion,
+          typstVersion: publicationFields.typstVersion,
           status: document.status,
           sourceArtifactId: document.sourceArtifactId,
         },

@@ -9,11 +9,18 @@ import type {
   LayoutPlan,
   PageModel,
 } from '@dnd-booker/shared';
-import { recommendLayoutPlan, resolveLayoutPlan, resolveTextLayoutFallbackScopeIds } from '@dnd-booker/shared';
+import {
+  normalizePublicationDocumentContent,
+  recommendLayoutPlan,
+  resolveLayoutPlan,
+  resolveTextLayoutFallbackScopeIds,
+} from '@dnd-booker/shared';
 import { prisma } from '../config/database.js';
 import { assembleHtml } from '../renderers/html-assembler.js';
+import { assembleTypst } from '../renderers/typst-assembler.js';
 import { normalizeExportDocuments } from '../renderers/export-document-normalizer.js';
-import { generateHtmlPdf, measureDocumentPageModels } from '../generators/html-pdf.generator.js';
+import { measureDocumentPageModels } from '../generators/html-pdf.generator.js';
+import { generateTypstPdf } from '../generators/typst.generator.js';
 import { generateEpub } from '../generators/epub.generator.js';
 import {
   buildUnavailableExportReview,
@@ -26,7 +33,6 @@ import {
 import fs from 'fs/promises';
 import path from 'path';
 import {
-  getAssetStorageDir,
   getProjectAssetRelativePath,
   parseProjectAssetUrl,
 } from '../../../server/src/services/asset-paths.service.js';
@@ -60,6 +66,13 @@ interface MeasuredRenderableDocument extends RenderableDocument {
   pageModel: PageModel | null;
   textLayoutParity?: ExportReviewTextLayoutParityMetrics | null;
   textLayoutParityFindings?: ExportReviewFinding[];
+}
+
+interface ExportDocumentSourceRecord {
+  title: string;
+  content?: unknown;
+  canonicalDocJson?: unknown;
+  editorProjectionJson?: unknown;
 }
 
 interface PreflightCandidate {
@@ -115,6 +128,12 @@ export function rewriteUploadUrlsInValue(value: unknown): unknown {
   );
 }
 
+export function resolveExportDocumentContent(input: ExportDocumentSourceRecord): DocumentContent | null {
+  const preferred = input.canonicalDocJson ?? input.editorProjectionJson ?? input.content;
+  if (!preferred) return null;
+  return normalizePublicationDocumentContent(preferred);
+}
+
 export function rewriteUploadUrlsInDocs(
   docs: Array<{
     title: string;
@@ -129,6 +148,31 @@ export function rewriteUploadUrlsInDocs(
     ...doc,
     content: doc.content ? rewriteUploadUrlsInValue(doc.content) as DocumentContent : doc.content,
   }));
+}
+
+function collectTypstUploadPaths(value: unknown, matches: Set<string> = new Set()): Set<string> {
+  if (typeof value === 'string') {
+    const parsed = parseProjectAssetUrl(value);
+    if (parsed) {
+      matches.add(getProjectAssetRelativePath(parsed.projectId, parsed.filename));
+    }
+    return matches;
+  }
+
+  if (Array.isArray(value)) {
+    for (const entry of value) {
+      collectTypstUploadPaths(entry, matches);
+    }
+    return matches;
+  }
+
+  if (!value || typeof value !== 'object') return matches;
+
+  for (const entry of Object.values(value as Record<string, unknown>)) {
+    collectTypstUploadPaths(entry, matches);
+  }
+
+  return matches;
 }
 
 function getReviewFindingTitle(
@@ -315,19 +359,26 @@ export async function createTypstWorkspace(baseDir: string): Promise<string> {
   const workspace = await fs.mkdtemp(path.join(baseDir, 'typst-workspace-'));
   const texturesSource = path.resolve(process.cwd(), 'assets', 'textures');
   const texturesDest = path.join(workspace, 'textures');
-  const uploadsSource = getAssetStorageDir();
   const uploadsDest = path.join(workspace, 'uploads');
 
   await fs.symlink(texturesSource, texturesDest);
-
-  try {
-    await fs.access(uploadsSource);
-    await fs.symlink(uploadsSource, uploadsDest);
-  } catch {
-    await fs.mkdir(uploadsDest, { recursive: true });
-  }
+  await fs.mkdir(uploadsDest, { recursive: true });
 
   return workspace;
+}
+
+export async function stageTypstUploadAssets(
+  workspace: string,
+  docs: Array<{ content: DocumentContent | null }>,
+): Promise<void> {
+  const uploadPaths = [...docs.reduce((matches, doc) => collectTypstUploadPaths(doc.content, matches), new Set<string>())];
+
+  await Promise.all(uploadPaths.map(async (relativePath) => {
+    const buffer = await readProjectAssetBuffer(relativePath);
+    const destination = path.join(workspace, relativePath);
+    await fs.mkdir(path.dirname(destination), { recursive: true });
+    await fs.writeFile(destination, buffer);
+  }));
 }
 
 /**
@@ -371,14 +422,28 @@ export async function processExportJob(job: Job<ExportJobData>): Promise<void> {
     const projectDocuments = await prisma.projectDocument.findMany({
       where: { projectId: exportJob.projectId },
       orderBy: { sortOrder: 'asc' },
-      select: { id: true, title: true, content: true, sortOrder: true, kind: true, layoutPlan: true },
+      select: {
+        id: true,
+        title: true,
+        content: true,
+        canonicalDocJson: true,
+        editorProjectionJson: true,
+        sortOrder: true,
+        kind: true,
+        layoutPlan: true,
+      },
     });
 
     const rawDocs = projectDocuments.length > 0
       ? projectDocuments.map(doc => ({
           id: doc.id,
           title: doc.title,
-          content: doc.content as DocumentContent | null,
+          content: resolveExportDocumentContent({
+            title: doc.title,
+            content: doc.content,
+            canonicalDocJson: doc.canonicalDocJson,
+            editorProjectionJson: doc.editorProjectionJson,
+          }),
           sortOrder: doc.sortOrder,
           kind: doc.kind as DocumentKind,
           layoutPlan: doc.layoutPlan as LayoutPlan | null,
@@ -598,20 +663,23 @@ async function renderPdfVariant(input: {
   const selectedCandidate = correctedCandidate && isBetterExportReview(correctedCandidate.review, baseCandidate.review)
     ? correctedCandidate
     : baseCandidate;
-
-  const html = assembleHtml({
-    documents: selectedCandidate.measuredDocs,
-    theme,
-    projectTitle,
-    pagePreset,
-    renderMode: 'paged',
-  });
-  const resolvedHtml = await rewriteUploadUrlsToEmbeddedDataUrls(html);
-  const buffer = await generateHtmlPdf({
-    html: resolvedHtml,
-    title: projectTitle,
-  });
-  await fs.writeFile(filepath, buffer);
+  const typstDocs = rewriteUploadUrlsInDocs(selectedCandidate.measuredDocs);
+  const workspace = await createTypstWorkspace(path.dirname(filepath));
+  let buffer: Buffer;
+  try {
+    await stageTypstUploadAssets(workspace, typstDocs);
+    const typstSource = assembleTypst({
+      documents: typstDocs,
+      theme,
+      projectTitle,
+      projectType,
+      printReady,
+    });
+    buffer = await generateTypstPdf(typstSource, undefined, workspace);
+    await fs.writeFile(filepath, buffer);
+  } finally {
+    await fs.rm(workspace, { recursive: true, force: true });
+  }
 
   try {
     const reviewedDocs = selectedCandidate.measuredDocs.map((doc) => ({
@@ -650,43 +718,4 @@ function rewritePublicAssetUrls(html: string, baseUrl: string): string {
       const nextQuote = quote || '"';
       return `url(${nextQuote}${baseUrl}${relativePath}${nextQuote})`;
     });
-}
-
-function getAssetMimeType(filename: string): string {
-  const extension = path.extname(filename).toLowerCase();
-  switch (extension) {
-    case '.jpg':
-    case '.jpeg':
-      return 'image/jpeg';
-    case '.gif':
-      return 'image/gif';
-    case '.webp':
-      return 'image/webp';
-    case '.png':
-    default:
-      return 'image/png';
-  }
-}
-
-async function rewriteUploadUrlsToEmbeddedDataUrls(html: string): Promise<string> {
-  const matches = html.match(/\/uploads\/[^"'()\s]+/g);
-  if (!matches || matches.length === 0) return html;
-
-  let nextHtml = html;
-  const uniquePaths = [...new Set(matches)];
-  for (const relativePath of uniquePaths) {
-    const parsed = parseProjectAssetUrl(relativePath);
-    if (!parsed) continue;
-
-    try {
-      const fileBuffer = await readProjectAssetBuffer(relativePath);
-      const mimeType = getAssetMimeType(parsed.filename);
-      const dataUrl = `data:${mimeType};base64,${fileBuffer.toString('base64')}`;
-      nextHtml = nextHtml.split(relativePath).join(dataUrl);
-    } catch (error) {
-      console.warn(`[export.job] Failed to inline asset ${relativePath}:`, error);
-    }
-  }
-
-  return nextHtml;
 }

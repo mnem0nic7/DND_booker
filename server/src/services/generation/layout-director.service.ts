@@ -7,6 +7,7 @@ import {
 } from '@dnd-booker/shared';
 import { prisma } from '../../config/database.js';
 import { materializeSparsePageArt } from '../layout-art.service.js';
+import { buildResolvedPublicationDocumentWriteData } from '../document-publication.service.js';
 
 interface LayoutDirectedDocumentSummary {
   documentId: string;
@@ -42,6 +43,9 @@ export async function executeLayoutDirectorPass(run: { id: string; projectId: st
       kind: true,
       content: true,
       layoutPlan: true,
+      canonicalVersion: true,
+      editorProjectionVersion: true,
+      typstVersion: true,
     },
   });
 
@@ -138,11 +142,29 @@ export async function executeLayoutDirectorPass(run: { id: string; projectId: st
       JSON.stringify(normalizedContent) !== JSON.stringify(document.content)
       || JSON.stringify(layoutPlan) !== JSON.stringify(document.layoutPlan)
     ) {
+      const writeData = buildResolvedPublicationDocumentWriteData({
+        content: normalizedContent,
+        layoutPlan,
+        kind: document.kind,
+        title: document.title,
+        versions: {
+          canonicalVersion: document.canonicalVersion,
+          editorProjectionVersion: document.editorProjectionVersion,
+          typstVersion: document.typstVersion,
+        },
+        bumpVersions: JSON.stringify(normalizedContent) !== JSON.stringify(document.content),
+      });
       await prisma.projectDocument.update({
         where: { id: document.id },
         data: {
-          content: normalizedContent as any,
-          layoutPlan: layoutPlan as any,
+          content: writeData.content,
+          layoutPlan: writeData.layoutPlan,
+          canonicalDocJson: writeData.canonicalDocJson,
+          editorProjectionJson: writeData.editorProjectionJson,
+          typstSource: writeData.typstSource,
+          canonicalVersion: writeData.canonicalVersion,
+          editorProjectionVersion: writeData.editorProjectionVersion,
+          typstVersion: writeData.typstVersion,
         },
       });
       documentsUpdated += 1;

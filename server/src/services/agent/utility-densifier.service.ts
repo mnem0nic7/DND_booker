@@ -2,7 +2,7 @@ import type { CritiqueBacklogItem, DocumentContent } from '@dnd-booker/shared';
 import { prisma } from '../../config/database.js';
 import { generateTextWithTimeout } from '../generation/model-timeouts.js';
 import { parseJsonResponse } from '../generation/parse-json.js';
-import { resolveDocumentLayout } from '../layout-plan.service.js';
+import { buildResolvedPublicationDocumentWriteData } from '../document-publication.service.js';
 import { resolveAgentModelForUser } from './model-resolution.service.js';
 
 interface UtilityPacketContent {
@@ -332,7 +332,7 @@ export async function densifySectionUtilityFromBacklog(input: {
     const insertionIndex = determineInsertionIndex(topLevel);
     topLevel.splice(insertionIndex, 0, ...packetBlocks);
 
-    const resolved = resolveDocumentLayout({
+    const writeData = buildResolvedPublicationDocumentWriteData({
       content: {
         ...baseContent,
         content: topLevel,
@@ -340,13 +340,25 @@ export async function densifySectionUtilityFromBacklog(input: {
       layoutPlan: document.layoutPlan,
       kind: document.kind,
       title: document.title,
+      versions: {
+        canonicalVersion: document.canonicalVersion,
+        editorProjectionVersion: document.editorProjectionVersion,
+        typstVersion: document.typstVersion,
+      },
+      bumpVersions: true,
     });
 
     await prisma.projectDocument.update({
       where: { id: document.id },
       data: {
-        content: resolved.content as any,
-        layoutPlan: resolved.layoutPlan as any,
+        content: writeData.content,
+        layoutPlan: writeData.layoutPlan,
+        canonicalDocJson: writeData.canonicalDocJson,
+        editorProjectionJson: writeData.editorProjectionJson,
+        typstSource: writeData.typstSource,
+        canonicalVersion: writeData.canonicalVersion,
+        editorProjectionVersion: writeData.editorProjectionVersion,
+        typstVersion: writeData.typstVersion,
         status: 'edited',
       },
     });
