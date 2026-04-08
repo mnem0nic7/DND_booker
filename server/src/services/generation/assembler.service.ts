@@ -5,6 +5,7 @@ import { publishGenerationEvent } from './pubsub.service.js';
 import { resolveOutlineArtifact } from './outline-artifact.service.js';
 import { resolveDocumentLayout } from '../layout-plan.service.js';
 import { buildPublicationDocumentStorageFields } from '../document-publication.service.js';
+import { rebuildProjectContentCache } from '../project-document-content.service.js';
 import { convertMarkdownToTipTapWithTimeout } from './markdown-artifact-conversion.service.js';
 import { applyRealizedArtToDocuments } from './art-direction.service.js';
 import type { ImageModel } from '../ai-image.service.js';
@@ -515,6 +516,8 @@ export async function assembleDocuments(
       }),
     );
   }
+
+  await rebuildProjectContentCache(run.projectId);
 
   // 5. Update manifest status
   await prisma.assemblyManifest.update({

@@ -3,6 +3,7 @@ import { prisma } from '../../config/database.js';
 import { generateTextWithTimeout } from '../generation/model-timeouts.js';
 import { parseJsonResponse } from '../generation/parse-json.js';
 import { buildResolvedPublicationDocumentWriteData } from '../document-publication.service.js';
+import { rebuildProjectContentCache } from '../project-document-content.service.js';
 import { resolveAgentModelForUser } from './model-resolution.service.js';
 
 interface UtilityPacketContent {
@@ -365,6 +366,10 @@ export async function densifySectionUtilityFromBacklog(input: {
     documentsUpdated += 1;
     insertedBlockCount += packetBlocks.length;
     updatedTitles.push(document.title);
+  }
+
+  if (documentsUpdated > 0) {
+    await rebuildProjectContentCache(input.projectId);
   }
 
   return {

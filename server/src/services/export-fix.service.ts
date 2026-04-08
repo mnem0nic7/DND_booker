@@ -22,6 +22,7 @@ import {
 import { buildResolvedPublicationDocumentWriteData } from './document-publication.service.js';
 import { resolveDocumentLayout } from './layout-plan.service.js';
 import { materializeSparsePageArt, realizeSparsePageArt } from './layout-art.service.js';
+import { rebuildProjectContentCache } from './project-document-content.service.js';
 
 const CONTENT_FIXABLE_CODES = new Set<ExportReviewCode>([
   'EXPORT_EMPTY_ENCOUNTER_TABLE',
@@ -784,6 +785,10 @@ export async function applySafeExportReviewFixes(
       if (update.layoutCodes && update.layoutChanged) {
         changes.push(...buildLayoutRefreshChanges(update.title, update.layoutCodes));
       }
+    }
+
+    if (pendingUpdates.length > 0) {
+      await rebuildProjectContentCache(exportJob.projectId, tx);
     }
   });
 

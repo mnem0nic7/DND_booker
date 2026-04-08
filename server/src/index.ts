@@ -80,7 +80,7 @@ app.use(cors({
 app.use(express.json({ limit: '5mb' }));
 app.use(cookieParser());
 
-app.get('/api/health', publicRateLimit, (_req, res) => {
+app.get(['/api/health', '/api/v1/health'], publicRateLimit, (_req, res) => {
   res.json({ status: 'ok' });
 });
 
@@ -89,6 +89,11 @@ app.use('/api/v1/auth', v1AuthRoutes);
 app.use('/api/v1', v1SpecRoutes);
 app.use('/api/v1', v1ProjectRoutes);
 app.use('/api/v1', v1ExportRoutes);
+app.use('/api/v1/ai', aiSettingsRoutes);
+app.use('/api/v1/ai', aiGenerateRoutes);
+app.use('/api/v1/projects/:projectId/assets', projectAssetRoutes);
+app.use('/api/v1/assets', assetRoutes);
+app.use('/api/v1/templates', templateRoutes);
 app.use('/api/projects', projectRoutes);
 app.use('/api/projects/:projectId/assets', projectAssetRoutes);
 app.use('/api/assets', assetRoutes);
@@ -96,6 +101,8 @@ app.use('/api', exportRoutes);
 app.use('/api/templates', templateRoutes);
 app.use('/api/ai', aiSettingsRoutes);
 app.use('/api/ai', aiGenerateRoutes);
+app.use('/api/v1/projects/:projectId', aiChatRoutes);
+app.use('/api/v1/projects/:projectId', aiWizardRoutes);
 app.use('/api/projects/:projectId', aiChatRoutes);
 app.use('/api/projects/:projectId', aiWizardRoutes);
 app.use('/api/projects/:projectId', generationRoutes);

@@ -14,8 +14,8 @@ import {
   listPublicationDocuments,
   type PublicationDocumentSummary as ServicePublicationDocumentSummary,
   updatePublicationDocument,
+  updatePublicationDocumentLayout,
 } from '../../services/document-publication.service.js';
-import { getDocument, updateDocumentLayout } from '../../services/document.service.js';
 
 const v1DocumentRoutes = Router({ mergeParams: true });
 
@@ -111,11 +111,7 @@ v1DocumentRoutes.get(
       return;
     }
 
-    const legacyDocument = await getDocument(docId, authReq.userId!);
-    res.json(PublicationDocumentDetailSchema.parse(toTransportJson({
-      ...toRouteDocumentResponse(document),
-      layoutPlan: legacyDocument?.layoutPlan ?? null,
-    })));
+    res.json(PublicationDocumentDetailSchema.parse(toTransportJson(toRouteDocumentResponse(document))));
   }),
 );
 
@@ -205,18 +201,12 @@ v1DocumentRoutes.patch(
     if (result.status === 'conflict') {
       res.status(409).json({
         error: 'Document has been modified since the provided timestamp',
-        document: PublicationDocumentDetailSchema.parse(toTransportJson({
-          ...toRouteDocumentResponse(result.document),
-          layoutPlan: (await getDocument(docId, authReq.userId!))?.layoutPlan ?? null,
-        })),
+        document: PublicationDocumentDetailSchema.parse(toTransportJson(toRouteDocumentResponse(result.document))),
       });
       return;
     }
 
-    res.json(PublicationDocumentDetailSchema.parse(toTransportJson({
-      ...toRouteDocumentResponse(result.document),
-      layoutPlan: (await getDocument(docId, authReq.userId!))?.layoutPlan ?? null,
-    })));
+    res.json(PublicationDocumentDetailSchema.parse(toTransportJson(toRouteDocumentResponse(result.document))));
   }),
 );
 
@@ -235,22 +225,13 @@ v1DocumentRoutes.patch(
       return;
     }
 
-    const document = await updateDocumentLayout(docId, authReq.userId!, parsed.data as never);
+    const document = await updatePublicationDocumentLayout(docId, authReq.userId!, parsed.data as never);
     if (!document) {
       res.status(404).json({ error: 'Document not found' });
       return;
     }
 
-    const publicationDocument = await getPublicationDocument(docId, authReq.userId!);
-    if (!publicationDocument) {
-      res.status(404).json({ error: 'Document not found' });
-      return;
-    }
-
-    res.json(PublicationDocumentDetailSchema.parse(toTransportJson({
-      ...toRouteDocumentResponse(publicationDocument),
-      layoutPlan: document.layoutPlan ?? null,
-    })));
+    res.json(PublicationDocumentDetailSchema.parse(toTransportJson(toRouteDocumentResponse(document))));
   }),
 );
 

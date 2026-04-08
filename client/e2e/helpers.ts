@@ -87,11 +87,11 @@ async function isOllamaGenerationActive(model = TEST_OLLAMA_MODEL): Promise<bool
 
 async function getAccessToken(page: Page): Promise<string> {
   const result = await page.evaluate(async () => {
-    const refreshResponse = await fetch('/api/auth/refresh', {
+    const refreshResponse = await fetch('/api/v1/auth/refresh', {
       method: 'POST',
       credentials: 'include',
     });
-
+    
     if (!refreshResponse.ok) {
       return {
         ok: false,
@@ -100,7 +100,7 @@ async function getAccessToken(page: Page): Promise<string> {
         body: await refreshResponse.text(),
       };
     }
-
+    
     const refreshData = await refreshResponse.json() as { accessToken?: string };
     if (!refreshData.accessToken) {
       return {
@@ -110,17 +110,17 @@ async function getAccessToken(page: Page): Promise<string> {
         body: 'Missing access token in refresh response',
       };
     }
-
+    
     return {
       ok: true,
       accessToken: refreshData.accessToken,
     };
   });
-
+  
   if (!result.ok) {
     throw new Error(`Failed to get auth token during ${result.step}: ${result.status} ${result.body}`);
   }
-
+  
   return result.accessToken;
 }
 
@@ -138,7 +138,7 @@ async function getCurrentProjectId(page: Page): Promise<string | null> {
 async function getStoredAiSettings(page: Page): Promise<StoredAiSettings> {
   const accessToken = await getAccessToken(page);
   const result = await page.evaluate(async ({ token }) => {
-    const response = await fetch('/api/ai/settings', {
+    const response = await fetch('/api/v1/ai/settings', {
       credentials: 'include',
       headers: {
         Authorization: `Bearer ${token}`,
@@ -169,7 +169,7 @@ async function getStoredAiSettings(page: Page): Promise<StoredAiSettings> {
 async function findProjectByTitle(page: Page, title: string): Promise<ProjectLookup | null> {
   const accessToken = await getAccessToken(page);
   const result = await page.evaluate(async ({ projectTitle, token }) => {
-    const projectsResponse = await fetch('/api/projects', {
+    const projectsResponse = await fetch('/api/v1/projects', {
       credentials: 'include',
       headers: {
         Authorization: `Bearer ${token}`,
@@ -194,7 +194,7 @@ async function findProjectByTitle(page: Page, title: string): Promise<ProjectLoo
       };
     }
 
-    const documentsResponse = await fetch(`/api/projects/${project.id}/documents`, {
+    const documentsResponse = await fetch(`/api/v1/projects/${project.id}/documents`, {
       credentials: 'include',
       headers: {
         Authorization: `Bearer ${token}`,
@@ -235,7 +235,7 @@ export async function getLatestExportJobForProject(page: Page, title: string): P
 
   const accessToken = await getAccessToken(page);
   const result = await page.evaluate(async ({ projectId, token }) => {
-    const response = await fetch(`/api/projects/${projectId}/export-jobs`, {
+    const response = await fetch(`/api/v1/projects/${projectId}/export-jobs`, {
       credentials: 'include',
       headers: {
         Authorization: `Bearer ${token}`,
@@ -274,7 +274,7 @@ export async function getLatestExportJobForProject(page: Page, title: string): P
 async function deleteProjectById(page: Page, projectId: string) {
   const accessToken = await getAccessToken(page);
   const result = await page.evaluate(async ({ id, token }) => {
-    const response = await fetch(`/api/projects/${id}`, {
+    const response = await fetch(`/api/v1/projects/${id}`, {
       method: 'DELETE',
       credentials: 'include',
       headers: {
@@ -297,7 +297,7 @@ async function deleteProjectById(page: Page, projectId: string) {
 export async function configureAiSettings(page: Page, settings: AiSettingsInput) {
   const accessToken = await getAccessToken(page);
   const result = await page.evaluate(async ({ token, nextSettings }) => {
-    const response = await fetch('/api/ai/settings', {
+    const response = await fetch('/api/v1/ai/settings', {
       method: 'POST',
       credentials: 'include',
       headers: {
@@ -341,7 +341,7 @@ export async function assertOllamaReady(
   const model = options?.model ?? TEST_OLLAMA_MODEL;
   const accessToken = await getAccessToken(page);
   const result = await page.evaluate(async ({ token, requestedBaseUrl }) => {
-    const response = await fetch('/api/ai/settings/validate-ollama', {
+    const response = await fetch('/api/v1/ai/settings/validate-ollama', {
       method: 'POST',
       credentials: 'include',
       headers: {
@@ -389,7 +389,7 @@ export async function getLatestGenerationRunForProject(page: Page, title: string
 
   const accessToken = await getAccessToken(page);
   const listResult = await page.evaluate(async ({ projectId, token }) => {
-    const response = await fetch(`/api/projects/${projectId}/ai/generation-runs`, {
+    const response = await fetch(`/api/v1/projects/${projectId}/generation-runs`, {
       credentials: 'include',
       headers: {
         Authorization: `Bearer ${token}`,
@@ -427,7 +427,7 @@ export async function getLatestGenerationRunForProject(page: Page, title: string
     .id;
 
   const detailResult = await page.evaluate(async ({ projectId, runId, token }) => {
-    const response = await fetch(`/api/projects/${projectId}/ai/generation-runs/${runId}`, {
+    const response = await fetch(`/api/v1/projects/${projectId}/generation-runs/${runId}`, {
       credentials: 'include',
       headers: {
         Authorization: `Bearer ${token}`,
@@ -925,7 +925,7 @@ export async function waitForGenerationCompletion(page: Page, timeoutMs = 240_00
 
       if (projectId && accessToken) {
         const backendStatus = await page.evaluate(async ({ currentProjectId, token }) => {
-          const response = await fetch(`/api/projects/${currentProjectId}/ai/generation-runs`, {
+          const response = await fetch(`/api/v1/projects/${currentProjectId}/generation-runs`, {
             credentials: 'include',
             headers: {
               Authorization: `Bearer ${token}`,

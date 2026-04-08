@@ -8,6 +8,7 @@ import {
 import { prisma } from '../../config/database.js';
 import { materializeSparsePageArt } from '../layout-art.service.js';
 import { buildResolvedPublicationDocumentWriteData } from '../document-publication.service.js';
+import { rebuildProjectContentCache } from '../project-document-content.service.js';
 
 interface LayoutDirectedDocumentSummary {
   documentId: string;
@@ -180,6 +181,10 @@ export async function executeLayoutDirectorPass(run: { id: string; projectId: st
       heroFragmentCount: pageModel.metrics.heroFragmentCount,
       groupedFragmentCount: pageModel.metrics.groupedFragmentCount,
     });
+  }
+
+  if (documentsUpdated > 0) {
+    await rebuildProjectContentCache(run.projectId);
   }
 
   const artifact = await prisma.generatedArtifact.create({

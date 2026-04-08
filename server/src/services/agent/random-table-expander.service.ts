@@ -8,6 +8,7 @@ import {
   strengthenRandomTableEntries,
 } from '@dnd-booker/shared';
 import { buildResolvedPublicationDocumentWriteData } from '../document-publication.service.js';
+import { rebuildProjectContentCache } from '../project-document-content.service.js';
 
 interface NormalizedRandomTableEntry {
   roll: string;
@@ -211,6 +212,10 @@ export async function expandRandomTablesFromBacklog(input: {
     });
     documentsUpdated += 1;
     updatedTitles.push(document.title);
+  }
+
+  if (documentsUpdated > 0) {
+    await rebuildProjectContentCache(input.projectId);
   }
 
   return {

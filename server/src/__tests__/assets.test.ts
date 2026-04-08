@@ -27,6 +27,13 @@ describe('Assets API', () => {
       await prisma.project.deleteMany({ where: { userId: existingUser.id } });
       await prisma.user.delete({ where: { id: existingUser.id } });
     }
+    await prisma.registrationInvite.deleteMany({ where: { email: TEST_USER.email } });
+    await prisma.registrationInvite.create({
+      data: {
+        email: TEST_USER.email,
+        note: 'assets test',
+      },
+    });
 
     const res = await request(app).post('/api/auth/register').send(TEST_USER);
     accessToken = res.body.accessToken;
@@ -45,6 +52,7 @@ describe('Assets API', () => {
       await prisma.project.deleteMany({ where: { userId: user.id } });
       await prisma.user.delete({ where: { id: user.id } });
     }
+    await prisma.registrationInvite.deleteMany({ where: { email: TEST_USER.email } });
     await prisma.$disconnect();
   });
 
@@ -118,6 +126,19 @@ describe('Assets API', () => {
 
       expect(res.status).toBe(401);
     });
+
+    it('should upload an image file through /api/v1/projects/:projectId/assets', async () => {
+      const res = await request(app)
+        .post(`/api/v1/projects/${projectId}/assets`)
+        .set('Authorization', `Bearer ${accessToken}`)
+        .attach('file', VALID_PNG, {
+          filename: 'test-image-v1.png',
+          contentType: 'image/png',
+        });
+
+      expect(res.status).toBe(201);
+      expect(res.body.filename).toBe('test-image-v1.png');
+    });
   });
 
   describe('GET /api/projects/:projectId/assets', () => {
@@ -144,6 +165,15 @@ describe('Assets API', () => {
         .get(`/api/projects/${projectId}/assets`);
 
       expect(res.status).toBe(401);
+    });
+
+    it('should list assets through /api/v1/projects/:projectId/assets', async () => {
+      const res = await request(app)
+        .get(`/api/v1/projects/${projectId}/assets`)
+        .set('Authorization', `Bearer ${accessToken}`);
+
+      expect(res.status).toBe(200);
+      expect(Array.isArray(res.body)).toBe(true);
     });
   });
 
@@ -180,6 +210,22 @@ describe('Assets API', () => {
         .delete('/api/assets/some-id');
 
       expect(res.status).toBe(401);
+    });
+
+    it('should delete an asset through /api/v1/assets/:id', async () => {
+      const uploadRes = await request(app)
+        .post(`/api/v1/projects/${projectId}/assets`)
+        .set('Authorization', `Bearer ${accessToken}`)
+        .attach('file', VALID_PNG, {
+          filename: 'delete-me-v1.png',
+          contentType: 'image/png',
+        });
+
+      const res = await request(app)
+        .delete(`/api/v1/assets/${uploadRes.body.id}`)
+        .set('Authorization', `Bearer ${accessToken}`);
+
+      expect(res.status).toBe(204);
     });
   });
 });

@@ -81,6 +81,19 @@ interface PreflightCandidate {
   review: ExportReview;
 }
 
+function getServerBaseUrl(): string {
+  const configured = process.env.SERVER_BASE_URL?.trim();
+  if (configured) {
+    return configured.replace(/\/$/, '');
+  }
+
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('SERVER_BASE_URL must be set in production exports.');
+  }
+
+  return 'http://localhost:4000';
+}
+
 function readExportTitleFromContent(content: DocumentContent | null): string | null {
   if (!content) return null;
   if (content.type === 'titlePage') {
@@ -558,7 +571,7 @@ export async function processExportJob(job: Job<ExportJobData>): Promise<void> {
         projectTitle: exportTitle,
         pagePreset: 'epub',
       });
-      const serverBaseUrl = process.env.SERVER_BASE_URL || 'http://localhost:4000';
+      const serverBaseUrl = getServerBaseUrl();
       const resolvedHtml = rewritePublicAssetUrls(html, serverBaseUrl);
       buffer = await generateEpub(resolvedHtml, exportJob.project.title);
     } else {

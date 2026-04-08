@@ -39,6 +39,13 @@ describe('AI Routes', () => {
       await prisma.project.deleteMany({ where: { userId: existingUser.id } });
       await prisma.user.delete({ where: { id: existingUser.id } });
     }
+    await prisma.registrationInvite.deleteMany({ where: { email: TEST_USER.email } });
+    await prisma.registrationInvite.create({
+      data: {
+        email: TEST_USER.email,
+        note: 'ai routes test',
+      },
+    });
 
     // Register and get token
     const res = await request(app).post('/api/auth/register').send(TEST_USER);
@@ -62,6 +69,7 @@ describe('AI Routes', () => {
       await prisma.project.deleteMany({ where: { userId: existingUser.id } });
       await prisma.user.delete({ where: { id: existingUser.id } });
     }
+    await prisma.registrationInvite.deleteMany({ where: { email: TEST_USER.email } });
     await prisma.$disconnect();
   });
 
@@ -87,6 +95,16 @@ describe('AI Routes', () => {
     it('should return 401 without auth token', async () => {
       const res = await request(app).get('/api/ai/settings');
       expect(res.status).toBe(401);
+    });
+
+    it('should serve the same settings through /api/v1/ai/settings', async () => {
+      const res = await request(app)
+        .get('/api/v1/ai/settings')
+        .set('Authorization', `Bearer ${accessToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.provider).toBeNull();
+      expect(res.body.hasApiKey).toBe(false);
     });
   });
 
@@ -381,6 +399,15 @@ describe('AI Routes', () => {
       const res = await request(app)
         .get(`/api/projects/${projectId}/ai/chat`);
       expect(res.status).toBe(401);
+    });
+
+    it('should serve chat history through /api/v1/projects/:projectId/ai/chat', async () => {
+      const res = await request(app)
+        .get(`/api/v1/projects/${projectId}/ai/chat`)
+        .set('Authorization', `Bearer ${accessToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.messages).toEqual([]);
     });
   });
 

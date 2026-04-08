@@ -101,7 +101,7 @@ export const useAiStore = create<AiState>((set, get) => ({
   fetchSettings: async () => {
     set({ isLoadingSettings: true });
     try {
-      const { data } = await api.get('/ai/settings');
+      const { data } = await api.get('/v1/ai/settings');
       set({ settings: data, isLoadingSettings: false });
     } catch (err) {
       console.error('[AI] Failed to fetch settings:', err);
@@ -111,7 +111,7 @@ export const useAiStore = create<AiState>((set, get) => ({
 
   saveSettings: async (provider, model, apiKey?, baseUrl?) => {
     try {
-      await api.post('/ai/settings', { provider, model, apiKey, baseUrl });
+      await api.post('/v1/ai/settings', { provider, model, apiKey, baseUrl });
       await get().fetchSettings();
     } catch (err) {
       console.error('[AI] Failed to save settings:', err);
@@ -121,7 +121,7 @@ export const useAiStore = create<AiState>((set, get) => ({
 
   removeApiKey: async () => {
     try {
-      await api.delete('/ai/settings/key');
+      await api.delete('/v1/ai/settings/key');
       await get().fetchSettings();
     } catch (err) {
       console.error('[AI] Failed to remove API key:', err);
@@ -130,17 +130,17 @@ export const useAiStore = create<AiState>((set, get) => ({
   },
 
   validateKey: async (provider, apiKey) => {
-    const { data } = await api.post('/ai/settings/validate', { provider, apiKey });
+    const { data } = await api.post('/v1/ai/settings/validate', { provider, apiKey });
     return data.valid;
   },
 
   validateOllama: async (baseUrl) => {
-    const { data } = await api.post('/ai/settings/validate-ollama', { baseUrl });
+    const { data } = await api.post('/v1/ai/settings/validate-ollama', { baseUrl });
     return data;
   },
 
   fetchModels: async (provider, apiKey) => {
-    const { data } = await api.post('/ai/settings/models', { provider, apiKey });
+    const { data } = await api.post('/v1/ai/settings/models', { provider, apiKey });
     return data.models as string[];
   },
 
@@ -160,8 +160,8 @@ export const useAiStore = create<AiState>((set, get) => ({
     });
     try {
       const [chatRes, stateRes] = await Promise.all([
-        api.get(`/projects/${projectId}/ai/chat`),
-        api.get(`/projects/${projectId}/ai/state`).catch(() => null),
+        api.get(`/v1/projects/${projectId}/ai/chat`),
+        api.get(`/v1/projects/${projectId}/ai/state`).catch(() => null),
       ]);
       // Ignore stale response if project changed while fetching
       if (get()._chatRequestId !== requestId) return;
@@ -200,7 +200,7 @@ export const useAiStore = create<AiState>((set, get) => ({
 
     async function doFetch(): Promise<globalThis.Response> {
       const token = getAccessToken();
-      return fetch(`/api/projects/${projectId}/ai/chat`, {
+      return fetch(`/api/v1/projects/${projectId}/ai/chat`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -221,7 +221,7 @@ export const useAiStore = create<AiState>((set, get) => ({
       if (response.status === 401 && !retried) {
         retried = true;
         try {
-          const { data } = await axios.post('/api/auth/refresh', {}, { withCredentials: true });
+          const { data } = await axios.post('/api/v1/auth/refresh', {}, { withCredentials: true });
           setAccessToken(data.accessToken);
           response = await doFetch();
         } catch {
@@ -319,9 +319,9 @@ export const useAiStore = create<AiState>((set, get) => ({
   clearChat: async (projectId) => {
     try {
       await Promise.all([
-        api.delete(`/projects/${projectId}/ai/chat`),
-        api.post(`/projects/${projectId}/ai/memory/reset`).catch(() => {}),
-        api.post(`/projects/${projectId}/ai/plan/reset`).catch(() => {}),
+        api.delete(`/v1/projects/${projectId}/ai/chat`),
+        api.post(`/v1/projects/${projectId}/ai/memory/reset`).catch(() => {}),
+        api.post(`/v1/projects/${projectId}/ai/plan/reset`).catch(() => {}),
       ]);
       set({ messages: [], chatError: null, planningState: null });
     } catch (err) {
@@ -337,7 +337,7 @@ export const useAiStore = create<AiState>((set, get) => ({
   generateBlock: async (blockType, prompt) => {
     set((s) => ({ _generatingCount: s._generatingCount + 1, isGeneratingBlock: true }));
     try {
-      const { data } = await api.post('/ai/generate-block', { blockType, prompt });
+      const { data } = await api.post('/v1/ai/generate-block', { blockType, prompt });
       return data.attrs;
     } catch (err) {
       console.error('[AI] generateBlock failed:', err);
@@ -357,7 +357,7 @@ export const useAiStore = create<AiState>((set, get) => ({
   autoFillBlock: async (blockType, currentAttrs) => {
     set((s) => ({ _autoFillCount: s._autoFillCount + 1, isAutoFilling: true }));
     try {
-      const { data } = await api.post('/ai/autofill', { blockType, currentAttrs });
+      const { data } = await api.post('/v1/ai/autofill', { blockType, currentAttrs });
       return data.suggestions;
     } catch (err) {
       console.error('[AI] autoFillBlock failed:', err);
@@ -376,7 +376,7 @@ export const useAiStore = create<AiState>((set, get) => ({
   generateImage: async (projectId, prompt, model, size, quality?) => {
     set({ isGeneratingImage: true });
     try {
-      const { data } = await api.post('/ai/generate-image', { projectId, prompt, model, size, quality });
+      const { data } = await api.post('/v1/ai/generate-image', { projectId, prompt, model, size, quality });
       return data.url as string;
     } catch (err) {
       if (axios.isAxiosError(err) && err.response?.data?.error) {
@@ -414,7 +414,7 @@ export const useAiStore = create<AiState>((set, get) => ({
 
     try {
       const token = getAccessToken();
-      const response = await fetch(`/api/projects/${projectId}/ai/wizard/chat-generate`, {
+      const response = await fetch(`/api/v1/projects/${projectId}/ai/wizard/chat-generate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -567,7 +567,7 @@ export const useAiStore = create<AiState>((set, get) => ({
 
   applyWizardSections: async (projectId, sectionIds) => {
     try {
-      const { data } = await api.post(`/projects/${projectId}/ai/wizard/apply`, { sectionIds });
+      const { data } = await api.post(`/v1/projects/${projectId}/ai/wizard/apply`, { sectionIds });
       set({ wizardProgress: null });
       return data;
     } catch (err) {
@@ -604,7 +604,7 @@ export const useAiStore = create<AiState>((set, get) => ({
 
   fetchPlanningState: async (projectId) => {
     try {
-      const { data } = await api.get(`/projects/${projectId}/ai/state`);
+      const { data } = await api.get(`/v1/projects/${projectId}/ai/state`);
       set({ planningState: data });
     } catch {
       // Non-critical — silently fail
@@ -613,7 +613,7 @@ export const useAiStore = create<AiState>((set, get) => ({
 
   rememberFact: async (projectId, type, content) => {
     try {
-      await api.post(`/projects/${projectId}/ai/memory/remember`, { type, content });
+      await api.post(`/v1/projects/${projectId}/ai/memory/remember`, { type, content });
       await get().fetchPlanningState(projectId);
     } catch (err) {
       console.error('[AI] rememberFact failed:', err);
@@ -622,7 +622,7 @@ export const useAiStore = create<AiState>((set, get) => ({
 
   forgetFact: async (projectId, itemId) => {
     try {
-      await api.post(`/projects/${projectId}/ai/memory/forget`, { itemId });
+      await api.post(`/v1/projects/${projectId}/ai/memory/forget`, { itemId });
       await get().fetchPlanningState(projectId);
     } catch (err) {
       console.error('[AI] forgetFact failed:', err);
@@ -631,7 +631,7 @@ export const useAiStore = create<AiState>((set, get) => ({
 
   resetPlan: async (projectId) => {
     try {
-      await api.post(`/projects/${projectId}/ai/plan/reset`);
+      await api.post(`/v1/projects/${projectId}/ai/plan/reset`);
       await get().fetchPlanningState(projectId);
     } catch (err) {
       console.error('[AI] resetPlan failed:', err);
@@ -640,7 +640,7 @@ export const useAiStore = create<AiState>((set, get) => ({
 
   resetWorkingMemory: async (projectId) => {
     try {
-      await api.post(`/projects/${projectId}/ai/memory/reset`);
+      await api.post(`/v1/projects/${projectId}/ai/memory/reset`);
       await get().fetchPlanningState(projectId);
     } catch (err) {
       console.error('[AI] resetWorkingMemory failed:', err);

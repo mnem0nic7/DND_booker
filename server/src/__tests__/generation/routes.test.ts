@@ -20,6 +20,13 @@ describe('Generation Run Routes', () => {
       await prisma.project.deleteMany({ where: { userId: existing.id } });
       await prisma.user.delete({ where: { id: existing.id } });
     }
+    await prisma.registrationInvite.deleteMany({ where: { email: TEST_USER.email } });
+    await prisma.registrationInvite.create({
+      data: {
+        email: TEST_USER.email,
+        note: 'generation routes test',
+      },
+    });
 
     const res = await request(app).post('/api/auth/register').send(TEST_USER);
     accessToken = res.body.accessToken;
@@ -38,6 +45,7 @@ describe('Generation Run Routes', () => {
       await prisma.project.deleteMany({ where: { userId: existing.id } });
       await prisma.user.delete({ where: { id: existing.id } });
     }
+    await prisma.registrationInvite.deleteMany({ where: { email: TEST_USER.email } });
     await prisma.$disconnect();
   });
 

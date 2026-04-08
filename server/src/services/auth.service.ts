@@ -18,11 +18,15 @@ function requireEnvSecret(name: string): string {
 const JWT_SECRET = requireEnvSecret('JWT_SECRET');
 const JWT_REFRESH_SECRET = requireEnvSecret('JWT_REFRESH_SECRET');
 
-function getAllowedRegistrationEmails(): string[] {
-  return (process.env.REGISTRATION_ALLOWED_EMAILS || '')
-    .split(',')
-    .map((value) => value.trim().toLowerCase())
-    .filter(Boolean);
+async function hasActiveRegistrationInvite(email: string): Promise<boolean> {
+  const invite = await prisma.registrationInvite.findFirst({
+    where: {
+      email,
+      revokedAt: null,
+    },
+    select: { id: true },
+  });
+  return Boolean(invite);
 }
 
 export function generateAccessToken(userId: string): string {
@@ -72,8 +76,8 @@ export async function incrementTokenVersion(userId: string): Promise<number> {
 
 export async function registerUser(email: string, password: string, displayName: string) {
   const normalizedEmail = email.trim().toLowerCase();
-  const allowedEmails = getAllowedRegistrationEmails();
-  if (allowedEmails.length > 0 && !allowedEmails.includes(normalizedEmail)) {
+  const isInvited = await hasActiveRegistrationInvite(normalizedEmail);
+  if (!isInvited) {
     throw new Error('REGISTRATION_NOT_ALLOWED');
   }
 

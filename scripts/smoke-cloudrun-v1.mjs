@@ -3,9 +3,11 @@
 const baseUrl = (process.env.BASE_URL ?? process.env.SERVICE_URL ?? '').trim().replace(/\/$/, '');
 const email = process.env.SMOKE_TEST_EMAIL?.trim();
 const password = process.env.SMOKE_TEST_PASSWORD;
-const preferredProjectId = process.env.SMOKE_TEST_PROJECT_ID?.trim() || null;
 const generationPrompt = process.env.SMOKE_TEST_GENERATION_PROMPT?.trim()
-  || '[smoke] Verify api/v1 generation run creation and cancellation';
+  || '[smoke] Create a very short D&D one-shot titled Smoke Gate with one clear hook, one location, one encounter, and one table.';
+const generationTimeoutMs = Number.parseInt(process.env.SMOKE_GENERATION_TIMEOUT_MS ?? '', 10) || 25 * 60 * 1000;
+const exportTimeoutMs = Number.parseInt(process.env.SMOKE_EXPORT_TIMEOUT_MS ?? '', 10) || 15 * 60 * 1000;
+const pollIntervalMs = Number.parseInt(process.env.SMOKE_POLL_INTERVAL_MS ?? '', 10) || 5_000;
 
 if (!baseUrl) {
   console.error('BASE_URL or SERVICE_URL is required for the Cloud Run smoke test.');
@@ -17,101 +19,234 @@ if (!email || !password) {
   process.exit(1);
 }
 
-function assertOk(response, detail) {
-  if (response.ok) {
-    return;
-  }
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
-  throw new Error(`${detail} failed with ${response.status} ${response.statusText}`);
+async function assertOk(response, detail) {
+  if (response.ok) return response;
+
+  let body = '';
+  try {
+    body = await response.text();
+  } catch {
+    body = '';
+  }
+  throw new Error(`${detail} failed with ${response.status} ${response.statusText}${body ? `: ${body}` : ''}`);
 }
 
 async function getJson(response, detail) {
-  assertOk(response, detail);
+  await assertOk(response, detail);
   return response.json();
 }
 
-async function main() {
-  const loginResponse = await fetch(`${baseUrl}/api/v1/auth/login`, {
-    method: 'POST',
+async function apiJson(path, { method = 'GET', token, body, headers = {} } = {}, detail = path) {
+  const response = await fetch(`${baseUrl}${path}`, {
+    method,
     headers: {
-      'Content-Type': 'application/json',
+      ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...headers,
     },
-    body: JSON.stringify({ email, password }),
+    body: body !== undefined ? JSON.stringify(body) : undefined,
   });
-  const loginData = await getJson(loginResponse, 'login');
+
+  return getJson(response, detail);
+}
+
+async function pollUntil(callback, { timeoutMs, intervalMs, label }) {
+  const startedAt = Date.now();
+
+  while (Date.now() - startedAt < timeoutMs) {
+    const result = await callback();
+    if (result.done) {
+      return result.value;
+    }
+    await sleep(intervalMs);
+  }
+
+  throw new Error(`Timed out waiting for ${label} after ${Math.round(timeoutMs / 1000)}s`);
+}
+
+async function main() {
+  let projectId = null;
+  let generationRunId = null;
+  let exportJobId = null;
+
+  const loginData = await apiJson('/api/v1/auth/login', {
+    method: 'POST',
+    body: { email, password },
+  }, 'login');
+
   if (!loginData.accessToken) {
     throw new Error('login succeeded but no access token was returned');
   }
 
-  const authHeaders = {
-    Authorization: `Bearer ${loginData.accessToken}`,
-  };
+  const token = loginData.accessToken;
+  const tempProjectTitle = `Smoke Accept ${new Date().toISOString().replace(/[:.]/g, '-')}`;
 
-  let projectId = preferredProjectId;
-  if (!projectId) {
-    const projectResponse = await fetch(`${baseUrl}/api/v1/projects`, { headers: authHeaders });
-    const projects = await getJson(projectResponse, 'list projects');
-    if (!Array.isArray(projects) || projects.length === 0) {
-      throw new Error('no projects were available for the smoke test user');
+  try {
+    const project = await apiJson('/api/v1/projects', {
+      method: 'POST',
+      token,
+      body: {
+        title: tempProjectTitle,
+        description: 'Temporary acceptance project created by deploy smoke.',
+        type: 'one_shot',
+      },
+    }, 'create temp project');
+    projectId = project.id;
+
+    const documents = await apiJson(`/api/v1/projects/${projectId}/documents`, {
+      token,
+    }, 'list temp project documents');
+    if (!Array.isArray(documents) || documents.length === 0) {
+      throw new Error('temp project did not materialize any publication documents');
     }
 
-    projectId = projects[0]?.id ?? null;
-  }
+    const createdRun = await apiJson(`/api/v1/projects/${projectId}/generation-runs`, {
+      method: 'POST',
+      token,
+      body: {
+        prompt: generationPrompt,
+        mode: 'one_shot',
+        quality: 'quick',
+        pageTarget: 4,
+      },
+    }, 'create generation run');
+    generationRunId = createdRun.id;
 
-  if (!projectId) {
-    throw new Error('unable to resolve a project id for the smoke test');
-  }
+    const pendingInterrupt = await pollUntil(async () => {
+      const run = await apiJson(`/api/v1/projects/${projectId}/generation-runs/${generationRunId}`, {
+        token,
+      }, 'poll generation run');
 
-  const documentsResponse = await fetch(`${baseUrl}/api/v1/projects/${projectId}/documents`, {
-    headers: authHeaders,
-  });
-  const documents = await getJson(documentsResponse, 'list documents');
-  if (!Array.isArray(documents)) {
-    throw new Error('document list response was not an array');
-  }
+      if (run.status === 'failed') {
+        throw new Error(`generation run failed: ${run.failureReason ?? 'unknown failure'}`);
+      }
+      if (run.status === 'cancelled') {
+        throw new Error('generation run was cancelled before acceptance completed');
+      }
 
-  const generationRunsResponse = await fetch(`${baseUrl}/api/v1/projects/${projectId}/generation-runs`, {
-    headers: authHeaders,
-  });
-  const generationRuns = await getJson(generationRunsResponse, 'list generation runs');
-  if (!Array.isArray(generationRuns)) {
-    throw new Error('generation run list response was not an array');
-  }
+      const interrupts = await apiJson(`/api/v1/projects/${projectId}/generation-runs/${generationRunId}/interrupts`, {
+        token,
+      }, 'list generation run interrupts');
+      const publicationReview = Array.isArray(interrupts)
+        ? interrupts.find((interrupt) => interrupt.status === 'pending' && interrupt.kind === 'manual_review')
+        : null;
 
-  const createGenerationRunResponse = await fetch(`${baseUrl}/api/v1/projects/${projectId}/generation-runs`, {
-    method: 'POST',
-    headers: {
-      ...authHeaders,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      prompt: generationPrompt,
-      mode: 'one_shot',
-      quality: 'quick',
-      pageTarget: 5,
-    }),
-  });
-  const createdRun = await getJson(createGenerationRunResponse, 'create generation run');
-  if (typeof createdRun.id !== 'string' || typeof createdRun.createdAt !== 'string' || typeof createdRun.updatedAt !== 'string') {
-    throw new Error('generation run create response did not return transport-safe timestamps');
-  }
+      return publicationReview
+        ? { done: true, value: publicationReview }
+        : { done: false };
+    }, {
+      timeoutMs: generationTimeoutMs,
+      intervalMs: pollIntervalMs,
+      label: 'publication-review interrupt',
+    });
 
-  const cancelGenerationRunResponse = await fetch(`${baseUrl}/api/v1/projects/${projectId}/generation-runs/${createdRun.id}/cancel`, {
-    method: 'POST',
-    headers: authHeaders,
-  });
-  const cancelledRun = await getJson(cancelGenerationRunResponse, 'cancel generation run');
-  if (cancelledRun.status !== 'cancelled') {
-    throw new Error(`generation run cancel returned unexpected status ${cancelledRun.status}`);
-  }
+    await apiJson(
+      `/api/v1/projects/${projectId}/generation-runs/${generationRunId}/interrupts/${pendingInterrupt.id}/resolve`,
+      {
+        method: 'POST',
+        token,
+        body: { action: 'approve' },
+      },
+      'approve publication-review interrupt',
+    );
 
-  console.log(JSON.stringify({
-    ok: true,
-    projectId,
-    documentCount: documents.length,
-    generationRunCount: generationRuns.length,
-    smokeGenerationRunId: createdRun.id,
-  }));
+    await apiJson(
+      `/api/v1/projects/${projectId}/generation-runs/${generationRunId}/resume`,
+      {
+        method: 'POST',
+        token,
+      },
+      'resume generation run after approval',
+    );
+
+    const completedRun = await pollUntil(async () => {
+      const run = await apiJson(`/api/v1/projects/${projectId}/generation-runs/${generationRunId}`, {
+        token,
+      }, 'poll resumed generation run');
+
+      if (run.status === 'failed') {
+        throw new Error(`generation run failed after approval: ${run.failureReason ?? 'unknown failure'}`);
+      }
+      if (run.status === 'cancelled') {
+        throw new Error('generation run was cancelled after approval');
+      }
+
+      return run.status === 'completed'
+        ? { done: true, value: run }
+        : { done: false };
+    }, {
+      timeoutMs: generationTimeoutMs,
+      intervalMs: pollIntervalMs,
+      label: 'generation run completion',
+    });
+
+    const exportJob = await apiJson(`/api/v1/projects/${projectId}/export-jobs`, {
+      method: 'POST',
+      token,
+      body: { format: 'pdf' },
+    }, 'create export job');
+    exportJobId = exportJob.id;
+
+    const completedExport = await pollUntil(async () => {
+      const job = await apiJson(`/api/v1/export-jobs/${exportJobId}`, {
+        token,
+      }, 'poll export job');
+
+      if (job.status === 'failed') {
+        throw new Error(`export job failed: ${job.errorMessage ?? 'unknown failure'}`);
+      }
+
+      return job.status === 'completed'
+        ? { done: true, value: job }
+        : { done: false };
+    }, {
+      timeoutMs: exportTimeoutMs,
+      intervalMs: pollIntervalMs,
+      label: 'export completion',
+    });
+
+    const downloadResponse = await fetch(`${baseUrl}/api/v1/export-jobs/${exportJobId}/download`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    await assertOk(downloadResponse, 'download export PDF');
+    const pdfBuffer = Buffer.from(await downloadResponse.arrayBuffer());
+    if (pdfBuffer.subarray(0, 5).toString('ascii') !== '%PDF-') {
+      throw new Error('downloaded export did not look like a PDF');
+    }
+
+    console.log(JSON.stringify({
+      ok: true,
+      projectId,
+      generationRunId,
+      generationRunStatus: completedRun.status,
+      exportJobId,
+      exportJobStatus: completedExport.status,
+      pdfBytes: pdfBuffer.length,
+    }));
+  } finally {
+    if (projectId) {
+      try {
+        const response = await fetch(`${baseUrl}/api/v1/projects/${projectId}`, {
+          method: 'DELETE',
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        if (!response.ok && response.status !== 404) {
+          const body = await response.text().catch(() => '');
+          console.error(`[smoke-cloudrun-v1] cleanup failed for project ${projectId}: ${response.status} ${body}`);
+        }
+      } catch (error) {
+        console.error(`[smoke-cloudrun-v1] cleanup error for project ${projectId}:`, error instanceof Error ? error.message : error);
+      }
+    }
+  }
 }
 
 main().catch((error) => {

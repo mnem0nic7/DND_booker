@@ -1,6 +1,7 @@
 import type { AgentCheckpoint, AgentScorecard, DocumentContent, LayoutPlan } from '@dnd-booker/shared';
 import { prisma } from '../../config/database.js';
 import { buildPublicationDocumentStorageFields } from '../document-publication.service.js';
+import { rebuildProjectContentCache } from '../project-document-content.service.js';
 
 interface ProjectSnapshot {
   title: string;
@@ -250,7 +251,6 @@ export async function restoreAgentCheckpoint(runId: string, checkpointId: string
         status: projectSnapshot.status as any,
         coverImageUrl: projectSnapshot.coverImageUrl,
         settings: projectSnapshot.settings as any,
-        content: projectSnapshot.content as any,
       },
     });
 
@@ -320,6 +320,8 @@ export async function restoreAgentCheckpoint(runId: string, checkpointId: string
         },
       });
     }
+
+    await rebuildProjectContentCache(checkpoint.projectId, tx);
   });
 
   return serializeCheckpoint(checkpoint);

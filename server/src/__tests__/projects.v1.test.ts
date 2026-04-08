@@ -19,6 +19,13 @@ describe('Projects API v1', () => {
       await prisma.project.deleteMany({ where: { userId: existingUser.id } });
       await prisma.user.delete({ where: { id: existingUser.id } });
     }
+    await prisma.registrationInvite.deleteMany({ where: { email: TEST_USER.email } });
+    await prisma.registrationInvite.create({
+      data: {
+        email: TEST_USER.email,
+        note: 'projects v1 test',
+      },
+    });
 
     const res = await request(app).post('/api/auth/register').send(TEST_USER);
     accessToken = res.body.accessToken;
@@ -30,6 +37,7 @@ describe('Projects API v1', () => {
       await prisma.project.deleteMany({ where: { userId: existingUser.id } });
       await prisma.user.delete({ where: { id: existingUser.id } });
     }
+    await prisma.registrationInvite.deleteMany({ where: { email: TEST_USER.email } });
     await prisma.$disconnect();
   });
 

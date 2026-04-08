@@ -9,6 +9,7 @@ import { generateAiImage, stripImageTextRenderingInstructions, type ImageModel }
 import { createAsset } from '../asset.service.js';
 import { generateTextWithTimeout } from './model-timeouts.js';
 import { buildResolvedPublicationDocumentWriteData } from '../document-publication.service.js';
+import { rebuildProjectContentCache } from '../project-document-content.service.js';
 
 type ImageCapableBlockType =
   | 'titlePage'
@@ -565,6 +566,7 @@ async function ensureArtDirectionReadyDocuments(input: {
 }>> {
   let documents = [...input.documents];
   const chapterLikeCount = documents.filter((doc) => doc.kind === 'chapter' || doc.kind === 'appendix').length;
+  let mutatedDocuments = false;
 
   if (!documents.some((doc) => doc.kind === 'front_matter')) {
     const frontMatterContent: DocumentContent = {
@@ -616,6 +618,7 @@ async function ensureArtDirectionReadyDocuments(input: {
     });
 
     documents = [frontMatterDoc as typeof documents[number], ...documents];
+    mutatedDocuments = true;
   }
 
   const nextDocuments = await Promise.all(documents.map(async (document) => {
@@ -663,6 +666,7 @@ async function ensureArtDirectionReadyDocuments(input: {
       nextCanonicalVersion = writeData.canonicalVersion;
       nextEditorProjectionVersion = writeData.editorProjectionVersion;
       nextTypstVersion = writeData.typstVersion;
+      mutatedDocuments = true;
     }
 
     return {
@@ -674,6 +678,10 @@ async function ensureArtDirectionReadyDocuments(input: {
       typstVersion: nextTypstVersion,
     };
   }));
+
+  if (mutatedDocuments) {
+    await rebuildProjectContentCache(input.projectId);
+  }
 
   return nextDocuments;
 }
@@ -1209,6 +1217,8 @@ export async function executeArtDirectionPass(
       });
     }),
   );
+
+  await rebuildProjectContentCache(run.projectId);
 
   const artifact = await prisma.generatedArtifact.create({
     data: {

@@ -22,7 +22,7 @@ export function ProjectAssetBrowser({
     setIsLoading(true);
     setError(null);
     try {
-      const { data } = await api.get<Asset[]>(`/projects/${projectId}/assets`);
+      const { data } = await api.get<Asset[]>(`/v1/projects/${projectId}/assets`);
       setAssets(data);
     } catch (err: unknown) {
       const message =
@@ -37,7 +37,7 @@ export function ProjectAssetBrowser({
 
   async function handleDelete(assetId: string) {
     try {
-      await api.delete(`/assets/${assetId}`);
+      await api.delete(`/v1/assets/${assetId}`);
       setAssets((current) => current.filter((asset) => asset.id !== assetId));
     } catch (err: unknown) {
       const message =

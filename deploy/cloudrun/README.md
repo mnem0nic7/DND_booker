@@ -1,12 +1,18 @@
 # Cloud Run Deployment
 
-This repo is deployed to Google Cloud Run as a single multi-container service:
+This repo is deployed to Google Cloud Run as two services:
 
-- `client` is the ingress container.
-- `server` is a sidecar on `localhost:4000`.
-- `worker` is a sidecar process that keeps BullMQ consumers running.
+- web service `dnd-booker`
+  - `client` is the ingress container
+  - `server` runs on `localhost:4000`
+  - `cloudsql-proxy` serves Postgres on `localhost:5432`
+- worker service `dnd-booker-worker`
+  - `worker` runs BullMQ consumers
+  - `cloudsql-proxy` serves Postgres on `localhost:5432`
+  - `SERVER_BASE_URL` points at the web service URL instead of `localhost`
+  - the worker runs a periodic runtime audit that logs `OPS_AUDIT_VIOLATION` when queued work or pending approvals go stale
 
-Use [`service.yaml`](/home/gallison/workspace/DND_booker/deploy/cloudrun/service.yaml) for the current production shape and [`service.yaml.example`](/home/gallison/workspace/DND_booker/deploy/cloudrun/service.yaml.example) as the generic template.
+Use [`service.yaml`](/home/gallison/workspace/DND_booker/deploy/cloudrun/service.yaml) for the web service, [`worker-service.yaml`](/home/gallison/workspace/DND_booker/deploy/cloudrun/worker-service.yaml) for the worker service, and the matching `*.example` files as templates.
 
 ## What You Need
 
@@ -44,6 +50,53 @@ PDF exports now use a split pipeline:
 - HTML/Playwright still measures page models for preflight and export review
 - Typst produces the final PDF artifact that gets uploaded
 - referenced `uploads/...` assets are staged into a temporary Typst workspace before compilation so the export path works with GCS-backed production storage as well as local disk
+
+`Project.content` is now a compatibility cache only. The authoritative publication state lives on `ProjectDocument.layoutPlan`, `canonicalDocJson`, `editorProjectionJson`, `typstSource`, and their version fields. Any document mutation should keep that publication bundle in sync and then rebuild the aggregate project content cache from ordered project documents.
+
+## Invite-Only Registration
+
+Registration is now controlled by the `registration_invites` table instead of `REGISTRATION_ALLOWED_EMAILS`.
+
+Manage invites from the repo root with:
+
+```bash
+npm run invites --workspace=server -- list
+npm run invites --workspace=server -- add invited@example.com "launch invite"
+npm run invites --workspace=server -- revoke invited@example.com
+```
+
+Existing users can still log in normally. New registrations require an active invite row.
+
+## Monitoring And Alerting
+
+Install the checked-in Cloud Monitoring policies after the web/worker services exist:
+
+```bash
+export PROJECT_ID="dnd-booker"
+export REGION="us-west4"
+export WEB_SERVICE="dnd-booker"
+export WORKER_SERVICE="dnd-booker-worker"
+export NOTIFICATION_CHANNELS="projects/dnd-booker/notificationChannels/1234567890"
+npm run monitor:cloudrun:install
+```
+
+The installer creates alerts for:
+
+- web request 5xxs
+- generation failures in the worker
+- export failures in the worker
+- runtime audit violations for stale queued work or stale pending interrupts
+- worker restart churn based on repeated startup logs
+
+Validate the monitoring wiring with one synthetic worker failure log:
+
+```bash
+npm run monitor:cloudrun:validate
+```
+
+That writes a synthetic `OPS_AUDIT_VIOLATION` log entry against the current worker revision so the `dnd-booker ops audit violations` policy can be confirmed end to end.
+
+Operational triage lives in [docs/runbooks/cloudrun-web-worker.md](/home/gallison/workspace/DND_booker/docs/runbooks/cloudrun-web-worker.md).
 
 ## Run Resume Semantics
 
@@ -110,21 +163,23 @@ For this service, keep `run.googleapis.com/vpc-access-egress: private-ranges-onl
 ## Deploy
 
 1. Build and push images with Cloud Build.
-2. Update the image tags in [`service.yaml`](/home/gallison/workspace/DND_booker/deploy/cloudrun/service.yaml) if you are not deploying `latest`.
-3. Confirm these values in the manifest:
+2. Update the image tags in [`service.yaml`](/home/gallison/workspace/DND_booker/deploy/cloudrun/service.yaml) and [`worker-service.yaml`](/home/gallison/workspace/DND_booker/deploy/cloudrun/worker-service.yaml) if you are not deploying `latest`.
+3. Confirm these values in the manifests:
    - Cloud SQL instance connection name
    - Redis host
    - `GCS_BUCKET`
    - service account
    - `CLIENT_URL`
-   - `REGISTRATION_ALLOWED_EMAILS`
+   - worker `SERVER_BASE_URL`
 4. Deploy:
 
 ```bash
-gcloud run services replace deploy/cloudrun/service.yaml --region="$REGION"
+npm run deploy:cloudrun
 ```
 
-Then fetch the public URL:
+The wrapper deploys the web service first, resolves the web URL, deploys the worker service with that web URL injected into `SERVER_BASE_URL`, checks web health, checks worker readiness, and then runs the authenticated acceptance smoke.
+
+Then fetch the public web URL:
 
 ```bash
 gcloud run services describe dnd-booker \
@@ -148,30 +203,32 @@ npm run deploy:cloudrun
 `npm run deploy:cloudrun` wraps the safest repeatable production flow for this repo:
 
 1. `gcloud builds submit --config deploy/cloudrun/cloudbuild.yaml --substitutions _REGION=us-west4,_REPO=dnd-booker,_TAG=<git-sha>`
-2. render a temporary service manifest with that same image tag
-3. `gcloud run services replace <rendered-manifest> --region=us-west4`
-3. `gcloud run services describe dnd-booker --region=us-west4 --format='value(status.url)'`
+2. render a temporary web manifest with that same image tag
+3. `gcloud run services replace <rendered-web-manifest> --region=us-west4`
+4. resolve the web service URL
+5. render a temporary worker manifest with the same worker image tag and `SERVER_BASE_URL=<web-url>`
+6. `gcloud run services replace <rendered-worker-manifest> --region=us-west4`
+7. `gcloud run services describe dnd-booker --region=us-west4 --format='value(status.url)'`
 
-`TAG` defaults to `git rev-parse --short HEAD`. Override `PROJECT_ID`, `REGION`, `REPOSITORY`, `TAG`, or `SERVICE` in the environment if you need a non-default deploy target.
+`TAG` defaults to `git rev-parse --short HEAD`. Override `PROJECT_ID`, `REGION`, `REPOSITORY`, `TAG`, `WEB_SERVICE`, `WORKER_SERVICE`, or `DEPLOY_TARGET` in the environment if you need a non-default deploy target.
 
-If you set these before deploy, the wrapper also runs an authenticated `api/v1` smoke test after the health check:
+If you set these before deploy, the wrapper also runs an authenticated `api/v1` smoke test after the health check. This now applies to `DEPLOY_TARGET=worker` as well, so worker-only deploys still prove the live generation/export path:
 
 ```bash
 export SMOKE_TEST_EMAIL="you@example.com"
 export SMOKE_TEST_PASSWORD="your-password"
-export SMOKE_TEST_PROJECT_ID="optional-project-id"
 export SMOKE_TEST_GENERATION_PROMPT="optional smoke prompt override"
 ```
 
 After deploy, verify:
 
-- `curl -fsS "$URL/api/health"`
+- `curl -fsS "$URL/api/v1/health"`
 - load `"$URL/"`
 - confirm the authenticated `api/v1` smoke test passed, or run `npm run smoke:cloudrun:v1` manually if you skipped it during deploy
-- note that the smoke now uses `/api/v1/projects` for project discovery and creates then immediately cancels one quick generation run, so both the v1 project surface and v1 run creation/transport timestamps are exercised against production
-- project aggregate content saves and document layout saves also flow through `api/v1` now, so production editor regressions are more likely to show up in the same typed transport path the SDK uses
+- note that the smoke now creates a temporary project, drives a generation run to the publication-review interrupt, approves and resumes it, creates an export job, downloads the resulting PDF, validates the `%PDF-` header, and then deletes the temp project
+- project aggregate content saves, document layout saves, chat history loads, asset uploads/browses, and template loads all flow through `api/v1` now, so production editor regressions are more likely to show up in the same typed transport path the SDK uses
 
-Local ship verification should also cover the `api/v1` project and run surfaces before deploy. `npm run verify:ship` now includes `documents.v1.test.ts`, `projects.v1.test.ts`, and `runs.v1.test.ts` through the Cloud SQL Proxy + local Redis harness so project transport and run orchestration regressions are caught before production.
+Local ship verification should also cover the `api/v1` project and run surfaces before deploy. `npm run verify:ship` now includes auth, AI, assets, templates, documents, projects, runs, agent restore, and generation route coverage through the Cloud SQL Proxy + local Redis harness so transport and orchestration regressions are caught before production.
 
 ## Seed Templates
 

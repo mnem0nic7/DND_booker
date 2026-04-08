@@ -145,5 +145,8 @@ describe('Agent Run Routes', () => {
     expect(JSON.stringify(restoredDoc.canonicalDocJson)).toContain('Original content.');
     expect(JSON.stringify(restoredDoc.editorProjectionJson)).toContain('Original content.');
     expect(restoredDoc.typstSource).toContain('Original content.');
+
+    const restoredProject = await prisma.project.findUniqueOrThrow({ where: { id: projectId } });
+    expect(JSON.stringify(restoredProject.content)).toContain('Original content.');
   });
 });

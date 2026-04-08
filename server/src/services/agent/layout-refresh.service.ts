@@ -2,6 +2,7 @@ import type { ExportReview, LayoutPlan } from '@dnd-booker/shared';
 import { recommendLayoutPlan } from '@dnd-booker/shared';
 import { prisma } from '../../config/database.js';
 import { buildResolvedPublicationDocumentWriteData } from '../document-publication.service.js';
+import { rebuildProjectContentCache } from '../project-document-content.service.js';
 
 function extractFindingCodesForTitle(review: ExportReview, title: string): string[] {
   return review.findings
@@ -78,6 +79,10 @@ export async function refreshLayoutPlansFromReview(input: {
     });
     documentsUpdated += 1;
     updatedTitles.push(document.title);
+  }
+
+  if (documentsUpdated > 0) {
+    await rebuildProjectContentCache(input.projectId);
   }
 
   return {

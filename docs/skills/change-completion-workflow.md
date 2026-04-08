@@ -23,18 +23,23 @@ Do not stop after code edits unless the user explicitly says not to ship.
 - `npm run verify:ship` means:
   - `npm run verify`
   - `npm run test:unit --workspace=client`
-  - `npm run test:server:local -- documents.v1.test.ts projects.v1.test.ts runs.v1.test.ts`
+  - `npm run test:server:local -- auth.test.ts ai-routes.test.ts assets.test.ts templates.test.ts documents.v1.test.ts projects.v1.test.ts runs.v1.test.ts agent-runs.test.ts src/__tests__/generation/routes.test.ts`
 - when `api/v1` routes validate responses against schemas with ISO timestamps, normalize transport DTOs before schema parsing instead of feeding raw Prisma rows directly into the validator
 - keep list endpoints on summary schemas and detail endpoints on detail schemas; summary payloads should never be parsed with full-detail contracts
 - when project lifecycle work changes, prefer `/api/v1/projects` plus the generated SDK over the legacy `/api/projects` routes
+- active runtime AI/chat/wizard flows should use `/api/v1/ai/*` and `/api/v1/projects/:projectId/ai/*`; keep the legacy AI mounts compatibility-only
+- active runtime template and asset flows should use `/api/v1/templates`, `/api/v1/projects/:projectId/assets`, and `/api/v1/assets/:id`; keep the legacy template and asset mounts compatibility-only
 - keep aggregate project content saves on `PATCH /api/v1/projects/:projectId` and manual layout saves on `PATCH /api/v1/projects/:projectId/documents/:docId/layout`; do not reintroduce runtime writes against the old project/document content endpoints
 - if a server-side change mutates `ProjectDocument.content`, keep `canonicalDocJson`, `editorProjectionJson`, and `typstSource` in sync in the same write; prefer `buildResolvedPublicationDocumentWriteData(...)` over ad hoc update payloads
+- after any document mutation, rebuild `Project.content` from ordered `ProjectDocument[]`; it is a compatibility cache, not the source of truth
 - when the local server integration test depends on Cloud SQL access, record the exact GCP blocker if it cannot run
 - remove accidental compiled artifacts from source directories before commit
 - if infrastructure blocks a test or deploy, record the exact blocker
+- for Cloud Run launch hardening, keep monitoring install and validation scripts up to date: `npm run monitor:cloudrun:install` and `npm run monitor:cloudrun:validate`
 
 ## Production Rule
 
 For Cloud Run, treat changes under `client/`, `server/`, `worker/`, `shared/`, `sdk/`, `deploy/cloudrun/`, and Prisma schema or migration changes as redeploy-triggering by default.
 
-The authenticated Cloud Run smoke should exercise at least one write path, not just read-only health checks. The current default is to create and immediately cancel a quick `api/v1` generation run so transport serialization and queue-backed run creation are covered after deploy.
+The authenticated Cloud Run smoke should exercise the full acceptance path, not just read-only health checks. The current default is: create temp project -> create generation run -> wait for publication-review interrupt -> approve + resume -> create export -> download PDF -> cleanup temp project.
+That smoke should run after worker-only deploys too when credentials are available.

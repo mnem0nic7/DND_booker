@@ -44,7 +44,7 @@ export function ProjectAssetGalleryDialog({
     setIsLoading(true);
     setError(null);
     try {
-      const { data } = await api.get<Asset[]>(`/projects/${projectId}/assets`);
+      const { data } = await api.get<Asset[]>(`/v1/projects/${projectId}/assets`);
       setAssets(data);
       if (preferredAssetUrl) {
         const matchingAsset = data.find((asset) => asset.url === preferredAssetUrl);
@@ -67,7 +67,7 @@ export function ProjectAssetGalleryDialog({
 
   async function handleDelete(assetId: string) {
     try {
-      await api.delete(`/assets/${assetId}`);
+      await api.delete(`/v1/assets/${assetId}`);
       setAssets((current) => current.filter((asset) => asset.id !== assetId));
       setSelectedAssetId((current) => (current === assetId ? null : current));
     } catch (err: unknown) {

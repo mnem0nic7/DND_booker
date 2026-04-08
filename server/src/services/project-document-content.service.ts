@@ -25,6 +25,7 @@ const documentContentSelect = {
 } satisfies Prisma.ProjectDocumentSelect;
 
 type CanonicalDocumentRecord = Prisma.ProjectDocumentGetPayload<{ select: typeof documentContentSelect }>;
+type ProjectDocumentContentClient = Prisma.TransactionClient | typeof prisma;
 
 export interface CanonicalProjectContentSnapshot {
   project: CanonicalProjectRecord;
@@ -56,6 +57,27 @@ export function composeProjectContentFromDocuments(
   }
 
   return nodes.length > 0 ? { type: 'doc', content: nodes } : BLANK_DOC;
+}
+
+export async function rebuildProjectContentCache(
+  projectId: string,
+  client: ProjectDocumentContentClient = prisma,
+): Promise<DocumentContent> {
+  const documents = await client.projectDocument.findMany({
+    where: { projectId },
+    orderBy: { sortOrder: 'asc' },
+    select: documentContentSelect,
+  });
+
+  const content = composeProjectContentFromDocuments(documents);
+  await client.project.update({
+    where: { id: projectId },
+    data: {
+      content: content as unknown as Prisma.InputJsonValue,
+    },
+  });
+
+  return content;
 }
 
 export async function getCanonicalProjectContent(

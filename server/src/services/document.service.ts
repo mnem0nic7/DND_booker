@@ -3,6 +3,7 @@ import { prisma } from '../config/database.js';
 import { ensureProjectDocuments } from './project-document-bootstrap.service.js';
 import { resolveDocumentLayout } from './layout-plan.service.js';
 import { buildPublicationDocumentStorageFields } from './document-publication.service.js';
+import { rebuildProjectContentCache } from './project-document-content.service.js';
 
 /**
  * List all documents for a project (excluding large content/outline fields).
@@ -59,7 +60,7 @@ export async function updateDocumentContent(
     { bumpVersions: true },
   );
 
-  return prisma.projectDocument.update({
+  const updated = await prisma.projectDocument.update({
     where: { id: documentId },
     data: {
       content: resolvedLayout.content as unknown as Prisma.InputJsonValue,
@@ -73,6 +74,8 @@ export async function updateDocumentContent(
       status: 'edited',
     },
   });
+  await rebuildProjectContentCache(doc.projectId);
+  return updated;
 }
 
 /**
@@ -105,7 +108,7 @@ export async function updateDocumentLayout(
     },
   );
 
-  return prisma.projectDocument.update({
+  const updated = await prisma.projectDocument.update({
     where: { id: documentId },
     data: {
       content: resolvedLayout.content as unknown as Prisma.InputJsonValue,
@@ -119,6 +122,8 @@ export async function updateDocumentLayout(
       status: 'edited',
     },
   });
+  await rebuildProjectContentCache(doc.projectId);
+  return updated;
 }
 
 /**
@@ -136,10 +141,12 @@ export async function updateDocumentTitle(
   });
   if (!doc || doc.project.userId !== userId) return null;
 
-  return prisma.projectDocument.update({
+  const updated = await prisma.projectDocument.update({
     where: { id: documentId },
     data: { title },
   });
+  await rebuildProjectContentCache(doc.projectId);
+  return updated;
 }
 
 /**
@@ -183,6 +190,7 @@ export async function reorderDocuments(
       }),
     ),
   );
+  await rebuildProjectContentCache(projectId);
 
   // Return the updated list (excluding large fields)
   return prisma.projectDocument.findMany({

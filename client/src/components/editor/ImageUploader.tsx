@@ -24,7 +24,7 @@ export function ImageUploader({ projectId, onUpload, className }: ImageUploaderP
 
       try {
         const { data } = await api.post(
-          `/projects/${projectId}/assets`,
+          `/v1/projects/${projectId}/assets`,
           formData,
           {
             headers: { 'Content-Type': 'multipart/form-data' },

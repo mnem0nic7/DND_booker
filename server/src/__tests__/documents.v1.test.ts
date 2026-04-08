@@ -129,6 +129,9 @@ describe('Document API v1', () => {
     expect(updated.status).toBe(200);
     expect(updated.body.title).toBe('Chapter Alpha Revised');
     expect(updated.body.typstSource).toContain('Chapter Alpha Revised');
+
+    const project = await prisma.project.findUniqueOrThrow({ where: { id: projectId } });
+    expect(JSON.stringify(project.content)).toContain('Chapter Alpha Revised');
   });
 
   it('updates layout plans through the v1 document route', async () => {
@@ -169,5 +172,8 @@ describe('Document API v1', () => {
     expect(updated.body.layoutPlan?.sectionRecipe).toBe('chapter_hero_split');
     expect(updated.body.layoutPlan?.columnBalanceTarget).toBe('balanced');
     expect(updated.body.layoutPlan.blocks.length).toBeGreaterThan(0);
+
+    const project = await prisma.project.findUniqueOrThrow({ where: { id: projectId } });
+    expect(JSON.stringify(project.content)).toContain('The story continues.');
   });
 });

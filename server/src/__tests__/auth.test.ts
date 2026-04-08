@@ -16,24 +16,37 @@ describe('Auth API', () => {
   beforeAll(async () => {
     // Clean up any existing test user
     await prisma.user.deleteMany({ where: { email: TEST_USER.email } });
+    await prisma.registrationInvite.deleteMany({
+      where: {
+        email: {
+          in: [TEST_USER.email, 'm7.ga.77@gmail.com'],
+        },
+      },
+    });
+    await prisma.registrationInvite.create({
+      data: {
+        email: TEST_USER.email,
+        note: 'auth integration test',
+      },
+    });
   });
 
   afterAll(async () => {
     // Clean up test data
     await prisma.user.deleteMany({ where: { email: TEST_USER.email } });
+    await prisma.registrationInvite.deleteMany({ where: { email: TEST_USER.email } });
     await prisma.$disconnect();
   });
 
   describe('POST /api/auth/register', () => {
     it('should reject registration when email is not allowlisted', async () => {
-      process.env.REGISTRATION_ALLOWED_EMAILS = 'm7.ga.77@gmail.com';
-
-      const res = await request(app).post('/api/auth/register').send(TEST_USER);
+      const res = await request(app).post('/api/auth/register').send({
+        ...TEST_USER,
+        email: 'blocked-registration@example.com',
+      });
 
       expect(res.status).toBe(403);
       expect(res.body.error).toBe('Registration is not allowed for this email');
-
-      delete process.env.REGISTRATION_ALLOWED_EMAILS;
     });
 
     it('should register a new user and return tokens', async () => {

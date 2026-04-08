@@ -6,6 +6,7 @@ import { cleanupExportFiles } from './jobs/cleanup.job.js';
 import { processGenerationJob } from './jobs/generation-orchestrator.job.js';
 import { processAgentRun } from './jobs/agent-orchestrator.job.js';
 import { resolveWorkerConcurrency, resolveWorkerTiming } from './runtime-config.js';
+import { startRuntimeAuditLoop } from './runtime-audit.js';
 
 const connection = new IORedis({
   host: process.env.REDIS_HOST || 'localhost',
@@ -14,11 +15,14 @@ const connection = new IORedis({
   maxRetriesPerRequest: null,
 });
 
+let workerReady = false;
+console.info('[worker.lifecycle] startup');
 const healthPort = Number(process.env.PORT);
 const healthServer = Number.isFinite(healthPort) && healthPort > 0
   ? createServer((_req, res) => {
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ status: 'ok', service: 'worker' }));
+    const statusCode = workerReady ? 200 : 503;
+    res.writeHead(statusCode, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ status: workerReady ? 'ok' : 'starting', service: 'worker' }));
   })
   : null;
 
@@ -72,20 +76,34 @@ cleanupQueue.upsertJobScheduler('export-cleanup', {
 });
 
 connection.on('error', (err) => console.error('[Redis] Connection error:', err.message));
+connection.on('ready', () => {
+  workerReady = true;
+  console.info('[worker.lifecycle] ready');
+});
+connection.on('close', () => {
+  workerReady = false;
+  console.warn('[worker.lifecycle] redis connection closed');
+});
+connection.on('end', () => {
+  workerReady = false;
+  console.warn('[worker.lifecycle] redis connection ended');
+});
 
 worker.on('completed', (job) => console.log(`Job ${job.id} completed`));
-worker.on('failed', (job, err) => console.error(`Job ${job?.id} failed:`, err.message));
+worker.on('failed', (job, err) => console.error(`[worker.export] job ${job?.id} failed:`, err.message));
 worker.on('error', (err) => console.error('[Worker] Error:', err.message));
 cleanupWorker.on('error', (err) => console.error('[Cleanup Worker] Error:', err.message));
 generationWorker.on('completed', (job) => console.log(`Generation job ${job.id} completed`));
-generationWorker.on('failed', (job, err) => console.error(`Generation job ${job?.id} failed:`, err.message));
+generationWorker.on('failed', (job, err) => console.error(`[worker.generation] job ${job?.id} failed:`, err.message));
 generationWorker.on('error', (err) => console.error('[Generation Worker] Error:', err.message));
 agentWorker.on('completed', (job) => console.log(`Agent job ${job.id} completed`));
-agentWorker.on('failed', (job, err) => console.error(`Agent job ${job?.id} failed:`, err.message));
+agentWorker.on('failed', (job, err) => console.error(`[worker.agent] job ${job?.id} failed:`, err.message));
 agentWorker.on('error', (err) => console.error('[Agent Worker] Error:', err.message));
 
+const stopRuntimeAudit = startRuntimeAuditLoop();
+
 async function shutdown() {
-  console.log('Shutting down worker...');
+  console.info('[worker.lifecycle] shutting down');
   const SHUTDOWN_TIMEOUT_MS = 70_000;
   const forceExit = setTimeout(() => {
     console.error('Worker shutdown timed out, forcing exit.');
@@ -94,6 +112,7 @@ async function shutdown() {
   forceExit.unref();
 
   try {
+    stopRuntimeAudit();
     await new Promise<void>((resolve, reject) => {
       if (!healthServer) {
         resolve();

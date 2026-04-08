@@ -20,7 +20,7 @@ NPM workspaces monorepo with six packages:
 ```
 Client (:3000) → API proxy → Server (:4000) → PostgreSQL + Redis + GCS
                                     ↓ BullMQ
-                           Worker (export + orchestration)
+                           Worker service (export + orchestration)
 ```
 
 ## Common Commands
@@ -63,6 +63,8 @@ The `api/v1` contract validates transport DTOs, not raw Prisma records. If a rou
 Project lifecycle now has a first-class `api/v1` surface (`/api/v1/projects`). New runtime work should use the generated SDK for project list/create/get/update/delete instead of adding more calls against the legacy `/api/projects` routes.
 Project aggregate content saves also go through `PATCH /api/v1/projects/:projectId`, and manual document layout saves go through `PATCH /api/v1/projects/:projectId/documents/:docId/layout`. Do not add new runtime writes against the legacy `/api/projects/:id/content` or `/api/projects/:projectId/documents/:docId/layout` paths.
 `api/v1` document snapshots now carry `layoutPlan` alongside canonical/editor/Typst fields. Client document loads should consume that v1 snapshot rather than stitching layout data from legacy document routes.
+Active client AI/chat/wizard traffic should use `/api/v1/ai/*` and `/api/v1/projects/:projectId/ai/*`. Keep the legacy `/api/ai/*` and `/api/projects/:projectId/ai/*` mounts compatibility-only.
+Active template and asset traffic should use `/api/v1/templates`, `/api/v1/projects/:projectId/assets`, and `/api/v1/assets/:id`. Keep the legacy template and asset mounts compatibility-only.
 
 ### SSE streaming
 Server uses `res.write()` chunks. Chat streams plain text; wizard streams newline-delimited JSON events. Client uses raw `fetch()` + `ReadableStream` reader (not EventSource) to support POST with body.
@@ -89,6 +91,7 @@ Random tables with 8+ entries are treated as wide in layout planning, but export
 When reapplying accepted art placements after document rebuilds, do not trust stored node indices alone. Resolve against the rebuilt document by block type, subject label, empty-image preference, and proximity.
 
 Any server-side `ProjectDocument` mutation that changes document body content should update `content`, `canonicalDocJson`, `editorProjectionJson`, and `typstSource` together. Prefer `buildResolvedPublicationDocumentWriteData(...)` in `server/src/services/document-publication.service.ts` instead of hand-written `projectDocument.update()` payloads.
+After any `ProjectDocument` mutation, rebuild `Project.content` from ordered project documents. `Project.content` is now a compatibility cache, not an authoritative source.
 
 PDF export now keeps the HTML/Playwright measurement pass for preflight and review, but the final production PDF render is Typst-based. Typst workspaces must stage referenced `uploads/...` assets explicitly because production uploads live in GCS, not a shared local disk.
 
@@ -116,6 +119,8 @@ Agent checkpoint restore now carries canonical publication fields (`canonicalDoc
 ### Authentication
 JWT access token (15min) + refresh token (7d, httpOnly cookie). Token version incremented on logout. Client axios interceptor auto-refreshes on 401.
 
+Registration is invite-only in production. New signups require an active row in `registration_invites`; manage that table with `npm run invites --workspace=server -- <list|add|revoke> ...`.
+
 ### Encryption
 User API keys encrypted with AES-256-GCM. IV + auth tag stored separately. Requires `AI_KEY_ENCRYPTION_SECRET` env var (64 hex chars).
 
@@ -127,7 +132,10 @@ PropertiesPanel shows document stats and a Document Outline that includes both H
 
 ## Deployment
 
-Docker Compose runs `postgres`, `redis`, `server`, `worker`, and `client`. Rebuild and restart the services that match the changed packages:
+Docker Compose runs `postgres`, `redis`, `server`, `worker`, and `client`. Production Cloud Run is split into a web service (`client + server + cloudsql-proxy`) and a worker service (`worker + cloudsql-proxy`).
+The worker service runs a periodic runtime audit for stale queued runs, stale queued exports, and stale pending interrupts. Audit violations log as `OPS_AUDIT_VIOLATION`; install Cloud Monitoring policies against that signal with `npm run monitor:cloudrun:install`.
+
+Rebuild and restart the local services that match the changed packages:
 
 - `client/` only: `docker compose build client && docker compose up -d client`
 - `server/` only: `docker compose build server && docker compose up -d server`
@@ -145,14 +153,16 @@ Unless the user explicitly says not to, treat this as the default after every co
    - `npm run verify:ship` for the normal shippable path.
    - `npm run verify` is the lighter build-only pass when you explicitly do not need the full ship checks.
    - If cloud-backed server integration is unavailable, record the exact blocker instead of silently skipping it.
-   - `verify:ship` now includes `documents.v1.test.ts`, `projects.v1.test.ts`, and `runs.v1.test.ts` through the local Cloud SQL Proxy + Redis harness; keep new `api/v1` route regressions in that path when they touch transport serialization or run orchestration APIs.
+   - `verify:ship` now includes auth, AI, asset, template, document, project, run, agent restore, and generation-route coverage through the local Cloud SQL Proxy + Redis harness; keep new `api/v1` route regressions in that path when they touch transport serialization or run orchestration APIs.
 3. Update repo memory and docs when behavior, workflow, deployment steps, or architecture changed.
    - Memory: this file and any other standing repo guidance.
-   - Docs: `README.md`, `deploy/cloudrun/README.md`, or the closest feature/runbook doc.
+   - Docs: `README.md`, `deploy/cloudrun/README.md`, `docs/runbooks/cloudrun-web-worker.md`, or the closest feature/runbook doc.
 4. Review `git status`, commit the intended changes, and push the current branch.
 5. Redeploy production with `npm run deploy:cloudrun` unless the user asked to skip deploys.
-   - Set `SMOKE_TEST_EMAIL`, `SMOKE_TEST_PASSWORD`, and optionally `SMOKE_TEST_PROJECT_ID` / `SMOKE_TEST_GENERATION_PROMPT` so the redeploy script also runs the authenticated `api/v1` smoke check automatically.
-   - The production smoke now creates and immediately cancels one quick generation run, so run-creation regressions get exercised before sign-off.
+   - Set `SMOKE_TEST_EMAIL`, `SMOKE_TEST_PASSWORD`, and optionally `SMOKE_TEST_GENERATION_PROMPT` so the redeploy script also runs the authenticated `api/v1` acceptance smoke automatically.
+   - `npm run deploy:cloudrun` now builds once, deploys the web service, deploys the worker service with the resolved web URL injected into `SERVER_BASE_URL`, checks worker readiness, and then runs the acceptance smoke even for worker-only deploys.
+   - The production smoke now creates a temp project, drives a generation run through publication review, resumes it, exports a PDF, validates the download, and cleans up the temp project.
+   - Manage launch alerts with `npm run monitor:cloudrun:install` and synthetic validation with `npm run monitor:cloudrun:validate`.
 
 Do not stop after code edits if the task implies shipping. Verification, docs, commit, push, and redeploy are part of the normal completion path.
 

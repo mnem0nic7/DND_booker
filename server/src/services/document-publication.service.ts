@@ -1,6 +1,7 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '../config/database.js';
 import { resolveDocumentLayout } from './layout-plan.service.js';
+import { rebuildProjectContentCache } from './project-document-content.service.js';
 import {
   buildPublicationDocumentSnapshot,
   canonicalPublicationDocumentToTypstSource,
@@ -101,10 +102,15 @@ export interface PublicationDocumentSummary {
   updatedAt: string;
 }
 
+export interface PublicationDocumentDetail extends PublicationDocument {
+  runId: string | null;
+  layoutPlan: unknown | null;
+}
+
 export type PublicationDocumentUpdateResult =
   | { status: 'not_found' }
-  | { status: 'conflict'; document: PublicationDocument }
-  | { status: 'success'; document: PublicationDocument };
+  | { status: 'conflict'; document: PublicationDocumentDetail }
+  | { status: 'success'; document: PublicationDocumentDetail };
 
 export function buildPublicationDocumentStorageFields(
   input: PublicationDocumentStorageInput,
@@ -162,25 +168,29 @@ export function buildResolvedPublicationDocumentWriteData(input: {
 
 export function toPublicationDocumentSnapshot(
   document: PublicationDocumentRecord,
-): PublicationDocument {
-  return buildPublicationDocumentSnapshot({
-    documentId: document.id,
-    projectId: document.projectId,
-    kind: document.kind,
-    title: document.title,
-    slug: document.slug,
-    sortOrder: document.sortOrder,
-    targetPageCount: document.targetPageCount,
-    status: document.status,
-    sourceArtifactId: document.sourceArtifactId,
-    canonicalDocJson: document.canonicalDocJson ?? document.content,
-    editorProjectionJson: document.editorProjectionJson ?? document.canonicalDocJson ?? document.content,
-    typstSource: document.typstSource,
-    canonicalVersion: document.canonicalVersion ?? 1,
-    editorProjectionVersion: document.editorProjectionVersion ?? 1,
-    typstVersion: document.typstVersion ?? 1,
-    updatedAt: document.updatedAt,
-  });
+): PublicationDocumentDetail {
+  return {
+    ...buildPublicationDocumentSnapshot({
+      documentId: document.id,
+      projectId: document.projectId,
+      kind: document.kind,
+      title: document.title,
+      slug: document.slug,
+      sortOrder: document.sortOrder,
+      targetPageCount: document.targetPageCount,
+      status: document.status,
+      sourceArtifactId: document.sourceArtifactId,
+      canonicalDocJson: document.canonicalDocJson ?? document.content,
+      editorProjectionJson: document.editorProjectionJson ?? document.canonicalDocJson ?? document.content,
+      typstSource: document.typstSource,
+      canonicalVersion: document.canonicalVersion ?? 1,
+      editorProjectionVersion: document.editorProjectionVersion ?? 1,
+      typstVersion: document.typstVersion ?? 1,
+      updatedAt: document.updatedAt,
+    }),
+    runId: document.runId,
+    layoutPlan: document.layoutPlan,
+  };
 }
 
 function toPublicationDocumentSummary(
@@ -228,7 +238,7 @@ export async function listPublicationDocuments(
 export async function getPublicationDocument(
   documentId: string,
   userId: string,
-): Promise<PublicationDocument | null> {
+): Promise<PublicationDocumentDetail | null> {
   const document = await prisma.projectDocument.findUnique({
     where: { id: documentId },
     include: { project: true },
@@ -312,6 +322,53 @@ export async function updatePublicationDocument(
     },
     include: { project: true },
   });
+  await rebuildProjectContentCache(updated.projectId);
 
   return { status: 'success', document: toPublicationDocumentSnapshot(updated) };
+}
+
+export async function updatePublicationDocumentLayout(
+  documentId: string,
+  userId: string,
+  layoutPlan: unknown,
+): Promise<PublicationDocumentDetail | null> {
+  const document = await prisma.projectDocument.findUnique({
+    where: { id: documentId },
+    include: { project: true },
+  });
+  if (!document || document.project.userId !== userId) return null;
+
+  const resolvedLayout = resolveDocumentLayout({
+    content: document.content,
+    layoutPlan,
+    kind: document.kind,
+    title: document.title,
+  });
+  const publicationFields = buildPublicationDocumentStorageFields(
+    { content: resolvedLayout.content },
+    {
+      canonicalVersion: document.canonicalVersion,
+      editorProjectionVersion: document.editorProjectionVersion,
+      typstVersion: document.typstVersion,
+    },
+  );
+
+  const updated = await prisma.projectDocument.update({
+    where: { id: documentId },
+    data: {
+      content: resolvedLayout.content as unknown as Prisma.InputJsonValue,
+      layoutPlan: resolvedLayout.layoutPlan as unknown as Prisma.InputJsonValue,
+      canonicalDocJson: publicationFields.canonicalDocJson,
+      editorProjectionJson: publicationFields.editorProjectionJson,
+      typstSource: publicationFields.typstSource,
+      canonicalVersion: publicationFields.canonicalVersion,
+      editorProjectionVersion: publicationFields.editorProjectionVersion,
+      typstVersion: publicationFields.typstVersion,
+      status: 'edited',
+    },
+    select: publicationDocumentFullSelect,
+  });
+
+  await rebuildProjectContentCache(updated.projectId);
+  return toPublicationDocumentSnapshot(updated);
 }

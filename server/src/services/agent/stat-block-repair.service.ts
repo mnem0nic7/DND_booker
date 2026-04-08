@@ -4,6 +4,7 @@ import { prisma } from '../../config/database.js';
 import { buildBlockPrompt, parseBlockResponse } from '../ai-content.service.js';
 import { generateTextWithTimeout } from '../generation/model-timeouts.js';
 import { buildResolvedPublicationDocumentWriteData } from '../document-publication.service.js';
+import { rebuildProjectContentCache } from '../project-document-content.service.js';
 import { resolveAgentModelForUser } from './model-resolution.service.js';
 
 type StatBlockAttrs = Record<string, unknown>;
@@ -253,6 +254,10 @@ export async function repairStatBlocksFromBacklog(input: {
     documentsUpdated += 1;
     statBlocksRepaired += transformed.updatedCount;
     updatedTitles.push(document.title);
+  }
+
+  if (documentsUpdated > 0) {
+    await rebuildProjectContentCache(input.projectId);
   }
 
   return {

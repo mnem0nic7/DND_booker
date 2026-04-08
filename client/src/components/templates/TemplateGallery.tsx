@@ -15,7 +15,7 @@ export default function TemplateGallery({ onSelect, onSkip }: TemplateGalleryPro
   useEffect(() => {
     async function fetchTemplates() {
       try {
-        const { data } = await api.get('/templates');
+        const { data } = await api.get('/v1/templates');
         setTemplates(data);
       } catch {
         setError('Failed to load templates.');

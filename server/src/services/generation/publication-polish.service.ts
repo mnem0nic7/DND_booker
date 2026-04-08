@@ -8,6 +8,7 @@ import {
   type PublicationPolishEdit,
 } from './publication-polish.helpers.js';
 import { buildResolvedPublicationDocumentWriteData } from '../document-publication.service.js';
+import { rebuildProjectContentCache } from '../project-document-content.service.js';
 
 interface ProjectDocumentRecord {
   id: string;
@@ -184,6 +185,10 @@ export async function executePublicationPolish(
       initialFindingCodes,
       finalFindingCodes,
     });
+  }
+
+  if (documentsUpdated > 0) {
+    await rebuildProjectContentCache(run.projectId);
   }
 
   const latest = await prisma.generatedArtifact.findFirst({

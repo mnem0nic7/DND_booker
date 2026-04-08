@@ -1,23 +1,23 @@
 apiVersion: serving.knative.dev/v1
 kind: Service
 metadata:
-  name: dnd-booker
+  name: dnd-booker-worker
   annotations:
-    run.googleapis.com/ingress: all
+    run.googleapis.com/ingress: internal
 spec:
   template:
     metadata:
       annotations:
         autoscaling.knative.dev/minScale: "1"
-        autoscaling.knative.dev/maxScale: "3"
+        autoscaling.knative.dev/maxScale: "1"
         run.googleapis.com/execution-environment: gen2
         run.googleapis.com/cpu-throttling: "false"
         run.googleapis.com/startup-cpu-boost: "true"
         run.googleapis.com/network-interfaces: '[{"network":"default","subnetwork":"default"}]'
         run.googleapis.com/vpc-access-egress: private-ranges-only
-        run.googleapis.com/container-dependencies: '{"server":["cloudsql-proxy"],"client":["server"]}'
+        run.googleapis.com/container-dependencies: '{"worker":["cloudsql-proxy"]}'
     spec:
-      containerConcurrency: 20
+      containerConcurrency: 10
       timeoutSeconds: 3600
       serviceAccountName: SERVICE_ACCOUNT@PROJECT_ID.iam.gserviceaccount.com
       containers:
@@ -36,30 +36,37 @@ spec:
               port: 5432
             failureThreshold: 30
             periodSeconds: 2
-        - name: server
-          image: REGION-docker.pkg.dev/PROJECT_ID/REPOSITORY/dnd-booker-server:TAG
-          command:
-            - sh
-            - -c
-          args:
-            - |
-              for i in $(seq 1 20); do
-                npx prisma migrate deploy && exec node dist/index.js
-                echo "prisma migrate deploy failed; retrying in 5s" >&2
-                sleep 5
-              done
-              exit 1
+        - name: worker
+          image: REGION-docker.pkg.dev/PROJECT_ID/REPOSITORY/dnd-booker-worker:TAG
+          ports:
+            - containerPort: 8080
           env:
             - name: NODE_ENV
               value: production
             - name: PORT
-              value: "4000"
+              value: "8080"
             - name: REDIS_HOST
               value: REDIS_IP
             - name: REDIS_PORT
               value: "6379"
-            - name: CLIENT_URL
-              value: https://YOUR_CLOUD_RUN_URL
+            - name: WORKER_CONCURRENCY
+              value: "1"
+            - name: WORKER_EXPORT_CONCURRENCY
+              value: "2"
+            - name: OPS_AUDIT_ENABLED
+              value: "true"
+            - name: OPS_AUDIT_INTERVAL_MS
+              value: "300000"
+            - name: OPS_AUDIT_STALE_GENERATION_MINUTES
+              value: "15"
+            - name: OPS_AUDIT_STALE_AGENT_MINUTES
+              value: "15"
+            - name: OPS_AUDIT_STALE_EXPORT_MINUTES
+              value: "15"
+            - name: OPS_AUDIT_PENDING_INTERRUPT_MINUTES
+              value: "20"
+            - name: SERVER_BASE_URL
+              value: https://YOUR_WEB_SERVICE_URL
             - name: GCS_BUCKET
               value: GCS_BUCKET
             - name: GCS_ASSET_PREFIX
@@ -76,16 +83,6 @@ spec:
                 secretKeyRef:
                   name: REDIS_PASSWORD_SECRET
                   key: latest
-            - name: JWT_SECRET
-              valueFrom:
-                secretKeyRef:
-                  name: JWT_SECRET_SECRET
-                  key: latest
-            - name: JWT_REFRESH_SECRET
-              valueFrom:
-                secretKeyRef:
-                  name: JWT_REFRESH_SECRET_SECRET
-                  key: latest
             - name: AI_KEY_ENCRYPTION_SECRET
               valueFrom:
                 secretKeyRef:
@@ -93,27 +90,14 @@ spec:
                   key: latest
           resources:
             limits:
-              cpu: "1"
-              memory: 2Gi
+              cpu: "2"
+              memory: 4Gi
           startupProbe:
             httpGet:
-              path: /api/health
-              port: 4000
+              path: /
+              port: 8080
             failureThreshold: 30
             periodSeconds: 2
-        - name: client
-          image: REGION-docker.pkg.dev/PROJECT_ID/REPOSITORY/dnd-booker-client:TAG
-          ports:
-            - containerPort: 8080
-          env:
-            - name: PORT
-              value: "8080"
-            - name: API_UPSTREAM
-              value: localhost:4000
-          resources:
-            limits:
-              cpu: "1"
-              memory: 512Mi
   traffic:
     - percent: 100
       latestRevision: true

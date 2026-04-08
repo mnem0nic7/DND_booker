@@ -18,6 +18,13 @@ describe('Templates API', () => {
       await prisma.project.deleteMany({ where: { userId: existingUser.id } });
       await prisma.user.delete({ where: { id: existingUser.id } });
     }
+    await prisma.registrationInvite.deleteMany({ where: { email: TEST_USER.email } });
+    await prisma.registrationInvite.create({
+      data: {
+        email: TEST_USER.email,
+        note: 'templates test',
+      },
+    });
     const res = await request(app).post('/api/auth/register').send(TEST_USER);
     accessToken = res.body.accessToken;
   });
@@ -27,6 +34,7 @@ describe('Templates API', () => {
     if (user) {
       await prisma.user.delete({ where: { id: user.id } });
     }
+    await prisma.registrationInvite.deleteMany({ where: { email: TEST_USER.email } });
     await prisma.$disconnect();
   });
 
@@ -50,6 +58,15 @@ describe('Templates API', () => {
       for (const template of res.body) {
         expect(template.type).toBe('campaign');
       }
+    });
+
+    it('should list templates through /api/v1/templates', async () => {
+      const res = await request(app)
+        .get('/api/v1/templates')
+        .set('Authorization', `Bearer ${accessToken}`);
+
+      expect(res.status).toBe(200);
+      expect(Array.isArray(res.body)).toBe(true);
     });
   });
 

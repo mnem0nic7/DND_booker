@@ -39,7 +39,7 @@ async function createTitlePage(page: Page) {
 
 async function getPersistedTitlePageImageUrl(page: Page, projectTitle: string) {
   return page.evaluate(async ({ title }) => {
-    const refreshResponse = await fetch('/api/auth/refresh', {
+    const refreshResponse = await fetch('/api/v1/auth/refresh', {
       method: 'POST',
       credentials: 'include',
     });
@@ -47,7 +47,7 @@ async function getPersistedTitlePageImageUrl(page: Page, projectTitle: string) {
     const refreshData = await refreshResponse.json() as { accessToken?: string };
     if (!refreshData.accessToken) return null;
 
-    const projectResponse = await fetch('/api/projects', {
+    const projectResponse = await fetch('/api/v1/projects', {
       credentials: 'include',
       headers: {
         Authorization: `Bearer ${refreshData.accessToken}`,
@@ -59,7 +59,7 @@ async function getPersistedTitlePageImageUrl(page: Page, projectTitle: string) {
     const project = projects.find((entry) => entry.title === title);
     if (!project) return null;
 
-    const documentsResponse = await fetch(`/api/projects/${project.id}/documents`, {
+    const documentsResponse = await fetch(`/api/v1/projects/${project.id}/documents`, {
       credentials: 'include',
       headers: {
         Authorization: `Bearer ${refreshData.accessToken}`,
@@ -67,9 +67,18 @@ async function getPersistedTitlePageImageUrl(page: Page, projectTitle: string) {
     });
     if (!documentsResponse.ok) return null;
 
-    const documents = await documentsResponse.json() as Array<{ content?: { content?: Array<{ type?: string; attrs?: { coverImageUrl?: string } }> } }>;
+    const documents = await documentsResponse.json() as Array<{ documentId?: string }>;
     for (const document of documents) {
-      const titlePage = document.content?.content?.find((node) => node?.type === 'titlePage');
+      if (!document.documentId) continue;
+      const detailResponse = await fetch(`/api/v1/projects/${project.id}/documents/${document.documentId}/editor-projection`, {
+        credentials: 'include',
+        headers: {
+          Authorization: `Bearer ${refreshData.accessToken}`,
+        },
+      });
+      if (!detailResponse.ok) continue;
+      const editorProjection = await detailResponse.json() as { content?: Array<{ type?: string; attrs?: { coverImageUrl?: string } }> };
+      const titlePage = editorProjection.content?.find((node) => node?.type === 'titlePage');
       const url = titlePage?.attrs?.coverImageUrl?.trim();
       if (url) {
         return url;

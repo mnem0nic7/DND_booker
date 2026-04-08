@@ -37,7 +37,7 @@ export const useThemeStore = create<ThemeState>()(
         const normalizedTheme = theme === 'dmguild' ? 'gilded-folio' : theme;
         set({ currentTheme: normalizedTheme });
         if (projectId) {
-          api.put(`/projects/${projectId}`, { settings: { theme: normalizedTheme } }).catch((err) => {
+          api.patch(`/v1/projects/${projectId}`, { settings: { theme: normalizedTheme } }).catch((err) => {
             console.error('[Theme] Failed to persist theme to server:', err);
           });
         }
