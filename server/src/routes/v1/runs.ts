@@ -45,6 +45,17 @@ import { listAgentActions } from '../../services/agent/log.service.js';
 
 const v1RunRoutes = Router({ mergeParams: true });
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function hasAcknowledgedGenerationPause(graphStateJson: unknown) {
+  if (!isRecord(graphStateJson)) return false;
+  const runtime = isRecord(graphStateJson.runtime) ? graphStateJson.runtime : graphStateJson;
+  const interrupted = isRecord(runtime.interrupted) ? runtime.interrupted : null;
+  return interrupted?.kind === 'paused';
+}
+
 v1RunRoutes.post(
   '/generation-runs',
   requireAuth,
@@ -132,11 +143,17 @@ for (const action of ['pause', 'resume', 'cancel'] as const) {
     asyncHandler(async (req, res) => {
       const authReq = req as AuthRequest;
       const runId = req.params.runId as string;
+      const projectId = req.params.projectId as string;
 
       if (action === 'resume') {
         const run = await getRun(runId, authReq.userId!);
         if (!run || run.status !== 'paused') {
           res.status(409).json({ error: 'Run is not paused' });
+          return;
+        }
+
+        if (!hasAcknowledgedGenerationPause(run.graphStateJson)) {
+          res.status(409).json({ error: 'Run has not yet reached a resumable checkpoint' });
           return;
         }
 
@@ -146,6 +163,8 @@ for (const action of ['pause', 'resume', 'cancel'] as const) {
           res.status(409).json({ error: 'Cannot resume this run' });
           return;
         }
+
+        await enqueueGenerationRun(runId, authReq.userId!, projectId, { priority: 10 });
 
         res.json(GenerationRunSchema.parse(result));
         return;

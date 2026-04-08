@@ -12,7 +12,7 @@ NPM workspaces monorepo with six packages:
 
 - **`client/`** — React 19 + Vite 6 + TipTap v3 editor + Tailwind CSS 4 + Zustand 5. Dev server on `:3000`, proxies `/api` to `:4000`.
 - **`server/`** — Express 4.21 + Prisma 6 + Vercel AI SDK. JWT auth, AES-256-GCM encrypted API keys, rate limiting. Runs on `:4000`.
-- **`worker/`** — BullMQ job processor for export and long-running generation/agent orchestration. Uses Typst + Playwright Core and writes durable artifacts to GCS in production.
+- **`worker/`** — BullMQ job processor for export and long-running generation/agent orchestration. Uses Typst + Playwright Core, writes durable artifacts to GCS in production, and now runs generation/agent flows as persisted step graphs mirrored into each run's `graphStateJson`.
 - **`shared/`** — Shared types, Zod contracts, publication-document schemas, and route metadata. Imported as `@dnd-booker/shared`.
 - **`text-layout/`** — Local layout engine and rendering helpers.
 - **`sdk/`** — Generated `api/v1` OpenAPI spec and typed client built from the shared route catalog.
@@ -81,6 +81,11 @@ Short lead-label paragraphs that end with `:` should stay attached to the follow
 Random tables with 8+ entries are treated as wide in layout planning, but export splitting should stay conservative: keep 8-10 entry tables intact and only split once tables grow beyond that range.
 
 When reapplying accepted art placements after document rebuilds, do not trust stored node indices alone. Resolve against the rebuilt document by block type, subject label, empty-image preference, and proximity.
+
+### Persisted run graphs
+Generation runs and agent runs now checkpoint the current graph node into `graphStateJson.runtime`. BullMQ retries should resume from that node instead of replaying the whole orchestration function.
+
+Generation pause/resume is now checkpoint-gated: a paused run can only be resumed after the worker has acknowledged the pause and written `runtime.interrupted.kind = "paused"`. Agent runs still pause cooperatively in-process and resume without requeueing.
 
 ### Authentication
 JWT access token (15min) + refresh token (7d, httpOnly cookie). Token version incremented on logout. Client axios interceptor auto-refreshes on 401.

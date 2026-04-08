@@ -14,6 +14,7 @@ Important distinctions:
 - `persistent_editor` and `background_producer` are run modes for the same top-level controller, not separate specialist agents
 - CRUD, memory, image, and document-edit capabilities are tools, not agents
 - specialists should own narrow mutation surfaces and be safe to checkpoint and roll back
+- the top-level controller now executes as a persisted node graph; retries should resume from `AgentRun.graphStateJson.runtime.currentNode`, not from cycle 0
 
 Current and proposed agents:
 

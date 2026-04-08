@@ -39,6 +39,15 @@ That keeps auth and URL shape stable while removing the shared-disk dependency t
 
 The worker still writes short-lived temporary files locally while rendering PDFs for the review pipeline. Those files do not need durable storage.
 
+## Run Resume Semantics
+
+Generation runs and agent runs now persist their active graph node into each run record's `graphStateJson.runtime`. This matters on Cloud Run because a deploy, crash, or BullMQ retry should resume from the last durable node instead of replaying the full orchestration function.
+
+Operational note:
+
+- generation resumes are checkpoint-gated; if the API says a paused run has not reached a resumable checkpoint yet, wait for the worker to acknowledge the pause before calling resume again
+- agent runs still pause cooperatively in-process, so they do not require an explicit requeue on resume
+
 ## Build And Push Images
 
 Set these first:

@@ -185,6 +185,65 @@ describe('Generation Run Routes', () => {
     });
   });
 
+  describe('POST .../resume', () => {
+    it('resumes a paused run after the graph runtime acknowledges the checkpoint', async () => {
+      const createRes = await request(app)
+        .post(`/api/projects/${projectId}/ai/generation-runs`)
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({ prompt: 'Resume test' });
+
+      await prisma.generationRun.update({
+        where: { id: createRes.body.id },
+        data: {
+          status: 'paused',
+          startedAt: new Date(),
+          currentStage: 'planning',
+          progressPercent: 42,
+          graphStateJson: {
+            runtime: {
+              currentNode: 'chapter_plans',
+              interrupted: {
+                kind: 'paused',
+                node: 'chapter_plans',
+                at: new Date().toISOString(),
+              },
+            },
+          } as any,
+        },
+      });
+
+      const res = await request(app)
+        .post(`/api/projects/${projectId}/ai/generation-runs/${createRes.body.id}/resume`)
+        .set('Authorization', `Bearer ${accessToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.status).toBe('planning');
+    });
+
+    it('rejects resume before the worker has checkpointed the paused state', async () => {
+      const createRes = await request(app)
+        .post(`/api/projects/${projectId}/ai/generation-runs`)
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({ prompt: 'Resume checkpoint test' });
+
+      await prisma.generationRun.update({
+        where: { id: createRes.body.id },
+        data: {
+          status: 'paused',
+          startedAt: new Date(),
+          currentStage: 'planning',
+        },
+      });
+
+      const res = await request(app)
+        .post(`/api/projects/${projectId}/ai/generation-runs/${createRes.body.id}/resume`)
+        .set('Authorization', `Bearer ${accessToken}`);
+
+      expect(res.status).toBe(409);
+      expect(res.body.error).toContain('resumable checkpoint');
+    });
+  });
+
   describe('POST .../cancel', () => {
     it('should cancel a queued run', async () => {
       const createRes = await request(app)
