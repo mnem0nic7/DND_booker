@@ -61,6 +61,8 @@ Routes export named routers (`authRoutes`, `aiSettingsRoutes`, `aiChatRoutes`, e
 The `api/v1` contract validates transport DTOs, not raw Prisma records. If a route parses against a Zod schema with ISO timestamp strings, normalize Prisma `Date` fields before schema validation instead of feeding database rows directly into the response schema. Also keep list routes on their true summary schemas; validating summary payloads against full detail shapes will fail in production even when the underlying data is correct.
 
 Project lifecycle now has a first-class `api/v1` surface (`/api/v1/projects`). New runtime work should use the generated SDK for project list/create/get/update/delete instead of adding more calls against the legacy `/api/projects` routes.
+Project aggregate content saves also go through `PATCH /api/v1/projects/:projectId`, and manual document layout saves go through `PATCH /api/v1/projects/:projectId/documents/:docId/layout`. Do not add new runtime writes against the legacy `/api/projects/:id/content` or `/api/projects/:projectId/documents/:docId/layout` paths.
+`api/v1` document snapshots now carry `layoutPlan` alongside canonical/editor/Typst fields. Client document loads should consume that v1 snapshot rather than stitching layout data from legacy document routes.
 
 ### SSE streaming
 Server uses `res.write()` chunks. Chat streams plain text; wizard streams newline-delimited JSON events. Client uses raw `fetch()` + `ReadableStream` reader (not EventSource) to support POST with body.

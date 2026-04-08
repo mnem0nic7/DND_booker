@@ -163,6 +163,7 @@ After deploy, verify:
 - load `"$URL/"`
 - confirm the authenticated `api/v1` smoke test passed, or run `npm run smoke:cloudrun:v1` manually if you skipped it during deploy
 - note that the smoke now uses `/api/v1/projects` for project discovery and creates then immediately cancels one quick generation run, so both the v1 project surface and v1 run creation/transport timestamps are exercised against production
+- project aggregate content saves and document layout saves also flow through `api/v1` now, so production editor regressions are more likely to show up in the same typed transport path the SDK uses
 
 Local ship verification should also cover the `api/v1` project and run surfaces before deploy. `npm run verify:ship` now includes `documents.v1.test.ts`, `projects.v1.test.ts`, and `runs.v1.test.ts` through the Cloud SQL Proxy + local Redis harness so project transport and run orchestration regressions are caught before production.
 

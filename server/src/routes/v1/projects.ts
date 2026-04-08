@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { Router } from 'express';
 import {
   ProjectCreateRequestSchema,
@@ -72,13 +73,38 @@ v1ProjectRoutes.patch(
       return;
     }
 
-    const project = await projectService.updateProject(projectId, authReq.userId!, parsed.data);
+    const { content, settings, ...metadata } = parsed.data;
+
+    if (Object.keys(metadata).length > 0 || settings !== undefined) {
+      const updatedProject = await projectService.updateProject(projectId, authReq.userId!, {
+        ...metadata,
+        ...(settings !== undefined ? { settings: settings as Prisma.InputJsonValue } : {}),
+      });
+      if (!updatedProject) {
+        res.status(404).json({ error: 'Project not found' });
+        return;
+      }
+    }
+
+    if (content !== undefined) {
+      const updatedProject = await projectService.updateProjectContent(
+        projectId,
+        authReq.userId!,
+        content as unknown as Prisma.InputJsonValue,
+      );
+      if (!updatedProject) {
+        res.status(404).json({ error: 'Project not found' });
+        return;
+      }
+    }
+
+    const project = await projectService.getProject(projectId, authReq.userId!);
     if (!project) {
       res.status(404).json({ error: 'Project not found' });
       return;
     }
 
-    res.json(ProjectSummarySchema.parse(toTransportJson(project)));
+    res.json(ProjectDetailSchema.parse(toTransportJson(project)));
   }),
 );
 

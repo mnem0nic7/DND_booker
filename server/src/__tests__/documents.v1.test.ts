@@ -130,4 +130,44 @@ describe('Document API v1', () => {
     expect(updated.body.title).toBe('Chapter Alpha Revised');
     expect(updated.body.typstSource).toContain('Chapter Alpha Revised');
   });
+
+  it('updates layout plans through the v1 document route', async () => {
+    const patch = {
+      version: 1,
+      sectionRecipe: 'chapter_hero_split',
+      columnBalanceTarget: 'balanced',
+      blocks: [
+        {
+          nodeId: 'hero-node',
+          presentationOrder: 0,
+          span: 'both_columns',
+          placement: 'hero_top',
+          groupId: null,
+          keepTogether: true,
+          allowWrapBelow: false,
+        },
+      ],
+    };
+
+    const res = await request(app)
+      .patch(`/api/v1/projects/${projectId}/documents/${docId}/layout`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send(patch);
+
+    expect(res.status).toBe(200);
+    expect(res.body.layoutPlan?.version).toBe(1);
+    expect(res.body.layoutPlan?.sectionRecipe).toBe('chapter_hero_split');
+    expect(res.body.layoutPlan?.columnBalanceTarget).toBe('balanced');
+    expect(Array.isArray(res.body.layoutPlan?.blocks)).toBe(true);
+    expect(res.body.layoutPlan.blocks.length).toBeGreaterThan(0);
+
+    const updated = await request(app)
+      .get(`/api/v1/projects/${projectId}/documents/${docId}`)
+      .set('Authorization', `Bearer ${accessToken}`);
+
+    expect(updated.status).toBe(200);
+    expect(updated.body.layoutPlan?.sectionRecipe).toBe('chapter_hero_split');
+    expect(updated.body.layoutPlan?.columnBalanceTarget).toBe('balanced');
+    expect(updated.body.layoutPlan.blocks.length).toBeGreaterThan(0);
+  });
 });

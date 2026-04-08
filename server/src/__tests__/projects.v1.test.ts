@@ -97,6 +97,32 @@ describe('Projects API v1', () => {
     expect(updateRes.body.settings.pageSize).toBeDefined();
   });
 
+  it('updates aggregate project content through api/v1', async () => {
+    const patchRes = await request(app)
+      .patch(`/api/v1/projects/${createdProjectId}`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        content: {
+          type: 'doc',
+          content: [
+            { type: 'heading', attrs: { level: 1 }, content: [{ type: 'text', text: 'Aggregate Title' }] },
+            { type: 'paragraph', content: [{ type: 'text', text: 'Aggregate content saved through v1.' }] },
+          ],
+        },
+      });
+
+    expect(patchRes.status).toBe(200);
+    expect(patchRes.body.content?.type).toBe('doc');
+    expect(patchRes.body.content?.content?.[1]?.content?.[0]?.text).toBe('Aggregate content saved through v1.');
+
+    const getRes = await request(app)
+      .get(`/api/v1/projects/${createdProjectId}`)
+      .set('Authorization', `Bearer ${accessToken}`);
+
+    expect(getRes.status).toBe(200);
+    expect(getRes.body.content?.content?.[1]?.content?.[0]?.text).toBe('Aggregate content saved through v1.');
+  });
+
   it('deletes a project through api/v1', async () => {
     const createRes = await request(app)
       .post('/api/v1/projects')
