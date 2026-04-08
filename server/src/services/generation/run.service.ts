@@ -1,5 +1,11 @@
 import { prisma } from '../../config/database.js';
-import type { RunStatus, GenerationMode, GenerationQuality, GenerationConstraints } from '@dnd-booker/shared';
+import type {
+  RunStatus,
+  GenerationMode,
+  GenerationQuality,
+  GenerationConstraints,
+  GenerationRun,
+} from '@dnd-booker/shared';
 import { RUN_STATUS_TRANSITIONS } from '@dnd-booker/shared';
 import { randomUUID } from 'node:crypto';
 import type { Prisma } from '@prisma/client';
@@ -36,6 +42,35 @@ function mergeGraphState(existing: unknown, patch: Record<string, unknown>): Pri
   } as Prisma.InputJsonValue;
 }
 
+function serializeRun(run: any): GenerationRun {
+  return {
+    id: run.id,
+    projectId: run.projectId,
+    userId: run.userId,
+    mode: run.mode,
+    quality: run.quality,
+    status: run.status,
+    currentStage: run.currentStage ?? null,
+    inputPrompt: run.inputPrompt,
+    inputParameters: (run.inputParameters as GenerationConstraints | null) ?? null,
+    progressPercent: run.progressPercent ?? 0,
+    estimatedPages: run.estimatedPages ?? null,
+    estimatedTokens: run.estimatedTokens ?? null,
+    estimatedCost: run.estimatedCost ?? null,
+    actualTokens: run.actualTokens ?? 0,
+    actualCost: run.actualCost ?? 0,
+    failureReason: run.failureReason ?? null,
+    graphThreadId: run.graphThreadId ?? null,
+    graphCheckpointKey: run.graphCheckpointKey ?? null,
+    graphStateJson: (run.graphStateJson as Record<string, unknown> | null) ?? null,
+    resumeToken: run.resumeToken ?? null,
+    createdAt: run.createdAt.toISOString(),
+    updatedAt: run.updatedAt.toISOString(),
+    startedAt: run.startedAt?.toISOString() ?? null,
+    completedAt: run.completedAt?.toISOString() ?? null,
+  };
+}
+
 interface CreateRunInput {
   projectId: string;
   userId: string;
@@ -52,7 +87,7 @@ export async function createRun(input: CreateRunInput) {
   });
   if (!project) return null;
 
-  return prisma.generationRun.create({
+  const run = await prisma.generationRun.create({
     data: {
       projectId: input.projectId,
       userId: input.userId,
@@ -64,12 +99,15 @@ export async function createRun(input: CreateRunInput) {
       estimatedPages: input.pageTarget ?? null,
     },
   });
+
+  return serializeRun(run);
 }
 
 export async function getRun(runId: string, userId: string) {
-  return prisma.generationRun.findFirst({
+  const run = await prisma.generationRun.findFirst({
     where: { id: runId, userId },
   });
+  return run ? serializeRun(run) : null;
 }
 
 export async function listRuns(projectId: string, userId: string) {
@@ -78,10 +116,12 @@ export async function listRuns(projectId: string, userId: string) {
   });
   if (!project) return null;
 
-  return prisma.generationRun.findMany({
+  const runs = await prisma.generationRun.findMany({
     where: { projectId, userId },
     orderBy: { createdAt: 'desc' },
   });
+
+  return runs.map(serializeRun);
 }
 
 export async function transitionRunStatus(
@@ -141,10 +181,12 @@ export async function transitionRunStatus(
     updatedAt: now.toISOString(),
   });
 
-  return prisma.generationRun.update({
+  const updated = await prisma.generationRun.update({
     where: { id: runId },
     data,
   });
+
+  return serializeRun(updated);
 }
 
 export async function updateRunProgress(

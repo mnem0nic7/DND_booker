@@ -58,6 +58,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
+function toTransportJson<T>(value: T): unknown {
+  return JSON.parse(JSON.stringify(value));
+}
+
 function hasAcknowledgedGenerationPause(graphStateJson: unknown) {
   if (!isRecord(graphStateJson)) return false;
   const runtime = isRecord(graphStateJson.runtime) ? graphStateJson.runtime : graphStateJson;
@@ -112,7 +116,7 @@ v1RunRoutes.post(
     }
 
     await enqueueGenerationRun(run.id, authReq.userId!, projectId);
-    res.status(201).json(GenerationRunSchema.parse(run));
+    res.status(201).json(GenerationRunSchema.parse(toTransportJson(run)));
   }),
 );
 
@@ -129,7 +133,7 @@ v1RunRoutes.get(
       return;
     }
 
-    res.json(GenerationRunSchema.array().parse(runs));
+    res.json(GenerationRunSchema.array().parse(toTransportJson(runs)));
   }),
 );
 
@@ -152,12 +156,12 @@ v1RunRoutes.get(
       getExportReviewArtifactForRun(run, authReq.userId!),
     ]);
 
-    res.json(GenerationRunDetailSchema.parse({
+    res.json(GenerationRunDetailSchema.parse(toTransportJson({
       ...run,
       taskCount,
       artifactCount: artifactCount + (exportReviewArtifact ? 1 : 0),
       latestExportReview: exportReviewArtifact?.jsonContent ?? null,
-    }));
+    })));
   }),
 );
 
@@ -192,7 +196,7 @@ for (const action of ['pause', 'resume', 'cancel'] as const) {
 
         await enqueueGenerationRun(runId, authReq.userId!, projectId, { priority: 10 });
 
-        res.json(GenerationRunSchema.parse(result));
+        res.json(GenerationRunSchema.parse(toTransportJson(result)));
         return;
       }
 
@@ -203,7 +207,7 @@ for (const action of ['pause', 'resume', 'cancel'] as const) {
         return;
       }
 
-      res.json(GenerationRunSchema.parse(result));
+      res.json(GenerationRunSchema.parse(toTransportJson(result)));
     }),
   );
 }
@@ -250,7 +254,7 @@ v1RunRoutes.get(
       return;
     }
 
-    res.json(GraphInterruptSchema.array().parse(interrupts));
+    res.json(GraphInterruptSchema.array().parse(toTransportJson(interrupts)));
   }),
 );
 
@@ -305,7 +309,7 @@ v1RunRoutes.post(
       }
     }
 
-    res.json(GraphInterruptSchema.parse(result.interrupt));
+    res.json(GraphInterruptSchema.parse(toTransportJson(result.interrupt)));
   }),
 );
 
@@ -330,9 +334,9 @@ v1RunRoutes.get(
       getExportReviewArtifactForRun(run, authReq.userId!),
     ]);
 
-    res.json(V1GeneratedArtifactSchema.array().parse(
+    res.json(V1GeneratedArtifactSchema.array().parse(toTransportJson(
       exportReviewArtifact ? [...artifacts, exportReviewArtifact] : artifacts,
-    ));
+    )));
   }),
 );
 
@@ -357,10 +361,10 @@ v1RunRoutes.get(
         return;
       }
 
-      res.json(V1GeneratedArtifactDetailSchema.parse({
+      res.json(V1GeneratedArtifactDetailSchema.parse(toTransportJson({
         ...exportReviewArtifact,
         evaluations: [],
-      }));
+      })));
       return;
     }
 
@@ -374,7 +378,7 @@ v1RunRoutes.get(
       return;
     }
 
-    res.json(V1GeneratedArtifactDetailSchema.parse(artifact));
+    res.json(V1GeneratedArtifactDetailSchema.parse(toTransportJson(artifact)));
   }),
 );
 
@@ -396,7 +400,7 @@ v1RunRoutes.get(
       orderBy: [{ entityType: 'asc' }, { canonicalName: 'asc' }],
     });
 
-    res.json(CanonEntitySchema.array().parse(entities));
+    res.json(CanonEntitySchema.array().parse(toTransportJson(entities)));
   }),
 );
 
@@ -418,7 +422,7 @@ v1RunRoutes.get(
       orderBy: { createdAt: 'desc' },
     });
 
-    res.json(ArtifactEvaluationSchema.array().parse(evaluations));
+    res.json(ArtifactEvaluationSchema.array().parse(toTransportJson(evaluations)));
   }),
 );
 
@@ -445,7 +449,7 @@ v1RunRoutes.get(
       return;
     }
 
-    res.json(AssemblyManifestSchema.parse(manifest));
+    res.json(AssemblyManifestSchema.parse(toTransportJson(manifest)));
   }),
 );
 
@@ -481,7 +485,7 @@ v1RunRoutes.post(
     }
 
     await enqueueAgentRun(run.id, authReq.userId!, projectId);
-    res.status(201).json(AgentRunSchema.parse(run));
+    res.status(201).json(AgentRunSchema.parse(toTransportJson(run)));
   }),
 );
 
@@ -498,7 +502,7 @@ v1RunRoutes.get(
       return;
     }
 
-    res.json(AgentRunSummarySchema.array().parse(runs));
+    res.json(AgentRunSummarySchema.array().parse(toTransportJson(runs)));
   }),
 );
 
@@ -520,7 +524,7 @@ v1RunRoutes.get(
       prisma.agentAction.count({ where: { runId } }),
     ]);
 
-    res.json(AgentRunDetailSchema.parse({ ...run, checkpointCount, actionCount }));
+    res.json(AgentRunDetailSchema.parse(toTransportJson({ ...run, checkpointCount, actionCount })));
   }),
 );
 
@@ -555,7 +559,7 @@ for (const action of ['pause', 'resume', 'cancel'] as const) {
           progressPercent: result.progressPercent,
         });
 
-        res.json(AgentRunSchema.parse(result));
+        res.json(AgentRunSchema.parse(toTransportJson(result)));
         return;
       }
 
@@ -574,7 +578,7 @@ for (const action of ['pause', 'resume', 'cancel'] as const) {
         progressPercent: result.progressPercent,
       });
 
-      res.json(AgentRunSchema.parse(result));
+      res.json(AgentRunSchema.parse(toTransportJson(result)));
     }),
   );
 }
@@ -592,7 +596,7 @@ v1RunRoutes.get(
       return;
     }
 
-    res.json(GraphInterruptSchema.array().parse(interrupts));
+    res.json(GraphInterruptSchema.array().parse(toTransportJson(interrupts)));
   }),
 );
 
@@ -647,7 +651,7 @@ v1RunRoutes.post(
       }
     }
 
-    res.json(GraphInterruptSchema.parse(result.interrupt));
+    res.json(GraphInterruptSchema.parse(toTransportJson(result.interrupt)));
   }),
 );
 
@@ -664,7 +668,7 @@ v1RunRoutes.get(
       return;
     }
 
-    res.json(AgentCheckpointSchema.array().parse(checkpoints));
+    res.json(AgentCheckpointSchema.array().parse(toTransportJson(checkpoints)));
   }),
 );
 
@@ -694,7 +698,7 @@ v1RunRoutes.post(
       label: restored.label,
     });
 
-    res.json(AgentCheckpointSchema.parse(restored));
+    res.json(AgentCheckpointSchema.parse(toTransportJson(restored)));
   }),
 );
 
@@ -711,7 +715,7 @@ v1RunRoutes.get(
       return;
     }
 
-    res.json(AgentActionSchema.array().parse(actions));
+    res.json(AgentActionSchema.array().parse(toTransportJson(actions)));
   }),
 );
 

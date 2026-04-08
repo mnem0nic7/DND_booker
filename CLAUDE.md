@@ -58,6 +58,8 @@ npm run build --workspace=server   # tsc to dist/
 ### Server routing
 Routes export named routers (`authRoutes`, `aiSettingsRoutes`, `aiChatRoutes`, etc.) mounted in `server/src/index.ts`. AI routes split into four routers: settings, generate, chat, wizard.
 
+The `api/v1` contract validates transport DTOs, not raw Prisma records. If a route parses against a Zod schema with ISO timestamp strings, normalize Prisma `Date` fields before schema validation instead of feeding database rows directly into the response schema.
+
 ### SSE streaming
 Server uses `res.write()` chunks. Chat streams plain text; wizard streams newline-delimited JSON events. Client uses raw `fetch()` + `ReadableStream` reader (not EventSource) to support POST with body.
 
@@ -132,12 +134,14 @@ Unless the user explicitly says not to, treat this as the default after every co
    - `npm run verify:ship` for the normal shippable path.
    - `npm run verify` is the lighter build-only pass when you explicitly do not need the full ship checks.
    - If cloud-backed server integration is unavailable, record the exact blocker instead of silently skipping it.
+   - `verify:ship` now includes both `documents.v1.test.ts` and `runs.v1.test.ts` through the local Cloud SQL Proxy + Redis harness; keep new `api/v1` route regressions in that path when they touch transport serialization or run orchestration APIs.
 3. Update repo memory and docs when behavior, workflow, deployment steps, or architecture changed.
    - Memory: this file and any other standing repo guidance.
    - Docs: `README.md`, `deploy/cloudrun/README.md`, or the closest feature/runbook doc.
 4. Review `git status`, commit the intended changes, and push the current branch.
 5. Redeploy production with `npm run deploy:cloudrun` unless the user asked to skip deploys.
-   - Set `SMOKE_TEST_EMAIL`, `SMOKE_TEST_PASSWORD`, and optionally `SMOKE_TEST_PROJECT_ID` so the redeploy script also runs the authenticated `api/v1` smoke check automatically.
+   - Set `SMOKE_TEST_EMAIL`, `SMOKE_TEST_PASSWORD`, and optionally `SMOKE_TEST_PROJECT_ID` / `SMOKE_TEST_GENERATION_PROMPT` so the redeploy script also runs the authenticated `api/v1` smoke check automatically.
+   - The production smoke now creates and immediately cancels one quick generation run, so run-creation regressions get exercised before sign-off.
 
 Do not stop after code edits if the task implies shipping. Verification, docs, commit, push, and redeploy are part of the normal completion path.
 

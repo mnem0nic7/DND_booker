@@ -6,7 +6,11 @@ export const EXPORT_REVIEW_ARTIFACT_PREFIX = 'export-review:';
 export interface GenerationRunExportWindow {
   id: string;
   projectId: string;
-  createdAt: Date;
+  createdAt: Date | string;
+}
+
+function normalizeDate(value: Date | string) {
+  return value instanceof Date ? value : new Date(value);
 }
 
 export function isExportReviewArtifactId(artifactId: string): boolean {
@@ -17,11 +21,13 @@ async function getLatestScopedExportJobForRun(
   run: GenerationRunExportWindow,
   userId: string,
 ) {
+  const runCreatedAt = normalizeDate(run.createdAt);
+
   const nextRun = await prisma.generationRun.findFirst({
     where: {
       projectId: run.projectId,
       userId,
-      createdAt: { gt: run.createdAt },
+      createdAt: { gt: runCreatedAt },
     },
     orderBy: { createdAt: 'asc' },
     select: { createdAt: true },
@@ -33,7 +39,7 @@ async function getLatestScopedExportJobForRun(
       userId,
       status: 'completed',
       createdAt: {
-        gte: run.createdAt,
+        gte: runCreatedAt,
         ...(nextRun ? { lt: nextRun.createdAt } : {}),
       },
     },

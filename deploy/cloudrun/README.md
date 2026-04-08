@@ -153,6 +153,7 @@ If you set these before deploy, the wrapper also runs an authenticated `api/v1` 
 export SMOKE_TEST_EMAIL="you@example.com"
 export SMOKE_TEST_PASSWORD="your-password"
 export SMOKE_TEST_PROJECT_ID="optional-project-id"
+export SMOKE_TEST_GENERATION_PROMPT="optional smoke prompt override"
 ```
 
 After deploy, verify:
@@ -160,6 +161,9 @@ After deploy, verify:
 - `curl -fsS "$URL/api/health"`
 - load `"$URL/"`
 - confirm the authenticated `api/v1` smoke test passed, or run `npm run smoke:cloudrun:v1` manually if you skipped it during deploy
+- note that the smoke now creates and immediately cancels one quick generation run so `api/v1` run creation and transport timestamps are exercised against production
+
+Local ship verification should also cover the `api/v1` run surface before deploy. `npm run verify:ship` now includes `documents.v1.test.ts` and `runs.v1.test.ts` through the Cloud SQL Proxy + local Redis harness so generation/agent run transport regressions are caught before production.
 
 ## Seed Templates
 
