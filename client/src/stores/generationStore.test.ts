@@ -1,5 +1,6 @@
 import { act } from '@testing-library/react';
 import { HttpResponse, http } from 'msw';
+import { vi } from 'vitest';
 import { useGenerationStore } from './generationStore';
 import { server } from '../test/msw/server';
 
@@ -55,5 +56,62 @@ describe('generationStore.fetchLatestRun', () => {
     expect(state.progressPercent).toBe(100);
     expect(state.currentStage).toBeNull();
     expect(state.artifactCount).toBe(3);
+  });
+
+  it('resolves a pending interrupt and resumes a paused run', async () => {
+    const resumeRun = vi.fn().mockResolvedValue(undefined);
+
+    useGenerationStore.setState({
+      currentRun: {
+        id: 'run-1',
+        mode: 'campaign',
+        quality: 'quick',
+        status: 'paused',
+        currentStage: 'planning',
+        progressPercent: 42,
+        inputPrompt: 'Parity test run',
+        graphStateJson: {
+          interrupts: [
+            {
+              id: '11111111-1111-4111-8111-111111111111',
+              kind: 'manual_review',
+              status: 'pending',
+              createdAt: '2026-04-01T16:00:00.000Z',
+            },
+          ],
+        },
+        createdAt: '2026-04-01T16:00:00.000Z',
+        updatedAt: '2026-04-01T16:05:00.000Z',
+      },
+      resumeRun: resumeRun as any,
+    });
+
+    server.use(
+      http.post('/api/v1/projects/:projectId/generation-runs/:runId/interrupts/:interruptId/resolve', () => HttpResponse.json({
+        id: '11111111-1111-4111-8111-111111111111',
+        runType: 'generation',
+        runId: 'run-1',
+        kind: 'manual_review',
+        title: 'Review chapter outline',
+        summary: 'Needs approval',
+        status: 'approved',
+        payload: null,
+        resolutionPayload: null,
+        resolvedByUserId: 'user-1',
+        createdAt: '2026-04-01T16:00:00.000Z',
+        resolvedAt: '2026-04-01T16:06:00.000Z',
+      })),
+    );
+
+    await act(async () => {
+      await useGenerationStore.getState().resolveInterrupt(
+        'project-1',
+        'run-1',
+        '11111111-1111-4111-8111-111111111111',
+        'approve',
+      );
+    });
+
+    expect(resumeRun).toHaveBeenCalledWith('project-1', 'run-1');
   });
 });

@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useAgentStore } from '../../stores/agentStore';
 import { AGENT_STATUS_TRANSITIONS, type AgentAction, type AgentEvent, type AgentRunStatus } from '@dnd-booker/shared';
+import { readPendingGraphInterrupts } from '../../lib/graphInterrupts';
 
 const STAGE_LABELS: Record<AgentRunStatus, string> = {
   queued: 'Queued',
@@ -96,6 +97,7 @@ export function AgentRunPanel({ projectId }: Props) {
     resumeRun,
     cancelRun,
     restoreCheckpoint,
+    resolveInterrupt,
     reset,
   } = useAgentStore();
 
@@ -111,8 +113,10 @@ export function AgentRunPanel({ projectId }: Props) {
   const status = currentRun.status;
   const isActive = ACTIVE_STATUSES.includes(status);
   const isTerminal = ['completed', 'failed', 'cancelled'].includes(status);
+  const pendingInterrupts = readPendingGraphInterrupts(currentRun.graphStateJson, 'agent', currentRun.id);
+  const hasPendingInterrupts = pendingInterrupts.length > 0;
   const canPause = AGENT_STATUS_TRANSITIONS[status]?.includes('paused') ?? false;
-  const canResume = status === 'paused'
+  const canResume = !hasPendingInterrupts && status === 'paused'
     && Boolean(currentRun.currentStage)
     && (AGENT_STATUS_TRANSITIONS.paused?.includes(currentRun.currentStage as AgentRunStatus) ?? false);
   const canCancel = AGENT_STATUS_TRANSITIONS[status]?.includes('cancelled') ?? false;
@@ -120,6 +124,16 @@ export function AgentRunPanel({ projectId }: Props) {
   const recentEvents = events.slice(-5);
   const recentActions = actions.slice(0, 3);
   const bestCheckpointId = currentRun.bestCheckpointId;
+  const handleResolveInterrupt = async (interruptId: string, action: 'approve' | 'edit' | 'reject') => {
+    if (action === 'edit') {
+      const note = window.prompt('Describe the requested edit before resuming this run.', '');
+      if (note === null) return;
+      await resolveInterrupt(projectId, currentRun.id, interruptId, action, { note });
+      return;
+    }
+
+    await resolveInterrupt(projectId, currentRun.id, interruptId, action);
+  };
 
   return (
     <div className="border border-amber-200 rounded-lg p-3 mb-3 bg-amber-50/60">
@@ -161,6 +175,44 @@ export function AgentRunPanel({ projectId }: Props) {
       </div>
 
       {error && <p className="text-xs text-red-600 mb-2">{error}</p>}
+
+      {hasPendingInterrupts && (
+        <div className="mb-3 rounded border border-amber-200 bg-white px-3 py-2">
+          <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-amber-700">
+            Approval Gate Pending
+          </div>
+          <div className="space-y-2">
+            {pendingInterrupts.map((interrupt) => (
+              <div key={interrupt.id} className="rounded border border-amber-100 bg-amber-50/60 px-2 py-2">
+                <div className="text-xs font-medium text-gray-800">{interrupt.title}</div>
+                {interrupt.summary && (
+                  <div className="mt-0.5 text-xs text-gray-600">{interrupt.summary}</div>
+                )}
+                <div className="mt-2 flex gap-2">
+                  <button
+                    onClick={() => void handleResolveInterrupt(interrupt.id, 'approve')}
+                    className="text-xs px-2 py-1 rounded bg-green-100 text-green-700 hover:bg-green-200 transition-colors"
+                  >
+                    Approve
+                  </button>
+                  <button
+                    onClick={() => void handleResolveInterrupt(interrupt.id, 'edit')}
+                    className="text-xs px-2 py-1 rounded bg-amber-100 text-amber-700 hover:bg-amber-200 transition-colors"
+                  >
+                    Request Edit
+                  </button>
+                  <button
+                    onClick={() => void handleResolveInterrupt(interrupt.id, 'reject')}
+                    className="text-xs px-2 py-1 rounded bg-red-100 text-red-700 hover:bg-red-200 transition-colors"
+                  >
+                    Reject
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {recentEvents.length > 0 && (
         <div className="text-xs text-gray-500 space-y-0.5 mb-2 max-h-20 overflow-y-auto">

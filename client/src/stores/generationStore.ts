@@ -8,6 +8,7 @@ import type {
   ArtifactEvaluation,
   CanonEntity,
   AssemblyManifest,
+  GraphInterruptResolutionAction,
 } from '@dnd-booker/shared';
 
 // Active statuses that indicate a run is still in progress
@@ -70,6 +71,13 @@ interface GenerationState {
   fetchEvaluations: (projectId: string, runId: string) => Promise<void>;
   fetchAssemblyManifest: (projectId: string, runId: string) => Promise<void>;
   selectArtifact: (artifactId: string | null) => void;
+  resolveInterrupt: (
+    projectId: string,
+    runId: string,
+    interruptId: string,
+    action: GraphInterruptResolutionAction,
+    payload?: unknown,
+  ) => Promise<void>;
 }
 
 export const useGenerationStore = create<GenerationState>((set, get) => ({
@@ -359,6 +367,33 @@ export const useGenerationStore = create<GenerationState>((set, get) => ({
 
   selectArtifact: (artifactId) => {
     set({ selectedArtifactId: artifactId, artifactDetail: null });
+  },
+
+  resolveInterrupt: async (projectId, runId, interruptId, action, payload) => {
+    try {
+      await v1Client.generationRuns.resolveGenerationRunInterrupt({
+        projectId,
+        runId,
+        interruptId,
+      }, {
+        action,
+        payload,
+      });
+
+      const currentRun = get().currentRun;
+      if (action !== 'reject' && currentRun?.status === 'paused') {
+        await get().resumeRun(projectId, runId);
+        return;
+      }
+
+      await get().fetchRun(projectId, runId);
+    } catch (err: unknown) {
+      const message =
+        err && typeof err === 'object' && 'response' in err
+          ? (err as { response?: { data?: { error?: string } } }).response?.data?.error
+          : undefined;
+      set({ error: message || 'Failed to resolve review gate' });
+    }
   },
 
   reset: () => {

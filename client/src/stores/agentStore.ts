@@ -9,6 +9,7 @@ import type {
   AgentRunMode,
   AgentRunStatus,
   CreateAgentRunRequest,
+  GraphInterruptResolutionAction,
 } from '@dnd-booker/shared';
 
 const ACTIVE_STATUSES: AgentRunStatus[] = [
@@ -43,6 +44,13 @@ interface AgentState {
   fetchCheckpoints: (projectId: string, runId: string) => Promise<void>;
   fetchActions: (projectId: string, runId: string) => Promise<void>;
   restoreCheckpoint: (projectId: string, runId: string, checkpointId: string) => Promise<void>;
+  resolveInterrupt: (
+    projectId: string,
+    runId: string,
+    interruptId: string,
+    action: GraphInterruptResolutionAction,
+    payload?: unknown,
+  ) => Promise<void>;
   reset: () => void;
 }
 
@@ -276,6 +284,33 @@ export const useAgentStore = create<AgentState>((set, get) => ({
       }
     } catch (err: unknown) {
       set({ error: toErrorMessage(err, 'Failed to restore checkpoint') });
+    }
+  },
+
+  resolveInterrupt: async (projectId, runId, interruptId, action, payload) => {
+    try {
+      await v1Client.agentRuns.resolveAgentRunInterrupt({
+        projectId,
+        runId,
+        interruptId,
+      }, {
+        action,
+        payload,
+      });
+
+      const currentRun = get().currentRun;
+      if (action !== 'reject' && currentRun?.status === 'paused') {
+        await get().resumeRun(projectId, runId);
+        return;
+      }
+
+      await Promise.all([
+        get().fetchRun(projectId, runId),
+        get().fetchCheckpoints(projectId, runId),
+        get().fetchActions(projectId, runId),
+      ]);
+    } catch (err: unknown) {
+      set({ error: toErrorMessage(err, 'Failed to resolve approval gate') });
     }
   },
 

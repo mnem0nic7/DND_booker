@@ -26,6 +26,9 @@ import type {
   GenerationRunCreateRequest,
   GenerationRunDetail,
   GenerationRunIdParams,
+  GraphInterrupt,
+  GraphInterruptIdParams,
+  GraphInterruptResolutionRequestBody,
   Problem,
   ProjectIdParams,
   PublicationDocumentDetail,
@@ -54,6 +57,9 @@ export interface V1Client {
     getDocumentTypst(params: DocumentIdParams, config?: AxiosRequestConfig): Promise<PublicationDocumentTypst>;
     updateDocument(params: DocumentIdParams, body: PublicationDocumentPatchRequest, config?: AxiosRequestConfig): Promise<PublicationDocumentDetail>;
   };
+  graphInterrupts: {
+    listProjectInterrupts(params: ProjectIdParams, config?: AxiosRequestConfig): Promise<GraphInterrupt[]>;
+  };
   generationRuns: {
     createGenerationRun(params: ProjectIdParams, body: GenerationRunCreateRequest, config?: AxiosRequestConfig): Promise<GenerationRun>;
     listGenerationRuns(params: ProjectIdParams, config?: AxiosRequestConfig): Promise<GenerationRun[]>;
@@ -61,6 +67,8 @@ export interface V1Client {
     pauseGenerationRun(params: GenerationRunIdParams, config?: AxiosRequestConfig): Promise<GenerationRun>;
     resumeGenerationRun(params: GenerationRunIdParams, config?: AxiosRequestConfig): Promise<GenerationRun>;
     cancelGenerationRun(params: GenerationRunIdParams, config?: AxiosRequestConfig): Promise<GenerationRun>;
+    listGenerationRunInterrupts(params: GenerationRunIdParams, config?: AxiosRequestConfig): Promise<GraphInterrupt[]>;
+    resolveGenerationRunInterrupt(params: GraphInterruptIdParams, body: GraphInterruptResolutionRequestBody, config?: AxiosRequestConfig): Promise<GraphInterrupt>;
     listGenerationArtifacts(params: GenerationRunIdParams, config?: AxiosRequestConfig): Promise<GeneratedArtifact[]>;
     getGenerationArtifact(params: GenerationArtifactIdParams, config?: AxiosRequestConfig): Promise<GeneratedArtifact & { evaluations?: ArtifactEvaluation[] }>;
     listGenerationCanonEntities(params: GenerationRunIdParams, config?: AxiosRequestConfig): Promise<CanonEntity[]>;
@@ -74,6 +82,8 @@ export interface V1Client {
     pauseAgentRun(params: AgentRunIdParams, config?: AxiosRequestConfig): Promise<AgentRun>;
     resumeAgentRun(params: AgentRunIdParams, config?: AxiosRequestConfig): Promise<AgentRun>;
     cancelAgentRun(params: AgentRunIdParams, config?: AxiosRequestConfig): Promise<AgentRun>;
+    listAgentRunInterrupts(params: AgentRunIdParams, config?: AxiosRequestConfig): Promise<GraphInterrupt[]>;
+    resolveAgentRunInterrupt(params: GraphInterruptIdParams, body: GraphInterruptResolutionRequestBody, config?: AxiosRequestConfig): Promise<GraphInterrupt>;
     listAgentCheckpoints(params: AgentRunIdParams, config?: AxiosRequestConfig): Promise<AgentCheckpoint[]>;
     restoreAgentCheckpoint(params: AgentCheckpointIdParams, config?: AxiosRequestConfig): Promise<AgentCheckpoint>;
     listAgentActions(params: AgentRunIdParams, config?: AxiosRequestConfig): Promise<AgentAction[]>;
@@ -133,6 +143,12 @@ export function createV1Client(axios: AxiosInstance): V1Client {
         return data;
       },
     },
+    graphInterrupts: {
+      async listProjectInterrupts(params: ProjectIdParams, config?: AxiosRequestConfig) {
+        const { data } = await axios.get<GraphInterrupt[]>(buildPath('/v1/projects/{projectId}/interrupts', params as Record<string, string | number | undefined>), config);
+        return data;
+      },
+    },
     generationRuns: {
       async createGenerationRun(params: ProjectIdParams, body: GenerationRunCreateRequest, config?: AxiosRequestConfig) {
         const { data } = await axios.post<GenerationRun>(buildPath('/v1/projects/{projectId}/generation-runs', params as Record<string, string | number | undefined>), body, config);
@@ -156,6 +172,14 @@ export function createV1Client(axios: AxiosInstance): V1Client {
       },
       async cancelGenerationRun(params: GenerationRunIdParams, config?: AxiosRequestConfig) {
         const { data } = await axios.post<GenerationRun>(buildPath('/v1/projects/{projectId}/generation-runs/{runId}/cancel', params as Record<string, string | number | undefined>), undefined, config);
+        return data;
+      },
+      async listGenerationRunInterrupts(params: GenerationRunIdParams, config?: AxiosRequestConfig) {
+        const { data } = await axios.get<GraphInterrupt[]>(buildPath('/v1/projects/{projectId}/generation-runs/{runId}/interrupts', params as Record<string, string | number | undefined>), config);
+        return data;
+      },
+      async resolveGenerationRunInterrupt(params: GraphInterruptIdParams, body: GraphInterruptResolutionRequestBody, config?: AxiosRequestConfig) {
+        const { data } = await axios.post<GraphInterrupt>(buildPath('/v1/projects/{projectId}/generation-runs/{runId}/interrupts/{interruptId}/resolve', params as Record<string, string | number | undefined>), body, config);
         return data;
       },
       async listGenerationArtifacts(params: GenerationRunIdParams, config?: AxiosRequestConfig) {
@@ -202,6 +226,14 @@ export function createV1Client(axios: AxiosInstance): V1Client {
       },
       async cancelAgentRun(params: AgentRunIdParams, config?: AxiosRequestConfig) {
         const { data } = await axios.post<AgentRun>(buildPath('/v1/projects/{projectId}/agent-runs/{runId}/cancel', params as Record<string, string | number | undefined>), undefined, config);
+        return data;
+      },
+      async listAgentRunInterrupts(params: AgentRunIdParams, config?: AxiosRequestConfig) {
+        const { data } = await axios.get<GraphInterrupt[]>(buildPath('/v1/projects/{projectId}/agent-runs/{runId}/interrupts', params as Record<string, string | number | undefined>), config);
+        return data;
+      },
+      async resolveAgentRunInterrupt(params: GraphInterruptIdParams, body: GraphInterruptResolutionRequestBody, config?: AxiosRequestConfig) {
+        const { data } = await axios.post<GraphInterrupt>(buildPath('/v1/projects/{projectId}/agent-runs/{runId}/interrupts/{interruptId}/resolve', params as Record<string, string | number | undefined>), body, config);
         return data;
       },
       async listAgentCheckpoints(params: AgentRunIdParams, config?: AxiosRequestConfig) {

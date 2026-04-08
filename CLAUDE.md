@@ -87,6 +87,8 @@ Generation runs and agent runs now checkpoint the current graph node into `graph
 
 Generation pause/resume is now checkpoint-gated: a paused run can only be resumed after the worker has acknowledged the pause and written `runtime.interrupted.kind = "paused"`. Agent runs still pause cooperatively in-process and resume without requeueing.
 
+Approval and review gates persist under `graphStateJson.interrupts`. The v1 run APIs expose project-level and run-level interrupt lists plus resolve endpoints, and the client run panels now block manual resume while pending interrupts remain.
+
 For generation nodes that own a fixed `version=1` durable row, retries must reuse that row instead of inserting again. Intake, bible, outline, front matter, chapter plan, chapter draft, and assembly now treat their fixed artifact or manifest/document records as replay boundaries.
 
 Assembly is replay-safe by upserting `ProjectDocument` rows on `(projectId, slug)` and reusing the run's `AssemblyManifest` v1 record. Do not reintroduce blanket `deleteMany({ projectId })` behavior for document rebuilds.

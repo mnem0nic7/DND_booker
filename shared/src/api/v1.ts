@@ -79,6 +79,9 @@ export const GenerationConstraintsSchema = z.object({
 });
 
 export const GraphStateSchema = z.record(z.unknown());
+export const GraphInterruptRunTypeSchema = z.enum(['generation', 'agent']);
+export const GraphInterruptStatusSchema = z.enum(['pending', 'approved', 'edited', 'rejected']);
+export const GraphInterruptResolutionActionSchema = z.enum(['approve', 'edit', 'reject']);
 
 export const V1CreateGenerationRunRequestSchema = z.object({
   prompt: z.string().min(1).max(5000),
@@ -414,14 +417,23 @@ export type AgentCheckpoint = z.infer<typeof AgentCheckpointSchema>;
 export type AgentAction = z.infer<typeof AgentActionSchema>;
 
 export const GraphInterruptSchema = z.object({
-  id: z.string(),
-  runType: z.enum(['generation', 'agent']),
+  id: z.string().uuid(),
+  runType: GraphInterruptRunTypeSchema,
   runId: z.string().uuid(),
   kind: z.string(),
-  status: z.enum(['pending', 'approved', 'edited', 'rejected']),
+  title: z.string(),
+  summary: z.string().nullable(),
+  status: GraphInterruptStatusSchema,
   payload: z.unknown(),
+  resolutionPayload: z.unknown().nullable().optional(),
+  resolvedByUserId: z.string().uuid().nullable().optional(),
   createdAt: z.string().datetime(),
   resolvedAt: z.string().datetime().nullable(),
+});
+
+export const GraphInterruptResolutionRequestSchema = z.object({
+  action: GraphInterruptResolutionActionSchema,
+  payload: z.unknown().optional(),
 });
 
 export const AgentConfigSchema = z.object({
@@ -433,6 +445,9 @@ export const AgentConfigSchema = z.object({
 });
 
 export type GraphInterrupt = z.infer<typeof GraphInterruptSchema>;
+export type GraphInterruptStatus = z.infer<typeof GraphInterruptStatusSchema>;
+export type GraphInterruptResolutionAction = z.infer<typeof GraphInterruptResolutionActionSchema>;
+export type GraphInterruptResolutionRequest = z.infer<typeof GraphInterruptResolutionRequestSchema>;
 export type AgentConfig = z.infer<typeof AgentConfigSchema>;
 
 export const V1PublicationDocumentSummarySchema = z.object({
@@ -631,6 +646,10 @@ export const AgentRunIdParamsSchema = ProjectIdParamsSchema.extend({
 export const AgentCheckpointIdParamsSchema = AgentRunIdParamsSchema.extend({
   checkpointId: z.string().uuid(),
 });
+export const GraphInterruptIdParamsSchema = ProjectIdParamsSchema.extend({
+  runId: z.string().uuid(),
+  interruptId: z.string().uuid(),
+});
 export const GenerationArtifactIdParamsSchema = GenerationRunIdParamsSchema.extend({
   artifactId: z.string().min(1),
 });
@@ -643,6 +662,7 @@ export type DocumentIdParams = z.infer<typeof DocumentIdParamsSchema>;
 export type GenerationRunIdParams = z.infer<typeof GenerationRunIdParamsSchema>;
 export type AgentRunIdParams = z.infer<typeof AgentRunIdParamsSchema>;
 export type AgentCheckpointIdParams = z.infer<typeof AgentCheckpointIdParamsSchema>;
+export type GraphInterruptIdParams = z.infer<typeof GraphInterruptIdParamsSchema>;
 export type GenerationArtifactIdParams = z.infer<typeof GenerationArtifactIdParamsSchema>;
 export type ExportJobIdParams = z.infer<typeof ExportJobIdParamsSchema>;
 
@@ -658,9 +678,10 @@ export type GenerationRunDetail = V1GenerationRunDetail;
 export type AgentRunCreateRequest = V1CreateAgentRunRequest;
 export type AgentRun = V1AgentRun;
 export type AgentRunDetail = V1AgentRunDetail;
+export type GraphInterruptResolutionRequestBody = z.infer<typeof GraphInterruptResolutionRequestSchema>;
 
 export interface ApiV1RouteContract {
-  tag: 'auth' | 'documents' | 'generationRuns' | 'agentRuns' | 'exports';
+  tag: 'auth' | 'documents' | 'generationRuns' | 'agentRuns' | 'graphInterrupts' | 'exports';
   operationId: string;
   method: 'get' | 'post' | 'patch';
   path: string;
@@ -784,6 +805,17 @@ export const V1_ROUTE_CONTRACTS: ApiV1RouteContract[] = [
     responseTypeName: 'PublicationDocumentDetail',
   },
   {
+    tag: 'graphInterrupts',
+    operationId: 'listProjectInterrupts',
+    method: 'get',
+    path: '/api/v1/projects/{projectId}/interrupts',
+    summary: 'List pending graph interrupts for a project.',
+    paramsSchema: ProjectIdParamsSchema,
+    responseSchema: z.array(GraphInterruptSchema),
+    paramsTypeName: 'ProjectIdParams',
+    responseTypeName: 'GraphInterrupt[]',
+  },
+  {
     tag: 'generationRuns',
     operationId: 'createGenerationRun',
     method: 'post',
@@ -850,6 +882,30 @@ export const V1_ROUTE_CONTRACTS: ApiV1RouteContract[] = [
     responseSchema: GenerationRunSchema,
     paramsTypeName: 'GenerationRunIdParams',
     responseTypeName: 'GenerationRun',
+  },
+  {
+    tag: 'generationRuns',
+    operationId: 'listGenerationRunInterrupts',
+    method: 'get',
+    path: '/api/v1/projects/{projectId}/generation-runs/{runId}/interrupts',
+    summary: 'List graph interrupts for a generation run.',
+    paramsSchema: GenerationRunIdParamsSchema,
+    responseSchema: z.array(GraphInterruptSchema),
+    paramsTypeName: 'GenerationRunIdParams',
+    responseTypeName: 'GraphInterrupt[]',
+  },
+  {
+    tag: 'generationRuns',
+    operationId: 'resolveGenerationRunInterrupt',
+    method: 'post',
+    path: '/api/v1/projects/{projectId}/generation-runs/{runId}/interrupts/{interruptId}/resolve',
+    summary: 'Resolve a generation run graph interrupt.',
+    paramsSchema: GraphInterruptIdParamsSchema,
+    requestBodySchema: GraphInterruptResolutionRequestSchema,
+    responseSchema: GraphInterruptSchema,
+    paramsTypeName: 'GraphInterruptIdParams',
+    requestTypeName: 'GraphInterruptResolutionRequestBody',
+    responseTypeName: 'GraphInterrupt',
   },
   {
     tag: 'generationRuns',
@@ -973,6 +1029,30 @@ export const V1_ROUTE_CONTRACTS: ApiV1RouteContract[] = [
     responseSchema: AgentRunSchema,
     paramsTypeName: 'AgentRunIdParams',
     responseTypeName: 'AgentRun',
+  },
+  {
+    tag: 'agentRuns',
+    operationId: 'listAgentRunInterrupts',
+    method: 'get',
+    path: '/api/v1/projects/{projectId}/agent-runs/{runId}/interrupts',
+    summary: 'List graph interrupts for an agent run.',
+    paramsSchema: AgentRunIdParamsSchema,
+    responseSchema: z.array(GraphInterruptSchema),
+    paramsTypeName: 'AgentRunIdParams',
+    responseTypeName: 'GraphInterrupt[]',
+  },
+  {
+    tag: 'agentRuns',
+    operationId: 'resolveAgentRunInterrupt',
+    method: 'post',
+    path: '/api/v1/projects/{projectId}/agent-runs/{runId}/interrupts/{interruptId}/resolve',
+    summary: 'Resolve an agent run graph interrupt.',
+    paramsSchema: GraphInterruptIdParamsSchema,
+    requestBodySchema: GraphInterruptResolutionRequestSchema,
+    responseSchema: GraphInterruptSchema,
+    paramsTypeName: 'GraphInterruptIdParams',
+    requestTypeName: 'GraphInterruptResolutionRequestBody',
+    responseTypeName: 'GraphInterrupt',
   },
   {
     tag: 'agentRuns',

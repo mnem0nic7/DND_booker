@@ -12,6 +12,8 @@ import {
   GenerationRunCreateSchema,
   GenerationRunDetailSchema,
   GenerationRunSchema,
+  GraphInterruptResolutionRequestSchema,
+  GraphInterruptSchema,
   V1GeneratedArtifactDetailSchema,
   V1GeneratedArtifactSchema,
 } from '@dnd-booker/shared';
@@ -42,6 +44,13 @@ import { enqueueAgentRun } from '../../services/agent/queue.service.js';
 import { publishAgentEvent, subscribeToAgentRun } from '../../services/agent/pubsub.service.js';
 import { listAgentCheckpoints, restoreAgentCheckpoint } from '../../services/agent/checkpoint.service.js';
 import { listAgentActions } from '../../services/agent/log.service.js';
+import {
+  listAgentRunInterrupts,
+  listGenerationRunInterrupts,
+  listProjectPendingInterrupts,
+  resolveAgentRunInterrupt,
+  resolveGenerationRunInterrupt,
+} from '../../services/graph/interrupt.service.js';
 
 const v1RunRoutes = Router({ mergeParams: true });
 
@@ -55,6 +64,23 @@ function hasAcknowledgedGenerationPause(graphStateJson: unknown) {
   const interrupted = isRecord(runtime.interrupted) ? runtime.interrupted : null;
   return interrupted?.kind === 'paused';
 }
+
+v1RunRoutes.get(
+  '/interrupts',
+  requireAuth,
+  validateUuid('projectId'),
+  asyncHandler(async (req, res) => {
+    const authReq = req as AuthRequest;
+    const projectId = req.params.projectId as string;
+    const interrupts = await listProjectPendingInterrupts(projectId, authReq.userId!);
+    if (!interrupts) {
+      res.status(404).json({ error: 'Project not found' });
+      return;
+    }
+
+    res.json(GraphInterruptSchema.array().parse(interrupts));
+  }),
+);
 
 v1RunRoutes.post(
   '/generation-runs',
@@ -208,6 +234,65 @@ v1RunRoutes.get(
       void subscription.unsubscribe();
       res.end();
     });
+  }),
+);
+
+v1RunRoutes.get(
+  '/generation-runs/:runId/interrupts',
+  requireAuth,
+  validateUuid('projectId', 'runId'),
+  asyncHandler(async (req, res) => {
+    const authReq = req as AuthRequest;
+    const runId = req.params.runId as string;
+    const interrupts = await listGenerationRunInterrupts(runId, authReq.userId!);
+    if (!interrupts) {
+      res.status(404).json({ error: 'Run not found' });
+      return;
+    }
+
+    res.json(GraphInterruptSchema.array().parse(interrupts));
+  }),
+);
+
+v1RunRoutes.post(
+  '/generation-runs/:runId/interrupts/:interruptId/resolve',
+  requireAuth,
+  validateUuid('projectId', 'runId', 'interruptId'),
+  asyncHandler(async (req, res) => {
+    const authReq = req as AuthRequest;
+    const runId = req.params.runId as string;
+    const interruptId = req.params.interruptId as string;
+    const parsed = GraphInterruptResolutionRequestSchema.safeParse(req.body);
+
+    if (!parsed.success) {
+      res.status(400).json({ error: 'Invalid input', details: parsed.error.flatten() });
+      return;
+    }
+
+    const result = await resolveGenerationRunInterrupt(
+      runId,
+      authReq.userId!,
+      interruptId,
+      parsed.data.action,
+      parsed.data.payload,
+    );
+
+    if (result.status === 'run_not_found') {
+      res.status(404).json({ error: 'Run not found' });
+      return;
+    }
+
+    if (result.status === 'interrupt_not_found') {
+      res.status(404).json({ error: 'Interrupt not found' });
+      return;
+    }
+
+    if (result.status === 'interrupt_not_pending') {
+      res.status(409).json({ error: 'Interrupt has already been resolved' });
+      return;
+    }
+
+    res.json(GraphInterruptSchema.parse(result.interrupt));
   }),
 );
 
@@ -480,6 +565,65 @@ for (const action of ['pause', 'resume', 'cancel'] as const) {
     }),
   );
 }
+
+v1RunRoutes.get(
+  '/agent-runs/:runId/interrupts',
+  requireAuth,
+  validateUuid('projectId', 'runId'),
+  asyncHandler(async (req, res) => {
+    const authReq = req as AuthRequest;
+    const runId = req.params.runId as string;
+    const interrupts = await listAgentRunInterrupts(runId, authReq.userId!);
+    if (!interrupts) {
+      res.status(404).json({ error: 'Run not found' });
+      return;
+    }
+
+    res.json(GraphInterruptSchema.array().parse(interrupts));
+  }),
+);
+
+v1RunRoutes.post(
+  '/agent-runs/:runId/interrupts/:interruptId/resolve',
+  requireAuth,
+  validateUuid('projectId', 'runId', 'interruptId'),
+  asyncHandler(async (req, res) => {
+    const authReq = req as AuthRequest;
+    const runId = req.params.runId as string;
+    const interruptId = req.params.interruptId as string;
+    const parsed = GraphInterruptResolutionRequestSchema.safeParse(req.body);
+
+    if (!parsed.success) {
+      res.status(400).json({ error: 'Invalid input', details: parsed.error.flatten() });
+      return;
+    }
+
+    const result = await resolveAgentRunInterrupt(
+      runId,
+      authReq.userId!,
+      interruptId,
+      parsed.data.action,
+      parsed.data.payload,
+    );
+
+    if (result.status === 'run_not_found') {
+      res.status(404).json({ error: 'Run not found' });
+      return;
+    }
+
+    if (result.status === 'interrupt_not_found') {
+      res.status(404).json({ error: 'Interrupt not found' });
+      return;
+    }
+
+    if (result.status === 'interrupt_not_pending') {
+      res.status(409).json({ error: 'Interrupt has already been resolved' });
+      return;
+    }
+
+    res.json(GraphInterruptSchema.parse(result.interrupt));
+  }),
+);
 
 v1RunRoutes.get(
   '/agent-runs/:runId/checkpoints',

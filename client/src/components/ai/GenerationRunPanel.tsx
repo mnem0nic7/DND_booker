@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useGenerationStore } from '../../stores/generationStore';
 import { RUN_STATUS_TRANSITIONS, type GenerationEvent, type RunStatus } from '@dnd-booker/shared';
 import { ArtifactReviewPanel } from './ArtifactReviewPanel';
+import { readPendingGraphInterrupts } from '../../lib/graphInterrupts';
 
 const STAGE_LABELS: Record<RunStatus, string> = {
   queued: 'Queued',
@@ -84,6 +85,7 @@ export function GenerationRunPanel({ projectId }: Props) {
     pauseRun,
     cancelRun,
     resumeRun,
+    resolveInterrupt,
     reset,
   } = useGenerationStore();
 
@@ -113,9 +115,11 @@ export function GenerationRunPanel({ projectId }: Props) {
   const isFailed = status === 'failed';
   const isCancelled = status === 'cancelled';
   const isTerminal = isDone || isFailed || isCancelled;
+  const pendingInterrupts = readPendingGraphInterrupts(currentRun.graphStateJson, 'generation', currentRun.id);
+  const hasPendingInterrupts = pendingInterrupts.length > 0;
   const canPause = RUN_STATUS_TRANSITIONS[status]?.includes('paused') ?? false;
   const canCancel = RUN_STATUS_TRANSITIONS[status]?.includes('cancelled') ?? false;
-  const canResume = isPaused && Boolean(currentRun.currentStage)
+  const canResume = !hasPendingInterrupts && isPaused && Boolean(currentRun.currentStage)
     && (RUN_STATUS_TRANSITIONS.paused?.includes(currentRun.currentStage as RunStatus) ?? false);
 
   const stageLabel = isTerminal
@@ -125,6 +129,16 @@ export function GenerationRunPanel({ projectId }: Props) {
       STAGE_LABELS[status] ??
       status;
   const recentEvents = events.slice(-5);
+  const handleResolveInterrupt = async (interruptId: string, action: 'approve' | 'edit' | 'reject') => {
+    if (action === 'edit') {
+      const note = window.prompt('Describe the requested edit before resuming this run.', '');
+      if (note === null) return;
+      await resolveInterrupt(projectId, currentRun.id, interruptId, action, { note });
+      return;
+    }
+
+    await resolveInterrupt(projectId, currentRun.id, interruptId, action);
+  };
 
   return (
     <div className="border border-gray-200 rounded-lg p-3 mb-3 bg-gray-50">
@@ -165,6 +179,44 @@ export function GenerationRunPanel({ projectId }: Props) {
 
       {/* Error message */}
       {error && <p className="text-xs text-red-600 mb-2">{error}</p>}
+
+      {hasPendingInterrupts && (
+        <div className="mb-3 rounded border border-purple-200 bg-white px-3 py-2">
+          <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-purple-700">
+            Review Gate Pending
+          </div>
+          <div className="space-y-2">
+            {pendingInterrupts.map((interrupt) => (
+              <div key={interrupt.id} className="rounded border border-purple-100 bg-purple-50/60 px-2 py-2">
+                <div className="text-xs font-medium text-gray-800">{interrupt.title}</div>
+                {interrupt.summary && (
+                  <div className="mt-0.5 text-xs text-gray-600">{interrupt.summary}</div>
+                )}
+                <div className="mt-2 flex gap-2">
+                  <button
+                    onClick={() => void handleResolveInterrupt(interrupt.id, 'approve')}
+                    className="text-xs px-2 py-1 rounded bg-green-100 text-green-700 hover:bg-green-200 transition-colors"
+                  >
+                    Approve
+                  </button>
+                  <button
+                    onClick={() => void handleResolveInterrupt(interrupt.id, 'edit')}
+                    className="text-xs px-2 py-1 rounded bg-purple-100 text-purple-700 hover:bg-purple-200 transition-colors"
+                  >
+                    Request Edit
+                  </button>
+                  <button
+                    onClick={() => void handleResolveInterrupt(interrupt.id, 'reject')}
+                    className="text-xs px-2 py-1 rounded bg-red-100 text-red-700 hover:bg-red-200 transition-colors"
+                  >
+                    Reject
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Recent events */}
       {recentEvents.length > 0 && (
