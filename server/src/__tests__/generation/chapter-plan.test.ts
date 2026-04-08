@@ -471,4 +471,35 @@ describe('Chapter Plan Service — executeChapterPlanGeneration', () => {
     expect(result.plan.entityReferences).toEqual([]);
     expect(result.plan.sections[0].entityReferences).toEqual([]);
   });
+
+  it('reuses the persisted chapter plan on replay', async () => {
+    mockGenerateText.mockResolvedValueOnce({
+      text: JSON.stringify(VALID_PLAN),
+      usage: { inputTokens: 1000, outputTokens: 1500 },
+    } as any);
+
+    const run = await createRun({
+      projectId: testProject.id, userId: testUser.id, prompt: 'test',
+    });
+
+    const first = await executeChapterPlanGeneration(
+      run!, SAMPLE_CHAPTER, SAMPLE_BIBLE,
+      SAMPLE_BIBLE.entities.map((e) => ({ slug: e.slug, entityType: e.entityType, name: e.name, summary: e.summary })),
+      {} as any, 8192,
+    );
+    const second = await executeChapterPlanGeneration(
+      run!, SAMPLE_CHAPTER, SAMPLE_BIBLE,
+      SAMPLE_BIBLE.entities.map((e) => ({ slug: e.slug, entityType: e.entityType, name: e.name, summary: e.summary })),
+      {} as any, 8192,
+    );
+
+    expect(second.artifactId).toBe(first.artifactId);
+    expect(second.plan.sections).toHaveLength(first.plan.sections.length);
+    expect(mockGenerateText).toHaveBeenCalledTimes(1);
+
+    const artifacts = await prisma.generatedArtifact.findMany({
+      where: { runId: run!.id, artifactType: 'chapter_plan' },
+    });
+    expect(artifacts).toHaveLength(1);
+  });
 });

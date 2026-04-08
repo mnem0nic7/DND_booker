@@ -129,8 +129,8 @@ function hashString(value: string): string {
   return Math.abs(hash >>> 0).toString(36);
 }
 
-function slugify(value: string): string {
-  return value
+function slugify(value: string | null | undefined): string {
+  return String(value ?? '')
     .trim()
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')

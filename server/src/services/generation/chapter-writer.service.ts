@@ -35,6 +35,60 @@ export async function executeChapterDraftGeneration(
   model: LanguageModel,
   maxOutputTokens: number,
 ): Promise<ChapterDraftResult> {
+  const existingArtifact = await prisma.generatedArtifact.findFirst({
+    where: {
+      runId: run.id,
+      artifactType: 'chapter_draft',
+      artifactKey: `chapter-draft-${chapter.slug}`,
+      version: 1,
+    },
+    select: {
+      id: true,
+      title: true,
+      markdownContent: true,
+      tiptapContent: true,
+      jsonContent: true,
+    },
+  });
+
+  if (existingArtifact) {
+    const normalizedMarkdown = existingArtifact.markdownContent
+      ? normalizeGeneratedMarkdown(existingArtifact.markdownContent)
+      : null;
+
+    if (!existingArtifact.tiptapContent && normalizedMarkdown) {
+      try {
+        const tiptapContent = await convertMarkdownToTipTapWithTimeout(
+          normalizedMarkdown,
+          `Chapter draft conversion for ${existingArtifact.title}`,
+        );
+
+        await prisma.generatedArtifact.update({
+          where: { id: existingArtifact.id },
+          data: {
+            markdownContent: normalizedMarkdown,
+            tiptapContent: tiptapContent as any,
+          },
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown markdown conversion failure';
+        await publishGenerationEvent(run.id, {
+          type: 'run_warning',
+          runId: run.id,
+          message: `Stored markdown for "${existingArtifact.title}", but TipTap conversion failed: ${message}`,
+          severity: 'warning',
+        });
+      }
+    }
+
+    return {
+      artifactId: existingArtifact.id,
+      chapterSlug: chapter.slug,
+      title: chapter.title,
+      wordCount: resolvePersistedWordCount(existingArtifact.jsonContent, normalizedMarkdown),
+    };
+  }
+
   // Assemble context (entity dossiers + prior chapter summaries)
   const context = await assembleChapterContext(
     run.id,
@@ -65,56 +119,55 @@ export async function executeChapterDraftGeneration(
 
   const totalTokens = (usage?.inputTokens ?? 0) + (usage?.outputTokens ?? 0);
 
-  // Create the chapter_draft artifact
-  const artifact = await prisma.generatedArtifact.create({
-    data: {
-      runId: run.id,
-      projectId: run.projectId,
-      artifactType: 'chapter_draft',
-      artifactKey: `chapter-draft-${chapter.slug}`,
-      status: 'generated',
-      version: 1,
-      title: chapter.title,
-      summary: `${wordCount} words, ${plan.sections.length} sections`,
-      markdownContent: normalizedText,
-      tiptapContent: Prisma.DbNull,
-      jsonContent: {
-        chapterSlug: chapter.slug,
-        act: chapter.act,
-        wordCount,
-        sectionCount: plan.sections.length,
-        encounterCount: plan.encounters.length,
-      } as any,
-      tokenCount: totalTokens,
-      pageEstimate: chapter.targetPages,
-    },
-  });
-
-  // Create CanonReferences for entities used in this chapter
-  const entitySlugs = plan.entityReferences;
-  if (entitySlugs.length > 0) {
-    const entities = await prisma.canonEntity.findMany({
-      where: { projectId: run.projectId, slug: { in: entitySlugs } },
-      select: { id: true },
+  const artifact = await prisma.$transaction(async (tx) => {
+    const createdArtifact = await tx.generatedArtifact.create({
+      data: {
+        runId: run.id,
+        projectId: run.projectId,
+        artifactType: 'chapter_draft',
+        artifactKey: `chapter-draft-${chapter.slug}`,
+        status: 'generated',
+        version: 1,
+        title: chapter.title,
+        summary: `${wordCount} words, ${plan.sections.length} sections`,
+        markdownContent: normalizedText,
+        tiptapContent: Prisma.DbNull,
+        jsonContent: {
+          chapterSlug: chapter.slug,
+          act: chapter.act,
+          wordCount,
+          sectionCount: plan.sections.length,
+          encounterCount: plan.encounters.length,
+        } as any,
+        tokenCount: totalTokens,
+        pageEstimate: chapter.targetPages,
+      },
     });
 
-    await Promise.all(
-      entities.map((entity) =>
-        prisma.canonReference.create({
-          data: {
-            entityId: entity.id,
-            artifactId: artifact.id,
-            referenceType: 'mentions',
-          },
-        }),
-      ),
-    );
-  }
+    const entitySlugs = plan.entityReferences;
+    if (entitySlugs.length > 0) {
+      const entities = await tx.canonEntity.findMany({
+        where: { projectId: run.projectId, slug: { in: entitySlugs } },
+        select: { id: true },
+      });
 
-  // Update run token count
-  await prisma.generationRun.update({
-    where: { id: run.id },
-    data: { actualTokens: { increment: totalTokens } },
+      if (entities.length > 0) {
+        await tx.canonReference.createMany({
+          data: entities.map((entity) => ({
+            entityId: entity.id,
+            artifactId: createdArtifact.id,
+            referenceType: 'mentions',
+          })),
+        });
+      }
+    }
+
+    await tx.generationRun.update({
+      where: { id: run.id },
+      data: { actualTokens: { increment: totalTokens } },
+    });
+
+    return createdArtifact;
   });
 
   // Publish progress event
@@ -153,4 +206,17 @@ export async function executeChapterDraftGeneration(
     title: chapter.title,
     wordCount,
   };
+}
+
+function resolvePersistedWordCount(jsonContent: unknown, markdownContent: string | null): number {
+  if (jsonContent && typeof jsonContent === 'object' && !Array.isArray(jsonContent)) {
+    const candidate = (jsonContent as { wordCount?: unknown }).wordCount;
+    if (typeof candidate === 'number' && Number.isFinite(candidate)) {
+      return candidate;
+    }
+  }
+
+  return markdownContent
+    ? markdownContent.split(/\s+/).filter(Boolean).length
+    : 0;
 }

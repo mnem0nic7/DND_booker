@@ -210,6 +210,46 @@ export async function executeBibleGeneration(
   model: LanguageModel,
   maxOutputTokens: number,
 ): Promise<BibleResult> {
+  const [existingArtifact, existingBible, existingEntities] = await Promise.all([
+    prisma.generatedArtifact.findFirst({
+      where: {
+        runId: run.id,
+        artifactType: 'campaign_bible',
+        artifactKey: 'campaign-bible',
+        version: 1,
+      },
+      select: {
+        id: true,
+      },
+    }),
+    prisma.campaignBible.findUnique({
+      where: { runId: run.id },
+      select: {
+        id: true,
+        runId: true,
+        title: true,
+      },
+    }),
+    prisma.canonEntity.findMany({
+      where: { runId: run.id },
+      select: {
+        id: true,
+        entityType: true,
+        slug: true,
+        canonicalName: true,
+      },
+      orderBy: { createdAt: 'asc' },
+    }),
+  ]);
+
+  if (existingArtifact && existingBible) {
+    return {
+      bible: existingBible,
+      artifactId: existingArtifact.id,
+      entities: existingEntities,
+    };
+  }
+
   const system = buildCampaignBibleSystemPrompt();
   const prompt = buildCampaignBibleUserPrompt(normalizedInput);
 
@@ -226,66 +266,116 @@ export async function executeBibleGeneration(
 
   const totalTokens = (usage?.inputTokens ?? 0) + (usage?.outputTokens ?? 0);
 
-  // Create CampaignBible record
-  const bible = await prisma.campaignBible.create({
-    data: {
-      runId: run.id,
-      projectId: run.projectId,
-      title: bibleContent.title,
-      summary: bibleContent.summary,
-      premise: bibleContent.premise,
-      worldRules: bibleContent.worldRules as any,
-      actStructure: bibleContent.actStructure as any,
-      timeline: bibleContent.timeline as any,
-      levelProgression: bibleContent.levelProgression as any,
-      pageBudget: bibleContent.pageBudget as any,
-      styleGuide: bibleContent.styleGuide as any,
-      openThreads: bibleContent.openThreads as any,
-      status: 'draft',
-    },
-  });
+  const { bible, artifact, entities } = await prisma.$transaction(async (tx) => {
+    const persistedBible = await tx.campaignBible.upsert({
+      where: { runId: run.id },
+      update: {
+        projectId: run.projectId,
+        title: bibleContent.title,
+        summary: bibleContent.summary,
+        premise: bibleContent.premise,
+        worldRules: bibleContent.worldRules as any,
+        actStructure: bibleContent.actStructure as any,
+        timeline: bibleContent.timeline as any,
+        levelProgression: bibleContent.levelProgression as any,
+        pageBudget: bibleContent.pageBudget as any,
+        styleGuide: bibleContent.styleGuide as any,
+        openThreads: bibleContent.openThreads as any,
+        status: 'draft',
+      },
+      create: {
+        runId: run.id,
+        projectId: run.projectId,
+        title: bibleContent.title,
+        summary: bibleContent.summary,
+        premise: bibleContent.premise,
+        worldRules: bibleContent.worldRules as any,
+        actStructure: bibleContent.actStructure as any,
+        timeline: bibleContent.timeline as any,
+        levelProgression: bibleContent.levelProgression as any,
+        pageBudget: bibleContent.pageBudget as any,
+        styleGuide: bibleContent.styleGuide as any,
+        openThreads: bibleContent.openThreads as any,
+        status: 'draft',
+      },
+    });
 
-  // Create the campaign_bible artifact
-  const artifact = await prisma.generatedArtifact.create({
-    data: {
-      runId: run.id,
-      projectId: run.projectId,
-      artifactType: 'campaign_bible',
-      artifactKey: 'campaign-bible',
-      status: 'generated',
-      version: 1,
-      title: bibleContent.title,
-      summary: bibleContent.summary,
-      jsonContent: bibleContent as any,
-      tokenCount: totalTokens,
-    },
-  });
-
-  // Create CanonEntity records for each entity seed
-  const entities = await Promise.all(
-    bibleContent.entities.map((seed) =>
-      prisma.canonEntity.create({
-        data: {
-          projectId: run.projectId,
+    const persistedArtifact = await tx.generatedArtifact.upsert({
+      where: {
+        runId_artifactType_artifactKey_version: {
           runId: run.id,
-          entityType: seed.entityType,
-          slug: seed.slug,
-          canonicalName: seed.name,
-          aliases: [] as any,
-          canonicalData: seed.details as any,
-          summary: seed.summary,
-          sourceArtifactId: artifact.id,
+          artifactType: 'campaign_bible',
+          artifactKey: 'campaign-bible',
+          version: 1,
         },
-      }),
-    ),
-  );
+      },
+      update: {
+        projectId: run.projectId,
+        status: 'generated',
+        title: bibleContent.title,
+        summary: bibleContent.summary,
+        jsonContent: bibleContent as any,
+        tokenCount: totalTokens,
+      },
+      create: {
+        runId: run.id,
+        projectId: run.projectId,
+        artifactType: 'campaign_bible',
+        artifactKey: 'campaign-bible',
+        status: 'generated',
+        version: 1,
+        title: bibleContent.title,
+        summary: bibleContent.summary,
+        jsonContent: bibleContent as any,
+        tokenCount: totalTokens,
+      },
+    });
 
-  // Update run token count
-  await prisma.generationRun.update({
-    where: { id: run.id },
-    data: {
-      actualTokens: { increment: totalTokens },
-    },
+    const persistedEntities = await Promise.all(
+      bibleContent.entities.map((seed) =>
+        tx.canonEntity.upsert({
+          where: {
+            runId_entityType_slug: {
+              runId: run.id,
+              entityType: seed.entityType,
+              slug: seed.slug,
+            },
+          },
+          update: {
+            projectId: run.projectId,
+            canonicalName: seed.name,
+            aliases: [] as any,
+            canonicalData: seed.details as any,
+            summary: seed.summary,
+            sourceArtifactId: persistedArtifact.id,
+          },
+          create: {
+            projectId: run.projectId,
+            runId: run.id,
+            entityType: seed.entityType,
+            slug: seed.slug,
+            canonicalName: seed.name,
+            aliases: [] as any,
+            canonicalData: seed.details as any,
+            summary: seed.summary,
+            sourceArtifactId: persistedArtifact.id,
+          },
+        }),
+      ),
+    );
+
+    await tx.generationRun.update({
+      where: { id: run.id },
+      data: {
+        actualTokens: { increment: totalTokens },
+      },
+    });
+
+    return {
+      bible: persistedBible,
+      artifact: persistedArtifact,
+      entities: persistedEntities,
+    };
   });
 
   // Publish progress events

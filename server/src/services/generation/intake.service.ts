@@ -192,6 +192,38 @@ export async function executeIntake(
   model: LanguageModel,
   maxOutputTokens: number,
 ): Promise<IntakeResult> {
+  const existingArtifact = await prisma.generatedArtifact.findFirst({
+    where: {
+      runId: run.id,
+      artifactType: 'project_profile',
+      artifactKey: 'project-profile',
+      version: 1,
+    },
+    select: {
+      id: true,
+      jsonContent: true,
+    },
+  });
+
+  if (existingArtifact?.jsonContent) {
+    const normalizedInput = NormalizedInputSchema.parse(normalizeParsedInput(existingArtifact.jsonContent, {
+      pageTargetHint: run.pageTargetHint ?? null,
+    })) as NormalizedInput;
+
+    await prisma.generationRun.update({
+      where: { id: run.id },
+      data: {
+        mode: normalizedInput.inferredMode,
+        estimatedPages: normalizedInput.pageTarget,
+      },
+    });
+
+    return {
+      normalizedInput,
+      artifactId: existingArtifact.id,
+    };
+  }
+
   const system = buildNormalizeInputSystemPrompt();
   const prompt = buildNormalizeInputUserPrompt(
     run.inputPrompt,
@@ -213,30 +245,32 @@ export async function executeIntake(
 
   const totalTokens = (usage?.inputTokens ?? 0) + (usage?.outputTokens ?? 0);
 
-  // Create the project_profile artifact
-  const artifact = await prisma.generatedArtifact.create({
-    data: {
-      runId: run.id,
-      projectId: run.projectId,
-      artifactType: 'project_profile',
-      artifactKey: 'project-profile',
-      status: 'accepted',
-      version: 1,
-      title: normalizedInput.title,
-      summary: normalizedInput.summary,
-      jsonContent: normalizedInput as any,
-      tokenCount: totalTokens,
-    },
-  });
+  const artifact = await prisma.$transaction(async (tx) => {
+    const createdArtifact = await tx.generatedArtifact.create({
+      data: {
+        runId: run.id,
+        projectId: run.projectId,
+        artifactType: 'project_profile',
+        artifactKey: 'project-profile',
+        status: 'accepted',
+        version: 1,
+        title: normalizedInput.title,
+        summary: normalizedInput.summary,
+        jsonContent: normalizedInput as any,
+        tokenCount: totalTokens,
+      },
+    });
 
-  // Update the run with inferred mode and estimates
-  await prisma.generationRun.update({
-    where: { id: run.id },
-    data: {
-      mode: normalizedInput.inferredMode,
-      estimatedPages: normalizedInput.pageTarget,
-      actualTokens: { increment: totalTokens },
-    },
+    await tx.generationRun.update({
+      where: { id: run.id },
+      data: {
+        mode: normalizedInput.inferredMode,
+        estimatedPages: normalizedInput.pageTarget,
+        actualTokens: { increment: totalTokens },
+      },
+    });
+
+    return createdArtifact;
   });
 
   // Publish progress event

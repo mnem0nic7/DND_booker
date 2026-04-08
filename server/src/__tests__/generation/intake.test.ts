@@ -236,4 +236,29 @@ describe('Intake Service — executeIntake', () => {
     });
     expect(artifact!.tokenCount).toBe(800); // 500 + 300
   });
+
+  it('reuses the persisted intake artifact on replay instead of regenerating it', async () => {
+    mockGenerateText.mockResolvedValueOnce({
+      text: JSON.stringify(VALID_AI_RESPONSE),
+      usage: { inputTokens: 500, outputTokens: 300 },
+    } as any);
+
+    const run = await createRun({
+      projectId: testProject.id,
+      userId: testUser.id,
+      prompt: 'A test adventure',
+    });
+
+    const first = await executeIntake(run!, {} as any, 4096);
+    const second = await executeIntake(run!, {} as any, 4096);
+
+    expect(second.artifactId).toBe(first.artifactId);
+    expect(second.normalizedInput.title).toBe(first.normalizedInput.title);
+    expect(mockGenerateText).toHaveBeenCalledTimes(1);
+
+    const artifacts = await prisma.generatedArtifact.findMany({
+      where: { runId: run!.id, artifactType: 'project_profile' },
+    });
+    expect(artifacts).toHaveLength(1);
+  });
 });

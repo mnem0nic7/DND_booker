@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, vi, beforeEach } from 'vitest';
 import { generateText } from 'ai';
+import { Prisma } from '@prisma/client';
 import type { BibleContent, ChapterOutlineEntry, ChapterPlan } from '@dnd-booker/shared';
 import { prisma } from '../../config/database.js';
 import { executeChapterDraftGeneration } from '../../services/generation/chapter-writer.service.js';
@@ -388,5 +389,54 @@ describe('Chapter Writer Service — executeChapterDraftGeneration', () => {
     expect(artifact).not.toBeNull();
     expect(artifact!.markdownContent).toContain('Chapter 1: The Village');
     expect(artifact!.tiptapContent).toBeNull();
+  });
+
+  it('reuses persisted markdown on replay and backfills missing TipTap content', async () => {
+    const run = await createRun({
+      projectId: testProject.id,
+      userId: testUser.id,
+      prompt: 'test',
+    });
+
+    const artifact = await prisma.generatedArtifact.create({
+      data: {
+        runId: run!.id,
+        projectId: run!.projectId,
+        artifactType: 'chapter_draft',
+        artifactKey: `chapter-draft-${SAMPLE_CHAPTER.slug}`,
+        status: 'generated',
+        version: 1,
+        title: SAMPLE_CHAPTER.title,
+        summary: 'partial write',
+        markdownContent: SAMPLE_MARKDOWN,
+        tiptapContent: Prisma.DbNull,
+        jsonContent: {
+          chapterSlug: SAMPLE_CHAPTER.slug,
+          wordCount: 123,
+        } as any,
+      },
+    });
+
+    const result = await executeChapterDraftGeneration(
+      run!,
+      SAMPLE_CHAPTER,
+      SAMPLE_PLAN,
+      SAMPLE_BIBLE,
+      [],
+      {} as any,
+      16384,
+    );
+
+    expect(result.artifactId).toBe(artifact.id);
+    expect(result.wordCount).toBe(123);
+    expect(mockGenerateText).not.toHaveBeenCalled();
+
+    const persisted = await prisma.generatedArtifact.findUnique({ where: { id: artifact.id } });
+    expect(persisted!.tiptapContent).not.toBeNull();
+
+    const artifacts = await prisma.generatedArtifact.findMany({
+      where: { runId: run!.id, artifactType: 'chapter_draft' },
+    });
+    expect(artifacts).toHaveLength(1);
   });
 });

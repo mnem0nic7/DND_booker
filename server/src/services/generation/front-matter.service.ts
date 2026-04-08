@@ -12,8 +12,55 @@ export async function executeFrontMatterGeneration(
   bible: BibleContent,
   outline: ChapterOutline,
 ): Promise<FrontMatterResult> {
+  const existingArtifact = await prisma.generatedArtifact.findFirst({
+    where: {
+      runId: run.id,
+      artifactType: 'front_matter_draft',
+      artifactKey: 'front-matter',
+      version: 1,
+    },
+    select: {
+      id: true,
+      title: true,
+      summary: true,
+      jsonContent: true,
+      tiptapContent: true,
+      pageEstimate: true,
+    },
+  });
+
   const tiptapContent = buildFrontMatterDocument(bible, outline);
   const chapterCount = outline.chapters.length;
+  const title = `${bible.title} — Front Matter`;
+  const summary = `Title page and DM brief for ${chapterCount} chapter${chapterCount === 1 ? '' : 's'}.`;
+  const jsonContent = {
+    chapterCount,
+    totalPageEstimate: outline.totalPageEstimate,
+    includesToc: shouldIncludeFrontMatterToc(outline),
+  } as const;
+
+  if (existingArtifact) {
+    const nextArtifact = existingArtifact.tiptapContent
+      ? existingArtifact
+      : await prisma.generatedArtifact.update({
+        where: { id: existingArtifact.id },
+        data: {
+          title,
+          summary,
+          jsonContent: jsonContent as any,
+          tiptapContent: tiptapContent as any,
+          pageEstimate: 3,
+        },
+        select: {
+          id: true,
+        },
+      });
+
+    return {
+      artifactId: nextArtifact.id,
+      tiptapContent,
+    };
+  }
 
   const artifact = await prisma.generatedArtifact.create({
     data: {
@@ -23,13 +70,9 @@ export async function executeFrontMatterGeneration(
       artifactKey: 'front-matter',
       status: 'accepted',
       version: 1,
-      title: `${bible.title} — Front Matter`,
-      summary: `Title page and DM brief for ${chapterCount} chapter${chapterCount === 1 ? '' : 's'}.`,
-      jsonContent: {
-        chapterCount,
-        totalPageEstimate: outline.totalPageEstimate,
-        includesToc: shouldIncludeFrontMatterToc(outline),
-      } as any,
+      title,
+      summary,
+      jsonContent: jsonContent as any,
       tiptapContent: tiptapContent as any,
       pageEstimate: 3,
       tokenCount: 0,

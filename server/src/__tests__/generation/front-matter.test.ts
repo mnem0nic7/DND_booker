@@ -123,4 +123,23 @@ describe('front-matter.service', () => {
     expect(artifact!.status).toBe('accepted');
     expect(JSON.stringify(artifact!.tiptapContent)).toContain('DM Brief');
   });
+
+  it('reuses the persisted front matter artifact on replay', async () => {
+    const run = await createRun({
+      projectId: testProject.id,
+      userId: testUser.id,
+      prompt: 'Generate a haunted mine one-shot.',
+    });
+
+    const first = await executeFrontMatterGeneration(run!, SAMPLE_BIBLE, SAMPLE_OUTLINE);
+    const second = await executeFrontMatterGeneration(run!, SAMPLE_BIBLE, SAMPLE_OUTLINE);
+
+    expect(second.artifactId).toBe(first.artifactId);
+    expect(JSON.stringify(second.tiptapContent)).toContain('DM Brief');
+
+    const artifacts = await prisma.generatedArtifact.findMany({
+      where: { runId: run!.id, artifactType: 'front_matter_draft' },
+    });
+    expect(artifacts).toHaveLength(1);
+  });
 });

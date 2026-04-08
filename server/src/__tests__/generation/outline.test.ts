@@ -261,4 +261,27 @@ describe('Outline Service — executeOutlineGeneration', () => {
     expect(result.outline.chapters[0].sections[0].contentType).toBe('exploration');
     expect(result.outline.chapters[0].sections[1].contentType).toBe('encounter');
   });
+
+  it('reuses the persisted outline artifact on replay', async () => {
+    mockGenerateText.mockResolvedValueOnce({
+      text: JSON.stringify(VALID_OUTLINE),
+      usage: { inputTokens: 800, outputTokens: 1200 },
+    } as any);
+
+    const run = await createRun({
+      projectId: testProject.id, userId: testUser.id, prompt: 'test',
+    });
+
+    const first = await executeOutlineGeneration(run!, SAMPLE_BIBLE, {} as any, 8192);
+    const second = await executeOutlineGeneration(run!, SAMPLE_BIBLE, {} as any, 8192);
+
+    expect(second.artifactId).toBe(first.artifactId);
+    expect(second.outline.totalPageEstimate).toBe(first.outline.totalPageEstimate);
+    expect(mockGenerateText).toHaveBeenCalledTimes(1);
+
+    const artifacts = await prisma.generatedArtifact.findMany({
+      where: { runId: run!.id, artifactType: 'chapter_outline' },
+    });
+    expect(artifacts).toHaveLength(1);
+  });
 });

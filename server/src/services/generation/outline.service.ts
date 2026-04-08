@@ -60,6 +60,26 @@ export async function executeOutlineGeneration(
   model: LanguageModel,
   maxOutputTokens: number,
 ): Promise<OutlineResult> {
+  const existingArtifact = await prisma.generatedArtifact.findFirst({
+    where: {
+      runId: run.id,
+      artifactType: 'chapter_outline',
+      artifactKey: 'chapter-outline',
+      version: 1,
+    },
+    select: {
+      id: true,
+      jsonContent: true,
+    },
+  });
+
+  if (existingArtifact?.jsonContent) {
+    return {
+      outline: ChapterOutlineSchema.parse(existingArtifact.jsonContent) as ChapterOutline,
+      artifactId: existingArtifact.id,
+    };
+  }
+
   const system = buildChapterOutlineSystemPrompt();
   const prompt = buildChapterOutlineUserPrompt(bible);
 
@@ -72,25 +92,29 @@ export async function executeOutlineGeneration(
 
   const totalTokens = (usage?.inputTokens ?? 0) + (usage?.outputTokens ?? 0);
 
-  const artifact = await prisma.generatedArtifact.create({
-    data: {
-      runId: run.id,
-      projectId: run.projectId,
-      artifactType: 'chapter_outline',
-      artifactKey: 'chapter-outline',
-      status: 'generated',
-      version: 1,
-      title: `${bible.title} — Chapter Outline`,
-      summary: `${outline.chapters.length} chapters, ${outline.appendices.length} appendices, ~${outline.totalPageEstimate} pages`,
-      jsonContent: outline as any,
-      tokenCount: totalTokens,
-      pageEstimate: outline.totalPageEstimate,
-    },
-  });
+  const artifact = await prisma.$transaction(async (tx) => {
+    const createdArtifact = await tx.generatedArtifact.create({
+      data: {
+        runId: run.id,
+        projectId: run.projectId,
+        artifactType: 'chapter_outline',
+        artifactKey: 'chapter-outline',
+        status: 'generated',
+        version: 1,
+        title: `${bible.title} — Chapter Outline`,
+        summary: `${outline.chapters.length} chapters, ${outline.appendices.length} appendices, ~${outline.totalPageEstimate} pages`,
+        jsonContent: outline as any,
+        tokenCount: totalTokens,
+        pageEstimate: outline.totalPageEstimate,
+      },
+    });
 
-  await prisma.generationRun.update({
-    where: { id: run.id },
-    data: { actualTokens: { increment: totalTokens } },
+    await tx.generationRun.update({
+      where: { id: run.id },
+      data: { actualTokens: { increment: totalTokens } },
+    });
+
+    return createdArtifact;
   });
 
   await publishGenerationEvent(run.id, {

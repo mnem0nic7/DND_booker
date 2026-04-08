@@ -698,4 +698,58 @@ describe('Assembler — assembleDocuments', () => {
       'No chapter outline found',
     );
   });
+
+  it('reuses the manifest and project documents on replay instead of recreating them', async () => {
+    const run = await createRun({
+      projectId: testProject.id,
+      userId: testUser.id,
+      prompt: 'assembly replay test',
+    });
+
+    await prisma.generatedArtifact.create({
+      data: {
+        runId: run!.id,
+        projectId: run!.projectId,
+        artifactType: 'chapter_outline',
+        artifactKey: 'chapter-outline',
+        status: 'accepted',
+        version: 1,
+        title: 'Outline',
+        jsonContent: SAMPLE_OUTLINE as any,
+      },
+    });
+
+    await prisma.generatedArtifact.create({
+      data: {
+        runId: run!.id,
+        projectId: run!.projectId,
+        artifactType: 'chapter_draft',
+        artifactKey: 'chapter-draft-goblin-ambush',
+        status: 'accepted',
+        version: 1,
+        title: 'The Goblin Ambush',
+        tiptapContent: { type: 'doc', content: [{ type: 'paragraph' }] } as any,
+        jsonContent: { wordCount: 2500 } as any,
+      },
+    });
+
+    const first = await assembleDocuments(run!);
+    const second = await assembleDocuments(run!);
+
+    expect(second.manifestId).toBe(first.manifestId);
+    expect(second.documentIds).toEqual(first.documentIds);
+
+    const [manifests, docs] = await Promise.all([
+      prisma.assemblyManifest.findMany({
+        where: { runId: run!.id },
+      }),
+      prisma.projectDocument.findMany({
+        where: { projectId: run!.projectId },
+        orderBy: { sortOrder: 'asc' },
+      }),
+    ]);
+
+    expect(manifests).toHaveLength(1);
+    expect(docs.map((doc) => doc.id)).toEqual(first.documentIds);
+  });
 });

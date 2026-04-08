@@ -96,6 +96,26 @@ export async function executeChapterPlanGeneration(
   model: LanguageModel,
   maxOutputTokens: number,
 ): Promise<ChapterPlanResult> {
+  const existingArtifact = await prisma.generatedArtifact.findFirst({
+    where: {
+      runId: run.id,
+      artifactType: 'chapter_plan',
+      artifactKey: `chapter-plan-${chapter.slug}`,
+      version: 1,
+    },
+    select: {
+      id: true,
+      jsonContent: true,
+    },
+  });
+
+  if (existingArtifact?.jsonContent) {
+    return {
+      plan: ChapterPlanSchema.parse(existingArtifact.jsonContent) as ChapterPlan,
+      artifactId: existingArtifact.id,
+    };
+  }
+
   const system = buildChapterPlanSystemPrompt();
   const prompt = buildChapterPlanUserPrompt(chapter, bible, entitySummaries);
 
@@ -112,25 +132,29 @@ export async function executeChapterPlanGeneration(
 
   const totalTokens = (usage?.inputTokens ?? 0) + (usage?.outputTokens ?? 0);
 
-  const artifact = await prisma.generatedArtifact.create({
-    data: {
-      runId: run.id,
-      projectId: run.projectId,
-      artifactType: 'chapter_plan',
-      artifactKey: `chapter-plan-${chapter.slug}`,
-      status: 'generated',
-      version: 1,
-      title: `Plan: ${chapter.title}`,
-      summary: `${plan.sections.length} sections, ${plan.encounters.length} encounters`,
-      jsonContent: plan as any,
-      tokenCount: totalTokens,
-      pageEstimate: chapter.targetPages,
-    },
-  });
+  const artifact = await prisma.$transaction(async (tx) => {
+    const createdArtifact = await tx.generatedArtifact.create({
+      data: {
+        runId: run.id,
+        projectId: run.projectId,
+        artifactType: 'chapter_plan',
+        artifactKey: `chapter-plan-${chapter.slug}`,
+        status: 'generated',
+        version: 1,
+        title: `Plan: ${chapter.title}`,
+        summary: `${plan.sections.length} sections, ${plan.encounters.length} encounters`,
+        jsonContent: plan as any,
+        tokenCount: totalTokens,
+        pageEstimate: chapter.targetPages,
+      },
+    });
 
-  await prisma.generationRun.update({
-    where: { id: run.id },
-    data: { actualTokens: { increment: totalTokens } },
+    await tx.generationRun.update({
+      where: { id: run.id },
+      data: { actualTokens: { increment: totalTokens } },
+    });
+
+    return createdArtifact;
   });
 
   await publishGenerationEvent(run.id, {

@@ -47,6 +47,8 @@ Operational note:
 
 - generation resumes are checkpoint-gated; if the API says a paused run has not reached a resumable checkpoint yet, wait for the worker to acknowledge the pause before calling resume again
 - agent runs still pause cooperatively in-process, so they do not require an explicit requeue on resume
+- fixed-key generation artifacts now replay in place; the worker reuses the existing v1 intake, bible, outline, front matter, chapter plan, and chapter draft rows on retry instead of inserting duplicates
+- document assembly also replays in place by reusing the run's v1 manifest and upserting `ProjectDocument` rows by `(projectId, slug)`, which keeps document IDs stable across retries and deploy interruptions
 
 ## Build And Push Images
 

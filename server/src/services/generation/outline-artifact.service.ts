@@ -1,3 +1,4 @@
+import { ArtifactStatus } from '@prisma/client';
 import type { ChapterOutline } from '@dnd-booker/shared';
 import { prisma } from '../../config/database.js';
 
@@ -8,6 +9,15 @@ export interface ResolvedOutlineArtifact {
   outline: ChapterOutline;
   accepted: boolean;
 }
+
+const OUTLINE_FALLBACK_STATUSES: readonly ArtifactStatus[] = [
+  'generated',
+  'failed_evaluation',
+  'needs_review',
+  'revising',
+  'passed',
+  'evaluating',
+] as const;
 
 /**
  * Prefer the latest accepted outline, but fall back to the latest available
@@ -32,16 +42,17 @@ export async function resolveOutlineArtifact(
     };
   }
 
-  const fallback = await prisma.generatedArtifact.findFirst({
+  const fallbackCandidates = await prisma.generatedArtifact.findMany({
     where: {
       runId,
       artifactType: 'chapter_outline',
-      status: {
-        in: ['generated', 'failed_evaluation', 'needs_review', 'revising', 'passed', 'evaluating'],
-      },
     },
     orderBy: { version: 'desc' },
   });
+  const fallback = fallbackCandidates.find((artifact) => (
+    OUTLINE_FALLBACK_STATUSES.includes(artifact.status as ArtifactStatus)
+    && Boolean(artifact.jsonContent)
+  )) ?? null;
 
   if (!fallback?.jsonContent) {
     return null;

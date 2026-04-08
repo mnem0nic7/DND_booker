@@ -1,5 +1,5 @@
 import type { ChapterOutline, AssemblyDocumentSpec } from '@dnd-booker/shared';
-import { Prisma } from '@prisma/client';
+import { ArtifactStatus, Prisma } from '@prisma/client';
 import { prisma } from '../../config/database.js';
 import { publishGenerationEvent } from './pubsub.service.js';
 import { resolveOutlineArtifact } from './outline-artifact.service.js';
@@ -30,7 +30,7 @@ interface RealizedArtPlacement {
 }
 
 const ASSEMBLY_MARKDOWN_CONVERSION_TIMEOUT_MS = 120_000;
-const ASSEMBLY_FALLBACK_CONTENT_STATUSES = [
+const ASSEMBLY_FALLBACK_CONTENT_STATUSES: readonly ArtifactStatus[] = [
   'generated',
   'failed_evaluation',
   'needs_review',
@@ -38,6 +38,18 @@ const ASSEMBLY_FALLBACK_CONTENT_STATUSES = [
   'passed',
   'evaluating',
 ] as const;
+
+async function findFallbackArtifacts(runId: string, artifactKey: string, statuses: readonly ArtifactStatus[]) {
+  const artifacts = await prisma.generatedArtifact.findMany({
+    where: {
+      runId,
+      artifactKey,
+    },
+    orderBy: { version: 'desc' },
+  });
+
+  return artifacts.filter((artifact) => statuses.includes(artifact.status as ArtifactStatus));
+}
 
 async function resolveArtifactContent(
   artifact: {
@@ -160,14 +172,11 @@ async function resolveAssemblySourceArtifact(
       return { artifact: acceptedDraft, accepted: true };
     }
 
-    const fallbackArtifacts = await prisma.generatedArtifact.findMany({
-      where: {
-        runId,
-        artifactKey: primaryDraftKey,
-        status: { in: [...ASSEMBLY_FALLBACK_CONTENT_STATUSES] },
-      },
-      orderBy: { version: 'desc' },
-    });
+    const fallbackArtifacts = await findFallbackArtifacts(
+      runId,
+      primaryDraftKey,
+      ASSEMBLY_FALLBACK_CONTENT_STATUSES,
+    );
 
     const fallback = fallbackArtifacts.find(hasRecoverableArtifactContent) ?? null;
     if (fallback) {
@@ -329,22 +338,39 @@ export async function assembleDocuments(
   // 3. Build manifest
   const manifestDocs = buildManifestDocuments(outline, acceptedKeys);
 
-  const manifest = await prisma.assemblyManifest.create({
-    data: {
+  const existingManifest = await prisma.assemblyManifest.findFirst({
+    where: {
       runId: run.id,
-      projectId: run.projectId,
       version: 1,
-      documents: manifestDocs as any,
-      status: 'draft',
+    },
+    select: {
+      id: true,
+    },
+    orderBy: {
+      createdAt: 'asc',
     },
   });
 
-  // 4. Replace any pre-existing project documents for this project.
-  await prisma.projectDocument.deleteMany({
-    where: { projectId: run.projectId },
-  });
+  const manifest = existingManifest
+    ? await prisma.assemblyManifest.update({
+      where: { id: existingManifest.id },
+      data: {
+        projectId: run.projectId,
+        documents: manifestDocs as any,
+        status: 'draft',
+      },
+    })
+    : await prisma.assemblyManifest.create({
+      data: {
+        runId: run.id,
+        projectId: run.projectId,
+        version: 1,
+        documents: manifestDocs as any,
+        status: 'draft',
+      },
+    });
 
-  // 5. Create ProjectDocument records
+  // 4. Upsert ProjectDocument records keyed by project + slug.
   const documentIds: string[] = [];
   const createdDocs: Array<{
     id: string;
@@ -380,8 +406,32 @@ export async function assembleDocuments(
     });
     const publicationFields = buildPublicationDocumentStorageFields({ content: resolvedLayout.content });
 
-    const doc = await prisma.projectDocument.create({
-      data: {
+    const doc = await prisma.projectDocument.upsert({
+      where: {
+        projectId_slug: {
+          projectId: run.projectId,
+          slug: spec.documentSlug,
+        },
+      },
+      update: {
+        runId: run.id,
+        kind: spec.kind,
+        title: spec.title,
+        sortOrder: spec.sortOrder,
+        targetPageCount: spec.targetPageCount ?? null,
+        outlineJson: (artifact?.jsonContent as any) ?? Prisma.JsonNull,
+        layoutPlan: resolvedLayout.layoutPlan as any,
+        content: resolvedLayout.content as any,
+        canonicalDocJson: publicationFields.canonicalDocJson,
+        editorProjectionJson: publicationFields.editorProjectionJson,
+        typstSource: publicationFields.typstSource,
+        canonicalVersion: publicationFields.canonicalVersion,
+        editorProjectionVersion: publicationFields.editorProjectionVersion,
+        typstVersion: publicationFields.typstVersion,
+        status: 'draft',
+        sourceArtifactId: artifact?.id ?? null,
+      },
+      create: {
         projectId: run.projectId,
         runId: run.id,
         kind: spec.kind,
@@ -413,6 +463,14 @@ export async function assembleDocuments(
       content: doc.content,
     });
   }
+
+  const manifestSlugs = manifestDocs.map((spec) => spec.documentSlug);
+  await prisma.projectDocument.deleteMany({
+    where: {
+      projectId: run.projectId,
+      slug: { notIn: manifestSlugs },
+    },
+  });
 
   if (acceptedGeneratedImages.length > 0) {
     const artUpdatedDocuments = applyRealizedArtToDocuments(
@@ -458,13 +516,13 @@ export async function assembleDocuments(
     );
   }
 
-  // 6. Update manifest status
+  // 5. Update manifest status
   await prisma.assemblyManifest.update({
     where: { id: manifest.id },
     data: { status: 'assembled' },
   });
 
-  // 7. Publish event
+  // 6. Publish event
   await publishGenerationEvent(run.id, {
     type: 'run_status',
     runId: run.id,

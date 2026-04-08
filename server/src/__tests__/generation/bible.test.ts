@@ -315,4 +315,41 @@ describe('Bible Service — executeBibleGeneration', () => {
     expect(result.entities.some((entity) => entity.canonicalName === 'Chief Gnarltooth')).toBe(true);
     expect(result.entities.some((entity) => entity.canonicalName === 'Duskhollow Caves')).toBe(true);
   });
+
+  it('reuses the persisted bible and canon entities on replay', async () => {
+    mockGenerateText.mockResolvedValueOnce({
+      text: JSON.stringify(VALID_BIBLE_RESPONSE),
+      usage: { inputTokens: 1000, outputTokens: 2000 },
+    } as any);
+
+    const run = await createRun({
+      projectId: testProject.id,
+      userId: testUser.id,
+      prompt: 'A goblin cave adventure',
+    });
+
+    const first = await executeBibleGeneration(run!, SAMPLE_INPUT, {} as any, 8192);
+    const second = await executeBibleGeneration(run!, SAMPLE_INPUT, {} as any, 8192);
+
+    expect(second.artifactId).toBe(first.artifactId);
+    expect(second.bible.id).toBe(first.bible.id);
+    expect(second.entities).toHaveLength(first.entities.length);
+    expect(mockGenerateText).toHaveBeenCalledTimes(1);
+
+    const [artifacts, bibles, entities] = await Promise.all([
+      prisma.generatedArtifact.findMany({
+        where: { runId: run!.id, artifactType: 'campaign_bible' },
+      }),
+      prisma.campaignBible.findMany({
+        where: { runId: run!.id },
+      }),
+      prisma.canonEntity.findMany({
+        where: { runId: run!.id },
+      }),
+    ]);
+
+    expect(artifacts).toHaveLength(1);
+    expect(bibles).toHaveLength(1);
+    expect(entities).toHaveLength(VALID_BIBLE_RESPONSE.entities.length);
+  });
 });
