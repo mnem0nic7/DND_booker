@@ -105,8 +105,6 @@ combiner: OR
 enabled: true
 notificationChannels: ${notification_channels_json}
 alertStrategy:
-  notificationRateLimit:
-    period: 900s
   autoClose: 1800s
 documentation:
   content: |-
