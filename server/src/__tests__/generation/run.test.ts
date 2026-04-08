@@ -138,6 +138,35 @@ describe('GenerationRun Service', () => {
       expect(updated!.status).toBe('paused');
     });
 
+    it('should allow assembling → paused for publication review gates', async () => {
+      const run = await createRun({ projectId, userId, prompt: 'Assembly pause test' });
+      await transitionRunStatus(run!.id, userId, 'planning');
+      await transitionRunStatus(run!.id, userId, 'generating_assets');
+      await transitionRunStatus(run!.id, userId, 'generating_prose');
+      await transitionRunStatus(run!.id, userId, 'assembling');
+
+      const updated = await transitionRunStatus(run!.id, userId, 'paused');
+
+      expect(updated).not.toBeNull();
+      expect(updated!.status).toBe('paused');
+      expect(updated!.currentStage).toBe('assembling');
+    });
+
+    it('should allow assembling → cancelled for rejected publication review gates', async () => {
+      const run = await createRun({ projectId, userId, prompt: 'Assembly cancel test' });
+      await transitionRunStatus(run!.id, userId, 'planning');
+      await transitionRunStatus(run!.id, userId, 'generating_assets');
+      await transitionRunStatus(run!.id, userId, 'generating_prose');
+      await transitionRunStatus(run!.id, userId, 'assembling');
+
+      const updated = await transitionRunStatus(run!.id, userId, 'cancelled');
+
+      expect(updated).not.toBeNull();
+      expect(updated!.status).toBe('cancelled');
+      expect(updated!.currentStage).toBeNull();
+      expect(updated!.completedAt).not.toBeNull();
+    });
+
     it('should reject invalid transitions (queued → completed)', async () => {
       const run = await createRun({ projectId, userId, prompt: 'Invalid transition' });
       const result = await transitionRunStatus(run!.id, userId, 'completed');

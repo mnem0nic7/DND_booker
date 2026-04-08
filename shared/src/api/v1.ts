@@ -379,6 +379,23 @@ export const V1AgentRunSchema = z.object({
   completedAt: z.string().datetime().nullable(),
 });
 
+export const V1AgentRunSummarySchema = z.object({
+  id: z.string().uuid(),
+  mode: AgentRunModeSchema,
+  status: AgentRunStatusSchema,
+  currentStage: z.string().nullable(),
+  progressPercent: z.number().int().min(0).max(100),
+  currentStrategy: z.string().nullable(),
+  cycleCount: z.number().int(),
+  exportCount: z.number().int(),
+  graphThreadId: z.string().nullable().optional(),
+  graphCheckpointKey: z.string().nullable().optional(),
+  graphStateJson: GraphStateSchema.nullable().optional(),
+  resumeToken: z.string().nullable().optional(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+});
+
 export const V1AgentRunDetailSchema = V1AgentRunSchema.extend({
   checkpointCount: z.number().int(),
   actionCount: z.number().int(),
@@ -412,6 +429,7 @@ export const AgentActionSchema = z.object({
 
 export type V1CreateAgentRunRequest = z.infer<typeof V1CreateAgentRunRequestSchema>;
 export type V1AgentRun = z.infer<typeof V1AgentRunSchema>;
+export type V1AgentRunSummary = z.infer<typeof V1AgentRunSummarySchema>;
 export type V1AgentRunDetail = z.infer<typeof V1AgentRunDetailSchema>;
 export type AgentCheckpoint = z.infer<typeof AgentCheckpointSchema>;
 export type AgentAction = z.infer<typeof AgentActionSchema>;
@@ -617,7 +635,7 @@ export const GenerationRunSummarySchema = V1GenerationRunSchema;
 export const GenerationRunDetailSchema = V1GenerationRunDetailSchema;
 export const AgentRunCreateSchema = V1CreateAgentRunRequestSchema;
 export const AgentRunSchema = V1AgentRunSchema;
-export const AgentRunSummarySchema = V1AgentRunSchema;
+export const AgentRunSummarySchema = V1AgentRunSummarySchema;
 export const AgentRunDetailSchema = V1AgentRunDetailSchema;
 
 export type V1PublicationDocumentSummary = z.infer<typeof V1PublicationDocumentSummarySchema>;
@@ -677,6 +695,7 @@ export type GenerationRun = V1GenerationRun;
 export type GenerationRunDetail = V1GenerationRunDetail;
 export type AgentRunCreateRequest = V1CreateAgentRunRequest;
 export type AgentRun = V1AgentRun;
+export type AgentRunSummary = V1AgentRunSummary;
 export type AgentRunDetail = V1AgentRunDetail;
 export type GraphInterruptResolutionRequestBody = z.infer<typeof GraphInterruptResolutionRequestSchema>;
 

@@ -262,4 +262,41 @@ describe('Run Interrupt API v1', () => {
     });
     expect(cancelledRun.status).toBe('cancelled');
   });
+
+  it('rejecting a generation interrupt cancels an assembling run at the publication gate', async () => {
+    const rejection = await ensureGenerationRunInterrupt({
+      runId: generationRunId,
+      userId,
+      interruptKey: 'generation:test-reject-assembly',
+      kind: 'manual_review',
+      title: 'Reject publication review',
+      summary: 'Reject should stop an assembling run.',
+    });
+
+    expect(rejection?.created).toBe(true);
+
+    await prisma.generationRun.update({
+      where: { id: generationRunId },
+      data: {
+        status: 'assembling',
+        currentStage: 'assembling',
+        startedAt: new Date(),
+      },
+    });
+
+    const res = await request(app)
+      .post(`/api/v1/projects/${projectId}/generation-runs/${generationRunId}/interrupts/${rejection!.interrupt.id}/resolve`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ action: 'reject' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe('rejected');
+
+    const cancelledRun = await prisma.generationRun.findUniqueOrThrow({
+      where: { id: generationRunId },
+    });
+
+    expect(cancelledRun.status).toBe('cancelled');
+    expect(cancelledRun.completedAt).not.toBeNull();
+  });
 });

@@ -78,6 +78,17 @@ describe('Run API v1 serialization', () => {
     expect(agentRes.body.status).toBe('queued');
     expect(typeof agentRes.body.createdAt).toBe('string');
     expect(typeof agentRes.body.updatedAt).toBe('string');
+
+    const listAgentRunsRes = await request(app)
+      .get(`/api/v1/projects/${projectId}/agent-runs`)
+      .set('Authorization', `Bearer ${accessToken}`);
+
+    expect(listAgentRunsRes.status).toBe(200);
+    expect(Array.isArray(listAgentRunsRes.body)).toBe(true);
+    expect(listAgentRunsRes.body.some((run: { id: string }) => run.id === agentRes.body.id)).toBe(true);
+    expect(typeof listAgentRunsRes.body[0].createdAt).toBe('string');
+    expect(typeof listAgentRunsRes.body[0].updatedAt).toBe('string');
+    expect(listAgentRunsRes.body[0].goal).toBeUndefined();
   });
 
   it('serializes generation run resources with ISO timestamps', async () => {

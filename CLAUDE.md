@@ -58,7 +58,7 @@ npm run build --workspace=server   # tsc to dist/
 ### Server routing
 Routes export named routers (`authRoutes`, `aiSettingsRoutes`, `aiChatRoutes`, etc.) mounted in `server/src/index.ts`. AI routes split into four routers: settings, generate, chat, wizard.
 
-The `api/v1` contract validates transport DTOs, not raw Prisma records. If a route parses against a Zod schema with ISO timestamp strings, normalize Prisma `Date` fields before schema validation instead of feeding database rows directly into the response schema.
+The `api/v1` contract validates transport DTOs, not raw Prisma records. If a route parses against a Zod schema with ISO timestamp strings, normalize Prisma `Date` fields before schema validation instead of feeding database rows directly into the response schema. Also keep list routes on their true summary schemas; validating summary payloads against full detail shapes will fail in production even when the underlying data is correct.
 
 ### SSE streaming
 Server uses `res.write()` chunks. Chat streams plain text; wizard streams newline-delimited JSON events. Client uses raw `fetch()` + `ReadableStream` reader (not EventSource) to support POST with body.
@@ -97,6 +97,7 @@ The graph runtime now emits real approval gates:
 - approving a gate auto-resumes the run
 - requesting edits keeps the run paused so manual document changes can happen before a later resume
 - rejecting a gate cancels the run
+- the generation status machine must continue to allow `assembling -> paused` and `assembling -> cancelled`, otherwise publication-review gates spin with a pending interrupt instead of actually yielding control
 
 For generation nodes that own a fixed `version=1` durable row, retries must reuse that row instead of inserting again. Intake, bible, outline, front matter, chapter plan, chapter draft, and assembly now treat their fixed artifact or manifest/document records as replay boundaries.
 

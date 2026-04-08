@@ -90,7 +90,7 @@ export const RUN_STATUS_TRANSITIONS: Record<RunStatus, RunStatus[]> = {
   generating_prose: ['evaluating', 'assembling', 'paused', 'cancelled', 'failed'],
   evaluating: ['revising', 'assembling', 'paused', 'cancelled', 'failed'],
   revising: ['evaluating', 'assembling', 'paused', 'cancelled', 'failed'],
-  assembling: ['completed', 'failed'],
+  assembling: ['completed', 'failed', 'paused', 'cancelled'],
   completed: [],
   failed: [],
   paused: ['planning', 'generating_assets', 'generating_prose', 'evaluating', 'revising', 'assembling', 'cancelled'],
