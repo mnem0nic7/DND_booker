@@ -31,7 +31,10 @@ Current `api/v1` equivalents used by the shipped client:
 - use `background_producer` when a generation prompt is required
 - keep budgets explicit for long runs
 - agent runs now checkpoint the active graph node into `AgentRun.graphStateJson.runtime`, so deploy interruptions and BullMQ retries should resume from the last durable node rather than restarting the whole loop
-- approval gates now persist in `graphStateJson.interrupts`; resolve them before attempting a manual resume because the client intentionally hides the resume action while pending interrupts exist
+- approval gates now persist in `graphStateJson.interrupts`; the persistent editor pauses before applying the next planned mutation
+- approving a gate auto-resumes the run
+- requesting edits keeps the run paused so you can make manual document changes and then resume into a fresh observation/replanning pass
+- rejecting a gate cancels the run
 - publish and observe checkpoints for any action that may degrade quality
 - prefer restore over ad hoc reversal when a run regresses
 - after agent-runtime changes, run the scoped verification, update the relevant docs or runbooks, and redeploy the affected runtime

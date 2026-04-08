@@ -89,6 +89,13 @@ Generation pause/resume is now checkpoint-gated: a paused run can only be resume
 
 Approval and review gates persist under `graphStateJson.interrupts`. The v1 run APIs expose project-level and run-level interrupt lists plus resolve endpoints, and the client run panels now block manual resume while pending interrupts remain.
 
+The graph runtime now emits real approval gates:
+- generation pauses at a publication-review gate before final art/layout passes
+- persistent editor agent runs pause at an approval gate before applying the next planned mutation
+- approving a gate auto-resumes the run
+- requesting edits keeps the run paused so manual document changes can happen before a later resume
+- rejecting a gate cancels the run
+
 For generation nodes that own a fixed `version=1` durable row, retries must reuse that row instead of inserting again. Intake, bible, outline, front matter, chapter plan, chapter draft, and assembly now treat their fixed artifact or manifest/document records as replay boundaries.
 
 Assembly is replay-safe by upserting `ProjectDocument` rows on `(projectId, slug)` and reusing the run's `AssemblyManifest` v1 record. Do not reintroduce blanket `deleteMany({ projectId })` behavior for document rebuilds.

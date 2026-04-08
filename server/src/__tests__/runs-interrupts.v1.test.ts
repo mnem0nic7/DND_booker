@@ -6,6 +6,7 @@ import app from '../index.js';
 import { prisma } from '../config/database.js';
 import { createRun } from '../services/generation/run.service.js';
 import { createAgentRun } from '../services/agent/run.service.js';
+import { ensureAgentRunInterrupt, ensureGenerationRunInterrupt } from '../services/graph/interrupt.service.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'test-secret';
 const uniqueSuffix = Date.now();
@@ -139,14 +140,39 @@ describe('Run Interrupt API v1', () => {
     expect(res.body.map((interrupt: { runType: string }) => interrupt.runType).sort()).toEqual(['agent', 'generation']);
   });
 
+  it('reuses the same persisted interrupt for a stable interrupt key', async () => {
+    const first = await ensureGenerationRunInterrupt({
+      runId: generationRunId,
+      userId,
+      interruptKey: 'generation:test-stable-key',
+      kind: 'manual_review',
+      title: 'Stable review gate',
+      summary: 'Should not duplicate on replay.',
+    });
+    const second = await ensureGenerationRunInterrupt({
+      runId: generationRunId,
+      userId,
+      interruptKey: 'generation:test-stable-key',
+      kind: 'manual_review',
+      title: 'Stable review gate',
+      summary: 'Should not duplicate on replay.',
+    });
+
+    expect(first?.created).toBe(true);
+    expect(second?.created).toBe(false);
+    expect(second?.interrupt.id).toBe(first?.interrupt.id);
+  });
+
   it('lists and resolves a generation run interrupt', async () => {
     const listRes = await request(app)
       .get(`/api/v1/projects/${projectId}/generation-runs/${generationRunId}/interrupts`)
       .set('Authorization', `Bearer ${accessToken}`);
 
     expect(listRes.status).toBe(200);
-    expect(listRes.body).toHaveLength(1);
-    expect(listRes.body[0].status).toBe('pending');
+    expect(Array.isArray(listRes.body)).toBe(true);
+    expect(listRes.body.some((interrupt: { id: string; status: string }) =>
+      interrupt.id === '11111111-1111-4111-8111-111111111111' && interrupt.status === 'pending',
+    )).toBe(true);
 
     const resolveRes = await request(app)
       .post(`/api/v1/projects/${projectId}/generation-runs/${generationRunId}/interrupts/11111111-1111-4111-8111-111111111111/resolve`)
@@ -160,10 +186,11 @@ describe('Run Interrupt API v1', () => {
     const updatedRun = await prisma.generationRun.findUniqueOrThrow({ where: { id: generationRunId } });
     const updatedState = updatedRun.graphStateJson as Record<string, unknown>;
     const interrupts = updatedState.interrupts as Array<Record<string, unknown>>;
-    expect(interrupts[0]?.status).toBe('approved');
-    expect(interrupts[0]?.resolvedByUserId).toBe(userId);
-    expect(updatedState.pendingInterruptCount).toBe(0);
-    expect(updatedState.activeInterruptId).toBeNull();
+    const resolvedInterrupt = interrupts.find((interrupt) => interrupt.id === '11111111-1111-4111-8111-111111111111');
+    expect(resolvedInterrupt?.status).toBe('approved');
+    expect(resolvedInterrupt?.resolvedByUserId).toBe(userId);
+    expect(updatedState.pendingInterruptCount).toBe(1);
+    expect(updatedState.activeInterruptId).toBeTruthy();
   });
 
   it('lists and resolves an agent run interrupt with edit payload', async () => {
@@ -192,11 +219,47 @@ describe('Run Interrupt API v1', () => {
     const updatedRun = await prisma.agentRun.findUniqueOrThrow({ where: { id: agentRunId } });
     const updatedState = updatedRun.graphStateJson as Record<string, unknown>;
     const interrupts = updatedState.interrupts as Array<Record<string, unknown>>;
-    expect(interrupts[0]?.status).toBe('edited');
-    expect(interrupts[0]?.resolutionPayload).toMatchObject({
+    const resolvedInterrupt = interrupts.find((interrupt) => interrupt.id === '22222222-2222-4222-8222-222222222222');
+    expect(resolvedInterrupt?.status).toBe('edited');
+    expect(resolvedInterrupt?.resolutionPayload).toMatchObject({
       note: 'Tighten encounter pacing before resuming.',
     });
     expect(updatedState.pendingInterruptCount).toBe(0);
     expect(updatedState.activeInterruptId).toBeNull();
+  });
+
+  it('rejecting an interrupt cancels the paused run', async () => {
+    const rejection = await ensureAgentRunInterrupt({
+      runId: agentRunId,
+      userId,
+      interruptKey: 'agent:test-reject',
+      kind: 'approval_gate',
+      title: 'Reject the next change',
+      summary: 'Reject should stop the run.',
+    });
+
+    expect(rejection?.created).toBe(true);
+
+    await prisma.agentRun.update({
+      where: { id: agentRunId },
+      data: {
+        status: 'paused',
+        currentStage: 'planning',
+      },
+    });
+
+    const res = await request(app)
+      .post(`/api/v1/projects/${projectId}/agent-runs/${agentRunId}/interrupts/${rejection!.interrupt.id}/resolve`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ action: 'reject' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe('rejected');
+
+    const cancelledRun = await prisma.agentRun.findUniqueOrThrow({
+      where: { id: agentRunId },
+      select: { status: true },
+    });
+    expect(cancelledRun.status).toBe('cancelled');
   });
 });

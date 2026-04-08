@@ -283,6 +283,10 @@ export const useGenerationStore = create<GenerationState>((set, get) => ({
 
                 return updates as GenerationState;
               });
+
+              if (event.type === 'run_status' && event.status === 'paused') {
+                void get().fetchRun(projectId, runId);
+              }
             } catch {
               // Skip malformed events
             }
@@ -381,7 +385,7 @@ export const useGenerationStore = create<GenerationState>((set, get) => ({
       });
 
       const currentRun = get().currentRun;
-      if (action !== 'reject' && currentRun?.status === 'paused') {
+      if (action === 'approve' && currentRun?.status === 'paused') {
         await get().resumeRun(projectId, runId);
         return;
       }

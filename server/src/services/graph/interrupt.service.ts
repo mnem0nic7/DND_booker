@@ -3,6 +3,7 @@ import type {
   GraphInterruptResolutionAction,
   GraphInterruptStatus,
 } from '@dnd-booker/shared';
+import { randomUUID } from 'node:crypto';
 import { prisma } from '../../config/database.js';
 
 type GraphRunType = 'generation' | 'agent';
@@ -17,6 +18,21 @@ interface GraphRunRecord {
 interface ResolveInterruptResult {
   status: 'resolved' | 'run_not_found' | 'interrupt_not_found' | 'interrupt_not_pending';
   interrupt?: GraphInterrupt;
+}
+
+interface EnsureInterruptInput {
+  runId: string;
+  userId: string;
+  interruptKey: string;
+  kind: string;
+  title: string;
+  summary?: string | null;
+  payload?: unknown;
+}
+
+interface EnsureInterruptResult {
+  interrupt: GraphInterrupt;
+  created: boolean;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -65,6 +81,26 @@ function normalizeGraphInterrupt(
     createdAt,
     resolvedAt,
   };
+}
+
+function readInterruptKey(interrupt: GraphInterrupt) {
+  if (!isRecord(interrupt.payload)) return null;
+  return typeof interrupt.payload.interruptKey === 'string'
+    ? interrupt.payload.interruptKey
+    : null;
+}
+
+function buildInterruptPayload(interruptKey: string, payload: unknown) {
+  if (isRecord(payload)) {
+    return {
+      ...payload,
+      interruptKey,
+    };
+  }
+
+  return payload === undefined
+    ? { interruptKey }
+    : { interruptKey, value: payload };
 }
 
 function readInterrupts(graphStateJson: unknown, runType: GraphRunType, runId: string): GraphInterrupt[] {
@@ -250,6 +286,51 @@ async function resolveRunInterrupt(
   };
 }
 
+async function ensureRunInterrupt(
+  runType: GraphRunType,
+  input: EnsureInterruptInput,
+): Promise<EnsureInterruptResult | null> {
+  const run = await getRunRecord(runType, input.runId, input.userId);
+  if (!run) return null;
+
+  const currentInterrupts = readInterrupts(run.graphStateJson, runType, run.id);
+  const existing = currentInterrupts.find((interrupt) =>
+    readInterruptKey(interrupt) === input.interruptKey,
+  );
+  if (existing) {
+    return {
+      interrupt: existing,
+      created: false,
+    };
+  }
+
+  const nextInterrupt: GraphInterrupt = {
+    id: randomUUID(),
+    runType,
+    runId: run.id,
+    kind: input.kind,
+    title: input.title,
+    summary: input.summary ?? null,
+    status: 'pending',
+    payload: buildInterruptPayload(input.interruptKey, input.payload),
+    resolutionPayload: null,
+    resolvedByUserId: null,
+    createdAt: new Date().toISOString(),
+    resolvedAt: null,
+  };
+
+  await persistRunInterrupts(
+    runType,
+    run.id,
+    writeInterrupts(run.graphStateJson, [nextInterrupt, ...currentInterrupts]),
+  );
+
+  return {
+    interrupt: nextInterrupt,
+    created: true,
+  };
+}
+
 export async function resolveGenerationRunInterrupt(
   runId: string,
   userId: string,
@@ -260,6 +341,10 @@ export async function resolveGenerationRunInterrupt(
   return resolveRunInterrupt('generation', runId, userId, interruptId, action, resolutionPayload);
 }
 
+export async function ensureGenerationRunInterrupt(input: EnsureInterruptInput) {
+  return ensureRunInterrupt('generation', input);
+}
+
 export async function resolveAgentRunInterrupt(
   runId: string,
   userId: string,
@@ -268,4 +353,8 @@ export async function resolveAgentRunInterrupt(
   resolutionPayload: unknown,
 ) {
   return resolveRunInterrupt('agent', runId, userId, interruptId, action, resolutionPayload);
+}
+
+export async function ensureAgentRunInterrupt(input: EnsureInterruptInput) {
+  return ensureRunInterrupt('agent', input);
 }

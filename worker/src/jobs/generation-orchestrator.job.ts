@@ -21,6 +21,7 @@ interface GenerationGraphData extends Record<string, unknown> {
   latestPreflight: StoredPreflightResult | null;
   needsPreflightRecheck: boolean;
   quickModeAccepted: boolean;
+  manualReviewRecheckPending: boolean;
 }
 
 interface StoredPreflightIssue {
@@ -47,6 +48,15 @@ const SUPPORTED_CANON_ENTITY_TYPES: Record<string, string> = {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function readResolutionNote(value: unknown) {
+  if (!isRecord(value) || typeof value.note !== 'string') {
+    return null;
+  }
+
+  const note = value.note.trim();
+  return note ? note : null;
 }
 
 function resolveOptionalStageTimeoutMs(): number {
@@ -99,6 +109,7 @@ async function loadGenerationDependencies() {
   const artDirectionService = await import('../../../server/src/services/generation/art-direction.service.js');
   const layoutDirectorService = await import('../../../server/src/services/generation/layout-director.service.js');
   const intakeService = await import('../../../server/src/services/generation/intake.service.js');
+  const interruptService = await import('../../../server/src/services/graph/interrupt.service.js');
 
   return {
     ...runService,
@@ -117,6 +128,7 @@ async function loadGenerationDependencies() {
     ...artDirectionService,
     ...layoutDirectorService,
     ...intakeService,
+    ...interruptService,
   };
 }
 
@@ -377,6 +389,15 @@ export async function processGenerationJob(job: Job<GenerationJobData>): Promise
     return preflight;
   }
 
+  async function resolveFinalPresentationNode() {
+    const runRecord = await prisma.generationRun.findUniqueOrThrow({
+      where: { id: runId },
+      select: { mode: true },
+    });
+
+    return runRecord.mode === 'one_shot' ? 'art_direction' : 'layout_director';
+  }
+
   try {
     await dependencies.updateRunGraphState(runId, userId, {
       jobName: job.name,
@@ -391,6 +412,7 @@ export async function processGenerationJob(job: Job<GenerationJobData>): Promise
         latestPreflight: null,
         needsPreflightRecheck: false,
         quickModeAccepted: false,
+        manualReviewRecheckPending: false,
       },
       loadSnapshot: () => readRuntimeState(fullRun.graphStateJson),
       externalContext: undefined,
@@ -742,15 +764,10 @@ export async function processGenerationJob(job: Job<GenerationJobData>): Promise
             });
           }
 
-          const runRecord = await prisma.generationRun.findUniqueOrThrow({
-            where: { id: runId },
-            select: { mode: true },
-          });
-
           return {
             nextNode: polish.documentsUpdated > 0
               ? 'preflight_recheck'
-              : (runRecord.mode === 'one_shot' ? 'art_direction' : 'layout_director'),
+              : 'publication_review_gate',
             data: {
               latestPreflight: preflight,
               needsPreflightRecheck: polish.documentsUpdated > 0,
@@ -760,16 +777,87 @@ export async function processGenerationJob(job: Job<GenerationJobData>): Promise
 
         preflight_recheck: async () => {
           const preflight = await runAndValidatePreflight(97);
-          const runRecord = await prisma.generationRun.findUniqueOrThrow({
-            where: { id: runId },
-            select: { mode: true },
-          });
 
           return {
-            nextNode: runRecord.mode === 'one_shot' ? 'art_direction' : 'layout_director',
+            nextNode: 'publication_review_gate',
             data: {
               latestPreflight: preflight,
               needsPreflightRecheck: false,
+            },
+          };
+        },
+
+        publication_review_gate: async ({ data }) => {
+          await publishProgress('assembling', 98);
+
+          const interruptResult = await dependencies.ensureGenerationRunInterrupt({
+            runId,
+            userId,
+            interruptKey: 'generation:publication-review',
+            kind: 'manual_review',
+            title: 'Review assembled draft before final presentation',
+            summary: 'Review the assembled draft before the final art and layout passes. Approve to continue, request edit to make manual document changes and then resume, or reject to stop the run.',
+            payload: {
+              stage: 'publication_review_gate',
+            },
+          });
+
+          if (!interruptResult) {
+            throw new Error('Failed to persist publication review gate.');
+          }
+
+          if (interruptResult.interrupt.status === 'pending') {
+            const pausedRun = await dependencies.transitionRunStatus(runId, userId, 'paused');
+
+            if (interruptResult.created) {
+              await dependencies.publishGenerationEvent(runId, {
+                type: 'run_warning',
+                runId,
+                message: 'Awaiting manual review before final presentation passes.',
+                severity: 'info',
+              });
+            }
+
+            await dependencies.publishGenerationEvent(runId, {
+              type: 'run_status',
+              runId,
+              status: pausedRun?.status ?? 'paused',
+              stage: pausedRun?.currentStage ?? 'assembling',
+              progressPercent: pausedRun?.progressPercent ?? 98,
+            });
+
+            return { nextNode: 'publication_review_gate' };
+          }
+
+          if (interruptResult.interrupt.status === 'rejected') {
+            return { nextNode: null };
+          }
+
+          if (interruptResult.interrupt.status === 'edited' && !data.manualReviewRecheckPending) {
+            const note = readResolutionNote(interruptResult.interrupt.resolutionPayload);
+            if (note) {
+              await dependencies.publishGenerationEvent(runId, {
+                type: 'run_warning',
+                runId,
+                message: `Manual reviewer requested edits before completion: ${note}`,
+                severity: 'info',
+              });
+            }
+
+            return {
+              nextNode: 'preflight',
+              data: {
+                latestPreflight: null,
+                needsPreflightRecheck: false,
+                manualReviewRecheckPending: true,
+              },
+            };
+          }
+
+          return {
+            nextNode: await resolveFinalPresentationNode(),
+            data: {
+              manualReviewRecheckPending: false,
             },
           };
         },

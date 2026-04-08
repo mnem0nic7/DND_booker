@@ -220,6 +220,10 @@ export const useAgentStore = create<AgentState>((set, get) => ({
                 return updates as AgentState;
               });
 
+              if (event.type === 'run_status' && event.status === 'paused') {
+                void get().fetchRun(projectId, runId);
+              }
+
               if (event.type === 'checkpoint_created' || event.type === 'checkpoint_restored') {
                 void get().fetchCheckpoints(projectId, runId);
               }
@@ -299,7 +303,7 @@ export const useAgentStore = create<AgentState>((set, get) => ({
       });
 
       const currentRun = get().currentRun;
-      if (action !== 'reject' && currentRun?.status === 'paused') {
+      if (action === 'approve' && currentRun?.status === 'paused') {
         await get().resumeRun(projectId, runId);
         return;
       }

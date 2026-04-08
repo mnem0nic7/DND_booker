@@ -28,7 +28,7 @@ import {
   transitionRunStatus,
 } from '../../services/generation/run.service.js';
 import { enqueueGenerationRun } from '../../services/generation/queue.service.js';
-import { subscribeToRun } from '../../services/generation/pubsub.service.js';
+import { publishGenerationEvent, subscribeToRun } from '../../services/generation/pubsub.service.js';
 import {
   getExportReviewArtifactForRun,
   isExportReviewArtifactId,
@@ -290,6 +290,19 @@ v1RunRoutes.post(
     if (result.status === 'interrupt_not_pending') {
       res.status(409).json({ error: 'Interrupt has already been resolved' });
       return;
+    }
+
+    if (parsed.data.action === 'reject') {
+      const cancelled = await transitionRunStatus(runId, authReq.userId!, 'cancelled');
+      if (cancelled) {
+        await publishGenerationEvent(runId, {
+          type: 'run_status',
+          runId,
+          status: cancelled.status,
+          stage: cancelled.currentStage,
+          progressPercent: cancelled.progressPercent,
+        });
+      }
     }
 
     res.json(GraphInterruptSchema.parse(result.interrupt));
@@ -619,6 +632,19 @@ v1RunRoutes.post(
     if (result.status === 'interrupt_not_pending') {
       res.status(409).json({ error: 'Interrupt has already been resolved' });
       return;
+    }
+
+    if (parsed.data.action === 'reject') {
+      const cancelled = await transitionAgentRunStatus(runId, authReq.userId!, 'cancelled');
+      if (cancelled) {
+        await publishAgentEvent(runId, {
+          type: 'run_status',
+          runId,
+          status: cancelled.status,
+          stage: cancelled.currentStage,
+          progressPercent: cancelled.progressPercent,
+        });
+      }
     }
 
     res.json(GraphInterruptSchema.parse(result.interrupt));

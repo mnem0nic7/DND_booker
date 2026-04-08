@@ -41,6 +41,19 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
+function readResolutionNote(value: unknown) {
+  if (!isRecord(value) || typeof value.note !== 'string') {
+    return null;
+  }
+
+  const note = value.note.trim();
+  return note ? note : null;
+}
+
+function formatPlannedActionLabel(actionType: string) {
+  return actionType.replace(/_/g, ' ');
+}
+
 function readRuntimeState(graphStateJson: unknown) {
   if (!isRecord(graphStateJson)) return null;
   return graphStateJson.runtime ?? null;
@@ -82,6 +95,7 @@ async function loadAgentDependencies() {
   const generationRunService = await import('../../../server/src/services/generation/run.service.js');
   const generationQueueService = await import('../../../server/src/services/generation/queue.service.js');
   const exportService = await import('../../../server/src/services/export.service.js');
+  const interruptService = await import('../../../server/src/services/graph/interrupt.service.js');
 
   return {
     ...runService,
@@ -100,6 +114,7 @@ async function loadAgentDependencies() {
     createGenerationRun: generationRunService.createRun,
     enqueueGenerationRun: generationQueueService.enqueueGenerationRun,
     ...exportService,
+    ...interruptService,
   };
 }
 
@@ -729,13 +744,113 @@ export async function processAgentRun(job: Job<AgentJobData>): Promise<void> {
           }
 
           return {
-            nextNode: 'apply_action',
+            nextNode: currentRun.mode === 'persistent_editor' ? 'approval_gate' : 'apply_action',
             data: {
               cycleIndex,
               plannedAction: plan,
               mutationActionId: null,
             },
           };
+        },
+
+        approval_gate: async ({ data }) => {
+          const currentRun = await refreshRun();
+          const cycleIndex = data.cycleIndex ?? currentRun.cycleCount;
+          const plan = data.plannedAction;
+          if (!plan) {
+            throw new Error('Missing planned action for approval gate.');
+          }
+
+          if (currentRun.mode !== 'persistent_editor') {
+            return { nextNode: 'apply_action' };
+          }
+
+          await setStatus('planning', progressForCycle(cycleIndex, currentRun.budget.maxCycles, 18));
+
+          const interruptKey = [
+            'agent-action-review',
+            cycleIndex,
+            data.reviewExportJobId ?? 'none',
+            String(plan.actionType ?? 'no_op'),
+            String(plan.targetTitle ?? 'project'),
+          ].join(':');
+
+          const interruptResult = await dependencies.ensureAgentRunInterrupt({
+            runId: agentRunId,
+            userId,
+            interruptKey,
+            kind: 'approval_gate',
+            title: 'Approve planned creative-director action',
+            summary: `Approve the next planned mutation: ${formatPlannedActionLabel(String(plan.actionType ?? 'no_op'))}. ${String(plan.rationale ?? '')}`.trim(),
+            payload: {
+              cycleIndex,
+              actionType: plan.actionType,
+              targetTitle: plan.targetTitle ?? null,
+              reviewExportJobId: data.reviewExportJobId ?? null,
+            },
+          });
+
+          if (!interruptResult) {
+            throw new Error('Failed to persist agent approval gate.');
+          }
+
+          if (interruptResult.interrupt.status === 'pending') {
+            const pausedRun = await dependencies.transitionAgentRunStatus(agentRunId, userId, 'paused');
+
+            if (interruptResult.created) {
+              await dependencies.publishAgentEvent(agentRunId, {
+                type: 'run_warning',
+                runId: agentRunId,
+                message: 'Awaiting approval before the creative director applies the next mutation.',
+                severity: 'info',
+              });
+            }
+
+            await dependencies.publishAgentEvent(agentRunId, {
+              type: 'run_status',
+              runId: agentRunId,
+              status: pausedRun?.status ?? 'paused',
+              stage: pausedRun?.currentStage ?? 'planning',
+              progressPercent: pausedRun?.progressPercent ?? progressForCycle(cycleIndex, currentRun.budget.maxCycles, 18),
+            });
+
+            return { nextNode: 'approval_gate' };
+          }
+
+          if (interruptResult.interrupt.status === 'rejected') {
+            return {
+              nextNode: null,
+              data: {
+                stopReason: 'Creative director action was rejected by the reviewer.',
+              },
+            };
+          }
+
+          if (interruptResult.interrupt.status === 'edited') {
+            const note = readResolutionNote(interruptResult.interrupt.resolutionPayload);
+            if (note) {
+              await dependencies.publishAgentEvent(agentRunId, {
+                type: 'run_warning',
+                runId: agentRunId,
+                message: `Reviewer requested edits before the next mutation: ${note}`,
+                severity: 'info',
+              });
+            }
+
+            return {
+              nextNode: 'observe_export',
+              data: {
+                cycleIndex,
+                reviewExportJobId: null,
+                observeActionId: null,
+                plannedAction: null,
+                mutationActionId: null,
+                projectChangedSinceLastExport: true,
+              },
+            };
+          }
+
+          return { nextNode: 'apply_action' };
         },
 
         apply_action: async ({ data, persistData }) => {

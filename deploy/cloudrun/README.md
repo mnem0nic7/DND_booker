@@ -46,7 +46,10 @@ Generation runs and agent runs now persist their active graph node into each run
 Operational note:
 
 - generation resumes are checkpoint-gated; if the API says a paused run has not reached a resumable checkpoint yet, wait for the worker to acknowledge the pause before calling resume again
-- approval gates are now durable run state under `graphStateJson.interrupts`; resolve pending gates through the `api/v1` interrupt endpoints before trying to resume from the UI
+- approval gates are now durable run state under `graphStateJson.interrupts`
+- generation now emits a real publication-review gate before the final art/layout passes
+- persistent editor agent runs now emit a real approval gate before applying the next planned mutation
+- approving a gate auto-resumes the run, requesting edits keeps it paused for manual changes, and rejecting a gate cancels it
 - agent runs still pause cooperatively in-process, so they do not require an explicit requeue on resume
 - fixed-key generation artifacts now replay in place; the worker reuses the existing v1 intake, bible, outline, front matter, chapter plan, and chapter draft rows on retry instead of inserting duplicates
 - document assembly also replays in place by reusing the run's v1 manifest and upserting `ProjectDocument` rows by `(projectId, slug)`, which keeps document IDs stable across retries and deploy interruptions
