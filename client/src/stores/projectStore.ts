@@ -3,12 +3,16 @@ import axios from 'axios';
 import type {
   DocumentContent,
   LayoutPlan,
+  ProjectCreateRequest,
+  ProjectDetail as V1ProjectDetail,
   ProjectDocument,
   ProjectSettings,
+  ProjectSummary as V1ProjectSummary,
+  ProjectUpdateRequest,
   PublicationDocumentDetail,
   PublicationDocumentSummary,
 } from '@dnd-booker/shared';
-import api, { v1Client } from '../lib/api';
+import { v1Client } from '../lib/api';
 import {
   clearDocumentTextLayoutFallbacks as clearDocumentTextLayoutFallbacksInSettings,
 } from '../lib/projectSettings';
@@ -40,7 +44,7 @@ interface ProjectState {
   isLoading: boolean;
   fetchError: string | null;
   fetchProjects: () => Promise<void>;
-  createProject: (data: { title: string; description?: string; type: string; templateId?: string }) => Promise<Project>;
+  createProject: (data: ProjectCreateRequest) => Promise<Project>;
   deleteProject: (id: string) => Promise<void>;
 
   // Active project (editor)
@@ -114,20 +118,111 @@ function classifySaveError(err: unknown): SaveError {
   };
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function toProjectSettings(settings: unknown): ProjectSettings {
+  const raw = isRecord(settings) ? settings : {};
+  const margins = isRecord(raw.margins) ? raw.margins : {};
+  const fonts = isRecord(raw.fonts) ? raw.fonts : {};
+  const rawFallbacks = isRecord(raw.textLayoutFallbacks) ? raw.textLayoutFallbacks : {};
+
+  return {
+    pageSize: raw.pageSize === 'a4' || raw.pageSize === 'a5' ? raw.pageSize : 'letter',
+    margins: {
+      top: typeof margins.top === 'number' ? margins.top : 1,
+      right: typeof margins.right === 'number' ? margins.right : 1,
+      bottom: typeof margins.bottom === 'number' ? margins.bottom : 1,
+      left: typeof margins.left === 'number' ? margins.left : 1,
+    },
+    columns: raw.columns === 2 ? 2 : 1,
+    theme: typeof raw.theme === 'string' && raw.theme.trim().length > 0 ? raw.theme : 'gilded-folio',
+    fonts: {
+      heading: typeof fonts.heading === 'string' && fonts.heading.trim().length > 0 ? fonts.heading : 'Cinzel',
+      body: typeof fonts.body === 'string' && fonts.body.trim().length > 0 ? fonts.body : 'Crimson Text',
+    },
+    textLayoutFallbacks: Object.fromEntries(
+      Object.entries(rawFallbacks).flatMap(([documentId, entry]) => {
+        if (!isRecord(entry) || !Array.isArray(entry.scopeIds)) return [];
+        const scopeIds = entry.scopeIds.filter(
+          (scopeId): scopeId is string => typeof scopeId === 'string' && scopeId.trim().length > 0,
+        );
+        return scopeIds.length > 0 ? [[documentId, { scopeIds }]] : [];
+      }),
+    ),
+  };
+}
+
+function toProjectFromV1(project: V1ProjectSummary | V1ProjectDetail): Project {
+  return {
+    id: project.id,
+    title: project.title,
+    description: project.description,
+    type: project.type,
+    status: project.status,
+    coverImageUrl: project.coverImageUrl,
+    settings: toProjectSettings(project.settings),
+    createdAt: project.createdAt,
+    updatedAt: project.updatedAt,
+    ...('content' in project && project.content ? { content: project.content as DocumentContent } : {}),
+  };
+}
+
+function toProjectSettingsPatch(settings: Partial<ProjectSettings>): ProjectUpdateRequest['settings'] {
+  const next: NonNullable<ProjectUpdateRequest['settings']> = {};
+
+  if (settings.pageSize === 'letter' || settings.pageSize === 'a4' || settings.pageSize === 'a5') {
+    next.pageSize = settings.pageSize;
+  }
+
+  if (settings.margins) {
+    next.margins = settings.margins;
+  }
+
+  if (settings.columns === 1 || settings.columns === 2) {
+    next.columns = settings.columns;
+  }
+
+  if (
+    settings.theme === 'classic-parchment'
+    || settings.theme === 'gilded-folio'
+    || settings.theme === 'dark-tome'
+    || settings.theme === 'clean-modern'
+    || settings.theme === 'fey-wild'
+    || settings.theme === 'infernal'
+    || settings.theme === 'dmguild'
+  ) {
+    next.theme = settings.theme;
+  }
+
+  if (settings.fonts) {
+    next.fonts = settings.fonts;
+  }
+
+  if (settings.textLayoutFallbacks) {
+    next.textLayoutFallbacks = settings.textLayoutFallbacks;
+  }
+
+  return next;
+}
+
 /* ─── retry with exponential backoff ─── */
 
 async function saveContentWithRetry(
   projectId: string,
   content: DocumentContent,
   maxAttempts = 3,
-): Promise<void> {
+): Promise<V1ProjectDetail> {
   const backoffMs = [1000, 2000, 4000];
   let lastError: unknown;
 
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     try {
-      await api.put(`/projects/${projectId}/content`, content);
-      return;
+      return await v1Client.projects.updateProject(
+        { projectId },
+        { content },
+      );
     } catch (err) {
       lastError = err;
       if (attempt < maxAttempts - 1) {
@@ -177,6 +272,7 @@ function toProjectDocumentFromV1(
   const canonicalDocJson = 'canonicalDocJson' in document ? document.canonicalDocJson : null;
   const editorProjectionJson = 'editorProjectionJson' in document ? document.editorProjectionJson : null;
   const typstSource = 'typstSource' in document ? document.typstSource : null;
+  const layoutPlan = 'layoutPlan' in document ? document.layoutPlan ?? null : null;
 
   return {
     id: documentId,
@@ -188,7 +284,7 @@ function toProjectDocumentFromV1(
     sortOrder: document.sortOrder,
     targetPageCount: document.targetPageCount,
     outlineJson: null,
-    layoutPlan: null,
+    layoutPlan,
     content,
     canonicalDocJson,
     editorProjectionJson,
@@ -248,24 +344,25 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   fetchProjects: async () => {
     set({ isLoading: true, fetchError: null });
     try {
-      const { data } = await api.get('/projects');
-      set({ projects: data, isLoading: false });
+      const data = await v1Client.projects.listProjects();
+      set({ projects: data.map((project) => toProjectFromV1(project)), isLoading: false });
     } catch {
       set({ isLoading: false, fetchError: 'Failed to load projects' });
     }
   },
 
   createProject: async (projectData) => {
-    const { data } = await api.post('/projects', projectData);
-    set({ projects: [data, ...get().projects] });
-    return data;
+    const data = await v1Client.projects.createProject(projectData);
+    const project = toProjectFromV1(data);
+    set({ projects: [project, ...get().projects] });
+    return project;
   },
 
   deleteProject: async (id) => {
     const prev = get().projects;
     set({ projects: prev.filter((p) => p.id !== id) });
     try {
-      await api.delete(`/projects/${id}`);
+      await v1Client.projects.deleteProject({ projectId: id });
     } catch (err) {
       set({ projects: prev });
       throw err;
@@ -282,8 +379,8 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   fetchProject: async (id) => {
     set({ isLoadingProject: true });
     try {
-      const { data } = await api.get(`/projects/${id}`);
-      set({ currentProject: data, isLoadingProject: false });
+      const data = await v1Client.projects.getProject({ projectId: id });
+      set({ currentProject: toProjectFromV1(data), isLoadingProject: false });
     } catch {
       set({ isLoadingProject: false });
     }
@@ -316,11 +413,15 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       if (!saveId || !saveContent) return;
       set({ isSaving: true, saveError: null });
       try {
-        await saveContentWithRetry(saveId, saveContent);
+        const updatedProject = await saveContentWithRetry(saveId, saveContent);
         clearBackup(saveId);
         failedSaveId = null;
         failedSaveContent = null;
-        set({ isSaving: false, hasPendingChanges: false });
+        set({
+          currentProject: toProjectFromV1(updatedProject),
+          isSaving: false,
+          hasPendingChanges: false,
+        });
       } catch (err) {
         saveBackup(saveId, saveContent);
         failedSaveId = saveId;
@@ -356,8 +457,9 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
           documents: state.documents.map((item) => item.id === nextDoc.id ? { ...item, ...nextDoc } : item),
         }));
       } else {
-        await saveContentWithRetry(saveId, saveContent);
+        const updatedProject = await saveContentWithRetry(saveId, saveContent);
         clearBackup(saveId);
+        set({ currentProject: toProjectFromV1(updatedProject) });
       }
       failedSaveId = null;
       failedSaveContent = null;
@@ -410,8 +512,9 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
           documents: state.documents.map((item) => item.id === nextDoc.id ? { ...item, ...nextDoc } : item),
         }));
       } else {
-        await saveContentWithRetry(saveId, saveContent);
+        const updatedProject = await saveContentWithRetry(saveId, saveContent);
         clearBackup(saveId);
+        set({ currentProject: toProjectFromV1(updatedProject) });
       }
       failedSaveId = null;
       failedSaveContent = null;
@@ -449,18 +552,22 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     }));
 
     try {
-      const { data } = await api.put(`/projects/${project.id}`, { settings });
+      const data = await v1Client.projects.updateProject(
+        { projectId: project.id },
+        { settings: toProjectSettingsPatch(settings) },
+      );
+      const nextProject = toProjectFromV1(data);
       set((state) => ({
         currentProject: state.currentProject ? {
           ...state.currentProject,
-          ...data,
-          content: data.content ?? state.currentProject.content,
-          settings: data.settings ?? nextSettings,
+          ...nextProject,
+          content: state.currentProject.content,
+          settings: nextProject.settings ?? nextSettings,
         } : state.currentProject,
         projects: state.projects.map((item) => item.id === project.id ? {
           ...item,
-          ...data,
-          settings: data.settings ?? nextSettings,
+          ...nextProject,
+          settings: nextProject.settings ?? nextSettings,
         } : item),
         isSaving: false,
       }));
@@ -587,10 +694,14 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     }));
 
     try {
-      const { data } = await api.put(`/projects/${project.id}/documents/${doc.id}/layout`, layoutPlan);
+      const data = await v1Client.documents.updateDocumentLayout(
+        { projectId: project.id, docId: doc.id },
+        layoutPlan,
+      );
+      const nextDoc = toProjectDocumentFromV1(data);
       set((state) => ({
-        activeDocument: state.activeDocument?.id === data.id ? data : state.activeDocument,
-        documents: state.documents.map((item) => item.id === data.id ? { ...item, layoutPlan: data.layoutPlan } : item),
+        activeDocument: state.activeDocument?.id === nextDoc.id ? nextDoc : state.activeDocument,
+        documents: state.documents.map((item) => item.id === nextDoc.id ? { ...item, ...nextDoc } : item),
         isSaving: false,
       }));
     } catch (err) {

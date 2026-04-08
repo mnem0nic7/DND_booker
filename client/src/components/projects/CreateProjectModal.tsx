@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import type { ProjectType } from '@dnd-booker/shared';
 import { useProjectStore } from '../../stores/projectStore';
 import TemplateGallery from '../templates/TemplateGallery';
 import type { Template } from '../templates/TemplateCard';
@@ -51,7 +52,7 @@ export default function CreateProjectModal({ open, onClose }: CreateProjectModal
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [type, setType] = useState<string>('campaign');
+  const [type, setType] = useState<ProjectType>('campaign');
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

@@ -1,13 +1,13 @@
 import { Router } from 'express';
-import { z } from 'zod';
 import { asyncHandler } from '../../middleware/async-handler.js';
 import { requireAuth, type AuthRequest } from '../../middleware/auth.js';
 import { validateUuid } from '../../middleware/validate-uuid.js';
 import {
+  LayoutPlanSchema,
+  PublicationDocumentDetailSchema,
   PublicationDocumentPatchSchema,
   PublicationDocumentSummarySchema,
   PublicationDocumentTypstSchema,
-  type PublicationDocument,
 } from '@dnd-booker/shared';
 import {
   getPublicationDocument,
@@ -15,39 +15,49 @@ import {
   type PublicationDocumentSummary as ServicePublicationDocumentSummary,
   updatePublicationDocument,
 } from '../../services/document-publication.service.js';
+import { getDocument, updateDocumentLayout } from '../../services/document.service.js';
 
 const v1DocumentRoutes = Router({ mergeParams: true });
 
-const publicationDocumentRouteResponseSchema = z.object({
-  documentId: z.string().uuid(),
-  projectId: z.string().uuid(),
-  kind: z.string().min(1),
-  title: z.string().min(1),
-  slug: z.string().min(1),
-  sortOrder: z.number().int(),
-  targetPageCount: z.number().int().nullable(),
-  status: z.string().min(1),
-  sourceArtifactId: z.string().uuid().nullable(),
-  canonicalDocJson: z.unknown(),
-  editorProjectionJson: z.unknown(),
-  typstSource: z.string(),
-  canonicalVersion: z.number().int().min(1),
-  editorProjectionVersion: z.number().int().min(1),
-  typstVersion: z.number().int().min(1),
-  updatedAt: z.string().datetime(),
-});
-
 const publicationDocumentBodySchema = PublicationDocumentPatchSchema;
 
-function toRouteDocumentResponse(document: PublicationDocument) {
+function toTransportJson<T>(value: T): unknown {
+  return JSON.parse(JSON.stringify(value));
+}
+
+function toRouteDocumentResponse(document: {
+  schemaVersion?: number;
+  documentId?: string;
+  id?: string;
+  projectId: string;
+  runId?: string | null;
+  kind: string;
+  title: string;
+  slug: string;
+  sortOrder: number;
+  targetPageCount: number | null;
+  layoutPlan?: unknown | null;
+  status: string;
+  sourceArtifactId: string | null;
+  canonicalDocJson: unknown;
+  editorProjectionJson: unknown;
+  typstSource: string;
+  canonicalVersion: number;
+  editorProjectionVersion: number;
+  typstVersion: number;
+  updatedAt: string | Date;
+}) {
   return {
-    documentId: document.documentId,
+    schemaVersion: document.schemaVersion ?? 1,
+    documentId: document.documentId ?? document.id,
     projectId: document.projectId,
+    runId: document.runId ?? null,
     kind: document.kind,
     title: document.title,
     slug: document.slug,
     sortOrder: document.sortOrder,
     targetPageCount: document.targetPageCount,
+    layoutPlan: document.layoutPlan ?? null,
     status: document.status,
     sourceArtifactId: document.sourceArtifactId,
     canonicalDocJson: document.canonicalDocJson,
@@ -56,7 +66,7 @@ function toRouteDocumentResponse(document: PublicationDocument) {
     canonicalVersion: document.canonicalVersion,
     editorProjectionVersion: document.editorProjectionVersion,
     typstVersion: document.typstVersion,
-    updatedAt: document.updatedAt,
+    updatedAt: document.updatedAt instanceof Date ? document.updatedAt.toISOString() : document.updatedAt,
   };
 }
 
@@ -82,7 +92,7 @@ v1DocumentRoutes.get(
       return;
     }
 
-    res.json(PublicationDocumentSummarySchema.array().parse(documents.map((document) => toSummaryResponse(document))));
+    res.json(PublicationDocumentSummarySchema.array().parse(documents.map((document) => toTransportJson(toSummaryResponse(document)))));
   }),
 );
 
@@ -101,7 +111,11 @@ v1DocumentRoutes.get(
       return;
     }
 
-    res.json(publicationDocumentRouteResponseSchema.parse(toRouteDocumentResponse(document)));
+    const legacyDocument = await getDocument(docId, authReq.userId!);
+    res.json(PublicationDocumentDetailSchema.parse(toTransportJson({
+      ...toRouteDocumentResponse(document),
+      layoutPlan: legacyDocument?.layoutPlan ?? null,
+    })));
   }),
 );
 
@@ -191,12 +205,52 @@ v1DocumentRoutes.patch(
     if (result.status === 'conflict') {
       res.status(409).json({
         error: 'Document has been modified since the provided timestamp',
-        document: publicationDocumentRouteResponseSchema.parse(toRouteDocumentResponse(result.document)),
+        document: PublicationDocumentDetailSchema.parse(toTransportJson({
+          ...toRouteDocumentResponse(result.document),
+          layoutPlan: (await getDocument(docId, authReq.userId!))?.layoutPlan ?? null,
+        })),
       });
       return;
     }
 
-    res.json(publicationDocumentRouteResponseSchema.parse(toRouteDocumentResponse(result.document)));
+    res.json(PublicationDocumentDetailSchema.parse(toTransportJson({
+      ...toRouteDocumentResponse(result.document),
+      layoutPlan: (await getDocument(docId, authReq.userId!))?.layoutPlan ?? null,
+    })));
+  }),
+);
+
+// PATCH /api/v1/projects/:projectId/documents/:docId/layout
+v1DocumentRoutes.patch(
+  '/documents/:docId/layout',
+  requireAuth,
+  validateUuid('projectId', 'docId'),
+  asyncHandler(async (req, res) => {
+    const authReq = req as AuthRequest;
+    const docId = req.params.docId as string;
+
+    const parsed = LayoutPlanSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'Invalid layout plan', details: parsed.error.flatten() });
+      return;
+    }
+
+    const document = await updateDocumentLayout(docId, authReq.userId!, parsed.data as never);
+    if (!document) {
+      res.status(404).json({ error: 'Document not found' });
+      return;
+    }
+
+    const publicationDocument = await getPublicationDocument(docId, authReq.userId!);
+    if (!publicationDocument) {
+      res.status(404).json({ error: 'Document not found' });
+      return;
+    }
+
+    res.json(PublicationDocumentDetailSchema.parse(toTransportJson({
+      ...toRouteDocumentResponse(publicationDocument),
+      layoutPlan: document.layoutPlan ?? null,
+    })));
   }),
 );
 

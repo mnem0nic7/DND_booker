@@ -49,7 +49,7 @@ async function main() {
 
   let projectId = preferredProjectId;
   if (!projectId) {
-    const projectResponse = await fetch(`${baseUrl}/api/projects`, { headers: authHeaders });
+    const projectResponse = await fetch(`${baseUrl}/api/v1/projects`, { headers: authHeaders });
     const projects = await getJson(projectResponse, 'list projects');
     if (!Array.isArray(projects) || projects.length === 0) {
       throw new Error('no projects were available for the smoke test user');

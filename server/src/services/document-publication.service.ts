@@ -45,6 +45,7 @@ export const publicationDocumentListSelect = {
   slug: true,
   sortOrder: true,
   targetPageCount: true,
+  layoutPlan: true,
   status: true,
   sourceArtifactId: true,
   canonicalVersion: true,
@@ -86,6 +87,7 @@ export interface PublicationDocumentSummary {
   slug: string;
   sortOrder: number;
   targetPageCount: number | null;
+  layoutPlan: unknown | null;
   status: string;
   sourceArtifactId: string | null;
   canonicalVersion: number;
@@ -163,6 +165,7 @@ function toPublicationDocumentSummary(
     slug: document.slug,
     sortOrder: document.sortOrder,
     targetPageCount: document.targetPageCount,
+    layoutPlan: document.layoutPlan,
     status: document.status,
     sourceArtifactId: document.sourceArtifactId,
     canonicalVersion: document.canonicalVersion ?? 1,

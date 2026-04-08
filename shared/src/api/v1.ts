@@ -53,6 +53,123 @@ export type AuthRegisterRequest = z.infer<typeof AuthRegisterRequestSchema>;
 export type AuthSessionResponse = z.infer<typeof AuthSessionResponseSchema>;
 export type AuthLogoutResponse = z.infer<typeof AuthLogoutResponseSchema>;
 
+export const ProjectTypeSchema = z.enum(['campaign', 'one_shot', 'supplement', 'sourcebook']);
+export const ProjectStatusSchema = z.enum(['draft', 'in_progress', 'review', 'published']);
+export const ProjectPageSizeSchema = z.enum(['letter', 'a4', 'a5']);
+export const ProjectColumnsSchema = z.union([z.literal(1), z.literal(2), z.literal(3)]);
+export const ProjectMarginsSchema = z.object({
+  top: z.number(),
+  right: z.number(),
+  bottom: z.number(),
+  left: z.number(),
+});
+export const ProjectFontsSchema = z.object({
+  heading: z.string().min(1),
+  body: z.string().min(1),
+});
+export const TextLayoutFallbackConfigSchema = z.object({
+  scopeIds: z.array(z.string().regex(/^(group|unit):.+$/)).max(64),
+}).strip();
+export const ProjectSettingsSchema = z.object({
+  pageSize: ProjectPageSizeSchema,
+  margins: ProjectMarginsSchema,
+  columns: ProjectColumnsSchema,
+  theme: z.string().min(1),
+  fonts: ProjectFontsSchema,
+  textLayoutFallbacks: z.record(z.string().uuid(), TextLayoutFallbackConfigSchema),
+});
+export const RichTextContentSchema = z.object({
+  type: z.string().max(50),
+  content: z.array(z.any()).optional(),
+  attrs: z.record(z.unknown()).optional(),
+}).refine(
+  (val) => JSON.stringify(val).length <= 5_000_000,
+  { message: 'Content exceeds 5 MB limit' },
+);
+export const ProjectSummarySchema = z.object({
+  id: z.string().uuid(),
+  userId: z.string().uuid(),
+  title: z.string().min(1).max(200),
+  description: z.string(),
+  type: ProjectTypeSchema,
+  status: ProjectStatusSchema,
+  coverImageUrl: z.string().nullable(),
+  settings: ProjectSettingsSchema,
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+});
+export const ProjectDetailSchema = ProjectSummarySchema.extend({
+  content: RichTextContentSchema.optional(),
+});
+export const ProjectCreateRequestSchema = z.object({
+  title: z.string().min(1).max(200),
+  description: z.string().max(2000).optional(),
+  type: ProjectTypeSchema.optional(),
+  templateId: z.string().uuid().optional(),
+});
+export const ProjectSettingsPatchSchema = z.object({
+  pageSize: ProjectPageSizeSchema.optional(),
+  margins: ProjectMarginsSchema.partial().optional(),
+  columns: ProjectColumnsSchema.optional(),
+  theme: z.enum([
+    'classic-parchment',
+    'gilded-folio',
+    'dark-tome',
+    'clean-modern',
+    'fey-wild',
+    'infernal',
+    'dmguild',
+  ]).optional(),
+  fonts: ProjectFontsSchema.partial().optional(),
+  textLayoutFallbacks: z.record(z.string().uuid(), TextLayoutFallbackConfigSchema).optional(),
+}).strip();
+export const ProjectUpdateRequestSchema = z.object({
+  title: z.string().min(1).max(200).optional(),
+  description: z.string().max(2000).optional(),
+  type: ProjectTypeSchema.optional(),
+  status: ProjectStatusSchema.optional(),
+  settings: ProjectSettingsPatchSchema.optional(),
+  content: EditorProjectionSchema.optional(),
+}).refine(
+  (value) =>
+    value.title !== undefined
+    || value.description !== undefined
+    || value.type !== undefined
+    || value.status !== undefined
+    || value.settings !== undefined
+    || value.content !== undefined,
+  { message: 'At least one field must be provided.' },
+);
+
+export const LayoutPlanBlockSchema = z.object({
+  nodeId: z.string().min(1),
+  presentationOrder: z.number().int(),
+  span: z.enum(['column', 'both_columns', 'full_page']),
+  placement: z.enum(['inline', 'hero_top', 'side_panel', 'bottom_panel', 'full_page_insert']),
+  groupId: z.string().min(1).nullable(),
+  keepTogether: z.boolean(),
+  allowWrapBelow: z.boolean(),
+});
+export const LayoutPlanSchema = z.object({
+  version: z.literal(1),
+  sectionRecipe: z.enum([
+    'chapter_hero_split',
+    'intro_split_spread',
+    'npc_roster_grid',
+    'encounter_packet_spread',
+    'utility_table_spread',
+    'full_page_insert',
+  ]).nullable(),
+  columnBalanceTarget: z.enum(['balanced', 'dense_left', 'dense_right']),
+  blocks: z.array(LayoutPlanBlockSchema),
+});
+
+export type ProjectSummary = z.infer<typeof ProjectSummarySchema>;
+export type ProjectDetail = z.infer<typeof ProjectDetailSchema>;
+export type ProjectCreateRequest = z.infer<typeof ProjectCreateRequestSchema>;
+export type ProjectUpdateRequest = z.infer<typeof ProjectUpdateRequestSchema>;
+export type DocumentLayout = z.infer<typeof LayoutPlanSchema>;
+
 export const GenerationModeSchema = z.enum(['one_shot', 'module', 'campaign', 'sourcebook']);
 export const GenerationQualitySchema = z.enum(['quick', 'polished']);
 export const RunStatusSchema = z.enum([
@@ -477,6 +594,7 @@ export const V1PublicationDocumentSummarySchema = z.object({
   slug: z.string(),
   sortOrder: z.number().int(),
   targetPageCount: z.number().int().nullable(),
+  layoutPlan: LayoutPlanSchema.nullable().optional(),
   status: z.string(),
   sourceArtifactId: z.string().uuid().nullable(),
   canonicalVersion: z.number().int(),
@@ -486,7 +604,9 @@ export const V1PublicationDocumentSummarySchema = z.object({
   updatedAt: z.string().datetime(),
 });
 
-export const V1PublicationDocumentSchema = PublicationDocumentSchema;
+export const V1PublicationDocumentSchema = PublicationDocumentSchema.extend({
+  layoutPlan: LayoutPlanSchema.nullable().optional(),
+});
 export const V1PublicationDocumentPatchSchema = PublicationDocumentPatchSchema;
 export const V1CanonicalTypstNodeSchema = CanonicalTypstNodeSchema;
 export const V1EditorProjectionSchema = EditorProjectionSchema;
@@ -690,6 +810,8 @@ export type PublicationDocumentSummary = V1PublicationDocumentSummary;
 export type PublicationDocumentDetail = z.infer<typeof PublicationDocumentDetailSchema>;
 export type PublicationDocumentTypst = z.infer<typeof PublicationDocumentTypstSchema>;
 export type PublicationDocumentPatchRequest = z.infer<typeof V1PublicationDocumentPatchSchema>;
+export type ProjectCreateRequestBody = ProjectCreateRequest;
+export type ProjectUpdateRequestBody = ProjectUpdateRequest;
 export type GenerationRunCreateRequest = V1CreateGenerationRunRequest;
 export type GenerationRun = V1GenerationRun;
 export type GenerationRunDetail = V1GenerationRunDetail;
@@ -700,15 +822,16 @@ export type AgentRunDetail = V1AgentRunDetail;
 export type GraphInterruptResolutionRequestBody = z.infer<typeof GraphInterruptResolutionRequestSchema>;
 
 export interface ApiV1RouteContract {
-  tag: 'auth' | 'documents' | 'generationRuns' | 'agentRuns' | 'graphInterrupts' | 'exports';
+  tag: 'auth' | 'projects' | 'documents' | 'generationRuns' | 'agentRuns' | 'graphInterrupts' | 'exports';
   operationId: string;
-  method: 'get' | 'post' | 'patch';
+  method: 'get' | 'post' | 'patch' | 'delete';
   path: string;
   summary: string;
   paramsSchema?: z.ZodTypeAny;
   requestBodySchema?: z.ZodTypeAny;
   responseSchema?: z.ZodTypeAny;
   axiosResponseType?: 'blob';
+  successStatusCode?: 200 | 201 | 204;
   paramsTypeName?: string;
   requestTypeName?: string;
   responseTypeName?: string;
@@ -754,6 +877,61 @@ export const V1_ROUTE_CONTRACTS: ApiV1RouteContract[] = [
     summary: 'Log out the current session.',
     responseSchema: AuthLogoutResponseSchema,
     responseTypeName: 'AuthLogoutResponse',
+  },
+  {
+    tag: 'projects',
+    operationId: 'listProjects',
+    method: 'get',
+    path: '/api/v1/projects',
+    summary: 'List the current user projects.',
+    responseSchema: ProjectSummarySchema.array(),
+    responseTypeName: 'ProjectSummary[]',
+  },
+  {
+    tag: 'projects',
+    operationId: 'createProject',
+    method: 'post',
+    path: '/api/v1/projects',
+    summary: 'Create a new project.',
+    requestBodySchema: ProjectCreateRequestSchema,
+    responseSchema: ProjectSummarySchema,
+    successStatusCode: 201,
+    requestTypeName: 'ProjectCreateRequest',
+    responseTypeName: 'ProjectSummary',
+  },
+  {
+    tag: 'projects',
+    operationId: 'getProject',
+    method: 'get',
+    path: '/api/v1/projects/{projectId}',
+    summary: 'Get a single project.',
+    paramsSchema: ProjectIdParamsSchema,
+    responseSchema: ProjectDetailSchema,
+    paramsTypeName: 'ProjectIdParams',
+    responseTypeName: 'ProjectDetail',
+  },
+  {
+    tag: 'projects',
+    operationId: 'updateProject',
+    method: 'patch',
+    path: '/api/v1/projects/{projectId}',
+    summary: 'Update project metadata or settings.',
+    paramsSchema: ProjectIdParamsSchema,
+    requestBodySchema: ProjectUpdateRequestSchema,
+    responseSchema: ProjectDetailSchema,
+    paramsTypeName: 'ProjectIdParams',
+    requestTypeName: 'ProjectUpdateRequest',
+    responseTypeName: 'ProjectDetail',
+  },
+  {
+    tag: 'projects',
+    operationId: 'deleteProject',
+    method: 'delete',
+    path: '/api/v1/projects/{projectId}',
+    summary: 'Delete a project.',
+    paramsSchema: ProjectIdParamsSchema,
+    successStatusCode: 204,
+    paramsTypeName: 'ProjectIdParams',
   },
   {
     tag: 'documents',
@@ -821,6 +999,19 @@ export const V1_ROUTE_CONTRACTS: ApiV1RouteContract[] = [
     responseSchema: PublicationDocumentDetailSchema,
     paramsTypeName: 'DocumentIdParams',
     requestTypeName: 'PublicationDocumentPatchRequest',
+    responseTypeName: 'PublicationDocumentDetail',
+  },
+  {
+    tag: 'documents',
+    operationId: 'updateDocumentLayout',
+    method: 'patch',
+    path: '/api/v1/projects/{projectId}/documents/{docId}/layout',
+    summary: 'Update a publication document layout plan.',
+    paramsSchema: DocumentIdParamsSchema,
+    requestBodySchema: LayoutPlanSchema,
+    responseSchema: PublicationDocumentDetailSchema,
+    paramsTypeName: 'DocumentIdParams',
+    requestTypeName: 'DocumentLayout',
     responseTypeName: 'PublicationDocumentDetail',
   },
   {

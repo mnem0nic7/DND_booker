@@ -39,12 +39,12 @@ describe('projectStore.clearDocumentTextLayoutFallbacks', () => {
     let requestBody: unknown = null;
 
     server.use(
-      http.put('/api/projects/:id', async ({ request, params }) => {
+      http.patch('/api/v1/projects/:projectId', async ({ request, params }) => {
         requestBody = await request.json();
         const payload = requestBody as { settings?: Partial<ProjectSettings> };
         return HttpResponse.json({
           ...project,
-          id: String(params.id),
+          id: String(params.projectId),
           settings: {
             ...initialSettings,
             ...payload.settings,

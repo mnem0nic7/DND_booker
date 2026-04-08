@@ -16,6 +16,7 @@ import type {
   AuthSessionResponse,
   CanonEntity,
   DocumentIdParams,
+  DocumentLayout,
   ExportJob,
   ExportJobIdParams,
   ExportRequest,
@@ -30,7 +31,11 @@ import type {
   GraphInterruptIdParams,
   GraphInterruptResolutionRequestBody,
   Problem,
+  ProjectCreateRequest,
+  ProjectDetail,
   ProjectIdParams,
+  ProjectSummary,
+  ProjectUpdateRequest,
   PublicationDocumentDetail,
   PublicationDocumentPatchRequest,
   PublicationDocumentSummary,
@@ -49,6 +54,13 @@ export interface V1Client {
     refresh(config?: AxiosRequestConfig): Promise<AuthSessionResponse>;
     logout(config?: AxiosRequestConfig): Promise<AuthLogoutResponse>;
   };
+  projects: {
+    listProjects(config?: AxiosRequestConfig): Promise<ProjectSummary[]>;
+    createProject(body: ProjectCreateRequest, config?: AxiosRequestConfig): Promise<ProjectSummary>;
+    getProject(params: ProjectIdParams, config?: AxiosRequestConfig): Promise<ProjectDetail>;
+    updateProject(params: ProjectIdParams, body: ProjectUpdateRequest, config?: AxiosRequestConfig): Promise<ProjectDetail>;
+    deleteProject(params: ProjectIdParams, config?: AxiosRequestConfig): Promise<void>;
+  };
   documents: {
     listDocuments(params: ProjectIdParams, config?: AxiosRequestConfig): Promise<PublicationDocumentSummary[]>;
     getDocument(params: DocumentIdParams, config?: AxiosRequestConfig): Promise<PublicationDocumentDetail>;
@@ -56,6 +68,7 @@ export interface V1Client {
     getDocumentEditorProjection(params: DocumentIdParams, config?: AxiosRequestConfig): Promise<PublicationDocumentDetail["editorProjectionJson"]>;
     getDocumentTypst(params: DocumentIdParams, config?: AxiosRequestConfig): Promise<PublicationDocumentTypst>;
     updateDocument(params: DocumentIdParams, body: PublicationDocumentPatchRequest, config?: AxiosRequestConfig): Promise<PublicationDocumentDetail>;
+    updateDocumentLayout(params: DocumentIdParams, body: DocumentLayout, config?: AxiosRequestConfig): Promise<PublicationDocumentDetail>;
   };
   graphInterrupts: {
     listProjectInterrupts(params: ProjectIdParams, config?: AxiosRequestConfig): Promise<GraphInterrupt[]>;
@@ -117,6 +130,28 @@ export function createV1Client(axios: AxiosInstance): V1Client {
         return data;
       },
     },
+    projects: {
+      async listProjects(config?: AxiosRequestConfig) {
+        const { data } = await axios.get<ProjectSummary[]>('/v1/projects', config);
+        return data;
+      },
+      async createProject(body: ProjectCreateRequest, config?: AxiosRequestConfig) {
+        const { data } = await axios.post<ProjectSummary>('/v1/projects', body, config);
+        return data;
+      },
+      async getProject(params: ProjectIdParams, config?: AxiosRequestConfig) {
+        const { data } = await axios.get<ProjectDetail>(buildPath('/v1/projects/{projectId}', params as Record<string, string | number | undefined>), config);
+        return data;
+      },
+      async updateProject(params: ProjectIdParams, body: ProjectUpdateRequest, config?: AxiosRequestConfig) {
+        const { data } = await axios.patch<ProjectDetail>(buildPath('/v1/projects/{projectId}', params as Record<string, string | number | undefined>), body, config);
+        return data;
+      },
+      async deleteProject(params: ProjectIdParams, config?: AxiosRequestConfig) {
+        const { data } = await axios.delete<void>(buildPath('/v1/projects/{projectId}', params as Record<string, string | number | undefined>), config);
+        return data;
+      },
+    },
     documents: {
       async listDocuments(params: ProjectIdParams, config?: AxiosRequestConfig) {
         const { data } = await axios.get<PublicationDocumentSummary[]>(buildPath('/v1/projects/{projectId}/documents', params as Record<string, string | number | undefined>), config);
@@ -140,6 +175,10 @@ export function createV1Client(axios: AxiosInstance): V1Client {
       },
       async updateDocument(params: DocumentIdParams, body: PublicationDocumentPatchRequest, config?: AxiosRequestConfig) {
         const { data } = await axios.patch<PublicationDocumentDetail>(buildPath('/v1/projects/{projectId}/documents/{docId}', params as Record<string, string | number | undefined>), body, config);
+        return data;
+      },
+      async updateDocumentLayout(params: DocumentIdParams, body: DocumentLayout, config?: AxiosRequestConfig) {
+        const { data } = await axios.patch<PublicationDocumentDetail>(buildPath('/v1/projects/{projectId}/documents/{docId}/layout', params as Record<string, string | number | undefined>), body, config);
         return data;
       },
     },

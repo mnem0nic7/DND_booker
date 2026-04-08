@@ -67,7 +67,7 @@ function buildOpenApiDocument() {
       summary: route.summary,
       tags: [route.tag],
       responses: {
-        [route.operationId.startsWith('create') || route.operationId === 'register' ? '201' : '200']: toSuccessResponse(route),
+        [String(route.successStatusCode ?? (route.operationId.startsWith('create') || route.operationId === 'register' ? 201 : 200))]: toSuccessResponse(route),
         default: {
           description: 'Error',
           content: {
@@ -158,8 +158,8 @@ function buildClientSource() {
       const configExpr = route.axiosResponseType
         ? `{ ...(config ?? {}), responseType: '${route.axiosResponseType}' }`
         : 'config';
-      const methodCall = route.method === 'get'
-        ? `axios.get<${responseType}>(${pathExpr}, ${configExpr})`
+      const methodCall = route.method === 'get' || route.method === 'delete'
+        ? `axios.${route.method}<${responseType}>(${pathExpr}, ${configExpr})`
         : hasBody
           ? `axios.${route.method}<${responseType}>(${pathExpr}, body, ${configExpr})`
           : `axios.${route.method}<${responseType}>(${pathExpr}, undefined, ${configExpr})`;
