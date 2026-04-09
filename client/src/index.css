@@ -111,8 +111,8 @@
   --page-height: 1056px;
   --page-padding: 60px;
   --content-height: 936px;          /* page-height - 2×padding */
-  --page-content-height: 896px;     /* content-height - margin-reserve */
-  --margin-reserve: 40px;
+  --page-content-height: 880px;     /* content-height - margin-reserve */
+  --margin-reserve: 56px;
   --layout-column-gap: 18px;
 
   width: var(--page-width);
@@ -139,7 +139,7 @@
   --page-width: 794px;
   --page-height: 1123px;
   --content-height: 979px;
-  --page-content-height: 931px;
+  --page-content-height: 923px;
 }
 
 /* A5: 148×210mm ≈ 559×794px at 96dpi */
@@ -148,7 +148,7 @@
   --page-height: 794px;
   --page-padding: 48px;
   --content-height: 698px;
-  --page-content-height: 650px;
+  --page-content-height: 642px;
 }
 
 .page-canvas[data-texture-off] {
@@ -160,7 +160,7 @@
   column-gap: var(--layout-column-gap);
   column-rule: 1px solid var(--column-rule-color, rgba(0,0,0,0.06));
   outline: none;
-  min-height: var(--content-height);
+  min-height: var(--page-content-height);
 }
 
 /* A5 is too narrow for two columns */
@@ -472,7 +472,7 @@
 }
 
 .parity-page-canvas .ProseMirror {
-  min-height: var(--content-height);
+  min-height: var(--page-content-height);
 }
 
 .parity-page-canvas .layout-page-stack {

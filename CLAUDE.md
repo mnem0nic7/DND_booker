@@ -100,6 +100,8 @@ Export job creation should materialize `ProjectDocument` rows before queueing wo
 Keep Typst keep-together wrappers away from manual `pageBreak` and `columnBreak` nodes. If a renderer groups a heading packet into `#block(...)[...]`, it must stop before structural breaks, or Typst will fail with `pagebreaks are not allowed inside of containers`.
 Canon expansion now uses schema-native `generateObject(...)` output instead of `generateText(...)` plus ad hoc JSON repair. Keep that node on structured output so preview-model JSON quirks do not stall generation retries.
 Normalize empty worker/export error strings before persisting or logging them. Typst/compiler failures can surface as `Error('')`, and blank production logs make export triage much slower than it needs to be.
+Keep editor preview page metrics in lockstep with shared layout metrics and the worker HTML assembler. `page-content-height`, footer reserve, and margin reserve must match across client CSS, `shared/src/layout-plan.ts`, and worker HTML rendering or WYSIWYG pages will collide with the footer even when export review is clean.
+For grouped utility bands and packets, the hidden flow-measurement host must advertise the unit span and placement on the wrapper itself. Otherwise bottom-panel or both-column groups get measured as ordinary column flow and preview pagination drifts from export.
 
 ### Persisted run graphs
 Generation runs and agent runs now checkpoint the current graph node into `graphStateJson.runtime`. BullMQ retries should resume from that node instead of replaying the whole orchestration function.

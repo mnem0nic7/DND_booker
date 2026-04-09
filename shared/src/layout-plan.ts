@@ -104,6 +104,12 @@ interface PagePresetMetrics {
 const COLUMN_FLOW_UNIT_GAP_PX = 6;
 const FULL_WIDTH_UNIT_GAP_PX = 8;
 const HERO_UNIT_GAP_PX = 10;
+const INTRO_TAIL_PANEL_MAX_ESTIMATED_HEIGHT_PX = 190;
+const INTRO_TAIL_PANEL_PADDING_PX = 20;
+const INTRO_TAIL_PANEL_ROW_GAP_PX = 14;
+const INTRO_TAIL_PANEL_SEGMENT_GAP_PX = 8;
+const PACKET_GROUP_LAYOUT_RESERVE_PX = 20;
+const INTRO_TAIL_GROUP_LAYOUT_RESERVE_PX = 28;
 
 function stableStringify(value: unknown): string {
   if (value === null || typeof value !== 'object') {
@@ -682,6 +688,7 @@ function applyIntroTailPanelGrouping(
   }
 
   if (tailSegments.length === 0) return;
+  if (estimateIntroTailBandHeight(blocks, tailSegments) > INTRO_TAIL_PANEL_MAX_ESTIMATED_HEIGHT_PX) return;
 
   const groupId = 'intro-tail-panel-1';
   for (const segment of tailSegments) {
@@ -692,6 +699,53 @@ function applyIntroTailPanelGrouping(
       layoutBlocks[memberIndex].placement = 'bottom_panel';
     }
   }
+}
+
+function estimateIntroTailBlockHeight(block: DocumentContent | undefined): number {
+  if (!block) return 0;
+
+  const chars = textLength(block);
+  switch (block.type) {
+    case 'heading':
+      return 34 + (Math.ceil(chars / 40) * 4);
+    case 'bulletList':
+    case 'orderedList':
+      return 72 + (Math.ceil(chars / 100) * 18);
+    case 'sidebarCallout':
+    case 'readAloudBox':
+      return 118 + (Math.ceil(chars / 120) * 18);
+    case 'paragraph':
+      return 52 + (Math.ceil(chars / 100) * 18);
+    default:
+      return 68 + (Math.ceil(chars / 110) * 16);
+  }
+}
+
+function estimateIntroTailSegmentHeight(
+  blocks: DocumentContent[],
+  segment: number[],
+): number {
+  return segment.reduce((total, blockIndex, index) => (
+    total
+    + estimateIntroTailBlockHeight(blocks[blockIndex])
+    + (index > 0 ? INTRO_TAIL_PANEL_SEGMENT_GAP_PX : 0)
+  ), 0);
+}
+
+function estimateIntroTailBandHeight(
+  blocks: DocumentContent[],
+  tailSegments: number[][],
+): number {
+  const segmentHeights = tailSegments.map((segment) => estimateIntroTailSegmentHeight(blocks, segment));
+  let totalHeight = INTRO_TAIL_PANEL_PADDING_PX;
+
+  for (let index = 0; index < segmentHeights.length; index += 2) {
+    const rowHeights = segmentHeights.slice(index, index + 2);
+    if (index > 0) totalHeight += INTRO_TAIL_PANEL_ROW_GAP_PX;
+    totalHeight += Math.max(...rowHeights);
+  }
+
+  return totalHeight;
 }
 
 function normalizeBlockPlan(
@@ -1269,6 +1323,14 @@ export function estimateFlowUnitHeight(unit: LayoutFlowUnit, fragments: LayoutFl
 }
 
 function getUnitLayoutReserve(unit: LayoutFlowUnit, flow: LayoutFlowModel): number {
+  if (unit.groupId?.startsWith('intro-tail-panel')) {
+    return INTRO_TAIL_GROUP_LAYOUT_RESERVE_PX;
+  }
+
+  if (unit.groupId?.startsWith('encounter-packet') || unit.groupId?.startsWith('utility-table')) {
+    return PACKET_GROUP_LAYOUT_RESERVE_PX;
+  }
+
   const nodeTypes = getUnitNodeTypes(unit, flow);
   if (nodeTypes.has('npcProfile')) {
     return 15;

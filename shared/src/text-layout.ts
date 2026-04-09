@@ -1313,6 +1313,8 @@ const INTRO_BAND_RIGHT_RATIO = 0.88;
 const INTRO_BAND_RIGHT_MIN_WIDTH_PX = 240;
 const PACKET_SIDE_RATIO = 0.95;
 const PACKET_MAIN_RATIO = 1.05;
+const PACKET_LAYOUT_OVERHEAD_PX = 20;
+const INTRO_BAND_LAYOUT_OVERHEAD_PX = 20;
 
 function sortFragmentsForMeasurement(fragments: LayoutFlowFragment[]): LayoutFlowFragment[] {
   return [...fragments].sort((left, right) => left.presentationOrder - right.presentationOrder);
@@ -1448,7 +1450,7 @@ function measurePacketGroup(
   return {
     surfaces: [...sideMeasurement.surfaces, ...mainMeasurement.surfaces],
     supported: sideMeasurement.supported && mainMeasurement.supported,
-    heightPx: Math.max(sideMeasurement.heightPx, mainMeasurement.heightPx),
+    heightPx: Math.max(sideMeasurement.heightPx, mainMeasurement.heightPx) + PACKET_LAYOUT_OVERHEAD_PX,
   };
 }
 
@@ -1515,7 +1517,7 @@ function measureIntroTailPanelGroup(
     )
   ));
 
-  let heightPx = INTRO_BAND_PADDING_TOP_PX + INTRO_BAND_PADDING_BOTTOM_PX + INTRO_BAND_BORDER_PX;
+  let heightPx = INTRO_BAND_PADDING_TOP_PX + INTRO_BAND_PADDING_BOTTOM_PX + INTRO_BAND_BORDER_PX + INTRO_BAND_LAYOUT_OVERHEAD_PX;
   for (let index = 0; index < panelMeasurements.length; index += 2) {
     const row = panelMeasurements.slice(index, index + 2);
     if (index > 0) heightPx += INTRO_BAND_ROW_GAP_PX;

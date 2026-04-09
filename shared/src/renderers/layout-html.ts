@@ -22,7 +22,19 @@ function renderFragment(fragment: LayoutFlowFragment | PageModelFragment): strin
   </div>`;
 }
 
+function unitWrapperClasses(fragment: Pick<LayoutFlowFragment | PageModelFragment, 'span' | 'placement'>): string {
+  return [
+    `layout-span-${fragment.span}`,
+    `layout-placement-${fragment.placement}`,
+  ].join(' ');
+}
+
 function renderGroup(groupId: string, fragments: Array<LayoutFlowFragment | PageModelFragment>, recipe: string | null, unitId?: string): string {
+  const lead = sortFragmentsForDisplay(fragments)[0];
+  const wrapperClasses = lead ? ` ${unitWrapperClasses(lead)}` : '';
+  const layoutAttrs = lead
+    ? ` data-layout-span="${lead.span}" data-layout-placement="${lead.placement}"`
+    : '';
   const nodeTypes = new Set(fragments.map((fragment) => fragment.nodeType));
   const isNpcGrid = recipe === 'npc_roster_grid' || (nodeTypes.size === 1 && nodeTypes.has('npcProfile'));
   const isEncounterPacket = recipe === 'encounter_packet_spread' || nodeTypes.has('statBlock') || nodeTypes.has('encounterTable');
@@ -49,7 +61,7 @@ function renderGroup(groupId: string, fragments: Array<LayoutFlowFragment | Page
     if (currentPair.length > 0) pairs.push(currentPair);
 
     if (pairs.length > 1) {
-      return `<div class="layout-group layout-group-utility-grid layout-group-utility-grid--band"${dataAttr} data-group-id="${groupId}">
+      return `<div class="layout-group layout-group-utility-grid layout-group-utility-grid--band${wrapperClasses}"${dataAttr}${layoutAttrs} data-group-id="${groupId}">
         ${pairs.map((pair) => {
           const panelClass = pair.some((fragment) => fragment.nodeType === 'sidebarCallout' || fragment.nodeType === 'readAloudBox')
             ? 'layout-group-utility-grid__panel layout-group-utility-grid__panel--callout'
@@ -61,14 +73,14 @@ function renderGroup(groupId: string, fragments: Array<LayoutFlowFragment | Page
   }
 
   if (isNpcGrid) {
-    return `<div class="layout-group layout-group-npc-grid"${dataAttr} data-group-id="${groupId}">
+    return `<div class="layout-group layout-group-npc-grid${wrapperClasses}"${dataAttr}${layoutAttrs} data-group-id="${groupId}">
       ${fragments.map((fragment) => renderFragment(fragment)).join('\n')}
     </div>`;
   }
 
   if (isEncounterPacket || isUtilityPacket) {
     if (hasWideRandomTable) {
-      return `<div class="layout-group layout-group-stack"${dataAttr} data-group-id="${groupId}">
+      return `<div class="layout-group layout-group-stack${wrapperClasses}"${dataAttr}${layoutAttrs} data-group-id="${groupId}">
         ${fragments.map((fragment) => renderFragment(fragment)).join('\n')}
       </div>`;
     }
@@ -76,17 +88,17 @@ function renderGroup(groupId: string, fragments: Array<LayoutFlowFragment | Page
     const mainFlow = fragments.filter((fragment) => fragment.placement !== 'side_panel');
     if (sidePanel.length === 0 || mainFlow.length === 0) {
       const visibleFragments = sidePanel.length > 0 ? sidePanel : mainFlow;
-      return `<div class="layout-group layout-group-packet layout-group-packet--single"${dataAttr} data-group-id="${groupId}">
+      return `<div class="layout-group layout-group-packet layout-group-packet--single${wrapperClasses}"${dataAttr}${layoutAttrs} data-group-id="${groupId}">
         <div class="layout-group-packet__main">${visibleFragments.map((fragment) => renderFragment(fragment)).join('\n')}</div>
       </div>`;
     }
-    return `<div class="layout-group layout-group-packet"${dataAttr} data-group-id="${groupId}">
+    return `<div class="layout-group layout-group-packet${wrapperClasses}"${dataAttr}${layoutAttrs} data-group-id="${groupId}">
       <div class="layout-group-packet__side">${sidePanel.map((fragment) => renderFragment(fragment)).join('\n')}</div>
       <div class="layout-group-packet__main">${mainFlow.map((fragment) => renderFragment(fragment)).join('\n')}</div>
     </div>`;
   }
 
-  return `<div class="layout-group layout-group-stack"${dataAttr} data-group-id="${groupId}">
+  return `<div class="layout-group layout-group-stack${wrapperClasses}"${dataAttr}${layoutAttrs} data-group-id="${groupId}">
     ${fragments.map((fragment) => renderFragment(fragment)).join('\n')}
   </div>`;
 }
@@ -117,7 +129,7 @@ function renderFlowUnit(
     return renderGroup(lead.groupId, ordered, flow.sectionRecipe, unitId);
   }
 
-  return `<div class="layout-unit" data-layout-unit-id="${unitId}">
+  return `<div class="layout-unit ${unitWrapperClasses(lead)}" data-layout-unit-id="${unitId}" data-layout-span="${lead.span}" data-layout-placement="${lead.placement}">
     ${renderFragment(lead)}
   </div>`;
 }
@@ -150,7 +162,7 @@ function renderPageUnit(
     return renderGroup(lead.groupId, ordered, pageModel.pages[0]?.recipe ?? null, unitId);
   }
 
-  return `<div class="layout-unit" data-layout-unit-id="${unitId}">
+  return `<div class="layout-unit ${unitWrapperClasses(lead)}" data-layout-unit-id="${unitId}" data-layout-span="${lead.span}" data-layout-placement="${lead.placement}">
     ${renderFragment(lead)}
   </div>`;
 }
@@ -298,6 +310,18 @@ export function getCanonicalLayoutCss(): string {
     .layout-flow-root > .layout-group {
       break-inside: avoid;
       page-break-inside: avoid;
+    }
+
+    .layout-flow-root > .layout-unit.layout-span-both_columns,
+    .layout-flow-root > .layout-group.layout-span-both_columns,
+    .layout-flow-root > .layout-unit.layout-span-full_page,
+    .layout-flow-root > .layout-group.layout-span-full_page,
+    .layout-flow-root > .layout-unit.layout-placement-hero_top,
+    .layout-flow-root > .layout-group.layout-placement-hero_top,
+    .layout-flow-root > .layout-unit.layout-placement-bottom_panel,
+    .layout-flow-root > .layout-group.layout-placement-bottom_panel {
+      column-span: all;
+      width: 100%;
     }
 
     .layout-page__column > *:last-child,

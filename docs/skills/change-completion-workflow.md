@@ -34,6 +34,7 @@ Do not stop after code edits unless the user explicitly says not to ship.
 - after any document mutation, rebuild `Project.content` from ordered `ProjectDocument[]`; it is a compatibility cache, not the source of truth
 - AI wizard apply and similar section-assembly flows count as document mutations; they should update `ProjectDocument` rows directly, insert generated content before back matter, and replace untouched template placeholder chapter scaffolds instead of flattening everything back through `Project.content`
 - export creation should ensure `ProjectDocument` rows exist before queueing worker jobs; keep `Project.content` fallbacks as defensive compatibility only
+- when touching WYSIWYG page layout or preview/export parity, keep client CSS page reserves aligned with `shared/src/layout-plan.ts` and the worker HTML assembler; a mismatched `page-content-height` or footer reserve creates preview-only footer collisions that the Typst export path will not reproduce
 - keep Typst keep-together renderers from swallowing manual `pageBreak` or `columnBreak` nodes; structural breaks must render at the top level, not inside `#block(...)[...]`, or PDF compilation will fail
 - generation nodes that already have strong Zod schemas, like canon expansion, should prefer schema-native `generateObject(...)` over `generateText(...)` plus post-parse repair
 - when the local server integration test depends on Cloud SQL access, record the exact GCP blocker if it cannot run

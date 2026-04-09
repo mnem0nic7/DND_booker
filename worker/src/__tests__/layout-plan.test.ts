@@ -6,6 +6,7 @@ import {
   recommendLayoutPlan,
   resolveLayoutPlan,
   renderContentWithLayoutPlan,
+  renderFlowContentWithLayoutPlan,
   validateLayoutPlan,
   type DocumentContent,
 } from '@dnd-booker/shared';
@@ -409,6 +410,58 @@ describe('layout-plan', () => {
     }).html;
 
     expect(html).toContain('layout-group-utility-grid--band');
+  });
+
+  it('keeps oversized intro tail utility content inline instead of forcing it into a bottom band', () => {
+    const content: DocumentContent = {
+      type: 'doc',
+      content: [
+        {
+          type: 'titlePage',
+          attrs: {
+            title: 'Underdark Afterdark',
+          },
+        },
+        { type: 'heading', attrs: { level: 1 }, content: [{ type: 'text', text: 'DM Brief' }] },
+        paragraph('A stylish but dangerous descent into a city beneath the stone.'),
+        {
+          type: 'bulletList',
+          content: [
+            { type: 'listItem', content: [paragraph('Track who remembers the missing hour and who denies it.')] },
+            { type: 'listItem', content: [paragraph('Keep the party moving so the unstable clockwork district keeps changing underneath them.')] },
+          ],
+        },
+        { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'Prep Checklist' }] },
+        {
+          type: 'bulletList',
+          content: [
+            { type: 'listItem', content: [paragraph('Prepare the opening clock-market scene, the stables, the painter, and the fountain so each clue can land on a different beat.')] },
+            { type: 'listItem', content: [paragraph('Review how the Rhythm of the Prime Cog can be solved through song, movement, gear alignment, or brute-force improvisation when the table goes sideways.')] },
+            { type: 'listItem', content: [paragraph('Keep one fail-forward clue ready for every room so the players can recover from bad rolls without stalling the mystery.')] },
+          ],
+        },
+        {
+          type: 'sidebarCallout',
+          attrs: { title: 'Roleplaying the Amnesia' },
+          content: [paragraph('Remind each player of one object or memory that should feel wrong, then make them decide whether to trust it while the city shifts beneath them.')],
+        },
+      ],
+    };
+
+    const resolved = resolveLayoutPlan(content, null, {
+      documentKind: 'front_matter',
+      documentTitle: 'Front Matter',
+    });
+
+    const prepChecklistHeadingNodeId = String(resolved.content.content?.[4]?.attrs?.nodeId ?? '');
+    const prepChecklistNode = resolved.layoutPlan.blocks.find((block) => block.nodeId === prepChecklistHeadingNodeId);
+    const roleplayingNodeId = String(resolved.content.content?.[6]?.attrs?.nodeId ?? '');
+    const roleplayingNode = resolved.layoutPlan.blocks.find((block) => block.nodeId === roleplayingNodeId);
+
+    expect(prepChecklistNode?.placement).not.toBe('bottom_panel');
+    expect(roleplayingNode?.placement).not.toBe('bottom_panel');
+    expect(prepChecklistNode?.groupId ?? null).not.toBe('intro-tail-panel-1');
+    expect(roleplayingNode?.groupId ?? null).not.toBe('intro-tail-panel-1');
   });
 
   it('groups only true encounter sections by local level-3 section instead of swallowing exploration openers', () => {
@@ -951,6 +1004,48 @@ describe('layout-plan', () => {
 
     expect(pageModel.fragments.find((fragment) => fragment.nodeType === 'randomTable')?.region).toBe('full_width');
     expect(pageModel.fragments.find((fragment) => fragment.nodeType === 'randomTable')?.columnIndex).toBeNull();
+  });
+
+  it('marks grouped full-width utility bands as full-width in flow html so measurement matches paged output', () => {
+    const content: DocumentContent = {
+      type: 'doc',
+      content: [
+        {
+          type: 'titlePage',
+          attrs: {
+            title: 'The Blackglass Mine',
+          },
+        },
+        { type: 'heading', attrs: { level: 1 }, content: [{ type: 'text', text: 'DM Brief' }] },
+        paragraph('Front-matter setup copy that fills the lead columns.'),
+        { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'Rewards and Scaling' }] },
+        {
+          type: 'bulletList',
+          content: [
+            { type: 'listItem', content: [paragraph('Use milestone advancement.')] },
+            { type: 'listItem', content: [paragraph('Add reinforcements if the table is cruising.')] },
+          ],
+        },
+        {
+          type: 'sidebarCallout',
+          attrs: { title: 'Prep Checklist' },
+          content: [paragraph('Highlight the likely encounter table and one fail-forward clue.')],
+        },
+      ],
+    };
+
+    const rendered = renderFlowContentWithLayoutPlan({
+      content,
+      preset: 'editor_preview',
+      options: {
+        documentKind: 'front_matter',
+        documentTitle: 'Front Matter',
+      },
+    });
+
+    expect(rendered.html).toContain('layout-group-utility-grid--band layout-span-both_columns layout-placement-bottom_panel');
+    expect(rendered.html).toContain('data-layout-span="both_columns"');
+    expect(rendered.html).toContain('data-layout-placement="bottom_panel"');
   });
 
   it('attaches a very short trailing paragraph to the section it closes', () => {
