@@ -1273,6 +1273,7 @@ function applyUnitMinimums(fragments: LayoutFlowFragment[], heightPx: number): n
   const nodeTypes = new Set(fragments.map((fragment) => fragment.nodeType));
   if (nodeTypes.has('chapterHeader')) return Math.max(220, heightPx);
   if (nodeTypes.has('statBlock')) return Math.max(260, heightPx);
+  if (nodeTypes.has('sidebarCallout') || nodeTypes.has('readAloudBox')) return Math.max(180, heightPx + 24);
   if (nodeTypes.has('npcProfile')) return Math.max(180, heightPx);
   if (nodeTypes.has('spellCard')) return Math.max(170, heightPx);
   if (nodeTypes.has('magicItem')) return Math.max(150, heightPx);

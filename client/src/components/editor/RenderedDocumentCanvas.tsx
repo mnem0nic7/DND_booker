@@ -135,7 +135,13 @@ export function RenderedDocumentCanvas({
     <div className="editor-outer parity-editor-outer relative" data-theme={theme}>
       <style>{getCanonicalLayoutCss()}</style>
       <div className="parity-measure-host" aria-hidden="true">
-        <div ref={measurementRef} className="page-canvas editor-themed-content parity-measure-canvas" data-theme={theme} dangerouslySetInnerHTML={measurementMarkup} />
+        <div className="page-canvas editor-themed-content parity-measure-canvas" data-theme={theme}>
+          <div
+            ref={measurementRef}
+            className="ProseMirror parity-measure-flow"
+            dangerouslySetInnerHTML={measurementMarkup}
+          />
+        </div>
       </div>
       <div className="editor-themed-content parity-page-canvas">
         <div

@@ -1336,14 +1336,16 @@ function getUnitLayoutReserve(unit: LayoutFlowUnit, flow: LayoutFlowModel): numb
     return 15;
   }
 
+  if (nodeTypes.has('sidebarCallout') || nodeTypes.has('readAloudBox')) {
+    return 36;
+  }
+
   if (
-    nodeTypes.has('sidebarCallout')
-    || nodeTypes.has('readAloudBox')
-    || nodeTypes.has('statBlock')
+    nodeTypes.has('statBlock')
     || nodeTypes.has('encounterTable')
     || nodeTypes.has('randomTable')
   ) {
-    return 12;
+    return 18;
   }
 
   if (nodeTypes.has('fullBleedImage')) {

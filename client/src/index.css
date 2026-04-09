@@ -501,6 +501,13 @@
   box-shadow: none;
 }
 
+.parity-measure-canvas > .parity-measure-flow {
+  column-count: initial;
+  column-gap: 0;
+  column-rule: none;
+  min-height: inherit;
+}
+
 .parity-render-surface [data-node-id] {
   cursor: pointer;
   transition: box-shadow 120ms ease, outline-color 120ms ease, transform 120ms ease;
