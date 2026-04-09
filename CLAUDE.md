@@ -100,7 +100,7 @@ Export job creation should materialize `ProjectDocument` rows before queueing wo
 Keep Typst keep-together wrappers away from manual `pageBreak` and `columnBreak` nodes. If a renderer groups a heading packet into `#block(...)[...]`, it must stop before structural breaks, or Typst will fail with `pagebreaks are not allowed inside of containers`.
 Canon expansion now uses schema-native `generateObject(...)` output instead of `generateText(...)` plus ad hoc JSON repair. Keep that node on structured output so preview-model JSON quirks do not stall generation retries.
 Normalize empty worker/export error strings before persisting or logging them. Typst/compiler failures can surface as `Error('')`, and blank production logs make export triage much slower than it needs to be.
-Keep editor preview page metrics in lockstep with shared layout metrics and the worker HTML assembler. `page-content-height`, footer reserve, and margin reserve must match across client CSS, `shared/src/layout-plan.ts`, and worker HTML rendering or WYSIWYG pages will collide with the footer even when export review is clean.
+Keep editor preview page metrics and box model in lockstep with shared layout metrics and the worker HTML assembler. `page-content-height`, footer reserve, margin reserve, page `height`, `box-sizing`, and overflow behavior must match across client CSS, `shared/src/layout-plan.ts`, and worker HTML rendering or WYSIWYG pages will collide with the footer or leak content into the inter-page gap even when export review is clean.
 For grouped utility bands and packets, the hidden flow-measurement host must advertise the unit span and placement on the wrapper itself. Otherwise bottom-panel or both-column groups get measured as ordinary column flow and preview pagination drifts from export.
 
 ### Persisted run graphs
@@ -170,6 +170,7 @@ Unless the user explicitly says not to, treat this as the default after every co
    - Set `SMOKE_TEST_EMAIL`, `SMOKE_TEST_PASSWORD`, and optionally `SMOKE_TEST_GENERATION_PROMPT` so the redeploy script also runs the authenticated `api/v1` acceptance smoke automatically.
    - `npm run deploy:cloudrun` now builds once, deploys the web service, deploys the worker service with the resolved web URL injected into `SERVER_BASE_URL`, checks worker readiness, and then runs the acceptance smoke even for worker-only deploys.
    - The production smoke now creates a temp project, drives a generation run through publication review, resumes it, exports a PDF, validates the download, and cleans up the temp project.
+   - `scripts/smoke-cloudrun-v1.mjs` should re-authenticate automatically if a long-running generation/export poll outlives the initial 15-minute access token.
    - Manage launch alerts with `npm run monitor:cloudrun:install` and synthetic validation with `npm run monitor:cloudrun:validate`.
 
 Do not stop after code edits if the task implies shipping. Verification, docs, commit, push, and redeploy are part of the normal completion path.

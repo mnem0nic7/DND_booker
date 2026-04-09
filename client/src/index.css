@@ -116,9 +116,11 @@
   --layout-column-gap: 18px;
 
   width: var(--page-width);
+  height: var(--page-height);
   min-height: var(--page-height);
   margin: 0 auto 2rem auto;
   padding: var(--page-padding);
+  box-sizing: border-box;
   background-color: var(--page-bg);
   background-image: var(--page-texture);
   background-size: var(--page-width) var(--page-height);
@@ -132,6 +134,7 @@
   font-feature-settings: 'kern' 1, 'liga' 1;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  overflow: hidden;
 }
 
 /* A4: 210×297mm ≈ 794×1123px at 96dpi */
