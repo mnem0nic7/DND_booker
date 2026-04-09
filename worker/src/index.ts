@@ -6,7 +6,7 @@ import { cleanupExportFiles } from './jobs/cleanup.job.js';
 import { processGenerationJob } from './jobs/generation-orchestrator.job.js';
 import { processAgentRun } from './jobs/agent-orchestrator.job.js';
 import { resolveWorkerConcurrency, resolveWorkerTiming } from './runtime-config.js';
-import { startRuntimeAuditLoop } from './runtime-audit.js';
+import { createQueueBacklogInspector, startRuntimeAuditLoop } from './runtime-audit.js';
 
 const connection = new IORedis({
   host: process.env.REDIS_HOST || 'localhost',
@@ -40,6 +40,9 @@ const worker = new Worker('export', processExportJob, {
   connection: connection as unknown as ConnectionOptions,
   concurrency: EXPORT_WORKER_CONCURRENCY,
 });
+const exportQueue = new Queue('export', {
+  connection: connection as unknown as ConnectionOptions,
+});
 
 // Cleanup worker: runs the export file cleanup job on a schedule
 const cleanupWorker = new Worker('cleanup', async () => {
@@ -56,6 +59,9 @@ const generationWorker = new Worker('generation', processGenerationJob, {
   stalledInterval: STALLED_CHECK_INTERVAL_MS,
   maxStalledCount: 2,
 });
+const generationQueue = new Queue('generation', {
+  connection: connection as unknown as ConnectionOptions,
+});
 
 const agentWorker = new Worker('agent', processAgentRun, {
   connection: connection as unknown as ConnectionOptions,
@@ -63,6 +69,9 @@ const agentWorker = new Worker('agent', processAgentRun, {
   lockDuration: LONG_RUNNING_JOB_LOCK_MS,
   stalledInterval: STALLED_CHECK_INTERVAL_MS,
   maxStalledCount: 2,
+});
+const agentQueue = new Queue('agent', {
+  connection: connection as unknown as ConnectionOptions,
 });
 
 // Schedule cleanup to run every hour
@@ -100,7 +109,16 @@ agentWorker.on('completed', (job) => console.log(`Agent job ${job.id} completed`
 agentWorker.on('failed', (job, err) => console.error(`[worker.agent] job ${job?.id} failed:`, err.message));
 agentWorker.on('error', (err) => console.error('[Agent Worker] Error:', err.message));
 
-const stopRuntimeAudit = startRuntimeAuditLoop();
+const stopRuntimeAudit = startRuntimeAuditLoop(
+  undefined,
+  {
+    inspectQueueBacklogs: createQueueBacklogInspector({
+      generation: generationQueue,
+      agent: agentQueue,
+      export: exportQueue,
+    }),
+  },
+);
 
 async function shutdown() {
   console.info('[worker.lifecycle] shutting down');
@@ -127,6 +145,9 @@ async function shutdown() {
     await generationWorker.close();
     await worker.close();
     await cleanupWorker.close();
+    await agentQueue.close();
+    await generationQueue.close();
+    await exportQueue.close();
     await cleanupQueue.close();
     await connection.quit();
   } catch (err) {

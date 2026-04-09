@@ -133,7 +133,7 @@ PropertiesPanel shows document stats and a Document Outline that includes both H
 ## Deployment
 
 Docker Compose runs `postgres`, `redis`, `server`, `worker`, and `client`. Production Cloud Run is split into a web service (`client + server + cloudsql-proxy`) and a worker service (`worker + cloudsql-proxy`).
-The worker service runs a periodic runtime audit for stale queued runs, stale queued exports, and stale pending interrupts. Audit violations log as `OPS_AUDIT_VIOLATION`; install Cloud Monitoring policies against that signal with `npm run monitor:cloudrun:install`.
+The worker service runs a periodic runtime audit for stale queued runs, stale queued exports, stale BullMQ queue backlog, and stale pending interrupts. Audit violations log as `OPS_AUDIT_VIOLATION`; install Cloud Monitoring policies against that signal with `npm run monitor:cloudrun:install`.
 
 Rebuild and restart the local services that match the changed packages:
 

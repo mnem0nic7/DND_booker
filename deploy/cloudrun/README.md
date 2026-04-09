@@ -11,7 +11,7 @@ This repo is deployed to Google Cloud Run as two services:
   - `cloudsql-proxy` serves Postgres on `localhost:5432`
   - `SERVER_BASE_URL` points at the web service URL instead of `localhost`
   - Cloud Run injects the worker `PORT`; do not set it manually in the standalone worker manifest
-  - the worker runs a periodic runtime audit that logs `OPS_AUDIT_VIOLATION` when queued work or pending approvals go stale
+  - the worker runs a periodic runtime audit that logs `OPS_AUDIT_VIOLATION` when queued work, BullMQ queue backlog, or pending approvals go stale
 
 Use [`service.yaml`](/home/gallison/workspace/DND_booker/deploy/cloudrun/service.yaml) for the web service, [`worker-service.yaml`](/home/gallison/workspace/DND_booker/deploy/cloudrun/worker-service.yaml) for the worker service, and the matching `*.example` files as templates.
 
@@ -86,7 +86,7 @@ The installer creates alerts for:
 - web request 5xxs
 - generation failures in the worker
 - export failures in the worker
-- runtime audit violations for stale queued work or stale pending interrupts
+- runtime audit violations for stale queued work, stale BullMQ queue backlog, or stale pending interrupts
 - worker restart churn based on repeated startup logs
 
 Validate the monitoring wiring with one synthetic worker failure log:

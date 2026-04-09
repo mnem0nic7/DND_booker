@@ -1,6 +1,8 @@
+import { type Job, type Queue } from 'bullmq';
 import { prisma } from '../../server/src/config/database.js';
 
 type RunType = 'generation' | 'agent';
+type AuditedQueueName = 'generation' | 'agent' | 'export';
 
 interface PendingInterruptSummary {
   runType: RunType;
@@ -19,8 +21,10 @@ export interface RuntimeAuditSummary {
   queuedAgentRuns: number;
   queuedExportJobs: number;
   stalePendingInterrupts: number;
+  staleQueueBacklogs: number;
   violations: string[];
   pendingInterrupts: PendingInterruptSummary[];
+  queueBacklogs: QueueBacklogSummary[];
 }
 
 interface RuntimeAuditThresholds {
@@ -28,6 +32,9 @@ interface RuntimeAuditThresholds {
   queuedAgentMinutes: number;
   queuedExportMinutes: number;
   pendingInterruptMinutes: number;
+  queueGenerationMinutes: number;
+  queueAgentMinutes: number;
+  queueExportMinutes: number;
 }
 
 interface RuntimeAuditConfig extends RuntimeAuditThresholds {
@@ -41,6 +48,23 @@ interface PendingInterruptRecord {
   kind: string;
   title: string;
   createdAt: string;
+}
+
+export interface QueueBacklogSummary {
+  queueName: AuditedQueueName;
+  waitingCount: number;
+  delayedCount: number;
+  prioritizedCount: number;
+  waitingChildrenCount: number;
+  activeCount: number;
+  totalQueuedCount: number;
+  oldestQueuedAt: string | null;
+  oldestQueuedAgeMinutes: number | null;
+}
+
+interface RuntimeAuditDependencies {
+  prismaClient?: typeof prisma;
+  inspectQueueBacklogs?: () => Promise<QueueBacklogSummary[]>;
 }
 
 function parsePositiveInt(raw: string | undefined, fallback: number) {
@@ -77,47 +101,126 @@ function minutesSince(isoTimestamp: string, now = Date.now()) {
 }
 
 export function resolveRuntimeAuditConfig(env = process.env): RuntimeAuditConfig {
+  const queuedGenerationMinutes = parsePositiveInt(env.OPS_AUDIT_STALE_GENERATION_MINUTES, 15);
+  const queuedAgentMinutes = parsePositiveInt(env.OPS_AUDIT_STALE_AGENT_MINUTES, 15);
+  const queuedExportMinutes = parsePositiveInt(env.OPS_AUDIT_STALE_EXPORT_MINUTES, 15);
   return {
     enabled: env.OPS_AUDIT_ENABLED !== 'false',
     intervalMs: parsePositiveInt(env.OPS_AUDIT_INTERVAL_MS, 5 * 60 * 1000),
-    queuedGenerationMinutes: parsePositiveInt(env.OPS_AUDIT_STALE_GENERATION_MINUTES, 15),
-    queuedAgentMinutes: parsePositiveInt(env.OPS_AUDIT_STALE_AGENT_MINUTES, 15),
-    queuedExportMinutes: parsePositiveInt(env.OPS_AUDIT_STALE_EXPORT_MINUTES, 15),
+    queuedGenerationMinutes,
+    queuedAgentMinutes,
+    queuedExportMinutes,
     pendingInterruptMinutes: parsePositiveInt(env.OPS_AUDIT_PENDING_INTERRUPT_MINUTES, 20),
+    queueGenerationMinutes: parsePositiveInt(env.OPS_AUDIT_QUEUE_GENERATION_MINUTES, queuedGenerationMinutes),
+    queueAgentMinutes: parsePositiveInt(env.OPS_AUDIT_QUEUE_AGENT_MINUTES, queuedAgentMinutes),
+    queueExportMinutes: parsePositiveInt(env.OPS_AUDIT_QUEUE_EXPORT_MINUTES, queuedExportMinutes),
     forceFail: env.OPS_AUDIT_FORCE_FAIL === '1',
+  };
+}
+
+function readQueueThresholdMinutes(queueName: AuditedQueueName, thresholds: RuntimeAuditThresholds) {
+  switch (queueName) {
+    case 'generation':
+      return thresholds.queueGenerationMinutes;
+    case 'agent':
+      return thresholds.queueAgentMinutes;
+    case 'export':
+      return thresholds.queueExportMinutes;
+  }
+}
+
+async function inspectQueueBacklogs(): Promise<QueueBacklogSummary[]> {
+  return [];
+}
+
+function toQueuedJobTimestamp(job: Job | undefined) {
+  return typeof job?.timestamp === 'number' && Number.isFinite(job.timestamp)
+    ? job.timestamp
+    : null;
+}
+
+async function loadQueueBacklog(queueName: AuditedQueueName, queue: Queue): Promise<QueueBacklogSummary> {
+  const [counts, waitingJobs, delayedJobs, prioritizedJobs, waitingChildrenJobs] = await Promise.all([
+    queue.getJobCounts('waiting', 'delayed', 'prioritized', 'waiting-children', 'active'),
+    queue.getWaiting(0, 0),
+    queue.getDelayed(0, 0),
+    queue.getPrioritized(0, 0),
+    queue.getWaitingChildren(0, 0),
+  ]);
+
+  const oldestTimestamp = [
+    toQueuedJobTimestamp(waitingJobs[0]),
+    toQueuedJobTimestamp(delayedJobs[0]),
+    toQueuedJobTimestamp(prioritizedJobs[0]),
+    toQueuedJobTimestamp(waitingChildrenJobs[0]),
+  ]
+    .filter((timestamp): timestamp is number => timestamp !== null)
+    .sort((left, right) => left - right)[0] ?? null;
+
+  const waitingCount = counts.waiting ?? 0;
+  const delayedCount = counts.delayed ?? 0;
+  const prioritizedCount = counts.prioritized ?? 0;
+  const waitingChildrenCount = counts['waiting-children'] ?? 0;
+  const activeCount = counts.active ?? 0;
+  const totalQueuedCount = waitingCount + delayedCount + prioritizedCount + waitingChildrenCount;
+  const oldestQueuedAt = oldestTimestamp === null ? null : new Date(oldestTimestamp).toISOString();
+
+  return {
+    queueName,
+    waitingCount,
+    delayedCount,
+    prioritizedCount,
+    waitingChildrenCount,
+    activeCount,
+    totalQueuedCount,
+    oldestQueuedAt,
+    oldestQueuedAgeMinutes: oldestQueuedAt === null ? null : minutesSince(oldestQueuedAt),
+  };
+}
+
+export function createQueueBacklogInspector(queues: Record<AuditedQueueName, Queue>) {
+  return async function inspectConfiguredQueueBacklogs(): Promise<QueueBacklogSummary[]> {
+    return Promise.all([
+      loadQueueBacklog('generation', queues.generation),
+      loadQueueBacklog('agent', queues.agent),
+      loadQueueBacklog('export', queues.export),
+    ]);
   };
 }
 
 export async function runRuntimeAudit(
   thresholds: RuntimeAuditThresholds = resolveRuntimeAuditConfig(),
+  dependencies: RuntimeAuditDependencies = {},
 ): Promise<RuntimeAuditSummary> {
+  const prismaClient = dependencies.prismaClient ?? prisma;
+  const inspectConfiguredQueueBacklogs = dependencies.inspectQueueBacklogs ?? inspectQueueBacklogs;
   const now = new Date();
   const generationCutoff = new Date(now.getTime() - thresholds.queuedGenerationMinutes * 60_000);
   const agentCutoff = new Date(now.getTime() - thresholds.queuedAgentMinutes * 60_000);
   const exportCutoff = new Date(now.getTime() - thresholds.queuedExportMinutes * 60_000);
   const interruptCutoff = new Date(now.getTime() - thresholds.pendingInterruptMinutes * 60_000);
 
-  const [queuedGenerationRuns, queuedAgentRuns, queuedExportJobs, generationInterruptRuns, agentInterruptRuns] =
+  const [queuedGenerationRuns, queuedAgentRuns, queuedExportJobs, generationInterruptRuns, agentInterruptRuns, queueBacklogs] =
     await Promise.all([
-      prisma.generationRun.count({
+      prismaClient.generationRun.count({
         where: {
           status: 'queued',
           createdAt: { lt: generationCutoff },
         },
       }),
-      prisma.agentRun.count({
+      prismaClient.agentRun.count({
         where: {
           status: 'queued',
           createdAt: { lt: agentCutoff },
         },
       }),
-      prisma.exportJob.count({
+      prismaClient.exportJob.count({
         where: {
           status: { in: ['queued', 'processing'] },
           createdAt: { lt: exportCutoff },
         },
       }),
-      prisma.generationRun.findMany({
+      prismaClient.generationRun.findMany({
         where: {
           updatedAt: { lt: interruptCutoff },
         },
@@ -127,7 +230,7 @@ export async function runRuntimeAudit(
           graphStateJson: true,
         },
       }),
-      prisma.agentRun.findMany({
+      prismaClient.agentRun.findMany({
         where: {
           updatedAt: { lt: interruptCutoff },
         },
@@ -137,6 +240,7 @@ export async function runRuntimeAudit(
           graphStateJson: true,
         },
       }),
+      inspectConfiguredQueueBacklogs(),
     ]);
 
   const nowMs = now.getTime();
@@ -167,6 +271,12 @@ export async function runRuntimeAudit(
     ),
   ].sort((left, right) => right.ageMinutes - left.ageMinutes);
 
+  const staleQueueBacklogs = queueBacklogs.filter((queueBacklog) =>
+    queueBacklog.totalQueuedCount > 0
+    && queueBacklog.oldestQueuedAgeMinutes !== null
+    && queueBacklog.oldestQueuedAgeMinutes >= readQueueThresholdMinutes(queueBacklog.queueName, thresholds),
+  );
+
   const violations: string[] = [];
   if (queuedGenerationRuns > 0) {
     violations.push(`stale queued generation runs: ${queuedGenerationRuns}`);
@@ -180,6 +290,11 @@ export async function runRuntimeAudit(
   if (pendingInterrupts.length > 0) {
     violations.push(`stale pending interrupts: ${pendingInterrupts.length}`);
   }
+  for (const queueBacklog of staleQueueBacklogs) {
+    violations.push(
+      `stale ${queueBacklog.queueName} queue backlog: ${queueBacklog.totalQueuedCount} queued, oldest ${queueBacklog.oldestQueuedAgeMinutes}m`,
+    );
+  }
 
   return {
     generatedAt: now.toISOString(),
@@ -187,8 +302,10 @@ export async function runRuntimeAudit(
     queuedAgentRuns,
     queuedExportJobs,
     stalePendingInterrupts: pendingInterrupts.length,
+    staleQueueBacklogs: staleQueueBacklogs.length,
     violations,
     pendingInterrupts,
+    queueBacklogs,
   };
 }
 
@@ -198,11 +315,20 @@ export function formatRuntimeAuditFingerprint(summary: RuntimeAuditSummary) {
     queuedAgentRuns: summary.queuedAgentRuns,
     queuedExportJobs: summary.queuedExportJobs,
     stalePendingInterrupts: summary.stalePendingInterrupts,
+    staleQueueBacklogs: summary.staleQueueBacklogs,
     pendingInterruptIds: summary.pendingInterrupts.map((interrupt) => interrupt.interruptId),
+    queueBacklogs: summary.queueBacklogs.map((queueBacklog) => ({
+      queueName: queueBacklog.queueName,
+      totalQueuedCount: queueBacklog.totalQueuedCount,
+      oldestQueuedAgeMinutes: queueBacklog.oldestQueuedAgeMinutes,
+    })),
   });
 }
 
-export function startRuntimeAuditLoop(config = resolveRuntimeAuditConfig()) {
+export function startRuntimeAuditLoop(
+  config = resolveRuntimeAuditConfig(),
+  dependencies: RuntimeAuditDependencies = {},
+) {
   if (!config.enabled) {
     console.info('[ops.audit] disabled');
     return () => {};
@@ -216,7 +342,7 @@ export function startRuntimeAuditLoop(config = resolveRuntimeAuditConfig()) {
     if (stopped) return;
 
     try {
-      const summary = await runRuntimeAudit(config);
+      const summary = await runRuntimeAudit(config, dependencies);
       if (config.forceFail) {
         summary.violations.push('forced audit failure for validation');
       }

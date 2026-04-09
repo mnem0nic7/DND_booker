@@ -36,6 +36,7 @@ Do not stop after code edits unless the user explicitly says not to ship.
 - remove accidental compiled artifacts from source directories before commit
 - if infrastructure blocks a test or deploy, record the exact blocker
 - for Cloud Run launch hardening, keep monitoring install and validation scripts up to date: `npm run monitor:cloudrun:install` and `npm run monitor:cloudrun:validate`
+- if worker runtime audit coverage changes, keep the backlog and interrupt semantics reflected in the runbook and worker manifest env defaults
 
 ## Production Rule
 

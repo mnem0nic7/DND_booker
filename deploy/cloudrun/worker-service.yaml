@@ -63,6 +63,12 @@ spec:
               value: "15"
             - name: OPS_AUDIT_PENDING_INTERRUPT_MINUTES
               value: "20"
+            - name: OPS_AUDIT_QUEUE_GENERATION_MINUTES
+              value: "15"
+            - name: OPS_AUDIT_QUEUE_AGENT_MINUTES
+              value: "15"
+            - name: OPS_AUDIT_QUEUE_EXPORT_MINUTES
+              value: "10"
             - name: SERVER_BASE_URL
               value: __WEB_SERVICE_URL__
             - name: GCS_BUCKET

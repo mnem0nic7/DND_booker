@@ -56,7 +56,7 @@ SMOKE_TEST_EMAIL=... SMOKE_TEST_PASSWORD=... npm run smoke:cloudrun:v1
     ```
 
 - `dnd-booker ops audit violations`
-  - Meaning: the always-on worker audit found stale queued runs, stale queued exports, or stale pending interrupts.
+  - Meaning: the always-on worker audit found stale queued runs, stale queued exports, stale BullMQ queue backlog, or stale pending interrupts.
   - Check:
     ```bash
     gcloud logging read \
@@ -65,6 +65,7 @@ SMOKE_TEST_EMAIL=... SMOKE_TEST_PASSWORD=... npm run smoke:cloudrun:v1
       --limit 50 \
       --freshness=2h
     ```
+  - The JSON payload now includes per-queue backlog summaries for `generation`, `agent`, and `export`, including total queued count and oldest queued age in minutes.
 
 - `dnd-booker worker restart churn`
   - Meaning: the worker started more than three times in fifteen minutes.
@@ -133,6 +134,26 @@ SMOKE_TEST_EMAIL=... SMOKE_TEST_PASSWORD=... npm run smoke:cloudrun:v1
    ```
 3. If smoke fails only on generation/export, roll back worker first.
 4. If smoke fails before generation starts, inspect the web service too and consider rolling back both.
+
+## Queue Backlog Without Hard Failure
+
+If `dnd-booker ops audit violations` fires but the worker service is still Ready, check whether the backlog is in BullMQ rather than a crash loop:
+
+1. Read the most recent audit payload:
+   ```bash
+   gcloud logging read \
+     'resource.type="cloud_run_revision" AND resource.labels.service_name="dnd-booker-worker" AND textPayload:"OPS_AUDIT_VIOLATION"' \
+     --project dnd-booker \
+     --limit 5 \
+     --freshness=2h \
+     --format=json
+   ```
+2. Look at `queueBacklogs` in the JSON payload.
+3. If one queue shows a growing `totalQueuedCount` with an old `oldestQueuedAgeMinutes`, rerun the authenticated smoke:
+   ```bash
+   SMOKE_TEST_EMAIL=... SMOKE_TEST_PASSWORD=... npm run smoke:cloudrun:v1
+   ```
+4. If smoke hangs in generation/export and the queue backlog keeps growing, roll back the worker revision first.
 
 ## Rollback
 
