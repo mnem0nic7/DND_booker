@@ -79,7 +79,7 @@ describe('Agent Run Routes', () => {
 
   it('creates and lists a persistent editor agent run', async () => {
     const createRes = await request(app)
-      .post(`/api/projects/${projectId}/ai/agent-runs`)
+      .post(`/api/v1/projects/${projectId}/agent-runs`)
       .set('Authorization', `Bearer ${accessToken}`)
       .send({
         mode: 'persistent_editor',
@@ -92,7 +92,7 @@ describe('Agent Run Routes', () => {
     runId = createRes.body.id;
 
     const listRes = await request(app)
-      .get(`/api/projects/${projectId}/ai/agent-runs`)
+      .get(`/api/v1/projects/${projectId}/agent-runs`)
       .set('Authorization', `Bearer ${accessToken}`);
 
     expect(listRes.status).toBe(200);
@@ -127,14 +127,14 @@ describe('Agent Run Routes', () => {
     });
 
     const listRes = await request(app)
-      .get(`/api/projects/${projectId}/ai/agent-runs/${runId}/checkpoints`)
+      .get(`/api/v1/projects/${projectId}/agent-runs/${runId}/checkpoints`)
       .set('Authorization', `Bearer ${accessToken}`);
 
     expect(listRes.status).toBe(200);
     expect(listRes.body[0].id).toBe(checkpoint.id);
 
     const restoreRes = await request(app)
-      .post(`/api/projects/${projectId}/ai/agent-runs/${runId}/checkpoints/${checkpoint.id}/restore`)
+      .post(`/api/v1/projects/${projectId}/agent-runs/${runId}/checkpoints/${checkpoint.id}/restore`)
       .set('Authorization', `Bearer ${accessToken}`);
 
     expect(restoreRes.status).toBe(200);

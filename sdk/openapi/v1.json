@@ -5516,6 +5516,187 @@
         }
       }
     },
+    "/api/v1/projects/{projectId}/generation-runs/{runId}/tasks": {
+      "get": {
+        "operationId": "listGenerationTasks",
+        "summary": "List generation tasks for a run.",
+        "tags": [
+          "generationRuns"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "runId": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "parentTaskId": {
+                        "type": "string",
+                        "format": "uuid",
+                        "nullable": true
+                      },
+                      "taskType": {
+                        "type": "string"
+                      },
+                      "artifactType": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "artifactKey": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "status": {
+                        "type": "string"
+                      },
+                      "priority": {
+                        "type": "integer"
+                      },
+                      "attemptCount": {
+                        "type": "integer"
+                      },
+                      "maxAttempts": {
+                        "type": "integer"
+                      },
+                      "dependsOn": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "inputPayload": {
+                        "nullable": true
+                      },
+                      "resultPayload": {
+                        "nullable": true
+                      },
+                      "errorMessage": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "tokenCount": {
+                        "type": "integer",
+                        "nullable": true
+                      },
+                      "costEstimate": {
+                        "type": "number",
+                        "nullable": true
+                      },
+                      "startedAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
+                      },
+                      "completedAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
+                      },
+                      "createdAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "updatedAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "runId",
+                      "parentTaskId",
+                      "taskType",
+                      "artifactType",
+                      "artifactKey",
+                      "status",
+                      "priority",
+                      "attemptCount",
+                      "maxAttempts",
+                      "dependsOn",
+                      "errorMessage",
+                      "tokenCount",
+                      "costEstimate",
+                      "startedAt",
+                      "completedAt",
+                      "createdAt",
+                      "updatedAt"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer"
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "instance": {
+                      "type": "string"
+                    },
+                    "errors": {
+                      "type": "object",
+                      "additionalProperties": {}
+                    }
+                  },
+                  "required": [
+                    "title",
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "runId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
     "/api/v1/projects/{projectId}/generation-runs/{runId}/artifacts": {
       "get": {
         "operationId": "listGenerationArtifacts",

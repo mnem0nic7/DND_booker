@@ -38,9 +38,9 @@ describe('Auth API', () => {
     await prisma.$disconnect();
   });
 
-  describe('POST /api/auth/register', () => {
+  describe('POST /api/v1/auth/register', () => {
     it('should reject registration when email is not allowlisted', async () => {
-      const res = await request(app).post('/api/auth/register').send({
+      const res = await request(app).post('/api/v1/auth/register').send({
         ...TEST_USER,
         email: 'blocked-registration@example.com',
       });
@@ -50,7 +50,7 @@ describe('Auth API', () => {
     });
 
     it('should register a new user and return tokens', async () => {
-      const res = await request(app).post('/api/auth/register').send(TEST_USER);
+      const res = await request(app).post('/api/v1/auth/register').send(TEST_USER);
 
       expect(res.status).toBe(201);
       expect(res.body.user).toBeDefined();
@@ -63,14 +63,14 @@ describe('Auth API', () => {
     });
 
     it('should reject duplicate email registration', async () => {
-      const res = await request(app).post('/api/auth/register').send(TEST_USER);
+      const res = await request(app).post('/api/v1/auth/register').send(TEST_USER);
 
       expect(res.status).toBe(409);
       expect(res.body.error).toBe('Email already registered');
     });
 
     it('should reject weak passwords', async () => {
-      const res = await request(app).post('/api/auth/register').send({
+      const res = await request(app).post('/api/v1/auth/register').send({
         email: 'weak@example.com',
         password: 'weak',
         displayName: 'Weak Password User',
@@ -81,7 +81,7 @@ describe('Auth API', () => {
     });
 
     it('should reject invalid email format', async () => {
-      const res = await request(app).post('/api/auth/register').send({
+      const res = await request(app).post('/api/v1/auth/register').send({
         email: 'not-an-email',
         password: 'StrongP@ss1',
         displayName: 'Bad Email User',
@@ -92,9 +92,9 @@ describe('Auth API', () => {
     });
   });
 
-  describe('POST /api/auth/login', () => {
+  describe('POST /api/v1/auth/login', () => {
     it('should login with valid credentials', async () => {
-      const res = await request(app).post('/api/auth/login').send({
+      const res = await request(app).post('/api/v1/auth/login').send({
         email: TEST_USER.email,
         password: TEST_USER.password,
       });
@@ -107,7 +107,7 @@ describe('Auth API', () => {
     });
 
     it('should reject wrong password', async () => {
-      const res = await request(app).post('/api/auth/login').send({
+      const res = await request(app).post('/api/v1/auth/login').send({
         email: TEST_USER.email,
         password: 'WrongP@ss1',
       });
@@ -117,7 +117,7 @@ describe('Auth API', () => {
     });
 
     it('should reject non-existent email', async () => {
-      const res = await request(app).post('/api/auth/login').send({
+      const res = await request(app).post('/api/v1/auth/login').send({
         email: 'nobody@example.com',
         password: 'StrongP@ss1',
       });
@@ -127,10 +127,10 @@ describe('Auth API', () => {
     });
   });
 
-  describe('POST /api/auth/refresh', () => {
+  describe('POST /api/v1/auth/refresh', () => {
     it('should refresh the access token with a valid refresh cookie', async () => {
       // First login to get a refresh token cookie
-      const loginRes = await request(app).post('/api/auth/login').send({
+      const loginRes = await request(app).post('/api/v1/auth/login').send({
         email: TEST_USER.email,
         password: TEST_USER.password,
       });
@@ -139,7 +139,7 @@ describe('Auth API', () => {
       expect(cookies).toBeDefined();
 
       const res = await request(app)
-        .post('/api/auth/refresh')
+        .post('/api/v1/auth/refresh')
         .set('Cookie', Array.isArray(cookies) ? cookies : [cookies]);
 
       expect(res.status).toBe(200);
@@ -147,16 +147,16 @@ describe('Auth API', () => {
     });
 
     it('should reject when no refresh token cookie is present', async () => {
-      const res = await request(app).post('/api/auth/refresh');
+      const res = await request(app).post('/api/v1/auth/refresh');
 
       expect(res.status).toBe(401);
       expect(res.body.error).toBe('No refresh token');
     });
   });
 
-  describe('POST /api/auth/logout', () => {
+  describe('POST /api/v1/auth/logout', () => {
     it('should clear the refresh token cookie', async () => {
-      const res = await request(app).post('/api/auth/logout');
+      const res = await request(app).post('/api/v1/auth/logout');
 
       expect(res.status).toBe(200);
       expect(res.body.message).toBe('Logged out');

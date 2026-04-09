@@ -14,6 +14,7 @@ import {
   GenerationRunSchema,
   GraphInterruptResolutionRequestSchema,
   GraphInterruptSchema,
+  V1GenerationTaskSchema,
   V1GeneratedArtifactDetailSchema,
   V1GeneratedArtifactSchema,
 } from '@dnd-booker/shared';
@@ -27,6 +28,7 @@ import {
   listRuns,
   transitionRunStatus,
 } from '../../services/generation/run.service.js';
+import { listTasksForRun } from '../../services/generation/task.service.js';
 import { enqueueGenerationRun } from '../../services/generation/queue.service.js';
 import { publishGenerationEvent, subscribeToRun } from '../../services/generation/pubsub.service.js';
 import {
@@ -310,6 +312,24 @@ v1RunRoutes.post(
     }
 
     res.json(GraphInterruptSchema.parse(toTransportJson(result.interrupt)));
+  }),
+);
+
+v1RunRoutes.get(
+  '/generation-runs/:runId/tasks',
+  requireAuth,
+  validateUuid('projectId', 'runId'),
+  asyncHandler(async (req, res) => {
+    const authReq = req as AuthRequest;
+    const runId = req.params.runId as string;
+    const run = await getRun(runId, authReq.userId!);
+    if (!run) {
+      res.status(404).json({ error: 'Run not found' });
+      return;
+    }
+
+    const tasks = await listTasksForRun(runId);
+    res.json(V1GenerationTaskSchema.array().parse(toTransportJson(tasks)));
   }),
 );
 

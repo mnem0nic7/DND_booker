@@ -28,12 +28,12 @@ describe('Generation Run Routes', () => {
       },
     });
 
-    const res = await request(app).post('/api/auth/register').send(TEST_USER);
+    const res = await request(app).post('/api/v1/auth/register').send(TEST_USER);
     accessToken = res.body.accessToken;
     userId = res.body.user.id;
 
     const projRes = await request(app)
-      .post('/api/projects')
+      .post('/api/v1/projects')
       .set('Authorization', `Bearer ${accessToken}`)
       .send({ title: 'Gen Route Project', type: 'one_shot' });
     projectId = projRes.body.id;
@@ -49,10 +49,10 @@ describe('Generation Run Routes', () => {
     await prisma.$disconnect();
   });
 
-  describe('POST /api/projects/:projectId/ai/generation-runs', () => {
+  describe('POST /api/v1/projects/:projectId/generation-runs', () => {
     it('should create a run with valid input', async () => {
       const res = await request(app)
-        .post(`/api/projects/${projectId}/ai/generation-runs`)
+        .post(`/api/v1/projects/${projectId}/generation-runs`)
         .set('Authorization', `Bearer ${accessToken}`)
         .send({ prompt: 'A goblin cave adventure for level 4' });
 
@@ -64,7 +64,7 @@ describe('Generation Run Routes', () => {
 
     it('should reject missing prompt', async () => {
       const res = await request(app)
-        .post(`/api/projects/${projectId}/ai/generation-runs`)
+        .post(`/api/v1/projects/${projectId}/generation-runs`)
         .set('Authorization', `Bearer ${accessToken}`)
         .send({});
 
@@ -73,17 +73,17 @@ describe('Generation Run Routes', () => {
 
     it('should require authentication', async () => {
       const res = await request(app)
-        .post(`/api/projects/${projectId}/ai/generation-runs`)
+        .post(`/api/v1/projects/${projectId}/generation-runs`)
         .send({ prompt: 'No auth' });
 
       expect(res.status).toBe(401);
     });
   });
 
-  describe('GET /api/projects/:projectId/ai/generation-runs', () => {
+  describe('GET /api/v1/projects/:projectId/generation-runs', () => {
     it('should list runs for the project', async () => {
       const res = await request(app)
-        .get(`/api/projects/${projectId}/ai/generation-runs`)
+        .get(`/api/v1/projects/${projectId}/generation-runs`)
         .set('Authorization', `Bearer ${accessToken}`);
 
       expect(res.status).toBe(200);
@@ -92,15 +92,15 @@ describe('Generation Run Routes', () => {
     });
   });
 
-  describe('GET /api/projects/:projectId/ai/generation-runs/:runId', () => {
+  describe('GET /api/v1/projects/:projectId/generation-runs/:runId', () => {
     it('should return a run with task and artifact counts', async () => {
       const createRes = await request(app)
-        .post(`/api/projects/${projectId}/ai/generation-runs`)
+        .post(`/api/v1/projects/${projectId}/generation-runs`)
         .set('Authorization', `Bearer ${accessToken}`)
         .send({ prompt: 'Detail test' });
 
       const res = await request(app)
-        .get(`/api/projects/${projectId}/ai/generation-runs/${createRes.body.id}`)
+        .get(`/api/v1/projects/${projectId}/generation-runs/${createRes.body.id}`)
         .set('Authorization', `Bearer ${accessToken}`);
 
       expect(res.status).toBe(200);
@@ -111,7 +111,7 @@ describe('Generation Run Routes', () => {
 
     it('should include the latest scoped export review in artifact counts', async () => {
       const createRes = await request(app)
-        .post(`/api/projects/${projectId}/ai/generation-runs`)
+        .post(`/api/v1/projects/${projectId}/generation-runs`)
         .set('Authorization', `Bearer ${accessToken}`)
         .send({ prompt: 'Run with export review' });
 
@@ -152,7 +152,7 @@ describe('Generation Run Routes', () => {
       });
 
       const res = await request(app)
-        .get(`/api/projects/${projectId}/ai/generation-runs/${createRes.body.id}`)
+        .get(`/api/v1/projects/${projectId}/generation-runs/${createRes.body.id}`)
         .set('Authorization', `Bearer ${accessToken}`);
 
       expect(res.status).toBe(200);
@@ -165,7 +165,7 @@ describe('Generation Run Routes', () => {
 
     it('should return 404 for non-existent run', async () => {
       const res = await request(app)
-        .get(`/api/projects/${projectId}/ai/generation-runs/00000000-0000-0000-0000-000000000000`)
+        .get(`/api/v1/projects/${projectId}/generation-runs/00000000-0000-0000-0000-000000000000`)
         .set('Authorization', `Bearer ${accessToken}`);
 
       expect(res.status).toBe(404);
@@ -175,7 +175,7 @@ describe('Generation Run Routes', () => {
   describe('POST .../pause', () => {
     it('should pause a planning run', async () => {
       const createRes = await request(app)
-        .post(`/api/projects/${projectId}/ai/generation-runs`)
+        .post(`/api/v1/projects/${projectId}/generation-runs`)
         .set('Authorization', `Bearer ${accessToken}`)
         .send({ prompt: 'Pause test' });
 
@@ -185,7 +185,7 @@ describe('Generation Run Routes', () => {
       });
 
       const res = await request(app)
-        .post(`/api/projects/${projectId}/ai/generation-runs/${createRes.body.id}/pause`)
+        .post(`/api/v1/projects/${projectId}/generation-runs/${createRes.body.id}/pause`)
         .set('Authorization', `Bearer ${accessToken}`);
 
       expect(res.status).toBe(200);
@@ -196,7 +196,7 @@ describe('Generation Run Routes', () => {
   describe('POST .../resume', () => {
     it('resumes a paused run after the graph runtime acknowledges the checkpoint', async () => {
       const createRes = await request(app)
-        .post(`/api/projects/${projectId}/ai/generation-runs`)
+        .post(`/api/v1/projects/${projectId}/generation-runs`)
         .set('Authorization', `Bearer ${accessToken}`)
         .send({ prompt: 'Resume test' });
 
@@ -221,7 +221,7 @@ describe('Generation Run Routes', () => {
       });
 
       const res = await request(app)
-        .post(`/api/projects/${projectId}/ai/generation-runs/${createRes.body.id}/resume`)
+        .post(`/api/v1/projects/${projectId}/generation-runs/${createRes.body.id}/resume`)
         .set('Authorization', `Bearer ${accessToken}`);
 
       expect(res.status).toBe(200);
@@ -230,7 +230,7 @@ describe('Generation Run Routes', () => {
 
     it('rejects resume before the worker has checkpointed the paused state', async () => {
       const createRes = await request(app)
-        .post(`/api/projects/${projectId}/ai/generation-runs`)
+        .post(`/api/v1/projects/${projectId}/generation-runs`)
         .set('Authorization', `Bearer ${accessToken}`)
         .send({ prompt: 'Resume checkpoint test' });
 
@@ -244,7 +244,7 @@ describe('Generation Run Routes', () => {
       });
 
       const res = await request(app)
-        .post(`/api/projects/${projectId}/ai/generation-runs/${createRes.body.id}/resume`)
+        .post(`/api/v1/projects/${projectId}/generation-runs/${createRes.body.id}/resume`)
         .set('Authorization', `Bearer ${accessToken}`);
 
       expect(res.status).toBe(409);
@@ -255,12 +255,12 @@ describe('Generation Run Routes', () => {
   describe('POST .../cancel', () => {
     it('should cancel a queued run', async () => {
       const createRes = await request(app)
-        .post(`/api/projects/${projectId}/ai/generation-runs`)
+        .post(`/api/v1/projects/${projectId}/generation-runs`)
         .set('Authorization', `Bearer ${accessToken}`)
         .send({ prompt: 'Cancel test' });
 
       const res = await request(app)
-        .post(`/api/projects/${projectId}/ai/generation-runs/${createRes.body.id}/cancel`)
+        .post(`/api/v1/projects/${projectId}/generation-runs/${createRes.body.id}/cancel`)
         .set('Authorization', `Bearer ${accessToken}`);
 
       expect(res.status).toBe(200);
@@ -271,12 +271,12 @@ describe('Generation Run Routes', () => {
   describe('GET .../tasks', () => {
     it('should list tasks for a run', async () => {
       const createRes = await request(app)
-        .post(`/api/projects/${projectId}/ai/generation-runs`)
+        .post(`/api/v1/projects/${projectId}/generation-runs`)
         .set('Authorization', `Bearer ${accessToken}`)
         .send({ prompt: 'Tasks list test' });
 
       const res = await request(app)
-        .get(`/api/projects/${projectId}/ai/generation-runs/${createRes.body.id}/tasks`)
+        .get(`/api/v1/projects/${projectId}/generation-runs/${createRes.body.id}/tasks`)
         .set('Authorization', `Bearer ${accessToken}`);
 
       expect(res.status).toBe(200);
@@ -287,12 +287,12 @@ describe('Generation Run Routes', () => {
   describe('GET .../artifacts', () => {
     it('should list artifacts for a run', async () => {
       const createRes = await request(app)
-        .post(`/api/projects/${projectId}/ai/generation-runs`)
+        .post(`/api/v1/projects/${projectId}/generation-runs`)
         .set('Authorization', `Bearer ${accessToken}`)
         .send({ prompt: 'Artifacts list test' });
 
       const res = await request(app)
-        .get(`/api/projects/${projectId}/ai/generation-runs/${createRes.body.id}/artifacts`)
+        .get(`/api/v1/projects/${projectId}/generation-runs/${createRes.body.id}/artifacts`)
         .set('Authorization', `Bearer ${accessToken}`);
 
       expect(res.status).toBe(200);
@@ -301,7 +301,7 @@ describe('Generation Run Routes', () => {
 
     it('should append the scoped export review artifact to the artifact list', async () => {
       const createRes = await request(app)
-        .post(`/api/projects/${projectId}/ai/generation-runs`)
+        .post(`/api/v1/projects/${projectId}/generation-runs`)
         .set('Authorization', `Bearer ${accessToken}`)
         .send({ prompt: 'Artifacts list with export review' });
 
@@ -334,7 +334,7 @@ describe('Generation Run Routes', () => {
       });
 
       const res = await request(app)
-        .get(`/api/projects/${projectId}/ai/generation-runs/${createRes.body.id}/artifacts`)
+        .get(`/api/v1/projects/${projectId}/generation-runs/${createRes.body.id}/artifacts`)
         .set('Authorization', `Bearer ${accessToken}`);
 
       expect(res.status).toBe(200);
@@ -354,7 +354,7 @@ describe('Generation Run Routes', () => {
   describe('GET .../artifacts/:artifactId', () => {
     it('should return synthetic export review artifact detail', async () => {
       const createRes = await request(app)
-        .post(`/api/projects/${projectId}/ai/generation-runs`)
+        .post(`/api/v1/projects/${projectId}/generation-runs`)
         .set('Authorization', `Bearer ${accessToken}`)
         .send({ prompt: 'Artifact detail export review' });
 
@@ -395,7 +395,7 @@ describe('Generation Run Routes', () => {
       });
 
       const res = await request(app)
-        .get(`/api/projects/${projectId}/ai/generation-runs/${createRes.body.id}/artifacts/export-review:${exportJob.id}`)
+        .get(`/api/v1/projects/${projectId}/generation-runs/${createRes.body.id}/artifacts/export-review:${exportJob.id}`)
         .set('Authorization', `Bearer ${accessToken}`);
 
       expect(res.status).toBe(200);

@@ -1119,6 +1119,17 @@ export const V1_ROUTE_CONTRACTS: ApiV1RouteContract[] = [
   },
   {
     tag: 'generationRuns',
+    operationId: 'listGenerationTasks',
+    method: 'get',
+    path: '/api/v1/projects/{projectId}/generation-runs/{runId}/tasks',
+    summary: 'List generation tasks for a run.',
+    paramsSchema: GenerationRunIdParamsSchema,
+    responseSchema: z.array(V1GenerationTaskSchema),
+    paramsTypeName: 'GenerationRunIdParams',
+    responseTypeName: 'V1GenerationTask[]',
+  },
+  {
+    tag: 'generationRuns',
     operationId: 'listGenerationArtifacts',
     method: 'get',
     path: '/api/v1/projects/{projectId}/generation-runs/{runId}/artifacts',

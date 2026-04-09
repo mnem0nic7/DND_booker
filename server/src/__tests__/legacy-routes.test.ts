@@ -11,7 +11,7 @@ const TEST_EMAIL = `legacy-route-${Date.now()}@example.com`;
 let accessToken: string;
 let userId: string;
 
-describe('Legacy route compatibility headers', () => {
+describe('Legacy route removal', () => {
   beforeAll(async () => {
     const passwordHash = await bcrypt.hash('StrongP@ss1', 4);
     const user = await prisma.user.create({
@@ -36,16 +36,14 @@ describe('Legacy route compatibility headers', () => {
     await prisma.$disconnect();
   });
 
-  it('marks legacy project routes as deprecated and leaves v1 routes clean', async () => {
+  it('returns 404 for removed legacy project routes and keeps v1 routes available', async () => {
     const legacyRes = await request(app)
       .get('/api/projects')
       .set('Authorization', `Bearer ${accessToken}`);
 
-    expect(legacyRes.status).toBe(200);
-    expect(legacyRes.headers.deprecation).toBe('true');
-    expect(legacyRes.headers.sunset).toBeDefined();
-    expect(legacyRes.headers.link).toContain('/api/v1/openapi.json');
-    expect(legacyRes.headers['x-api-compatibility']).toBe('legacy');
+    expect(legacyRes.status).toBe(404);
+    expect(legacyRes.headers.deprecation).toBeUndefined();
+    expect(legacyRes.headers['x-api-compatibility']).toBeUndefined();
 
     const v1Res = await request(app)
       .get('/api/v1/projects')

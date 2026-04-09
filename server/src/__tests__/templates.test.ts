@@ -25,7 +25,7 @@ describe('Templates API', () => {
         note: 'templates test',
       },
     });
-    const res = await request(app).post('/api/auth/register').send(TEST_USER);
+    const res = await request(app).post('/api/v1/auth/register').send(TEST_USER);
     accessToken = res.body.accessToken;
   });
 
@@ -38,10 +38,10 @@ describe('Templates API', () => {
     await prisma.$disconnect();
   });
 
-  describe('GET /api/templates', () => {
+  describe('GET /api/v1/templates', () => {
     it('should return an array of templates', async () => {
       const res = await request(app)
-        .get('/api/templates')
+        .get('/api/v1/templates')
         .set('Authorization', `Bearer ${accessToken}`);
 
       expect(res.status).toBe(200);
@@ -50,7 +50,7 @@ describe('Templates API', () => {
 
     it('should filter templates by type', async () => {
       const res = await request(app)
-        .get('/api/templates?type=campaign')
+        .get('/api/v1/templates?type=campaign')
         .set('Authorization', `Bearer ${accessToken}`);
 
       expect(res.status).toBe(200);
@@ -70,10 +70,10 @@ describe('Templates API', () => {
     });
   });
 
-  describe('GET /api/templates/:id', () => {
+  describe('GET /api/v1/templates/:id', () => {
     it('should return 404 for non-existent template', async () => {
       const res = await request(app)
-        .get('/api/templates/00000000-0000-0000-0000-000000000000')
+        .get('/api/v1/templates/00000000-0000-0000-0000-000000000000')
         .set('Authorization', `Bearer ${accessToken}`);
 
       expect(res.status).toBe(404);
@@ -82,7 +82,7 @@ describe('Templates API', () => {
 
     it('should return a template by ID if one exists', async () => {
       const listRes = await request(app)
-        .get('/api/templates')
+        .get('/api/v1/templates')
         .set('Authorization', `Bearer ${accessToken}`);
 
       if (listRes.body.length > 0) {

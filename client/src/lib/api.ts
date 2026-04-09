@@ -26,7 +26,6 @@ api.interceptors.response.use(
     const requestUrl = String(error.config?.url ?? '');
     const isRefreshRequest = [
       '/auth/refresh',
-      '/api/auth/refresh',
       '/v1/auth/refresh',
       '/api/v1/auth/refresh',
     ].includes(requestUrl);

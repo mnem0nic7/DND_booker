@@ -48,12 +48,12 @@ describe('AI Routes', () => {
     });
 
     // Register and get token
-    const res = await request(app).post('/api/auth/register').send(TEST_USER);
+    const res = await request(app).post('/api/v1/auth/register').send(TEST_USER);
     accessToken = res.body.accessToken;
 
     // Create a test project
     const projRes = await request(app)
-      .post('/api/projects')
+      .post('/api/v1/projects')
       .set('Authorization', `Bearer ${accessToken}`)
       .send({ title: 'AI Test Campaign' });
     projectId = projRes.body.id;
@@ -75,10 +75,10 @@ describe('AI Routes', () => {
 
   // ─── Settings Routes ───────────────────────────────────────────
 
-  describe('GET /api/ai/settings', () => {
+  describe('GET /api/v1/ai/settings', () => {
     it('should return default settings for a new user', async () => {
       const res = await request(app)
-        .get('/api/ai/settings')
+        .get('/api/v1/ai/settings')
         .set('Authorization', `Bearer ${accessToken}`);
 
       expect(res.status).toBe(200);
@@ -93,7 +93,7 @@ describe('AI Routes', () => {
     });
 
     it('should return 401 without auth token', async () => {
-      const res = await request(app).get('/api/ai/settings');
+      const res = await request(app).get('/api/v1/ai/settings');
       expect(res.status).toBe(401);
     });
 
@@ -108,10 +108,10 @@ describe('AI Routes', () => {
     });
   });
 
-  describe('POST /api/ai/settings', () => {
+  describe('POST /api/v1/ai/settings', () => {
     it('should save provider and model (without API key)', async () => {
       const res = await request(app)
-        .post('/api/ai/settings')
+        .post('/api/v1/ai/settings')
         .set('Authorization', `Bearer ${accessToken}`)
         .send({ provider: 'anthropic', model: 'claude-sonnet-4-6' });
 
@@ -120,7 +120,7 @@ describe('AI Routes', () => {
 
       // Verify settings were saved
       const getRes = await request(app)
-        .get('/api/ai/settings')
+        .get('/api/v1/ai/settings')
         .set('Authorization', `Bearer ${accessToken}`);
       expect(getRes.body.provider).toBe('anthropic');
       expect(getRes.body.model).toBe('claude-sonnet-4-6');
@@ -129,7 +129,7 @@ describe('AI Routes', () => {
 
     it('should save settings with API key', async () => {
       const res = await request(app)
-        .post('/api/ai/settings')
+        .post('/api/v1/ai/settings')
         .set('Authorization', `Bearer ${accessToken}`)
         .send({
           provider: 'openai',
@@ -140,7 +140,7 @@ describe('AI Routes', () => {
       expect(res.status).toBe(200);
 
       const getRes = await request(app)
-        .get('/api/ai/settings')
+        .get('/api/v1/ai/settings')
         .set('Authorization', `Bearer ${accessToken}`);
       expect(getRes.body.provider).toBe('openai');
       expect(getRes.body.model).toBe('gpt-4o');
@@ -149,7 +149,7 @@ describe('AI Routes', () => {
 
     it('should save Gemini settings with API key', async () => {
       const res = await request(app)
-        .post('/api/ai/settings')
+        .post('/api/v1/ai/settings')
         .set('Authorization', `Bearer ${accessToken}`)
         .send({
           provider: 'google',
@@ -160,7 +160,7 @@ describe('AI Routes', () => {
       expect(res.status).toBe(200);
 
       const getRes = await request(app)
-        .get('/api/ai/settings')
+        .get('/api/v1/ai/settings')
         .set('Authorization', `Bearer ${accessToken}`);
       expect(getRes.body.provider).toBe('google');
       expect(getRes.body.model).toBe('gemini-2.5-pro');
@@ -169,7 +169,7 @@ describe('AI Routes', () => {
 
     it('should return google models from the models route', async () => {
       const res = await request(app)
-        .post('/api/ai/settings/models')
+        .post('/api/v1/ai/settings/models')
         .set('Authorization', `Bearer ${accessToken}`)
         .send({ provider: 'google', apiKey: 'google-test-fake-key-1234567890' });
 
@@ -180,7 +180,7 @@ describe('AI Routes', () => {
 
     it('should reject invalid provider', async () => {
       const res = await request(app)
-        .post('/api/ai/settings')
+        .post('/api/v1/ai/settings')
         .set('Authorization', `Bearer ${accessToken}`)
         .send({ provider: 'invalid', model: 'gpt-4o' });
 
@@ -190,7 +190,7 @@ describe('AI Routes', () => {
 
     it('should accept any model string for provider (dynamic model lists)', async () => {
       const res = await request(app)
-        .post('/api/ai/settings')
+        .post('/api/v1/ai/settings')
         .set('Authorization', `Bearer ${accessToken}`)
         .send({ provider: 'anthropic', model: 'gpt-4o' }); // cross-provider models allowed (dynamic lists)
 
@@ -200,7 +200,7 @@ describe('AI Routes', () => {
 
     it('should reject API key that is too short', async () => {
       const res = await request(app)
-        .post('/api/ai/settings')
+        .post('/api/v1/ai/settings')
         .set('Authorization', `Bearer ${accessToken}`)
         .send({ provider: 'openai', model: 'gpt-4o', apiKey: 'short' });
 
@@ -209,7 +209,7 @@ describe('AI Routes', () => {
 
     it('should return 401 without auth token', async () => {
       const res = await request(app)
-        .post('/api/ai/settings')
+        .post('/api/v1/ai/settings')
         .send({ provider: 'openai', model: 'gpt-4o' });
       expect(res.status).toBe(401);
     });
@@ -219,12 +219,12 @@ describe('AI Routes', () => {
     it('should remove the stored API key', async () => {
       // First ensure there's a key
       await request(app)
-        .post('/api/ai/settings')
+        .post('/api/v1/ai/settings')
         .set('Authorization', `Bearer ${accessToken}`)
         .send({ provider: 'openai', model: 'gpt-4o', apiKey: 'sk-test-key-to-remove-1234' });
 
       const res = await request(app)
-        .delete('/api/ai/settings/key')
+        .delete('/api/v1/ai/settings/key')
         .set('Authorization', `Bearer ${accessToken}`);
 
       expect(res.status).toBe(200);
@@ -232,13 +232,13 @@ describe('AI Routes', () => {
 
       // Verify key was removed
       const getRes = await request(app)
-        .get('/api/ai/settings')
+        .get('/api/v1/ai/settings')
         .set('Authorization', `Bearer ${accessToken}`);
       expect(getRes.body.hasApiKey).toBe(false);
     });
 
     it('should return 401 without auth token', async () => {
-      const res = await request(app).delete('/api/ai/settings/key');
+      const res = await request(app).delete('/api/v1/ai/settings/key');
       expect(res.status).toBe(401);
     });
   });
@@ -246,7 +246,7 @@ describe('AI Routes', () => {
   describe('POST /api/ai/settings/validate', () => {
     it('should reject missing fields', async () => {
       const res = await request(app)
-        .post('/api/ai/settings/validate')
+        .post('/api/v1/ai/settings/validate')
         .set('Authorization', `Bearer ${accessToken}`)
         .send({ provider: 'openai' }); // missing apiKey
 
@@ -255,7 +255,7 @@ describe('AI Routes', () => {
 
     it('should return valid: false for fake key (no real provider call)', async () => {
       const res = await request(app)
-        .post('/api/ai/settings/validate')
+        .post('/api/v1/ai/settings/validate')
         .set('Authorization', `Bearer ${accessToken}`)
         .send({ provider: 'openai', apiKey: 'sk-fake-key-that-wont-work-123456' });
 
@@ -265,7 +265,7 @@ describe('AI Routes', () => {
 
     it('should accept google provider for key validation route', async () => {
       const res = await request(app)
-        .post('/api/ai/settings/validate')
+        .post('/api/v1/ai/settings/validate')
         .set('Authorization', `Bearer ${accessToken}`)
         .send({ provider: 'google', apiKey: 'google-fake-key-that-wont-work-123456' });
 
@@ -274,16 +274,16 @@ describe('AI Routes', () => {
 
     it('should return 401 without auth token', async () => {
       const res = await request(app)
-        .post('/api/ai/settings/validate')
+        .post('/api/v1/ai/settings/validate')
         .send({ provider: 'openai', apiKey: 'sk-test-1234567890' });
       expect(res.status).toBe(401);
     });
   });
 
-  describe('POST /api/ai/settings (Ollama)', () => {
+  describe('POST /api/v1/ai/settings (Ollama)', () => {
     it('should accept ollama provider with any model name', async () => {
       const res = await request(app)
-        .post('/api/ai/settings')
+        .post('/api/v1/ai/settings')
         .set('Authorization', `Bearer ${accessToken}`)
         .send({ provider: 'ollama', model: 'llama3.1:8b', baseUrl: 'http://host.docker.internal:11434' });
 
@@ -291,7 +291,7 @@ describe('AI Routes', () => {
       expect(res.body.success).toBe(true);
 
       const getRes = await request(app)
-        .get('/api/ai/settings')
+        .get('/api/v1/ai/settings')
         .set('Authorization', `Bearer ${accessToken}`);
       expect(getRes.body.provider).toBe('ollama');
       expect(getRes.body.model).toBe('llama3.1:8b');
@@ -301,26 +301,26 @@ describe('AI Routes', () => {
     it('should accept ollama without API key and clear stale key', async () => {
       // First save with an API key on openai
       await request(app)
-        .post('/api/ai/settings')
+        .post('/api/v1/ai/settings')
         .set('Authorization', `Bearer ${accessToken}`)
         .send({ provider: 'openai', model: 'gpt-4o', apiKey: 'sk-test-fake-key-1234567890' });
 
       // Verify key was saved
       let getRes = await request(app)
-        .get('/api/ai/settings')
+        .get('/api/v1/ai/settings')
         .set('Authorization', `Bearer ${accessToken}`);
       expect(getRes.body.hasApiKey).toBe(true);
 
       // Now switch to ollama — should clear the stale key
       const res = await request(app)
-        .post('/api/ai/settings')
+        .post('/api/v1/ai/settings')
         .set('Authorization', `Bearer ${accessToken}`)
         .send({ provider: 'ollama', model: 'mistral:7b' });
 
       expect(res.status).toBe(200);
 
       getRes = await request(app)
-        .get('/api/ai/settings')
+        .get('/api/v1/ai/settings')
         .set('Authorization', `Bearer ${accessToken}`);
       expect(getRes.body.provider).toBe('ollama');
       expect(getRes.body.hasApiKey).toBe(false);
@@ -328,7 +328,7 @@ describe('AI Routes', () => {
 
     it('should skip model validation for ollama (any model name allowed)', async () => {
       const res = await request(app)
-        .post('/api/ai/settings')
+        .post('/api/v1/ai/settings')
         .set('Authorization', `Bearer ${accessToken}`)
         .send({ provider: 'ollama', model: 'custom-fine-tuned:latest' });
 
@@ -336,10 +336,10 @@ describe('AI Routes', () => {
     });
   });
 
-  describe('POST /api/ai/settings/validate-ollama', () => {
+  describe('POST /api/v1/ai/settings/validate-ollama', () => {
     it('should reject missing baseUrl', async () => {
       const res = await request(app)
-        .post('/api/ai/settings/validate-ollama')
+        .post('/api/v1/ai/settings/validate-ollama')
         .set('Authorization', `Bearer ${accessToken}`)
         .send({});
 
@@ -349,7 +349,7 @@ describe('AI Routes', () => {
 
     it('should reject invalid URL format', async () => {
       const res = await request(app)
-        .post('/api/ai/settings/validate-ollama')
+        .post('/api/v1/ai/settings/validate-ollama')
         .set('Authorization', `Bearer ${accessToken}`)
         .send({ baseUrl: 'not-a-url' });
 
@@ -358,7 +358,7 @@ describe('AI Routes', () => {
 
     it('should return invalid for unreachable Ollama server', async () => {
       const res = await request(app)
-        .post('/api/ai/settings/validate-ollama')
+        .post('/api/v1/ai/settings/validate-ollama')
         .set('Authorization', `Bearer ${accessToken}`)
         .send({ baseUrl: 'http://localhost:1' });
 
@@ -369,7 +369,7 @@ describe('AI Routes', () => {
 
     it('should return 401 without auth token', async () => {
       const res = await request(app)
-        .post('/api/ai/settings/validate-ollama')
+        .post('/api/v1/ai/settings/validate-ollama')
         .send({ baseUrl: 'http://localhost:11434' });
       expect(res.status).toBe(401);
     });
@@ -377,10 +377,10 @@ describe('AI Routes', () => {
 
   // ─── Chat Routes ───────────────────────────────────────────────
 
-  describe('GET /api/projects/:projectId/ai/chat', () => {
+  describe('GET /api/v1/projects/:projectId/ai/chat', () => {
     it('should return empty messages for new project', async () => {
       const res = await request(app)
-        .get(`/api/projects/${projectId}/ai/chat`)
+        .get(`/api/v1/projects/${projectId}/ai/chat`)
         .set('Authorization', `Bearer ${accessToken}`);
 
       expect(res.status).toBe(200);
@@ -389,7 +389,7 @@ describe('AI Routes', () => {
 
     it('should return 404 for non-existent project', async () => {
       const res = await request(app)
-        .get('/api/projects/00000000-0000-0000-0000-000000000000/ai/chat')
+        .get('/api/v1/projects/00000000-0000-0000-0000-000000000000/ai/chat')
         .set('Authorization', `Bearer ${accessToken}`);
 
       expect(res.status).toBe(404);
@@ -397,7 +397,7 @@ describe('AI Routes', () => {
 
     it('should return 401 without auth token', async () => {
       const res = await request(app)
-        .get(`/api/projects/${projectId}/ai/chat`);
+        .get(`/api/v1/projects/${projectId}/ai/chat`);
       expect(res.status).toBe(401);
     });
 
@@ -411,7 +411,7 @@ describe('AI Routes', () => {
     });
   });
 
-  describe('POST /api/projects/:projectId/ai/chat', () => {
+  describe('POST /api/v1/projects/:projectId/ai/chat', () => {
     it('should return 400 when AI is not configured (no API key)', async () => {
       // Clear provider entirely so getModelForUser returns null
       // (deleting just the key isn't enough — Ollama doesn't require one)
@@ -421,7 +421,7 @@ describe('AI Routes', () => {
       });
 
       const res = await request(app)
-        .post(`/api/projects/${projectId}/ai/chat`)
+        .post(`/api/v1/projects/${projectId}/ai/chat`)
         .set('Authorization', `Bearer ${accessToken}`)
         .send({ message: 'Create an orc war chief' });
 
@@ -431,7 +431,7 @@ describe('AI Routes', () => {
 
     it('should reject empty message', async () => {
       const res = await request(app)
-        .post(`/api/projects/${projectId}/ai/chat`)
+        .post(`/api/v1/projects/${projectId}/ai/chat`)
         .set('Authorization', `Bearer ${accessToken}`)
         .send({ message: '' });
 
@@ -440,7 +440,7 @@ describe('AI Routes', () => {
 
     it('should reject malformed layout snapshot payloads', async () => {
       const res = await request(app)
-        .post(`/api/projects/${projectId}/ai/chat`)
+        .post(`/api/v1/projects/${projectId}/ai/chat`)
         .set('Authorization', `Bearer ${accessToken}`)
         .send({
           message: 'Evaluate the layout',
@@ -487,7 +487,7 @@ describe('AI Routes', () => {
 
     it('should return 404 for non-existent project', async () => {
       const res = await request(app)
-        .post('/api/projects/00000000-0000-0000-0000-000000000000/ai/chat')
+        .post('/api/v1/projects/00000000-0000-0000-0000-000000000000/ai/chat')
         .set('Authorization', `Bearer ${accessToken}`)
         .send({ message: 'Hello' });
 
@@ -496,16 +496,16 @@ describe('AI Routes', () => {
 
     it('should return 401 without auth token', async () => {
       const res = await request(app)
-        .post(`/api/projects/${projectId}/ai/chat`)
+        .post(`/api/v1/projects/${projectId}/ai/chat`)
         .send({ message: 'Hello' });
       expect(res.status).toBe(401);
     });
   });
 
-  describe('DELETE /api/projects/:projectId/ai/chat', () => {
+  describe('DELETE /api/v1/projects/:projectId/ai/chat', () => {
     it('should clear chat history', async () => {
       const res = await request(app)
-        .delete(`/api/projects/${projectId}/ai/chat`)
+        .delete(`/api/v1/projects/${projectId}/ai/chat`)
         .set('Authorization', `Bearer ${accessToken}`);
 
       expect(res.status).toBe(200);
@@ -514,14 +514,14 @@ describe('AI Routes', () => {
 
     it('should return 401 without auth token', async () => {
       const res = await request(app)
-        .delete(`/api/projects/${projectId}/ai/chat`);
+        .delete(`/api/v1/projects/${projectId}/ai/chat`);
       expect(res.status).toBe(401);
     });
   });
 
   // ─── Block Generation Routes ───────────────────────────────────
 
-  describe('POST /api/ai/generate-block', () => {
+  describe('POST /api/v1/ai/generate-block', () => {
     it('should return 400 when AI is not configured', async () => {
       // Ensure provider is fully cleared (Ollama doesn't need a key)
       await prisma.user.update({
@@ -530,7 +530,7 @@ describe('AI Routes', () => {
       });
 
       const res = await request(app)
-        .post('/api/ai/generate-block')
+        .post('/api/v1/ai/generate-block')
         .set('Authorization', `Bearer ${accessToken}`)
         .send({ blockType: 'statBlock', prompt: 'A goblin warrior' });
 
@@ -540,7 +540,7 @@ describe('AI Routes', () => {
 
     it('should reject unsupported block type', async () => {
       const res = await request(app)
-        .post('/api/ai/generate-block')
+        .post('/api/v1/ai/generate-block')
         .set('Authorization', `Bearer ${accessToken}`)
         .send({ blockType: 'invalidBlock', prompt: 'test' });
 
@@ -550,7 +550,7 @@ describe('AI Routes', () => {
 
     it('should reject missing prompt', async () => {
       const res = await request(app)
-        .post('/api/ai/generate-block')
+        .post('/api/v1/ai/generate-block')
         .set('Authorization', `Bearer ${accessToken}`)
         .send({ blockType: 'statBlock' });
 
@@ -559,7 +559,7 @@ describe('AI Routes', () => {
 
     it('should reject empty prompt', async () => {
       const res = await request(app)
-        .post('/api/ai/generate-block')
+        .post('/api/v1/ai/generate-block')
         .set('Authorization', `Bearer ${accessToken}`)
         .send({ blockType: 'statBlock', prompt: '' });
 
@@ -568,7 +568,7 @@ describe('AI Routes', () => {
 
     it('should reject prompt exceeding max length', async () => {
       const res = await request(app)
-        .post('/api/ai/generate-block')
+        .post('/api/v1/ai/generate-block')
         .set('Authorization', `Bearer ${accessToken}`)
         .send({ blockType: 'statBlock', prompt: 'A'.repeat(2001) });
 
@@ -577,13 +577,13 @@ describe('AI Routes', () => {
 
     it('should return 401 without auth token', async () => {
       const res = await request(app)
-        .post('/api/ai/generate-block')
+        .post('/api/v1/ai/generate-block')
         .send({ blockType: 'statBlock', prompt: 'test' });
       expect(res.status).toBe(401);
     });
   });
 
-  describe('POST /api/ai/autofill', () => {
+  describe('POST /api/v1/ai/autofill', () => {
     it('should return 400 when AI is not configured', async () => {
       // Ensure provider is fully cleared (Ollama doesn't need a key)
       await prisma.user.update({
@@ -592,7 +592,7 @@ describe('AI Routes', () => {
       });
 
       const res = await request(app)
-        .post('/api/ai/autofill')
+        .post('/api/v1/ai/autofill')
         .set('Authorization', `Bearer ${accessToken}`)
         .send({
           blockType: 'npcProfile',
@@ -605,7 +605,7 @@ describe('AI Routes', () => {
 
     it('should reject unsupported block type', async () => {
       const res = await request(app)
-        .post('/api/ai/autofill')
+        .post('/api/v1/ai/autofill')
         .set('Authorization', `Bearer ${accessToken}`)
         .send({ blockType: 'fakeBlock', currentAttrs: {} });
 
@@ -618,7 +618,7 @@ describe('AI Routes', () => {
         attrs[`field${i}`] = 'value';
       }
       const res = await request(app)
-        .post('/api/ai/autofill')
+        .post('/api/v1/ai/autofill')
         .set('Authorization', `Bearer ${accessToken}`)
         .send({ blockType: 'statBlock', currentAttrs: attrs });
 
@@ -627,7 +627,7 @@ describe('AI Routes', () => {
 
     it('should return 401 without auth token', async () => {
       const res = await request(app)
-        .post('/api/ai/autofill')
+        .post('/api/v1/ai/autofill')
         .send({ blockType: 'statBlock', currentAttrs: {} });
       expect(res.status).toBe(401);
     });

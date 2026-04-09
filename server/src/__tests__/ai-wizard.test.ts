@@ -569,13 +569,13 @@ describe('AI Wizard Routes', () => {
       },
     });
 
-    const res = await request(app).post('/api/auth/register').send(TEST_USER);
+    const res = await request(app).post('/api/v1/auth/register').send(TEST_USER);
     accessToken = res.body.accessToken;
     const user = await prisma.user.findUniqueOrThrow({ where: { email: TEST_USER.email } });
     testUserId = user.id;
 
     const projRes = await request(app)
-      .post('/api/projects')
+      .post('/api/v1/projects')
       .set('Authorization', `Bearer ${accessToken}`)
       .send({ title: 'Wizard Test Campaign' });
     projectId = projRes.body.id;
@@ -596,10 +596,10 @@ describe('AI Wizard Routes', () => {
     await prisma.$disconnect();
   });
 
-  describe('GET /api/projects/:projectId/ai/wizard', () => {
+  describe('GET /api/v1/projects/:projectId/ai/wizard', () => {
     it('should return null session for new project', async () => {
       const res = await request(app)
-        .get(`/api/projects/${projectId}/ai/wizard`)
+        .get(`/api/v1/projects/${projectId}/ai/wizard`)
         .set('Authorization', `Bearer ${accessToken}`);
 
       expect(res.status).toBe(200);
@@ -608,7 +608,7 @@ describe('AI Wizard Routes', () => {
 
     it('should return 404 for non-existent project', async () => {
       const res = await request(app)
-        .get('/api/projects/00000000-0000-0000-0000-000000000000/ai/wizard')
+        .get('/api/v1/projects/00000000-0000-0000-0000-000000000000/ai/wizard')
         .set('Authorization', `Bearer ${accessToken}`);
 
       expect(res.status).toBe(404);
@@ -616,7 +616,7 @@ describe('AI Wizard Routes', () => {
 
     it('should return 401 without auth token', async () => {
       const res = await request(app)
-        .get(`/api/projects/${projectId}/ai/wizard`);
+        .get(`/api/v1/projects/${projectId}/ai/wizard`);
 
       expect(res.status).toBe(401);
     });
@@ -626,11 +626,11 @@ describe('AI Wizard Routes', () => {
     it('should return 400 when AI is not configured', async () => {
       // Ensure no API key
       await request(app)
-        .delete('/api/ai/settings/key')
+        .delete('/api/v1/ai/settings/key')
         .set('Authorization', `Bearer ${accessToken}`);
 
       const res = await request(app)
-        .post(`/api/projects/${projectId}/ai/wizard/start`)
+        .post(`/api/v1/projects/${projectId}/ai/wizard/start`)
         .set('Authorization', `Bearer ${accessToken}`)
         .send({});
 
@@ -640,7 +640,7 @@ describe('AI Wizard Routes', () => {
 
     it('should return 404 for non-existent project', async () => {
       const res = await request(app)
-        .post('/api/projects/00000000-0000-0000-0000-000000000000/ai/wizard/start')
+        .post('/api/v1/projects/00000000-0000-0000-0000-000000000000/ai/wizard/start')
         .set('Authorization', `Bearer ${accessToken}`)
         .send({});
 
@@ -649,7 +649,7 @@ describe('AI Wizard Routes', () => {
 
     it('should return 401 without auth token', async () => {
       const res = await request(app)
-        .post(`/api/projects/${projectId}/ai/wizard/start`)
+        .post(`/api/v1/projects/${projectId}/ai/wizard/start`)
         .send({});
 
       expect(res.status).toBe(401);
@@ -659,7 +659,7 @@ describe('AI Wizard Routes', () => {
   describe('POST /api/projects/:projectId/ai/wizard/parameters', () => {
     it('should reject missing required fields', async () => {
       const res = await request(app)
-        .post(`/api/projects/${projectId}/ai/wizard/parameters`)
+        .post(`/api/v1/projects/${projectId}/ai/wizard/parameters`)
         .set('Authorization', `Bearer ${accessToken}`)
         .send({ answers: {} }); // missing projectType
 
@@ -669,17 +669,17 @@ describe('AI Wizard Routes', () => {
     it('should return 404 when no wizard session exists', async () => {
       // Clean any existing session
       await request(app)
-        .delete(`/api/projects/${projectId}/ai/wizard`)
+        .delete(`/api/v1/projects/${projectId}/ai/wizard`)
         .set('Authorization', `Bearer ${accessToken}`);
 
       // Ensure AI is configured with ollama (no key needed)
       await request(app)
-        .post('/api/ai/settings')
+        .post('/api/v1/ai/settings')
         .set('Authorization', `Bearer ${accessToken}`)
         .send({ provider: 'ollama', model: 'llama3.1:8b', baseUrl: 'http://host.docker.internal:11434' });
 
       const res = await request(app)
-        .post(`/api/projects/${projectId}/ai/wizard/parameters`)
+        .post(`/api/v1/projects/${projectId}/ai/wizard/parameters`)
         .set('Authorization', `Bearer ${accessToken}`)
         .send({ projectType: 'one shot', answers: { q1: 'Dark fantasy' } });
 
@@ -688,7 +688,7 @@ describe('AI Wizard Routes', () => {
 
     it('should return 401 without auth token', async () => {
       const res = await request(app)
-        .post(`/api/projects/${projectId}/ai/wizard/parameters`)
+        .post(`/api/v1/projects/${projectId}/ai/wizard/parameters`)
         .send({ projectType: 'one shot', answers: {} });
 
       expect(res.status).toBe(401);
@@ -740,7 +740,7 @@ describe('AI Wizard Routes', () => {
       });
 
       const res = await request(app)
-        .post(`/api/projects/${projectId}/ai/wizard/apply`)
+        .post(`/api/v1/projects/${projectId}/ai/wizard/apply`)
         .set('Authorization', `Bearer ${accessToken}`)
         .send({ sectionIds: ['section-1'] });
 
@@ -782,7 +782,7 @@ describe('AI Wizard Routes', () => {
 
     it('should reject empty sectionIds', async () => {
       const res = await request(app)
-        .post(`/api/projects/${projectId}/ai/wizard/apply`)
+        .post(`/api/v1/projects/${projectId}/ai/wizard/apply`)
         .set('Authorization', `Bearer ${accessToken}`)
         .send({ sectionIds: [] });
 
@@ -791,7 +791,7 @@ describe('AI Wizard Routes', () => {
 
     it('should return 404 when no wizard session exists', async () => {
       const res = await request(app)
-        .post(`/api/projects/${projectId}/ai/wizard/apply`)
+        .post(`/api/v1/projects/${projectId}/ai/wizard/apply`)
         .set('Authorization', `Bearer ${accessToken}`)
         .send({ sectionIds: ['section-1'] });
 
@@ -800,7 +800,7 @@ describe('AI Wizard Routes', () => {
 
     it('should return 401 without auth token', async () => {
       const res = await request(app)
-        .post(`/api/projects/${projectId}/ai/wizard/apply`)
+        .post(`/api/v1/projects/${projectId}/ai/wizard/apply`)
         .send({ sectionIds: ['section-1'] });
 
       expect(res.status).toBe(401);
@@ -810,7 +810,7 @@ describe('AI Wizard Routes', () => {
   describe('DELETE /api/projects/:projectId/ai/wizard', () => {
     it('should delete wizard session (or succeed even if none exists)', async () => {
       const res = await request(app)
-        .delete(`/api/projects/${projectId}/ai/wizard`)
+        .delete(`/api/v1/projects/${projectId}/ai/wizard`)
         .set('Authorization', `Bearer ${accessToken}`);
 
       expect(res.status).toBe(200);
@@ -819,7 +819,7 @@ describe('AI Wizard Routes', () => {
 
     it('should return 401 without auth token', async () => {
       const res = await request(app)
-        .delete(`/api/projects/${projectId}/ai/wizard`);
+        .delete(`/api/v1/projects/${projectId}/ai/wizard`);
 
       expect(res.status).toBe(401);
     });

@@ -93,6 +93,8 @@ export {
   type GraphInterruptResolutionAction,
   type GraphInterruptResolutionRequest,
   type GraphInterruptResolutionRequestBody,
+  V1GenerationTaskSchema,
+  type V1GenerationTask,
   V1GeneratedArtifactSchema,
   V1GeneratedArtifactDetailSchema,
   ArtifactEvaluationSchema,

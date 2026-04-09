@@ -39,7 +39,6 @@ Uploaded assets and generated export files are now stored in Google Cloud Storag
 The app still exposes the same authenticated routes:
 
 - `/uploads/:projectId/:filename`
-- `/api/export-jobs/:id/download`
 - `/api/v1/export-jobs/:jobId/download`
 
 That keeps auth and URL shape stable while removing the shared-disk dependency that Cloud Run cannot provide reliably.
@@ -55,15 +54,7 @@ PDF exports now use a split pipeline:
 `Project.content` is now a compatibility cache only. The authoritative publication state lives on `ProjectDocument.layoutPlan`, `canonicalDocJson`, `editorProjectionJson`, `typstSource`, and their version fields. Any document mutation should keep that publication bundle in sync and then rebuild the aggregate project content cache from ordered project documents.
 That includes AI wizard apply flows: they must merge against canonical project content and save back through the canonical project-content service instead of patching `Project.content` directly.
 Export creation now materializes `ProjectDocument` rows before queueing worker jobs. The worker still has a final monolithic `Project.content` fallback for older compatibility cases, but that path should not be the active source of truth.
-
-Legacy `/api/*` compatibility routes remain mounted, but they now advertise deprecation explicitly with:
-
-- `Deprecation: true`
-- `Sunset: Thu, 31 Dec 2026 23:59:59 GMT`
-- `Link: </api/v1/openapi.json>; rel="successor-version"`
-- `X-API-Compatibility: legacy`
-
-Use those headers to identify anything that still depends on the compatibility surface before removing it.
+Legacy product `/api/*` compatibility routes have been removed. Keep health and infra probes on `/api/health`, and use `/api/v1/*` for app traffic, smoke tests, and operator tooling.
 
 ## Invite-Only Registration
 

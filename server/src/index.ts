@@ -2,16 +2,9 @@ import express, { type Request, type Response, type NextFunction } from 'express
 import cors from 'cors';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
-import authRoutes from './routes/auth.js';
-import projectRoutes from './routes/projects.js';
-
 import { projectAssetRoutes, assetRoutes } from './routes/assets.js';
-import exportRoutes from './routes/exports.js';
 import templateRoutes from './routes/templates.js';
 import { aiSettingsRoutes, aiGenerateRoutes, aiChatRoutes, aiWizardRoutes } from './routes/ai.js';
-import generationRoutes from './routes/generation.js';
-import documentRoutes from './routes/documents.js';
-import agentRoutes from './routes/agent-runs.js';
 import v1AuthRoutes from './routes/v1/auth.js';
 import v1ProjectRoutes from './routes/v1/projects.js';
 import v1DocumentRoutes from './routes/v1/documents.js';
@@ -20,7 +13,6 @@ import v1RunRoutes from './routes/v1/runs.js';
 import v1SpecRoutes from './routes/v1/spec.js';
 import { publicRateLimit } from './middleware/ai-rate-limit.js';
 import { requireAuth, requireAuthOrRefreshCookie, type AuthRequest } from './middleware/auth.js';
-import { legacyApiCompatibility } from './middleware/legacy-api.js';
 import { buildProjectAssetUrl } from './services/asset-paths.service.js';
 import { openProjectAssetStream } from './services/object-storage.service.js';
 
@@ -85,7 +77,6 @@ app.get(['/api/health', '/api/v1/health'], publicRateLimit, (_req, res) => {
   res.json({ status: 'ok' });
 });
 
-app.use('/api/auth', legacyApiCompatibility, authRoutes);
 app.use('/api/v1/auth', v1AuthRoutes);
 app.use('/api/v1', v1SpecRoutes);
 app.use('/api/v1', v1ProjectRoutes);
@@ -95,20 +86,8 @@ app.use('/api/v1/ai', aiGenerateRoutes);
 app.use('/api/v1/projects/:projectId/assets', projectAssetRoutes);
 app.use('/api/v1/assets', assetRoutes);
 app.use('/api/v1/templates', templateRoutes);
-app.use('/api/projects', legacyApiCompatibility, projectRoutes);
-app.use('/api/projects/:projectId/assets', legacyApiCompatibility, projectAssetRoutes);
-app.use('/api/assets', legacyApiCompatibility, assetRoutes);
-app.use('/api', legacyApiCompatibility, exportRoutes);
-app.use('/api/templates', legacyApiCompatibility, templateRoutes);
-app.use('/api/ai', legacyApiCompatibility, aiSettingsRoutes);
-app.use('/api/ai', legacyApiCompatibility, aiGenerateRoutes);
 app.use('/api/v1/projects/:projectId', aiChatRoutes);
 app.use('/api/v1/projects/:projectId', aiWizardRoutes);
-app.use('/api/projects/:projectId', legacyApiCompatibility, aiChatRoutes);
-app.use('/api/projects/:projectId', legacyApiCompatibility, aiWizardRoutes);
-app.use('/api/projects/:projectId', legacyApiCompatibility, generationRoutes);
-app.use('/api/projects/:projectId', legacyApiCompatibility, agentRoutes);
-app.use('/api/projects/:projectId', legacyApiCompatibility, documentRoutes);
 app.use('/api/v1/projects/:projectId', v1DocumentRoutes);
 app.use('/api/v1/projects/:projectId', v1RunRoutes);
 

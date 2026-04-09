@@ -35,11 +35,11 @@ describe('Assets API', () => {
       },
     });
 
-    const res = await request(app).post('/api/auth/register').send(TEST_USER);
+    const res = await request(app).post('/api/v1/auth/register').send(TEST_USER);
     accessToken = res.body.accessToken;
 
     const projRes = await request(app)
-      .post('/api/projects')
+      .post('/api/v1/projects')
       .set('Authorization', `Bearer ${accessToken}`)
       .send({ title: 'Asset Test Project' });
     projectId = projRes.body.id;
@@ -59,7 +59,7 @@ describe('Assets API', () => {
   describe('POST /api/projects/:projectId/assets', () => {
     it('should reject request without file', async () => {
       const res = await request(app)
-        .post(`/api/projects/${projectId}/assets`)
+        .post(`/api/v1/projects/${projectId}/assets`)
         .set('Authorization', `Bearer ${accessToken}`);
 
       expect(res.status).toBe(400);
@@ -68,7 +68,7 @@ describe('Assets API', () => {
 
     it('should upload an image file', async () => {
       const res = await request(app)
-        .post(`/api/projects/${projectId}/assets`)
+        .post(`/api/v1/projects/${projectId}/assets`)
         .set('Authorization', `Bearer ${accessToken}`)
         .attach('file', VALID_PNG, {
           filename: 'test-image.png',
@@ -83,7 +83,7 @@ describe('Assets API', () => {
 
     it('should reject SVG uploads', async () => {
       const res = await request(app)
-        .post(`/api/projects/${projectId}/assets`)
+        .post(`/api/v1/projects/${projectId}/assets`)
         .set('Authorization', `Bearer ${accessToken}`)
         .attach('file', Buffer.from('<svg></svg>'), {
           filename: 'test.svg',
@@ -97,7 +97,7 @@ describe('Assets API', () => {
     it('should reject file with spoofed MIME type (magic bytes mismatch)', async () => {
       // Send HTML content but claim it is image/png
       const res = await request(app)
-        .post(`/api/projects/${projectId}/assets`)
+        .post(`/api/v1/projects/${projectId}/assets`)
         .set('Authorization', `Bearer ${accessToken}`)
         .attach('file', Buffer.from('<html>evil</html>'), {
           filename: 'evil.png',
@@ -110,7 +110,7 @@ describe('Assets API', () => {
 
     it('should return 404 for non-existent project', async () => {
       const res = await request(app)
-        .post('/api/projects/00000000-0000-0000-0000-000000000000/assets')
+        .post('/api/v1/projects/00000000-0000-0000-0000-000000000000/assets')
         .set('Authorization', `Bearer ${accessToken}`)
         .attach('file', VALID_PNG, {
           filename: 'test.png',
@@ -122,7 +122,7 @@ describe('Assets API', () => {
 
     it('should return 401 without auth token', async () => {
       const res = await request(app)
-        .post(`/api/projects/${projectId}/assets`);
+        .post(`/api/v1/projects/${projectId}/assets`);
 
       expect(res.status).toBe(401);
     });
@@ -144,7 +144,7 @@ describe('Assets API', () => {
   describe('GET /api/projects/:projectId/assets', () => {
     it('should list assets for a project', async () => {
       const res = await request(app)
-        .get(`/api/projects/${projectId}/assets`)
+        .get(`/api/v1/projects/${projectId}/assets`)
         .set('Authorization', `Bearer ${accessToken}`);
 
       expect(res.status).toBe(200);
@@ -154,7 +154,7 @@ describe('Assets API', () => {
 
     it('should return 404 for non-existent project', async () => {
       const res = await request(app)
-        .get('/api/projects/00000000-0000-0000-0000-000000000000/assets')
+        .get('/api/v1/projects/00000000-0000-0000-0000-000000000000/assets')
         .set('Authorization', `Bearer ${accessToken}`);
 
       expect(res.status).toBe(404);
@@ -162,7 +162,7 @@ describe('Assets API', () => {
 
     it('should return 401 without auth token', async () => {
       const res = await request(app)
-        .get(`/api/projects/${projectId}/assets`);
+        .get(`/api/v1/projects/${projectId}/assets`);
 
       expect(res.status).toBe(401);
     });
@@ -181,7 +181,7 @@ describe('Assets API', () => {
     it('should delete an asset', async () => {
       // First create an asset to delete
       const uploadRes = await request(app)
-        .post(`/api/projects/${projectId}/assets`)
+        .post(`/api/v1/projects/${projectId}/assets`)
         .set('Authorization', `Bearer ${accessToken}`)
         .attach('file', VALID_PNG, {
           filename: 'delete-me.png',
@@ -191,7 +191,7 @@ describe('Assets API', () => {
       const assetId = uploadRes.body.id;
 
       const res = await request(app)
-        .delete(`/api/assets/${assetId}`)
+        .delete(`/api/v1/assets/${assetId}`)
         .set('Authorization', `Bearer ${accessToken}`);
 
       expect(res.status).toBe(204);
@@ -199,7 +199,7 @@ describe('Assets API', () => {
 
     it('should return 404 for non-existent asset', async () => {
       const res = await request(app)
-        .delete('/api/assets/00000000-0000-0000-0000-000000000000')
+        .delete('/api/v1/assets/00000000-0000-0000-0000-000000000000')
         .set('Authorization', `Bearer ${accessToken}`);
 
       expect(res.status).toBe(404);
@@ -207,7 +207,7 @@ describe('Assets API', () => {
 
     it('should return 401 without auth token', async () => {
       const res = await request(app)
-        .delete('/api/assets/some-id');
+        .delete('/api/v1/assets/some-id');
 
       expect(res.status).toBe(401);
     });

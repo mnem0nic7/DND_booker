@@ -39,7 +39,8 @@ import type {
   PublicationDocumentDetail,
   PublicationDocumentPatchRequest,
   PublicationDocumentSummary,
-  PublicationDocumentTypst
+  PublicationDocumentTypst,
+  V1GenerationTask
 } from '@dnd-booker/shared';
 
 function buildPath(template: string, params?: Record<string, string | number | undefined>) {
@@ -82,6 +83,7 @@ export interface V1Client {
     cancelGenerationRun(params: GenerationRunIdParams, config?: AxiosRequestConfig): Promise<GenerationRun>;
     listGenerationRunInterrupts(params: GenerationRunIdParams, config?: AxiosRequestConfig): Promise<GraphInterrupt[]>;
     resolveGenerationRunInterrupt(params: GraphInterruptIdParams, body: GraphInterruptResolutionRequestBody, config?: AxiosRequestConfig): Promise<GraphInterrupt>;
+    listGenerationTasks(params: GenerationRunIdParams, config?: AxiosRequestConfig): Promise<V1GenerationTask[]>;
     listGenerationArtifacts(params: GenerationRunIdParams, config?: AxiosRequestConfig): Promise<GeneratedArtifact[]>;
     getGenerationArtifact(params: GenerationArtifactIdParams, config?: AxiosRequestConfig): Promise<GeneratedArtifact & { evaluations?: ArtifactEvaluation[] }>;
     listGenerationCanonEntities(params: GenerationRunIdParams, config?: AxiosRequestConfig): Promise<CanonEntity[]>;
@@ -219,6 +221,10 @@ export function createV1Client(axios: AxiosInstance): V1Client {
       },
       async resolveGenerationRunInterrupt(params: GraphInterruptIdParams, body: GraphInterruptResolutionRequestBody, config?: AxiosRequestConfig) {
         const { data } = await axios.post<GraphInterrupt>(buildPath('/v1/projects/{projectId}/generation-runs/{runId}/interrupts/{interruptId}/resolve', params as Record<string, string | number | undefined>), body, config);
+        return data;
+      },
+      async listGenerationTasks(params: GenerationRunIdParams, config?: AxiosRequestConfig) {
+        const { data } = await axios.get<V1GenerationTask[]>(buildPath('/v1/projects/{projectId}/generation-runs/{runId}/tasks', params as Record<string, string | number | undefined>), config);
         return data;
       },
       async listGenerationArtifacts(params: GenerationRunIdParams, config?: AxiosRequestConfig) {

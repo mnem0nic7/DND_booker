@@ -27,7 +27,7 @@ describe('Projects API v1', () => {
       },
     });
 
-    const res = await request(app).post('/api/auth/register').send(TEST_USER);
+    const res = await request(app).post('/api/v1/auth/register').send(TEST_USER);
     accessToken = res.body.accessToken;
   });
 

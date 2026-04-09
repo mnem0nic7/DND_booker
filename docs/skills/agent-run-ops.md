@@ -6,19 +6,16 @@ Use this skill when operating, debugging, or documenting the persistent agent ru
 
 ## Core Surface
 
-- `POST /api/projects/:projectId/ai/agent-runs`
-- `GET /api/projects/:projectId/ai/agent-runs`
-- `GET /api/projects/:projectId/ai/agent-runs/:runId`
-- `POST /api/projects/:projectId/ai/agent-runs/:runId/pause`
-- `POST /api/projects/:projectId/ai/agent-runs/:runId/resume`
-- `POST /api/projects/:projectId/ai/agent-runs/:runId/cancel`
-- `GET /api/projects/:projectId/ai/agent-runs/:runId/checkpoints`
-- `POST /api/projects/:projectId/ai/agent-runs/:runId/checkpoints/:checkpointId/restore`
-- `GET /api/projects/:projectId/ai/agent-runs/:runId/actions`
-- `GET /api/projects/:projectId/ai/agent-runs/:runId/stream`
-
-Current `api/v1` equivalents used by the shipped client:
-
+- `POST /api/v1/projects/:projectId/agent-runs`
+- `GET /api/v1/projects/:projectId/agent-runs`
+- `GET /api/v1/projects/:projectId/agent-runs/:runId`
+- `POST /api/v1/projects/:projectId/agent-runs/:runId/pause`
+- `POST /api/v1/projects/:projectId/agent-runs/:runId/resume`
+- `POST /api/v1/projects/:projectId/agent-runs/:runId/cancel`
+- `GET /api/v1/projects/:projectId/agent-runs/:runId/checkpoints`
+- `POST /api/v1/projects/:projectId/agent-runs/:runId/checkpoints/:checkpointId/restore`
+- `GET /api/v1/projects/:projectId/agent-runs/:runId/actions`
+- `GET /api/v1/projects/:projectId/agent-runs/:runId/events`
 - `GET /api/v1/projects/:projectId/interrupts`
 - `GET /api/v1/projects/:projectId/agent-runs/:runId/interrupts`
 - `POST /api/v1/projects/:projectId/agent-runs/:runId/interrupts/:interruptId/resolve`

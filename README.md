@@ -160,26 +160,31 @@ Built-in AI assistant powered by the Vercel AI SDK with support for **Anthropic 
 
 | Method | Path | Description |
 |--------|------|-------------|
-| POST | `/api/auth/register` | Create account |
-| POST | `/api/auth/login` | Login |
-| POST | `/api/auth/refresh` | Refresh JWT |
-| POST | `/api/auth/logout` | Logout |
-| GET/POST | `/api/projects` | List/create projects |
-| GET/PUT/DELETE | `/api/projects/:id` | Project CRUD |
-| GET/POST | `/api/projects/:id/documents` | List/create documents |
-| GET/PUT/DELETE | `/api/documents/:id` | Document CRUD |
-| POST | `/api/documents/reorder` | Reorder documents |
-| POST | `/api/projects/:id/export` | Start export job |
-| GET | `/api/export-jobs/:id` | Check export status |
-| GET | `/api/templates` | List templates |
-| GET/POST | `/api/projects/:id/assets` | List/upload assets |
-| DELETE | `/api/assets/:id` | Delete asset |
-| GET/POST | `/api/ai/settings` | Get/save AI provider settings |
-| DELETE | `/api/ai/settings/key` | Remove stored API key |
-| POST | `/api/ai/settings/validate` | Test API key against provider |
-| POST | `/api/ai/generate-block` | Generate block attrs with AI |
-| POST | `/api/ai/autofill` | Suggest values for empty fields |
-| GET/POST/DELETE | `/api/projects/:id/ai/chat` | AI chat history & streaming |
+| POST | `/api/v1/auth/register` | Create account |
+| POST | `/api/v1/auth/login` | Login |
+| POST | `/api/v1/auth/refresh` | Refresh JWT |
+| POST | `/api/v1/auth/logout` | Logout |
+| GET/POST | `/api/v1/projects` | List/create projects |
+| GET/PATCH/DELETE | `/api/v1/projects/:projectId` | Project CRUD and aggregate content/settings updates |
+| GET | `/api/v1/projects/:projectId/documents` | List project publication documents |
+| GET/PATCH | `/api/v1/projects/:projectId/documents/:docId` | Read/update publication document |
+| PATCH | `/api/v1/projects/:projectId/documents/:docId/layout` | Update document layout plan |
+| GET | `/api/v1/projects/:projectId/documents/:docId/canonical` | Read canonical Typst-oriented AST |
+| GET | `/api/v1/projects/:projectId/documents/:docId/editor-projection` | Read editor projection JSON |
+| GET | `/api/v1/projects/:projectId/documents/:docId/typst` | Read generated Typst source |
+| POST | `/api/v1/projects/:projectId/export-jobs` | Start export job |
+| GET | `/api/v1/projects/:projectId/export-jobs` | List export jobs for a project |
+| GET | `/api/v1/export-jobs/:jobId` | Check export status |
+| GET | `/api/v1/export-jobs/:jobId/download` | Download completed export |
+| GET | `/api/v1/templates` | List templates |
+| GET/POST | `/api/v1/projects/:projectId/assets` | List/upload assets |
+| DELETE | `/api/v1/assets/:id` | Delete asset |
+| GET/POST | `/api/v1/ai/settings` | Get/save AI provider settings |
+| DELETE | `/api/v1/ai/settings/key` | Remove stored API key |
+| POST | `/api/v1/ai/settings/validate` | Test API key against provider |
+| POST | `/api/v1/ai/generate-block` | Generate block attrs with AI |
+| POST | `/api/v1/ai/autofill` | Suggest values for empty fields |
+| GET/POST/DELETE | `/api/v1/projects/:projectId/ai/chat` | AI chat history & streaming |
 
 ## Environment Variables
 
