@@ -65,6 +65,7 @@ Project aggregate content saves also go through `PATCH /api/v1/projects/:project
 `api/v1` document snapshots now carry `layoutPlan` alongside canonical/editor/Typst fields. Client document loads should consume that v1 snapshot rather than stitching layout data from legacy document routes.
 Active client AI/chat/wizard traffic should use `/api/v1/ai/*` and `/api/v1/projects/:projectId/ai/*`. Keep the legacy `/api/ai/*` and `/api/projects/:projectId/ai/*` mounts compatibility-only.
 Active template and asset traffic should use `/api/v1/templates`, `/api/v1/projects/:projectId/assets`, and `/api/v1/assets/:id`. Keep the legacy template and asset mounts compatibility-only.
+Legacy compatibility routes now emit `Deprecation: true`, `Sunset`, `Link: </api/v1/openapi.json>; rel="successor-version"`, and `X-API-Compatibility: legacy`. Treat those headers as the contract boundary for anything still mounted under `/api/*`.
 
 ### SSE streaming
 Server uses `res.write()` chunks. Chat streams plain text; wizard streams newline-delimited JSON events. Client uses raw `fetch()` + `ReadableStream` reader (not EventSource) to support POST with body.
@@ -92,8 +93,10 @@ When reapplying accepted art placements after document rebuilds, do not trust st
 
 Any server-side `ProjectDocument` mutation that changes document body content should update `content`, `canonicalDocJson`, `editorProjectionJson`, and `typstSource` together. Prefer `buildResolvedPublicationDocumentWriteData(...)` in `server/src/services/document-publication.service.ts` instead of hand-written `projectDocument.update()` payloads.
 After any `ProjectDocument` mutation, rebuild `Project.content` from ordered project documents. `Project.content` is now a compatibility cache, not an authoritative source.
+AI wizard apply now counts as a canonical document mutation. Do not append directly into `Project.content`; route it through `saveCanonicalProjectContent(...)` so publication fields and document splits stay synchronized.
 
 PDF export now keeps the HTML/Playwright measurement pass for preflight and review, but the final production PDF render is Typst-based. Typst workspaces must stage referenced `uploads/...` assets explicitly because production uploads live in GCS, not a shared local disk.
+Export job creation should materialize `ProjectDocument` rows before queueing work. The worker's monolithic `Project.content` fallback is defensive compatibility-only, not an active runtime source of truth.
 
 ### Persisted run graphs
 Generation runs and agent runs now checkpoint the current graph node into `graphStateJson.runtime`. BullMQ retries should resume from that node instead of replaying the whole orchestration function.
@@ -153,7 +156,7 @@ Unless the user explicitly says not to, treat this as the default after every co
    - `npm run verify:ship` for the normal shippable path.
    - `npm run verify` is the lighter build-only pass when you explicitly do not need the full ship checks.
    - If cloud-backed server integration is unavailable, record the exact blocker instead of silently skipping it.
-   - `verify:ship` now includes auth, AI, asset, template, document, project, run, agent restore, and generation-route coverage through the local Cloud SQL Proxy + Redis harness; keep new `api/v1` route regressions in that path when they touch transport serialization or run orchestration APIs.
+   - `verify:ship` now includes auth, AI, wizard apply, asset, template, document, v1 export, legacy-compatibility header, project, run, agent restore, and generation-route coverage through the local Cloud SQL Proxy + Redis harness; keep new `api/v1` route regressions in that path when they touch transport serialization or run orchestration APIs.
 3. Update repo memory and docs when behavior, workflow, deployment steps, or architecture changed.
    - Memory: this file and any other standing repo guidance.
    - Docs: `README.md`, `deploy/cloudrun/README.md`, `docs/runbooks/cloudrun-web-worker.md`, or the closest feature/runbook doc.

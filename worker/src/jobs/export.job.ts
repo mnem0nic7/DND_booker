@@ -431,7 +431,8 @@ export async function processExportJob(job: Job<ExportJobData>): Promise<void> {
 
     const theme = (exportJob.project.settings as Record<string, unknown>)?.theme as string || 'classic-parchment';
 
-    // Use per-chapter ProjectDocuments when available, fall back to monolithic Project.content
+    // Active runtime flows should materialize ProjectDocuments before queueing export jobs.
+    // Keep the monolithic Project.content fallback only for defensive compatibility with older data.
     const projectDocuments = await prisma.projectDocument.findMany({
       where: { projectId: exportJob.projectId },
       orderBy: { sortOrder: 'asc' },
@@ -446,6 +447,10 @@ export async function processExportJob(job: Job<ExportJobData>): Promise<void> {
         layoutPlan: true,
       },
     });
+
+    if (projectDocuments.length === 0) {
+      console.warn(`[export.job] Project ${exportJob.projectId} has no ProjectDocuments; using legacy content fallback.`);
+    }
 
     const rawDocs = projectDocuments.length > 0
       ? projectDocuments.map(doc => ({

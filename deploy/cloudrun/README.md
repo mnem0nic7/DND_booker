@@ -53,6 +53,17 @@ PDF exports now use a split pipeline:
 - referenced `uploads/...` assets are staged into a temporary Typst workspace before compilation so the export path works with GCS-backed production storage as well as local disk
 
 `Project.content` is now a compatibility cache only. The authoritative publication state lives on `ProjectDocument.layoutPlan`, `canonicalDocJson`, `editorProjectionJson`, `typstSource`, and their version fields. Any document mutation should keep that publication bundle in sync and then rebuild the aggregate project content cache from ordered project documents.
+That includes AI wizard apply flows: they must merge against canonical project content and save back through the canonical project-content service instead of patching `Project.content` directly.
+Export creation now materializes `ProjectDocument` rows before queueing worker jobs. The worker still has a final monolithic `Project.content` fallback for older compatibility cases, but that path should not be the active source of truth.
+
+Legacy `/api/*` compatibility routes remain mounted, but they now advertise deprecation explicitly with:
+
+- `Deprecation: true`
+- `Sunset: Thu, 31 Dec 2026 23:59:59 GMT`
+- `Link: </api/v1/openapi.json>; rel="successor-version"`
+- `X-API-Compatibility: legacy`
+
+Use those headers to identify anything that still depends on the compatibility surface before removing it.
 
 ## Invite-Only Registration
 

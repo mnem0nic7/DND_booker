@@ -11,6 +11,7 @@ import {
 import { getSupportedBlockTypes } from './ai-content.service.js';
 import { normalizeGeneratedMarkdown } from './generation/markdown-normalizer.js';
 import { parseJsonResponse } from './generation/parse-json.js';
+import { getCanonicalProjectContent, saveCanonicalProjectContent } from './project-document-content.service.js';
 
 // ── Session CRUD ────────────────────────────────────────────────
 
@@ -1258,6 +1259,7 @@ export function summarizeSection(markdown: string): string {
 
 export async function applyToProject(
   projectId: string,
+  userId: string,
   sections: WizardGeneratedSection[],
   selectedSectionIds: string[],
 ) {
@@ -1283,24 +1285,28 @@ export async function applyToProject(
 
   if (newNodes.length === 0) return null;
 
-  // Append to existing project content
-  const project = await prisma.project.findUnique({
-    where: { id: projectId },
-    select: { content: true },
-  });
-
-  const existing = project?.content as { type?: string; content?: object[] } | null;
-  const existingNodes = existing?.content ?? [];
+  const snapshot = await getCanonicalProjectContent(projectId, userId);
+  if (!snapshot) return null;
+  const existingNodes = snapshot.content.content ?? [];
 
   // Add a pageBreak before the new content if there's existing content
   const mergedNodes = existingNodes.length > 0
     ? [...existingNodes, { type: 'pageBreak' }, ...newNodes]
     : newNodes;
 
-  return prisma.project.update({
-    where: { id: projectId },
-    data: {
-      content: { type: 'doc', content: mergedNodes },
-    },
-  });
+  const saveResult = await saveCanonicalProjectContent(
+    projectId,
+    userId,
+    { type: 'doc', content: mergedNodes },
+    snapshot.updatedAt.toISOString(),
+  );
+  if (saveResult.status !== 'success') {
+    return null;
+  }
+
+  return {
+    ...saveResult.project,
+    content: saveResult.content,
+    updatedAt: saveResult.updatedAt,
+  };
 }

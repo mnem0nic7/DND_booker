@@ -546,6 +546,7 @@ const TEST_USER = {
 
 let accessToken: string;
 let projectId: string;
+let testUserId: string;
 
 describe('AI Wizard Routes', () => {
   beforeAll(async () => {
@@ -570,6 +571,8 @@ describe('AI Wizard Routes', () => {
 
     const res = await request(app).post('/api/auth/register').send(TEST_USER);
     accessToken = res.body.accessToken;
+    const user = await prisma.user.findUniqueOrThrow({ where: { email: TEST_USER.email } });
+    testUserId = user.id;
 
     const projRes = await request(app)
       .post('/api/projects')
@@ -693,6 +696,90 @@ describe('AI Wizard Routes', () => {
   });
 
   describe('POST /api/projects/:projectId/ai/wizard/apply', () => {
+    it('should apply completed sections through the canonical publication pipeline', async () => {
+      await prisma.aiWizardSession.upsert({
+        where: { projectId_userId: { projectId, userId: testUserId } },
+        create: {
+          projectId,
+          userId: testUserId,
+          phase: 'review',
+          sections: [
+            {
+              sectionId: 'section-1',
+              title: 'Wizard Hook',
+              markdown: '## Wizard Hook\n\nThe story turns.',
+              status: 'completed',
+              content: {
+                type: 'doc',
+                content: [
+                  { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'Wizard Hook' }] },
+                  { type: 'paragraph', content: [{ type: 'text', text: 'The story turns.' }] },
+                ],
+              },
+            },
+          ],
+        },
+        update: {
+          phase: 'review',
+          sections: [
+            {
+              sectionId: 'section-1',
+              title: 'Wizard Hook',
+              markdown: '## Wizard Hook\n\nThe story turns.',
+              status: 'completed',
+              content: {
+                type: 'doc',
+                content: [
+                  { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'Wizard Hook' }] },
+                  { type: 'paragraph', content: [{ type: 'text', text: 'The story turns.' }] },
+                ],
+              },
+            },
+          ],
+        },
+      });
+
+      const res = await request(app)
+        .post(`/api/projects/${projectId}/ai/wizard/apply`)
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({ sectionIds: ['section-1'] });
+
+      expect(res.status).toBe(200);
+      expect(JSON.stringify(res.body.project?.content ?? null)).toContain('Wizard Hook');
+
+      const documents = await prisma.projectDocument.findMany({
+        where: { projectId },
+        orderBy: { sortOrder: 'asc' },
+      });
+      expect(documents.length).toBeGreaterThan(0);
+      expect(documents.some((document) => JSON.stringify(document.content).includes('Wizard Hook'))).toBe(true);
+      expect(documents.some((document) => JSON.stringify(document.canonicalDocJson).includes('Wizard Hook'))).toBe(true);
+      expect(documents.some((document) => JSON.stringify(document.editorProjectionJson).includes('Wizard Hook'))).toBe(true);
+      expect(documents.some((document) => (document.typstSource ?? '').includes('Wizard Hook'))).toBe(true);
+
+      const updatedProject = await prisma.project.findUniqueOrThrow({ where: { id: projectId } });
+      expect(JSON.stringify(updatedProject.content)).toContain('Wizard Hook');
+
+      const session = await prisma.aiWizardSession.findUniqueOrThrow({
+        where: {
+          projectId_userId: {
+            projectId,
+            userId: updatedProject.userId,
+          },
+        },
+      });
+      expect(session.phase).toBe('done');
+
+      await prisma.aiWizardSession.delete({
+        where: {
+          projectId_userId: {
+            projectId,
+            userId: updatedProject.userId,
+          },
+        },
+      });
+    });
+
     it('should reject empty sectionIds', async () => {
       const res = await request(app)
         .post(`/api/projects/${projectId}/ai/wizard/apply`)

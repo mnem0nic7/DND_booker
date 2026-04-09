@@ -4,6 +4,7 @@ import type { ExportJob as PrismaExportJob } from '@prisma/client';
 import { prisma } from '../config/database.js';
 import { redis } from '../config/redis.js';
 import { applySafeExportReviewFixes } from './export-fix.service.js';
+import { ensureProjectDocuments } from './project-document-bootstrap.service.js';
 import { resolveQueueDispatchOptions, type QueueDispatchOverrides } from './queue/config.js';
 
 const exportQueue = new Queue('export', { connection: redis as unknown as ConnectionOptions });
@@ -16,6 +17,7 @@ export async function createExportJob(
 ) {
   const project = await prisma.project.findFirst({ where: { id: projectId, userId } });
   if (!project) return null;
+  await ensureProjectDocuments(projectId, userId);
 
   const job = await prisma.exportJob.create({
     data: { projectId, userId, format },

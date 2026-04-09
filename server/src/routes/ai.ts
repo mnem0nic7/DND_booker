@@ -1095,7 +1095,11 @@ aiWizardRoutes.post('/ai/wizard/apply', validateUuid('projectId'), asyncHandler(
   const sections = (session.sections ?? []) as unknown as WizardGeneratedSection[];
 
   try {
-    const updatedProject = await aiWizard.applyToProject(projectId, sections, parsed.data.sectionIds);
+    const updatedProject = await aiWizard.applyToProject(projectId, req.userId!, sections, parsed.data.sectionIds);
+    if (!updatedProject) {
+      res.status(404).json({ error: 'Project not found' });
+      return;
+    }
 
     // Mark wizard as done
     await aiWizard.updateSession(session.id, { phase: 'done' });
