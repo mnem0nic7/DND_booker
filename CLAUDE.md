@@ -97,6 +97,7 @@ AI wizard apply now counts as a canonical document mutation. Do not append direc
 
 PDF export now keeps the HTML/Playwright measurement pass for preflight and review, but the final production PDF render is Typst-based. Typst workspaces must stage referenced `uploads/...` assets explicitly because production uploads live in GCS, not a shared local disk.
 Export job creation should materialize `ProjectDocument` rows before queueing work. The worker's monolithic `Project.content` fallback is defensive compatibility-only, not an active runtime source of truth.
+Canon expansion now uses schema-native `generateObject(...)` output instead of `generateText(...)` plus ad hoc JSON repair. Keep that node on structured output so preview-model JSON quirks do not stall generation retries.
 
 ### Persisted run graphs
 Generation runs and agent runs now checkpoint the current graph node into `graphStateJson.runtime`. BullMQ retries should resume from that node instead of replaying the whole orchestration function.
@@ -156,7 +157,7 @@ Unless the user explicitly says not to, treat this as the default after every co
    - `npm run verify:ship` for the normal shippable path.
    - `npm run verify` is the lighter build-only pass when you explicitly do not need the full ship checks.
    - If cloud-backed server integration is unavailable, record the exact blocker instead of silently skipping it.
-   - `verify:ship` now includes auth, AI, wizard apply, asset, template, document, v1 export, legacy-compatibility header, project, run, agent restore, and generation-route coverage through the local Cloud SQL Proxy + Redis harness; keep new `api/v1` route regressions in that path when they touch transport serialization or run orchestration APIs.
+   - `verify:ship` now includes auth, AI, wizard apply, asset, template, document, v1 export, legacy-compatibility header, canon expansion, project, run, agent restore, and generation-route coverage through the local Cloud SQL Proxy + Redis harness; keep new `api/v1` route regressions in that path when they touch transport serialization or run orchestration APIs.
 3. Update repo memory and docs when behavior, workflow, deployment steps, or architecture changed.
    - Memory: this file and any other standing repo guidance.
    - Docs: `README.md`, `deploy/cloudrun/README.md`, `docs/runbooks/cloudrun-web-worker.md`, or the closest feature/runbook doc.

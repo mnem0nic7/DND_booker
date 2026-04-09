@@ -23,7 +23,7 @@ Do not stop after code edits unless the user explicitly says not to ship.
 - `npm run verify:ship` means:
   - `npm run verify`
   - `npm run test:unit --workspace=client`
-  - `npm run test:server:local -- auth.test.ts ai-routes.test.ts ai-wizard.test.ts assets.test.ts templates.test.ts documents.v1.test.ts projects.v1.test.ts runs.v1.test.ts agent-runs.test.ts src/__tests__/exports.v1.test.ts src/__tests__/legacy-routes.test.ts src/__tests__/generation/routes.test.ts`
+  - `npm run test:server:local -- auth.test.ts ai-routes.test.ts ai-wizard.test.ts assets.test.ts templates.test.ts documents.v1.test.ts projects.v1.test.ts runs.v1.test.ts agent-runs.test.ts src/__tests__/exports.v1.test.ts src/__tests__/legacy-routes.test.ts src/__tests__/generation/canon.test.ts src/__tests__/generation/routes.test.ts`
 - when `api/v1` routes validate responses against schemas with ISO timestamps, normalize transport DTOs before schema parsing instead of feeding raw Prisma rows directly into the validator
 - keep list endpoints on summary schemas and detail endpoints on detail schemas; summary payloads should never be parsed with full-detail contracts
 - when project lifecycle work changes, prefer `/api/v1/projects` plus the generated SDK over the legacy `/api/projects` routes
@@ -35,6 +35,7 @@ Do not stop after code edits unless the user explicitly says not to ship.
 - after any document mutation, rebuild `Project.content` from ordered `ProjectDocument[]`; it is a compatibility cache, not the source of truth
 - AI wizard apply and similar section-assembly flows count as document mutations; they should merge against canonical project content and save back through the canonical project-content service instead of updating `Project.content` directly
 - export creation should ensure `ProjectDocument` rows exist before queueing worker jobs; keep `Project.content` fallbacks as defensive compatibility only
+- generation nodes that already have strong Zod schemas, like canon expansion, should prefer schema-native `generateObject(...)` over `generateText(...)` plus post-parse repair
 - when the local server integration test depends on Cloud SQL access, record the exact GCP blocker if it cannot run
 - remove accidental compiled artifacts from source directories before commit
 - if infrastructure blocks a test or deploy, record the exact blocker

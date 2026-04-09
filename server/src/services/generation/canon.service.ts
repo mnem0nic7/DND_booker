@@ -11,13 +11,12 @@ import type {
 } from '@dnd-booker/shared';
 import { prisma } from '../../config/database.js';
 import { publishGenerationEvent } from './pubsub.service.js';
-import { parseJsonResponse } from './parse-json.js';
 import { buildNpcDossierSystemPrompt, buildNpcDossierUserPrompt } from './prompts/npc-dossier.prompt.js';
 import { buildLocationBriefSystemPrompt, buildLocationBriefUserPrompt } from './prompts/location-brief.prompt.js';
 import { buildFactionProfileSystemPrompt, buildFactionProfileUserPrompt } from './prompts/faction-profile.prompt.js';
 import { buildEncounterBundleSystemPrompt, buildEncounterBundleUserPrompt } from './prompts/encounter-bundle.prompt.js';
 import { buildItemBundleSystemPrompt, buildItemBundleUserPrompt } from './prompts/item-bundle.prompt.js';
-import { generateTextWithTimeout } from './model-timeouts.js';
+import { generateObjectWithTimeout } from './model-timeouts.js';
 
 // ---------- Zod Schemas ----------
 
@@ -182,12 +181,11 @@ export async function expandCanonEntity(
   const system = config.buildSystem();
   const prompt = config.buildUser(entitySeed, bible);
 
-  const { text, usage } = await generateTextWithTimeout(`Canon expansion for ${entity.canonicalName}`, {
+  const { object, usage } = await generateObjectWithTimeout(`Canon expansion for ${entity.canonicalName}`, {
     model, system, prompt, maxOutputTokens,
+    schema: config.schema,
   });
-
-  const parsed = parseJsonResponse(text);
-  const validated = config.schema.parse(parsed);
+  const validated = config.schema.parse(object);
 
   const totalTokens = (usage?.inputTokens ?? 0) + (usage?.outputTokens ?? 0);
 

@@ -1,15 +1,15 @@
 import { describe, it, expect, beforeAll, afterAll, vi, beforeEach } from 'vitest';
-import { generateText } from 'ai';
+import { generateObject } from 'ai';
 import type { BibleContent, NpcDossier, LocationBrief, ItemBundle } from '@dnd-booker/shared';
 import { prisma } from '../../config/database.js';
 import { expandCanonEntity, expandAllCanonEntities } from '../../services/generation/canon.service.js';
 import { createRun } from '../../services/generation/run.service.js';
 
-vi.mock('ai', () => ({ generateText: vi.fn() }));
+vi.mock('ai', () => ({ generateObject: vi.fn(), generateText: vi.fn() }));
 vi.mock('../../services/generation/pubsub.service.js', () => ({
   publishGenerationEvent: vi.fn(),
 }));
-const mockGenerateText = vi.mocked(generateText);
+const mockGenerateObject = vi.mocked(generateObject);
 
 let testUser: { id: string };
 let testProject: { id: string };
@@ -149,8 +149,8 @@ beforeEach(() => {
 
 describe('Canon Service — expandCanonEntity', () => {
   it('should create an npc_dossier artifact for an NPC entity', async () => {
-    mockGenerateText.mockResolvedValueOnce({
-      text: JSON.stringify(VALID_NPC_DOSSIER),
+    mockGenerateObject.mockResolvedValueOnce({
+      object: VALID_NPC_DOSSIER,
       usage: { inputTokens: 800, outputTokens: 1200 },
     } as any);
 
@@ -193,8 +193,8 @@ describe('Canon Service — expandCanonEntity', () => {
   });
 
   it('should create a CanonReference linking entity to artifact', async () => {
-    mockGenerateText.mockResolvedValueOnce({
-      text: JSON.stringify(VALID_NPC_DOSSIER),
+    mockGenerateObject.mockResolvedValueOnce({
+      object: VALID_NPC_DOSSIER,
       usage: { inputTokens: 800, outputTokens: 1200 },
     } as any);
 
@@ -234,8 +234,8 @@ describe('Canon Service — expandCanonEntity', () => {
   });
 
   it('should update the entity canonicalData with enriched details', async () => {
-    mockGenerateText.mockResolvedValueOnce({
-      text: JSON.stringify(VALID_NPC_DOSSIER),
+    mockGenerateObject.mockResolvedValueOnce({
+      object: VALID_NPC_DOSSIER,
       usage: { inputTokens: 800, outputTokens: 1200 },
     } as any);
 
@@ -274,8 +274,8 @@ describe('Canon Service — expandCanonEntity', () => {
   });
 
   it('should create a location_brief artifact for a location entity', async () => {
-    mockGenerateText.mockResolvedValueOnce({
-      text: JSON.stringify(VALID_LOCATION_BRIEF),
+    mockGenerateObject.mockResolvedValueOnce({
+      object: VALID_LOCATION_BRIEF,
       usage: { inputTokens: 600, outputTokens: 1000 },
     } as any);
 
@@ -333,10 +333,9 @@ describe('Canon Service — expandCanonEntity', () => {
   });
 
   it('should throw on malformed AI response', async () => {
-    mockGenerateText.mockResolvedValueOnce({
-      text: 'Not valid JSON',
-      usage: { inputTokens: 100, outputTokens: 50 },
-    } as any);
+    mockGenerateObject.mockRejectedValueOnce(
+      new Error('Failed to parse AI JSON response: malformed object'),
+    );
 
     const run = await createRun({
       projectId: testProject.id,
@@ -370,8 +369,8 @@ describe('Canon Service — expandCanonEntity', () => {
   });
 
   it('should update run token count', async () => {
-    mockGenerateText.mockResolvedValueOnce({
-      text: JSON.stringify(VALID_NPC_DOSSIER),
+    mockGenerateObject.mockResolvedValueOnce({
+      object: VALID_NPC_DOSSIER,
       usage: { inputTokens: 800, outputTokens: 1200 },
     } as any);
 
@@ -410,10 +409,10 @@ describe('Canon Service — expandCanonEntity', () => {
 
 describe('Canon Service — expandAllCanonEntities', () => {
   it('should expand all entities and return results', async () => {
-    mockGenerateText
-      .mockResolvedValueOnce({ text: JSON.stringify(VALID_NPC_DOSSIER), usage: { inputTokens: 800, outputTokens: 1200 } } as any)
-      .mockResolvedValueOnce({ text: JSON.stringify(VALID_LOCATION_BRIEF), usage: { inputTokens: 600, outputTokens: 1000 } } as any)
-      .mockResolvedValueOnce({ text: JSON.stringify(VALID_ITEM_BUNDLE), usage: { inputTokens: 400, outputTokens: 600 } } as any);
+    mockGenerateObject
+      .mockResolvedValueOnce({ object: VALID_NPC_DOSSIER, usage: { inputTokens: 800, outputTokens: 1200 } } as any)
+      .mockResolvedValueOnce({ object: VALID_LOCATION_BRIEF, usage: { inputTokens: 600, outputTokens: 1000 } } as any)
+      .mockResolvedValueOnce({ object: VALID_ITEM_BUNDLE, usage: { inputTokens: 400, outputTokens: 600 } } as any);
 
     const run = await createRun({
       projectId: testProject.id,
@@ -448,12 +447,12 @@ describe('Canon Service — expandAllCanonEntities', () => {
 
     expect(results.length).toBe(3);
     expect(results.map((r) => r.artifactType).sort()).toEqual(['item_bundle', 'location_brief', 'npc_dossier']);
-    expect(mockGenerateText).toHaveBeenCalledTimes(3);
+    expect(mockGenerateObject).toHaveBeenCalledTimes(3);
   });
 
   it('should skip entities with no matching bible seed', async () => {
-    mockGenerateText.mockResolvedValueOnce({
-      text: JSON.stringify(VALID_NPC_DOSSIER),
+    mockGenerateObject.mockResolvedValueOnce({
+      object: VALID_NPC_DOSSIER,
       usage: { inputTokens: 800, outputTokens: 1200 },
     } as any);
 
@@ -502,6 +501,6 @@ describe('Canon Service — expandAllCanonEntities', () => {
 
     expect(results.length).toBe(1);
     expect(results[0].entitySlug).toBe('chief-gnarltooth');
-    expect(mockGenerateText).toHaveBeenCalledTimes(1);
+    expect(mockGenerateObject).toHaveBeenCalledTimes(1);
   });
 });

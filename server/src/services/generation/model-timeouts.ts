@@ -1,4 +1,4 @@
-import { generateText } from 'ai';
+import { generateObject, generateText } from 'ai';
 
 const DEFAULT_GENERATION_TEXT_TIMEOUT_MS = 240_000;
 const DEFAULT_GENERATION_TEXT_ATTEMPTS = 2;
@@ -62,6 +62,31 @@ export async function generateTextWithTimeout(
   for (let attempt = 1; attempt <= DEFAULT_GENERATION_TEXT_ATTEMPTS; attempt += 1) {
     try {
       return await withHardTextTimeout(label, timeoutMs, async (signal) => generateText({
+        ...options,
+        abortSignal: signal,
+      }));
+    } catch (error) {
+      lastError = error;
+      if (!isAbortLikeError(error) || attempt >= DEFAULT_GENERATION_TEXT_ATTEMPTS) {
+        throw error;
+      }
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error(`${label} failed`);
+}
+
+export async function generateObjectWithTimeout(
+  label: string,
+  options: Parameters<typeof generateObject>[0],
+  fallbackMs = DEFAULT_GENERATION_TEXT_TIMEOUT_MS,
+): Promise<any> {
+  const timeoutMs = resolveTimeoutMs(fallbackMs);
+  let lastError: unknown = null;
+
+  for (let attempt = 1; attempt <= DEFAULT_GENERATION_TEXT_ATTEMPTS; attempt += 1) {
+    try {
+      return await withHardTextTimeout(label, timeoutMs, async (signal) => generateObject({
         ...options,
         abortSignal: signal,
       }));
