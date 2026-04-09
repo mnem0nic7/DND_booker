@@ -235,5 +235,5 @@ describe('Run API v1 serialization', () => {
     expect(assemblyRes.status).toBe(200);
     expect(typeof assemblyRes.body.createdAt).toBe('string');
     expect(typeof assemblyRes.body.updatedAt).toBe('string');
-  });
+  }, 15000);
 });

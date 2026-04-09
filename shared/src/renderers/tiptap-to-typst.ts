@@ -10,6 +10,8 @@
  */
 
 import type { DocumentContent } from '../types/document';
+import type { LayoutPlan, LayoutFlowFragment, LayoutFlowUnit, ResolveLayoutPlanOptions } from '../types/layout-plan.js';
+import { compileFlowModel } from '../layout-plan.js';
 import {
   escapeTypst,
   escapeTypstUrl,
@@ -21,6 +23,7 @@ import {
 } from './utils.js';
 
 type TipTapNode = DocumentContent;
+type WrapRenderSide = 'start' | 'end';
 
 interface NameDesc {
   name: string;
@@ -29,6 +32,25 @@ interface NameDesc {
   description?: string;
   desc?: string;
 }
+
+export interface TipTapToTypstOptions {
+  layoutPlan?: LayoutPlan | null;
+  documentKind?: string | null;
+  documentTitle?: string | null;
+}
+
+const WRAP_NODE_TYPES = new Set([
+  'readAloudBox',
+  'sidebarCallout',
+  'magicItem',
+  'spellCard',
+  'classFeature',
+  'raceBlock',
+  'npcProfile',
+  'randomTable',
+  'encounterTable',
+  'statBlock',
+]);
 
 // ── Helper Functions ──
 
@@ -127,6 +149,101 @@ function renderMarks(text: string, marks?: TipTapNode['marks']): string {
 function renderChildren(nodes?: TipTapNode[]): string {
   if (!nodes || nodes.length === 0) return '';
   return nodes.map((node) => renderTypstNodeImpl(node)).join('');
+}
+
+function indentTypst(value: string, spaces = 2): string {
+  const indent = ' '.repeat(spaces);
+  return value
+    .split('\n')
+    .map((line) => (line.trim().length > 0 ? `${indent}${line}` : line))
+    .join('\n');
+}
+
+function isWrapAnchorFragment(fragment: Pick<LayoutFlowFragment, 'nodeType'>): boolean {
+  return WRAP_NODE_TYPES.has(fragment.nodeType);
+}
+
+function getWrapClusterFragments(
+  unit: LayoutFlowUnit,
+  fragments: LayoutFlowFragment[],
+): {
+  prefix: LayoutFlowFragment[];
+  anchor: LayoutFlowFragment | null;
+  suffix: LayoutFlowFragment[];
+} {
+  const ordered = fragments
+    .filter((fragment) => unit.fragmentNodeIds.includes(fragment.nodeId))
+    .sort((left, right) => left.presentationOrder - right.presentationOrder);
+  const anchorIndex = ordered.findIndex((fragment) => isWrapAnchorFragment(fragment));
+  if (anchorIndex === -1) {
+    return {
+      prefix: ordered,
+      anchor: null,
+      suffix: [],
+    };
+  }
+
+  return {
+    prefix: ordered.slice(0, anchorIndex),
+    anchor: ordered[anchorIndex] ?? null,
+    suffix: ordered.slice(anchorIndex + 1),
+  };
+}
+
+function renderTypstWrapBlock(
+  side: WrapRenderSide,
+  widthRatio: number | null | undefined,
+  insertMarkup: string,
+  bodyMarkup: string,
+): string {
+  const widthPercent = Math.max(24, Math.min(42, Math.round((widthRatio ?? 0.38) * 100)));
+  return `#booker-wrap-${side}([\n${indentTypst(insertMarkup)}\n], [\n${indentTypst(bodyMarkup)}\n], width: ${widthPercent}%)\n\n`;
+}
+
+function renderDocumentChildrenWithFlow(
+  doc: TipTapNode,
+  options: TipTapToTypstOptions,
+): string {
+  const resolved = compileFlowModel(
+    doc,
+    options.layoutPlan ?? null,
+    'standard_pdf',
+    {
+      documentKind: options.documentKind ?? null,
+      documentTitle: options.documentTitle ?? null,
+      respectManualPageBreaks: true,
+    } satisfies ResolveLayoutPlanOptions,
+  );
+
+  return resolved.flow.units.map((unit) => {
+    const split = getWrapClusterFragments(unit, resolved.flow.fragments);
+    const prefixMarkup = split.prefix.map((fragment) => renderTypstNodeImpl(fragment.content)).join('');
+    const fullMarkup = [
+      ...split.prefix,
+      ...(split.anchor ? [split.anchor] : []),
+      ...split.suffix,
+    ].map((fragment) => renderTypstNodeImpl(fragment.content)).join('');
+    if (
+      (unit.flowBehavior !== 'wrap_end' && unit.flowBehavior !== 'wrap_start')
+      || !split.anchor
+      || split.suffix.length === 0
+    ) {
+      return fullMarkup;
+    }
+
+    const bodyMarkup = split.suffix.map((fragment) => renderTypstNodeImpl(fragment.content)).join('');
+    if (!bodyMarkup.trim()) {
+      return prefixMarkup + renderTypstNodeImpl(split.anchor.content);
+    }
+
+    const insertMarkup = renderTypstNodeImpl(split.anchor.content).trim();
+    return prefixMarkup + renderTypstWrapBlock(
+      unit.wrapSide ?? 'end',
+      unit.wrapWidthRatio,
+      insertMarkup,
+      bodyMarkup.trim(),
+    );
+  }).join('');
 }
 
 function renderDocumentChildren(nodes?: TipTapNode[]): string {
@@ -991,6 +1108,9 @@ export function renderTypstNode(node: TipTapNode): string {
 }
 
 /** Convert a complete TipTap document JSON to Typst markup. */
-export function tiptapToTypst(doc: TipTapNode): string {
+export function tiptapToTypst(doc: TipTapNode, options: TipTapToTypstOptions = {}): string {
+  if (doc.type === 'doc' && (options.layoutPlan || options.documentKind || options.documentTitle)) {
+    return renderDocumentChildrenWithFlow(doc, options);
+  }
   return renderTypstNodeImpl(doc);
 }

@@ -2,6 +2,7 @@ import type { DocumentContent } from './types/document.js';
 import { resolveRandomTableEntries } from './renderers/utils.js';
 import type {
   LayoutColumnBalanceTarget,
+  LayoutFlowBehavior,
   LayoutFlowFragment,
   LayoutFlowModel,
   LayoutFlowUnit,
@@ -10,6 +11,7 @@ import type {
   LayoutPlan,
   LayoutPlanBlock,
   LayoutPlanValidationResult,
+  LayoutWrapSide,
   PageBoundaryType,
   LayoutRecipe,
   LayoutSpan,
@@ -88,6 +90,26 @@ const LOCAL_SHOWCASE_UTILITY_ANCHOR_TYPES = new Set([
   'classFeature',
   'raceBlock',
 ]);
+const WRAP_ELIGIBLE_NODE_TYPES = new Set([
+  'readAloudBox',
+  'sidebarCallout',
+  'magicItem',
+  'spellCard',
+  'classFeature',
+  'raceBlock',
+  'npcProfile',
+  'randomTable',
+  'encounterTable',
+  'statBlock',
+]);
+const WRAP_FLOW_SUPPORT_TYPES = new Set([
+  'paragraph',
+  'bulletList',
+  'orderedList',
+  'heading',
+  'readAloudBox',
+  'sidebarCallout',
+]);
 const LOCAL_UTILITY_SUPPORT_TYPES = new Set([
   'heading',
   'paragraph',
@@ -122,6 +144,11 @@ const INTRO_TAIL_PANEL_ROW_GAP_PX = 14;
 const INTRO_TAIL_PANEL_SEGMENT_GAP_PX = 8;
 const PACKET_GROUP_LAYOUT_RESERVE_PX = 20;
 const INTRO_TAIL_GROUP_LAYOUT_RESERVE_PX = 28;
+const WRAP_BODY_LINE_HEIGHT_PX = 24;
+const WRAP_TWO_COLUMN_MAX_WIDTH_RATIO = 0.4;
+const WRAP_SINGLE_COLUMN_MAX_WIDTH_RATIO = 0.33;
+const WRAP_TWO_COLUMN_MAX_LINES = 16;
+const WRAP_SINGLE_COLUMN_MAX_LINES = 22;
 
 function stableStringify(value: unknown): string {
   if (value === null || typeof value !== 'object') {
@@ -190,6 +217,18 @@ function readLayoutHintSpan(node: DocumentContent | undefined): LayoutSpan | nul
 function readLayoutHintPlacement(node: DocumentContent | undefined): LayoutPlacement | null {
   const placement = typeof node?.attrs?.layoutPlacementHint === 'string' ? node.attrs.layoutPlacementHint.trim() : '';
   return VALID_PLACEMENTS.has(placement as LayoutPlacement) ? placement as LayoutPlacement : null;
+}
+
+function isWrapEligibleTextNode(node: DocumentContent | undefined): boolean {
+  return Boolean(node) && WRAP_ELIGIBLE_NODE_TYPES.has(node!.type);
+}
+
+function shouldIgnoreTextPlacementHint(
+  node: DocumentContent | undefined,
+  placement: LayoutPlacement | null,
+): boolean {
+  return isWrapEligibleTextNode(node)
+    && (placement === 'side_panel' || placement === 'bottom_panel');
 }
 
 function readArtRole(node: DocumentContent | undefined): string {
@@ -265,7 +304,9 @@ function createDefaultBlockPlan(
   let groupId: string | null = null;
   let allowWrapBelow = false;
   const hintedSpan = readLayoutHintSpan(block);
-  const hintedPlacement = readLayoutHintPlacement(block);
+  const hintedPlacement = shouldIgnoreTextPlacementHint(block, readLayoutHintPlacement(block))
+    ? null
+    : readLayoutHintPlacement(block);
 
   if (block.type === 'titlePage' || block.type === 'backCover') {
     span = 'full_page';
@@ -310,13 +351,19 @@ function createDefaultBlockPlan(
     && (block.type === 'statBlock' || block.type === 'encounterTable' || block.type === 'mapBlock' || block.type === 'handout')
   ) {
     keepTogether = true;
-    placement = 'side_panel';
+    if (block.type === 'mapBlock' || block.type === 'handout') {
+      placement = 'side_panel';
+    }
   }
 
   if (sectionRecipe === 'utility_table_spread' && (block.type === 'mapBlock' || block.type === 'handout' || block.type === 'randomTable')) {
     groupId = 'utility-table-1';
     keepTogether = true;
-    placement = block.type === 'handout' ? 'bottom_panel' : 'side_panel';
+    if (block.type === 'handout') {
+      placement = 'bottom_panel';
+    } else if (block.type === 'mapBlock') {
+      placement = 'side_panel';
+    }
   }
 
   return {
@@ -606,9 +653,71 @@ function applyLocalUtilityPacketGrouping(
       layoutBlocks[memberIndex].groupId = groupId;
       layoutBlocks[memberIndex].keepTogether = true;
     }
-    layoutBlocks[index].placement = 'side_panel';
+    if (!isWrapEligibleTextNode(blocks[index])) {
+      layoutBlocks[index].placement = 'side_panel';
+    }
     layoutBlocks[index].keepTogether = true;
     index = Math.max(index, start);
+  }
+}
+
+function isWrapFlowSupport(node: DocumentContent | undefined): boolean {
+  if (!node) return false;
+  if (!WRAP_FLOW_SUPPORT_TYPES.has(node.type)) return false;
+
+  if (node.type === 'heading') {
+    const level = headingLevel(node);
+    return level !== null && level >= 3;
+  }
+
+  return true;
+}
+
+function isWrapFlowBoundary(node: DocumentContent | undefined): boolean {
+  if (!node) return true;
+  if (node.type === 'pageBreak' || node.type === 'columnBreak') return true;
+  if (node.type === 'mapBlock' || node.type === 'handout' || node.type === 'fullBleedImage') return true;
+  if (node.type === 'titlePage' || node.type === 'tableOfContents' || node.type === 'creditsPage' || node.type === 'backCover') return true;
+  if (isWrapEligibleTextNode(node)) return true;
+  const level = headingLevel(node);
+  return level !== null && level <= 2;
+}
+
+function applyWrapFlowGrouping(
+  blocks: DocumentContent[],
+  layoutBlocks: LayoutPlanBlock[],
+): void {
+  let groupIndex = 1;
+
+  for (let index = 0; index < blocks.length; index += 1) {
+    const anchor = blocks[index];
+    const anchorPlan = layoutBlocks[index];
+    if (!anchor || !anchorPlan || !isWrapEligibleTextNode(anchor)) continue;
+    if (anchorPlan.groupId || anchorPlan.span === 'full_page' || anchorPlan.placement === 'full_page_insert') continue;
+
+    const members = [index];
+    let end = index;
+
+    while (end + 1 < blocks.length && members.length < 5) {
+      const next = blocks[end + 1];
+      const nextPlan = layoutBlocks[end + 1];
+      if (!next || !nextPlan) break;
+      if (nextPlan.groupId) break;
+      if (isWrapFlowBoundary(next)) break;
+      if (!isWrapFlowSupport(next)) break;
+      members.push(end + 1);
+      end += 1;
+    }
+
+    if (members.length <= 1) continue;
+
+    const groupId = `wrap-flow-${groupIndex}`;
+    groupIndex += 1;
+    for (const memberIndex of members) {
+      layoutBlocks[memberIndex].groupId = groupId;
+      layoutBlocks[memberIndex].keepTogether = true;
+    }
+    index = end;
   }
 }
 
@@ -954,6 +1063,7 @@ export function buildDefaultLayoutPlan(
     applyHeadingAttachmentGrouping(blocks, layoutBlocks);
     applyLeadLabelAttachmentGrouping(blocks, layoutBlocks);
     applyLocalUtilityPacketGrouping(blocks, layoutBlocks);
+    applyWrapFlowGrouping(blocks, layoutBlocks);
     applyShortTailParagraphGrouping(blocks, layoutBlocks);
     applyTerminalOrphanTailGrouping(blocks, layoutBlocks);
     if (blocks.some((block) => block.type === 'statBlock' || block.type === 'encounterTable')) {
@@ -1266,6 +1376,133 @@ function estimateStructuredFragmentHeight(fragment: LayoutFlowFragment): number 
   return 0;
 }
 
+function isWrapCandidateFragment(fragment: Pick<LayoutFlowFragment, 'nodeType'>): boolean {
+  return WRAP_ELIGIBLE_NODE_TYPES.has(fragment.nodeType);
+}
+
+function estimateWrapAnchorWidthRatio(fragment: LayoutFlowFragment): number {
+  switch (fragment.nodeType) {
+    case 'readAloudBox':
+    case 'sidebarCallout':
+      return 0.36;
+    case 'magicItem':
+    case 'spellCard':
+    case 'classFeature':
+    case 'raceBlock':
+      return 0.38;
+    case 'npcProfile':
+      return 0.4;
+    case 'encounterTable':
+      return 0.42;
+    case 'randomTable':
+      return resolveRandomTableEntries(fragment.content.attrs ?? {}).length >= 8 ? 0.46 : 0.4;
+    case 'statBlock':
+      return 0.46;
+    default:
+      return 0.4;
+  }
+}
+
+function estimateWrapAnchorChars(fragment: LayoutFlowFragment): number {
+  if (fragment.nodeType === 'readAloudBox' || fragment.nodeType === 'sidebarCallout') {
+    return Math.max(1, readNodeText(fragment.content).length);
+  }
+
+  return Math.max(1, stableStringify(fragment.content.attrs ?? {}).length);
+}
+
+function estimateWrapAnchorHeightPx(
+  fragment: LayoutFlowFragment,
+  wrapWidthPx: number,
+): number {
+  const structured = estimateStructuredFragmentHeight(fragment);
+  const chars = estimateWrapAnchorChars(fragment);
+  const charsPerLine = Math.max(18, Math.floor(wrapWidthPx / 7.2));
+  const lines = Math.max(1, Math.ceil(chars / charsPerLine));
+  const lineHeight = fragment.nodeType === 'statBlock' ? 17 : 18;
+  const baseHeight = (() => {
+    switch (fragment.nodeType) {
+      case 'readAloudBox':
+      case 'sidebarCallout':
+        return 80;
+      case 'magicItem':
+      case 'spellCard':
+      case 'classFeature':
+      case 'raceBlock':
+        return 96;
+      case 'npcProfile':
+        return 132;
+      case 'randomTable':
+        return 112;
+      case 'encounterTable':
+        return 118;
+      case 'statBlock':
+        return 180;
+      default:
+        return 88;
+    }
+  })();
+
+  return Math.max(baseHeight + (lines * lineHeight), structured || 0);
+}
+
+function resolveUnitFlowSemantics(
+  unit: LayoutFlowUnit,
+  fragments: LayoutFlowFragment[],
+  frame: LayoutMeasurementFrame,
+): Pick<LayoutFlowUnit, 'flowBehavior' | 'wrapSide' | 'wrapEligible' | 'wrapWidthPx' | 'wrapWidthRatio'> {
+  if (unit.span === 'full_page' || unit.placement === 'full_page_insert') {
+    return {
+      flowBehavior: 'full_page',
+      wrapSide: null,
+      wrapEligible: false,
+      wrapWidthPx: null,
+      wrapWidthRatio: null,
+    };
+  }
+
+  const unitFragments = fragments.filter((fragment) => unit.fragmentNodeIds.includes(fragment.nodeId));
+  const wrapAnchors = unitFragments.filter((fragment) => isWrapCandidateFragment(fragment));
+  const wrapEligible = wrapAnchors.length === 1
+    && !unit.isHero
+    && !unit.groupId?.startsWith('npc-roster')
+    && !unit.groupId?.startsWith('intro-tail-panel');
+
+  if (!wrapEligible) {
+    return {
+      flowBehavior: 'wide_block',
+      wrapSide: null,
+      wrapEligible: false,
+      wrapWidthPx: null,
+      wrapWidthRatio: null,
+    };
+  }
+
+  const availableWidthPx = frame.columnCount > 1 && unit.span === 'column'
+    ? frame.columnWidthPx
+    : frame.contentWidthPx;
+  const wrapWidthRatio = estimateWrapAnchorWidthRatio(wrapAnchors[0]!);
+  const wrapWidthPx = Math.max(120, Math.round(availableWidthPx * wrapWidthRatio));
+  const maxWidthRatio = frame.columnCount > 1 && unit.span === 'column'
+    ? WRAP_TWO_COLUMN_MAX_WIDTH_RATIO
+    : WRAP_SINGLE_COLUMN_MAX_WIDTH_RATIO;
+  const maxHeightPx = (frame.columnCount > 1 && unit.span === 'column'
+    ? WRAP_TWO_COLUMN_MAX_LINES
+    : WRAP_SINGLE_COLUMN_MAX_LINES) * WRAP_BODY_LINE_HEIGHT_PX;
+  const wrapAnchorHeightPx = estimateWrapAnchorHeightPx(wrapAnchors[0]!, wrapWidthPx);
+  const flowBehavior: LayoutFlowBehavior = wrapWidthRatio <= maxWidthRatio && wrapAnchorHeightPx <= maxHeightPx
+    ? 'wrap_end'
+    : 'wide_block';
+
+  return {
+    flowBehavior,
+    wrapSide: flowBehavior === 'wide_block' ? null : 'end',
+    wrapEligible: true,
+    wrapWidthPx,
+    wrapWidthRatio,
+  };
+}
+
 function buildLayoutFlowUnits(fragments: LayoutFlowFragment[]): LayoutFlowUnit[] {
   const units: LayoutFlowUnit[] = [];
   let currentUnit: LayoutFlowUnit | null = null;
@@ -1277,6 +1514,11 @@ function buildLayoutFlowUnits(fragments: LayoutFlowFragment[]): LayoutFlowUnit[]
       currentUnit.fragmentIndexes.push(fragment.sourceIndex);
       currentUnit.span = mergeUnitSpan(currentUnit.span, fragment.span);
       currentUnit.placement = mergeUnitPlacement(currentUnit.placement, fragment.placement);
+      currentUnit.flowBehavior = fragment.flowBehavior;
+      currentUnit.wrapSide = fragment.wrapSide;
+      currentUnit.wrapEligible = currentUnit.wrapEligible || fragment.wrapEligible;
+      currentUnit.wrapWidthPx = fragment.wrapWidthPx ?? currentUnit.wrapWidthPx;
+      currentUnit.wrapWidthRatio = fragment.wrapWidthRatio ?? currentUnit.wrapWidthRatio;
       currentUnit.keepTogether = currentUnit.keepTogether || fragment.keepTogether;
       currentUnit.allowWrapBelow = currentUnit.allowWrapBelow || fragment.allowWrapBelow;
       currentUnit.isHero = currentUnit.isHero || fragment.isHero;
@@ -1290,6 +1532,11 @@ function buildLayoutFlowUnits(fragments: LayoutFlowFragment[]): LayoutFlowUnit[]
       fragmentIndexes: [fragment.sourceIndex],
       span: fragment.span,
       placement: fragment.placement,
+      flowBehavior: fragment.flowBehavior,
+      wrapSide: fragment.wrapSide,
+      wrapEligible: fragment.wrapEligible,
+      wrapWidthPx: fragment.wrapWidthPx,
+      wrapWidthRatio: fragment.wrapWidthRatio,
       groupId: fragment.groupId,
       keepTogether: fragment.keepTogether,
       allowWrapBelow: fragment.allowWrapBelow,
@@ -1326,6 +1573,18 @@ function estimateUnitHeight(unit: LayoutFlowUnit, fragments: LayoutFlowFragment[
   const textChars = unitFragments.reduce((total, fragment) => total + readNodeText(fragment.content).length, 0);
   const primaryTypes = new Set(unitFragments.map((fragment) => fragment.nodeType));
   const structuredHeight = unitFragments.reduce((total, fragment) => total + estimateStructuredFragmentHeight(fragment), 0);
+  const wrapAnchor = unitFragments.find((fragment) => isWrapCandidateFragment(fragment));
+  if (wrapAnchor && (unit.flowBehavior === 'wrap_end' || unit.flowBehavior === 'wrap_start')) {
+    const wrapWidthPx = unit.wrapWidthPx ?? 220;
+    const anchorHeight = estimateWrapAnchorHeightPx(wrapAnchor, wrapWidthPx);
+    const bodyChars = unitFragments
+      .filter((fragment) => fragment.nodeId !== wrapAnchor.nodeId)
+      .reduce((total, fragment) => total + readNodeText(fragment.content).length, 0);
+    const bodyHeight = bodyChars > 0
+      ? Math.max(64, 28 + Math.ceil(bodyChars / 95) * 18)
+      : 0;
+    return Math.max(anchorHeight + 20, bodyHeight + 20);
+  }
 
   if (unit.span === 'full_page' || unit.placement === 'full_page_insert') return 780;
   if (unit.isHero) return primaryTypes.has('chapterHeader') ? 260 : 340;
@@ -1355,6 +1614,10 @@ export function estimateFlowUnitHeight(unit: LayoutFlowUnit, fragments: LayoutFl
 }
 
 function getUnitLayoutReserve(unit: LayoutFlowUnit, flow: LayoutFlowModel): number {
+  if (unit.flowBehavior === 'wrap_end' || unit.flowBehavior === 'wrap_start') {
+    return 12;
+  }
+
   if (unit.groupId?.startsWith('intro-tail-panel')) {
     return INTRO_TAIL_GROUP_LAYOUT_RESERVE_PX;
   }
@@ -1442,7 +1705,7 @@ export function compileFlowModel(
     blocks.map((block, index) => [getNodeId(block, index), { block, sourceIndex: index }] as const),
   );
 
-  const fragments: LayoutFlowFragment[] = resolved.layoutPlan.blocks
+  const baseFragments: LayoutFlowFragment[] = resolved.layoutPlan.blocks
     .map((block): LayoutFlowFragment | null => {
       const source = blocksById.get(block.nodeId);
       if (!source) return null;
@@ -1453,6 +1716,11 @@ export function compileFlowModel(
         presentationOrder: block.presentationOrder,
         span: block.span,
         placement: block.placement,
+        flowBehavior: block.span === 'full_page' || block.placement === 'full_page_insert' ? 'full_page' : 'wide_block',
+        wrapSide: null,
+        wrapEligible: false,
+        wrapWidthPx: null,
+        wrapWidthRatio: null,
         groupId: block.groupId,
         keepTogether: block.keepTogether,
         allowWrapBelow: block.allowWrapBelow,
@@ -1470,13 +1738,24 @@ export function compileFlowModel(
     })
     .filter((fragment): fragment is LayoutFlowFragment => fragment !== null)
     .sort((left, right) => left.presentationOrder - right.presentationOrder);
-
+  const frame = getLayoutMeasurementFrame(preset, options, resolved.layoutPlan.sectionRecipe);
+  const baseUnits = buildLayoutFlowUnits(baseFragments);
+  const unitSemanticsById = new Map(
+    baseUnits.map((unit) => [unit.id, resolveUnitFlowSemantics(unit, baseFragments, frame)] as const),
+  );
+  const fragments = baseFragments.map((fragment) => ({
+    ...fragment,
+    ...unitSemanticsById.get(fragment.unitId),
+  }));
   const flow: LayoutFlowModel = {
     preset,
     sectionRecipe: resolved.layoutPlan.sectionRecipe,
     columnBalanceTarget: resolved.layoutPlan.columnBalanceTarget,
     fragments,
-    units: buildLayoutFlowUnits(fragments),
+    units: buildLayoutFlowUnits(fragments).map((unit) => ({
+      ...unit,
+      ...unitSemanticsById.get(unit.id),
+    })),
   };
 
   return {
@@ -1551,6 +1830,11 @@ function assignUnitToPage(args: {
       presentationOrder: fragment.presentationOrder,
       span: fragment.span,
       placement: fragment.placement,
+      flowBehavior: fragment.flowBehavior,
+      wrapSide: fragment.wrapSide,
+      wrapEligible: fragment.wrapEligible,
+      wrapWidthPx: fragment.wrapWidthPx,
+      wrapWidthRatio: fragment.wrapWidthRatio,
       groupId: fragment.groupId,
       keepTogether: fragment.keepTogether,
       allowWrapBelow: fragment.allowWrapBelow,
@@ -1591,6 +1875,7 @@ function shouldUseFullWidthRegion(
   height: number,
   contentHeight: number,
 ): boolean {
+  if (unit.flowBehavior === 'wrap_end' || unit.flowBehavior === 'wrap_start') return false;
   if (unit.span === 'both_columns') return true;
   if (!unit.groupId) return false;
 

@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { ensureStableNodeIds } from './layout-plan.js';
 import { tiptapToTypst } from './renderers/tiptap-to-typst.js';
 import type { DocumentContent } from './types/document.js';
+import type { LayoutPlan } from './types/layout-plan.js';
 
 export const PUBLICATION_DOCUMENT_SCHEMA_VERSION = 1 as const;
 export const PUBLICATION_DOCUMENT_KINDS = ['front_matter', 'chapter', 'appendix', 'back_matter'] as const;
@@ -113,8 +114,17 @@ export function canonicalPublicationDocumentToEditorProjection(
 
 export function canonicalPublicationDocumentToTypstSource(
   canonicalDocJson: unknown,
+  options: {
+    layoutPlan?: LayoutPlan | null;
+    kind?: string | null;
+    title?: string | null;
+  } = {},
 ): string {
-  return tiptapToTypst(normalizeNode(canonicalDocJson));
+  return tiptapToTypst(normalizeNode(canonicalDocJson), {
+    layoutPlan: options.layoutPlan ?? null,
+    documentKind: options.kind ?? null,
+    documentTitle: options.title ?? null,
+  });
 }
 
 export function buildPublicationDocumentSnapshot(

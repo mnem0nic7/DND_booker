@@ -9,12 +9,15 @@ import path from 'path';
 
 const ASSETS_DIR = path.resolve(process.cwd(), 'assets');
 const FONTS_DIR = path.join(ASSETS_DIR, 'fonts');
+const TYPST_PACKAGES_DIR = path.join(ASSETS_DIR, 'typst', 'packages');
 
 export async function generateTypstPdf(
   typstSource: string,
   fontPaths?: string[],
   workspaceRoot?: string,
 ): Promise<Buffer> {
+  const previousPackagePath = process.env.TYPST_PACKAGE_PATH;
+  process.env.TYPST_PACKAGE_PATH = TYPST_PACKAGES_DIR;
   const compiler = NodeCompiler.create({
     workspace: workspaceRoot || ASSETS_DIR,
     fontArgs: [{ fontPaths: fontPaths || [FONTS_DIR] }],
@@ -33,5 +36,10 @@ export async function generateTypstPdf(
     return Buffer.from(pdf);
   } finally {
     compiler.evictCache(0);
+    if (previousPackagePath) {
+      process.env.TYPST_PACKAGE_PATH = previousPackagePath;
+    } else {
+      delete process.env.TYPST_PACKAGE_PATH;
+    }
   }
 }

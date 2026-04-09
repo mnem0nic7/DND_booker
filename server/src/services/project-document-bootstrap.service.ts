@@ -243,7 +243,12 @@ async function materializeProjectDocuments(
       kind: doc.kind,
       title: doc.title,
     });
-    const publicationFields = buildPublicationDocumentStorageFields({ content: resolvedLayout.content });
+    const publicationFields = buildPublicationDocumentStorageFields({
+      content: resolvedLayout.content,
+      layoutPlan: resolvedLayout.layoutPlan,
+      kind: doc.kind,
+      title: doc.title,
+    });
 
     await tx.projectDocument.create({
       data: {

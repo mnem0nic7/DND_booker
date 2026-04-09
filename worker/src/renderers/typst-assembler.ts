@@ -14,6 +14,7 @@ interface AssembleTypstDocument {
   sortOrder: number;
   kind?: DocumentKind | null;
   chapterNumberLabel?: string | null;
+  layoutPlan?: unknown | null;
 }
 
 type EndCapMode = 'inline' | 'full_page';
@@ -57,6 +58,7 @@ export function assembleTypst(options: AssembleTypstOptions): string {
 
   // Emit theme variables
   t += themeVars + '\n\n';
+  t += `#import "typst/lib/flow-wrap.typ": booker-wrap-start, booker-wrap-end\n\n`;
 
   // 2. Page setup
   t += `#set columns(gutter: 0.9cm)\n`;
@@ -138,7 +140,11 @@ export function assembleTypst(options: AssembleTypstOptions): string {
 
   for (const doc of renderQueue) {
     if (doc.content == null) continue;
-    let rendered = tiptapToTypst(doc.content);
+    let rendered = tiptapToTypst(doc.content, {
+      layoutPlan: doc.layoutPlan as any,
+      documentKind: doc.kind ?? null,
+      documentTitle: doc.title,
+    });
     if (!rendered.trim()) continue;
 
     if (hasRenderedDocument && requiresFreshPage(doc) && !previousEndedWithPageBreak) {
@@ -147,7 +153,11 @@ export function assembleTypst(options: AssembleTypstOptions): string {
 
     if (chapterOpenerMode === 'dedicated_page' && (doc.kind === 'chapter' || doc.kind === 'appendix')) {
       t += renderDedicatedChapterOpening(doc.title, doc.chapterNumberLabel);
-      rendered = tiptapToTypst(stripLeadingSectionOpener(doc.content, doc.title, doc.chapterNumberLabel ?? null));
+      rendered = tiptapToTypst(stripLeadingSectionOpener(doc.content, doc.title, doc.chapterNumberLabel ?? null), {
+        layoutPlan: doc.layoutPlan as any,
+        documentKind: doc.kind ?? null,
+        documentTitle: doc.title,
+      });
       if (!rendered.trim()) {
         hasRenderedDocument = true;
         previousEndedWithPageBreak = true;

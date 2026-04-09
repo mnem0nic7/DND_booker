@@ -61,6 +61,9 @@ export interface PublicationDocumentStorageInput {
   canonicalDocJson?: unknown;
   editorProjectionJson?: unknown;
   typstSource?: string | null;
+  layoutPlan?: unknown;
+  kind?: string | null;
+  title?: string | null;
 }
 
 export interface PublicationDocumentVersionState {
@@ -121,7 +124,11 @@ export function buildPublicationDocumentStorageFields(
   const canonicalDocJson = normalizePublicationDocumentContent(canonicalSource);
   const editorProjectionJson = normalizePublicationDocumentContent(canonicalSource);
   const typstSource = String(
-    input.typstSource ?? canonicalPublicationDocumentToTypstSource(canonicalDocJson),
+    input.typstSource ?? canonicalPublicationDocumentToTypstSource(canonicalDocJson, {
+      layoutPlan: (input.layoutPlan ?? null) as any,
+      kind: input.kind ?? null,
+      title: input.title ?? null,
+    }),
   );
 
   const currentCanonicalVersion = versions.canonicalVersion ?? 1;
@@ -155,7 +162,12 @@ export function buildResolvedPublicationDocumentWriteData(input: {
     title: input.title ?? null,
   });
   const publicationFields = buildPublicationDocumentStorageFields(
-    { content: resolvedLayout.content },
+    {
+      content: resolvedLayout.content,
+      layoutPlan: resolvedLayout.layoutPlan,
+      kind: input.kind ?? null,
+      title: input.title ?? null,
+    },
     input.versions,
     { bumpVersions: input.bumpVersions === true },
   );
@@ -292,6 +304,9 @@ export async function updatePublicationDocument(
       canonicalDocJson: patch.canonicalDocJson,
       editorProjectionJson: patch.editorProjectionJson,
       typstSource: hasBodyUpdate ? null : document.typstSource,
+      layoutPlan: resolvedLayout.layoutPlan,
+      kind: document.kind,
+      title: patch.title ?? document.title,
     },
     {
       canonicalVersion: document.canonicalVersion,
@@ -345,7 +360,12 @@ export async function updatePublicationDocumentLayout(
     title: document.title,
   });
   const publicationFields = buildPublicationDocumentStorageFields(
-    { content: resolvedLayout.content },
+    {
+      content: resolvedLayout.content,
+      layoutPlan: resolvedLayout.layoutPlan,
+      kind: document.kind,
+      title: document.title,
+    },
     {
       canonicalVersion: document.canonicalVersion,
       editorProjectionVersion: document.editorProjectionVersion,

@@ -405,7 +405,12 @@ export async function assembleDocuments(
       kind: spec.kind,
       title: spec.title,
     });
-    const publicationFields = buildPublicationDocumentStorageFields({ content: resolvedLayout.content });
+    const publicationFields = buildPublicationDocumentStorageFields({
+      content: resolvedLayout.content,
+      layoutPlan: resolvedLayout.layoutPlan,
+      kind: spec.kind,
+      title: spec.title,
+    });
 
     const doc = await prisma.projectDocument.upsert({
       where: {
@@ -494,7 +499,12 @@ export async function assembleDocuments(
           kind: existing.kind,
           title: existing.title,
         });
-        const publicationFields = buildPublicationDocumentStorageFields({ content: resolvedLayout.content }, {
+        const publicationFields = buildPublicationDocumentStorageFields({
+          content: resolvedLayout.content,
+          layoutPlan: resolvedLayout.layoutPlan,
+          kind: existing.kind,
+          title: existing.title,
+        }, {
           canonicalVersion: (existing as { canonicalVersion?: number | null }).canonicalVersion,
           editorProjectionVersion: (existing as { editorProjectionVersion?: number | null }).editorProjectionVersion,
           typstVersion: (existing as { typstVersion?: number | null }).typstVersion,

@@ -377,10 +377,13 @@ function hasRenderableInsertedArt(content: DocumentContent, nodeIds: string[]): 
 export async function createTypstWorkspace(baseDir: string): Promise<string> {
   const workspace = await fs.mkdtemp(path.join(baseDir, 'typst-workspace-'));
   const texturesSource = path.resolve(process.cwd(), 'assets', 'textures');
+  const typstSource = path.resolve(process.cwd(), 'assets', 'typst');
   const texturesDest = path.join(workspace, 'textures');
+  const typstDest = path.join(workspace, 'typst');
   const uploadsDest = path.join(workspace, 'uploads');
 
   await fs.symlink(texturesSource, texturesDest);
+  await fs.symlink(typstSource, typstDest);
   await fs.mkdir(uploadsDest, { recursive: true });
 
   return workspace;

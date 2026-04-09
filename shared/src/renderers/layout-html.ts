@@ -3,6 +3,19 @@ import type { LayoutFlowFragment, LayoutFlowModel, LayoutPlan, PageModel, PageMo
 import { compileFlowModel, compilePageModel } from '../layout-plan.js';
 import { renderNode } from './tiptap-to-html.js';
 
+const WRAP_NODE_TYPES = new Set([
+  'readAloudBox',
+  'sidebarCallout',
+  'magicItem',
+  'spellCard',
+  'classFeature',
+  'raceBlock',
+  'npcProfile',
+  'randomTable',
+  'encounterTable',
+  'statBlock',
+]);
+
 function classesForFragment(fragment: Pick<PageModelFragment | LayoutFlowFragment, 'span' | 'placement' | 'nodeType' | 'keepTogether' | 'allowWrapBelow'>): string {
   const classes = [
     'layout-fragment',
@@ -16,9 +29,76 @@ function classesForFragment(fragment: Pick<PageModelFragment | LayoutFlowFragmen
   return classes.join(' ');
 }
 
-function renderFragment(fragment: LayoutFlowFragment | PageModelFragment): string {
-  return `<div class="${classesForFragment(fragment)}" data-node-id="${fragment.nodeId}" data-node-type="${fragment.nodeType}" data-presentation-order="${fragment.presentationOrder}" draggable="true">
+function renderFragment(fragment: LayoutFlowFragment | PageModelFragment, extraClasses = ''): string {
+  const flowClasses = [
+    `layout-flow-${fragment.flowBehavior}`,
+    fragment.wrapSide ? `layout-wrap-side-${fragment.wrapSide}` : '',
+    extraClasses,
+  ].filter(Boolean).join(' ');
+  const className = [classesForFragment(fragment), flowClasses].filter(Boolean).join(' ');
+  const style = fragment.wrapWidthPx ? ` style="--layout-wrap-width: ${fragment.wrapWidthPx}px;"` : '';
+  return `<div class="${className}" data-node-id="${fragment.nodeId}" data-node-type="${fragment.nodeType}" data-presentation-order="${fragment.presentationOrder}" data-flow-behavior="${fragment.flowBehavior}"${fragment.wrapSide ? ` data-wrap-side="${fragment.wrapSide}"` : ''}${style} draggable="true">
     ${renderNode(fragment.content)}
+  </div>`;
+}
+
+function isWrapAnchorFragment(fragment: LayoutFlowFragment | PageModelFragment): boolean {
+  return WRAP_NODE_TYPES.has(fragment.nodeType);
+}
+
+function splitWrapFragments(
+  fragments: Array<LayoutFlowFragment | PageModelFragment>,
+): {
+  prefix: Array<LayoutFlowFragment | PageModelFragment>;
+  anchor: LayoutFlowFragment | PageModelFragment | null;
+  suffix: Array<LayoutFlowFragment | PageModelFragment>;
+} {
+  const anchorIndex = fragments.findIndex((fragment) => isWrapAnchorFragment(fragment));
+  if (anchorIndex === -1) {
+    return {
+      prefix: fragments,
+      anchor: null,
+      suffix: [],
+    };
+  }
+
+  return {
+    prefix: fragments.slice(0, anchorIndex),
+    anchor: fragments[anchorIndex] ?? null,
+    suffix: fragments.slice(anchorIndex + 1),
+  };
+}
+
+function renderWrapCluster(
+  groupId: string,
+  fragments: Array<LayoutFlowFragment | PageModelFragment>,
+  lead: LayoutFlowFragment | PageModelFragment,
+  unitId?: string,
+): string {
+  const ordered = sortFragmentsForDisplay(fragments);
+  const split = splitWrapFragments(ordered);
+  if (!split.anchor || split.suffix.length === 0) {
+    return `<div class="layout-group layout-group-stack${lead ? ` ${unitWrapperClasses(lead)}` : ''}"${unitId ? ` data-layout-unit-id="${unitId}"` : ''} data-group-id="${groupId}">
+      ${ordered.map((fragment) => renderFragment(fragment)).join('\n')}
+    </div>`;
+  }
+
+  const wrapperClasses = [
+    'layout-group',
+    'layout-group-wrap',
+    `layout-group-wrap--${lead.wrapSide ?? 'end'}`,
+    unitWrapperClasses(lead),
+    `layout-flow-${lead.flowBehavior}`,
+  ].join(' ');
+  const dataAttr = unitId ? ` data-layout-unit-id="${unitId}"` : '';
+  const wrapStyle = lead.wrapWidthPx ? ` style="--layout-wrap-width: ${lead.wrapWidthPx}px;"` : '';
+
+  return `<div class="${wrapperClasses}"${dataAttr} data-group-id="${groupId}" data-flow-behavior="${lead.flowBehavior}"${wrapStyle}>
+    ${split.prefix.map((fragment) => renderFragment(fragment)).join('\n')}
+    <div class="layout-group-wrap__body">
+      ${renderFragment(split.anchor, 'layout-fragment--wrap-anchor')}
+      ${split.suffix.map((fragment) => renderFragment(fragment, 'layout-fragment--wrap-body')).join('\n')}
+    </div>
   </div>`;
 }
 
@@ -48,6 +128,10 @@ function renderGroup(groupId: string, fragments: Array<LayoutFlowFragment | Page
     || nodeTypes.has('raceBlock');
   const hasWideRandomTable = fragments.some((fragment) => fragment.nodeType === 'randomTable' && fragment.span === 'both_columns');
   const dataAttr = unitId ? ` data-layout-unit-id="${unitId}"` : '';
+
+  if (lead && (lead.flowBehavior === 'wrap_end' || lead.flowBehavior === 'wrap_start')) {
+    return renderWrapCluster(groupId, fragments, lead, unitId);
+  }
 
   if (groupId.startsWith('intro-tail-panel')) {
     const pairs: Array<Array<LayoutFlowFragment | PageModelFragment>> = [];
@@ -136,6 +220,10 @@ function renderFlowUnit(
     return renderGroup(lead.groupId, ordered, flow.sectionRecipe, unitId);
   }
 
+  if (lead.flowBehavior === 'wrap_end' || lead.flowBehavior === 'wrap_start') {
+    return renderWrapCluster(unitId, ordered, lead, unitId);
+  }
+
   return `<div class="layout-unit ${unitWrapperClasses(lead)}" data-layout-unit-id="${unitId}" data-layout-span="${lead.span}" data-layout-placement="${lead.placement}">
     ${renderFragment(lead)}
   </div>`;
@@ -167,6 +255,10 @@ function renderPageUnit(
 
   if (lead.groupId) {
     return renderGroup(lead.groupId, ordered, pageModel.pages[0]?.recipe ?? null, unitId);
+  }
+
+  if (lead.flowBehavior === 'wrap_end' || lead.flowBehavior === 'wrap_start') {
+    return renderWrapCluster(unitId, ordered, lead, unitId);
   }
 
   return `<div class="layout-unit ${unitWrapperClasses(lead)}" data-layout-unit-id="${unitId}" data-layout-span="${lead.span}" data-layout-placement="${lead.placement}">
@@ -415,6 +507,44 @@ export function getCanonicalLayoutCss(): string {
 
     .layout-group-stack {
       display: block;
+    }
+
+    .layout-group-wrap {
+      display: flow-root;
+      min-width: 0;
+    }
+
+    .layout-group-wrap__body {
+      display: block;
+      min-width: 0;
+    }
+
+    .layout-group-wrap__body::after,
+    .layout-group-wrap::after {
+      content: "";
+      display: block;
+      clear: both;
+    }
+
+    .layout-fragment--wrap-anchor {
+      width: var(--layout-wrap-width, 240px);
+      max-width: 42%;
+      min-width: 170px;
+      margin-bottom: 0.45rem;
+    }
+
+    .layout-group-wrap--end .layout-fragment--wrap-anchor {
+      float: right;
+      margin-left: 0.85rem;
+    }
+
+    .layout-group-wrap--start .layout-fragment--wrap-anchor {
+      float: left;
+      margin-right: 0.85rem;
+    }
+
+    .layout-fragment--wrap-body {
+      margin-bottom: 0.28rem;
     }
 
     .layout-node-chapterHeader,

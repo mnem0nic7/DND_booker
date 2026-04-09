@@ -51,7 +51,12 @@ export async function updateDocumentContent(
     title: doc.title,
   });
   const publicationFields = buildPublicationDocumentStorageFields(
-    { content: resolvedLayout.content },
+    {
+      content: resolvedLayout.content,
+      layoutPlan: resolvedLayout.layoutPlan,
+      kind: doc.kind,
+      title: doc.title,
+    },
     {
       canonicalVersion: doc.canonicalVersion,
       editorProjectionVersion: doc.editorProjectionVersion,
@@ -100,7 +105,12 @@ export async function updateDocumentLayout(
     title: doc.title,
   });
   const publicationFields = buildPublicationDocumentStorageFields(
-    { content: resolvedLayout.content },
+    {
+      content: resolvedLayout.content,
+      layoutPlan: resolvedLayout.layoutPlan,
+      kind: doc.kind,
+      title: doc.title,
+    },
     {
       canonicalVersion: doc.canonicalVersion,
       editorProjectionVersion: doc.editorProjectionVersion,

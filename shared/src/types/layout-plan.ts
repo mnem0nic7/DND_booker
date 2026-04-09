@@ -7,6 +7,8 @@ export type LayoutPlacement =
   | 'side_panel'
   | 'bottom_panel'
   | 'full_page_insert';
+export type LayoutFlowBehavior = 'wrap_start' | 'wrap_end' | 'wide_block' | 'full_page';
+export type LayoutWrapSide = 'start' | 'end';
 export type LayoutRecipe =
   | 'chapter_hero_split'
   | 'intro_split_spread'
@@ -42,6 +44,11 @@ export interface LayoutFlowFragment {
   presentationOrder: number;
   span: LayoutSpan;
   placement: LayoutPlacement;
+  flowBehavior: LayoutFlowBehavior;
+  wrapSide: LayoutWrapSide | null;
+  wrapEligible: boolean;
+  wrapWidthPx: number | null;
+  wrapWidthRatio: number | null;
   groupId: string | null;
   keepTogether: boolean;
   allowWrapBelow: boolean;
@@ -58,6 +65,11 @@ export interface LayoutFlowUnit {
   fragmentIndexes: number[];
   span: LayoutSpan;
   placement: LayoutPlacement;
+  flowBehavior: LayoutFlowBehavior;
+  wrapSide: LayoutWrapSide | null;
+  wrapEligible: boolean;
+  wrapWidthPx: number | null;
+  wrapWidthRatio: number | null;
   groupId: string | null;
   keepTogether: boolean;
   allowWrapBelow: boolean;
@@ -101,6 +113,11 @@ export interface PageModelFragment {
   presentationOrder: number;
   span: LayoutSpan;
   placement: LayoutPlacement;
+  flowBehavior: LayoutFlowBehavior;
+  wrapSide: LayoutWrapSide | null;
+  wrapEligible: boolean;
+  wrapWidthPx: number | null;
+  wrapWidthRatio: number | null;
   groupId: string | null;
   keepTogether: boolean;
   allowWrapBelow: boolean;

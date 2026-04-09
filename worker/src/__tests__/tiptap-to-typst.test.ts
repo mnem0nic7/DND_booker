@@ -1,8 +1,16 @@
 import { describe, it, expect } from 'vitest';
+import { resolveLayoutPlan, type DocumentContent } from '@dnd-booker/shared';
 import { renderTypstNode, tiptapToTypst } from '../renderers/tiptap-to-typst.js';
 
 // Helper to cast node objects to the expected type
 const node = (n: any) => n;
+
+function paragraph(text: string): DocumentContent {
+  return {
+    type: 'paragraph',
+    content: [{ type: 'text', text }],
+  };
+}
 
 describe('TipTap-to-Typst Renderer', () => {
   // ── Text & Marks ──
@@ -297,6 +305,93 @@ describe('TipTap-to-Typst Renderer', () => {
       expect(result).not.toContain('#pagebreak()\n]');
       expect(result).toContain('Reality buckles around the workshop.\n\n]\n\n#pagebreak()\n');
       expect(result).toContain('== The Gear-Gate Entrance');
+    });
+
+    it('emits wrap macros for compact inserts when prose continues after the anchor', () => {
+      const content: DocumentContent = {
+        type: 'doc',
+        content: [
+          { type: 'heading', attrs: { level: 2, nodeId: 'h1' }, content: [{ type: 'text', text: 'Temporal Instability' }] },
+          paragraph('The gears hum with a rhythm that feels just a half-step out of phase with the room.'),
+          {
+            type: 'sidebarCallout',
+            attrs: { nodeId: 'callout1', title: 'DM Tip', calloutType: 'info' },
+            content: [paragraph('Ask the players to narrate one small thing that feels wrong before the effect becomes dangerous.')],
+          },
+          paragraph('Once the party notices the pattern, they can match their movement to the prime rhythm and pass the corridor safely.'),
+        ],
+      };
+      const resolved = resolveLayoutPlan(content, null, {
+        documentKind: 'chapter',
+        documentTitle: 'The Missing Hour',
+      });
+
+      const result = tiptapToTypst(content, {
+        layoutPlan: resolved.layoutPlan,
+        documentKind: 'chapter',
+        documentTitle: 'The Missing Hour',
+      });
+
+      expect(result).toContain('#booker-wrap-end(');
+      expect(result).toContain('DM Tip');
+      expect(result).toContain('Once the party notices the pattern');
+    });
+
+    it('falls back to normal block rendering for oversized inserts', () => {
+      const content: DocumentContent = {
+        type: 'doc',
+        content: [
+          { type: 'heading', attrs: { level: 2, nodeId: 'h1' }, content: [{ type: 'text', text: 'Workshop Defenders' }] },
+          paragraph('Clockwork dust hangs in the air while the guardians grind back to life.'),
+          {
+            type: 'statBlock',
+            attrs: {
+              nodeId: 'stat1',
+              name: 'Gearwright Sentinel',
+              size: 'Large',
+              type: 'construct',
+              alignment: 'unaligned',
+              ac: 17,
+              hp: 136,
+              hitDice: '16d10 + 48',
+              speed: '30 ft.',
+              str: 20,
+              dex: 10,
+              con: 16,
+              int: 6,
+              wis: 12,
+              cha: 5,
+              traits: JSON.stringify([
+                { name: 'Immutable Form', description: 'The sentinel is immune to any spell or effect that would alter its form.' },
+                { name: 'Siege Monster', description: 'The sentinel deals double damage to objects and structures.' },
+                { name: 'Clockwork Recovery', description: 'At the start of each of its turns, the sentinel regains 10 hit points unless it took lightning damage since the end of its last turn.' },
+                { name: 'Stabilized Core', description: 'If reduced below half hit points, the sentinel emits waves of distortion that force nearby creatures to reorient themselves.' },
+              ]),
+              actions: JSON.stringify([
+                { name: 'Multiattack', description: 'The sentinel makes two slam attacks and one gearburst attack.' },
+                { name: 'Slam', description: 'Melee Weapon Attack: +8 to hit, reach 10 ft., one target. Hit: 17 (2d10 + 6) bludgeoning damage.' },
+                { name: 'Gearburst', description: 'Ranged Weapon Attack: +7 to hit, range 60/180 ft., one target. Hit: 14 (3d6 + 4) force damage, and the target must succeed on a DC 15 Dexterity saving throw or be knocked prone.' },
+                { name: 'Temporal Shunt (Recharge 5-6)', description: 'The sentinel opens a rip in local time. Each creature within 15 feet must succeed on a DC 16 Constitution saving throw or lose its reaction and have its speed halved until the end of its next turn.' },
+              ]),
+            },
+          },
+          paragraph('The workshop floor trembles as the sentinel advances, forcing the party to choose between cover and speed.'),
+        ],
+      };
+      const resolved = resolveLayoutPlan(content, null, {
+        documentKind: 'chapter',
+        documentTitle: 'The Missing Hour',
+      });
+
+      const result = tiptapToTypst(content, {
+        layoutPlan: resolved.layoutPlan,
+        documentKind: 'chapter',
+        documentTitle: 'The Missing Hour',
+      });
+
+      expect(result).not.toContain('#booker-wrap-end(');
+      expect(result).toContain('Gearwright Sentinel');
+      expect(result).toContain('#block(');
     });
   });
 

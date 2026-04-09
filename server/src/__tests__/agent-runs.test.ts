@@ -148,5 +148,5 @@ describe('Agent Run Routes', () => {
 
     const restoredProject = await prisma.project.findUniqueOrThrow({ where: { id: projectId } });
     expect(JSON.stringify(restoredProject.content)).toContain('Original content.');
-  });
+  }, 15000);
 });

@@ -160,7 +160,12 @@ export async function saveCanonicalProjectContent(
         kind: document.kind,
         title: document.title,
       });
-      const publicationFields = buildPublicationDocumentStorageFields({ content: resolvedLayout.content });
+      const publicationFields = buildPublicationDocumentStorageFields({
+        content: resolvedLayout.content,
+        layoutPlan: resolvedLayout.layoutPlan,
+        kind: document.kind,
+        title: document.title,
+      });
 
       await tx.projectDocument.create({
         data: {

@@ -673,7 +673,10 @@ describe('layout-plan', () => {
     expect(headingPlan?.groupId).toBe(magicItemPlan?.groupId);
     expect(introParagraphPlan?.groupId).toBe(magicItemPlan?.groupId);
     expect(magicItemPlan?.groupId?.startsWith('utility-table-')).toBe(true);
-    expect(magicItemPlan?.placement).toBe('side_panel');
+    expect(magicItemPlan?.placement).toBe('inline');
+    expect(
+      resolved.layoutPlan.blocks.find((block) => block.nodeId === 'mi1')?.placement,
+    ).toBe('inline');
 
     const html = renderContentWithLayoutPlan({
       content,
@@ -685,8 +688,124 @@ describe('layout-plan', () => {
       },
     }).html;
 
-    expect(html).toContain('layout-group-packet');
+    expect(html).toContain('data-group-id="utility-table-1"');
+    expect(html).toContain('layout-group-stack');
     expect(html).toContain('layout-node-magicItem');
+  });
+
+  it('wraps compact text inserts when prose continues after the insert anchor', () => {
+    const content: DocumentContent = {
+      type: 'doc',
+      content: [
+        { type: 'heading', attrs: { level: 2, nodeId: 'h1' }, content: [{ type: 'text', text: 'Temporal Instability' }] },
+        paragraph('The gears hum with a rhythm that feels just a half-step out of phase with the room.'),
+        {
+          type: 'sidebarCallout',
+          attrs: {
+            nodeId: 'callout1',
+            title: 'DM Tip',
+            calloutType: 'info',
+          },
+          content: [paragraph('Ask the players to narrate one small thing that feels wrong before the effect becomes dangerous.')],
+        },
+        paragraph('Once the party notices the pattern, they can match their movement to the prime rhythm and pass the corridor safely.'),
+      ],
+    };
+
+    const resolved = resolveLayoutPlan(content, null, {
+      documentKind: 'chapter',
+      documentTitle: 'The Missing Hour',
+    });
+    const flow = compileFlowModel(content, resolved.layoutPlan, 'editor_preview', {
+      documentKind: 'chapter',
+      documentTitle: 'The Missing Hour',
+    });
+
+    const wrapUnit = flow.flow.units.find((unit) => unit.fragmentNodeIds.includes('callout1'));
+    const calloutFragment = flow.flow.fragments.find((fragment) => fragment.nodeId === 'callout1');
+    const html = renderContentWithLayoutPlan({
+      content,
+      layoutPlan: resolved.layoutPlan,
+      preset: 'editor_preview',
+      options: {
+        documentKind: 'chapter',
+        documentTitle: 'The Missing Hour',
+      },
+    }).html;
+
+    expect(wrapUnit?.flowBehavior).toBe('wrap_end');
+    expect(wrapUnit?.wrapEligible).toBe(true);
+    expect(calloutFragment?.wrapWidthRatio).not.toBeNull();
+    expect(html).toContain('layout-group-wrap');
+    expect(html).toContain('layout-fragment--wrap-anchor');
+    expect(html).toContain('layout-node-sidebarCallout');
+  });
+
+  it('falls back to wide blocks for tall wrap-eligible inserts', () => {
+    const content: DocumentContent = {
+      type: 'doc',
+      content: [
+        { type: 'heading', attrs: { level: 2, nodeId: 'h1' }, content: [{ type: 'text', text: 'Workshop Defenders' }] },
+        paragraph('Clockwork dust hangs in the air while the guardians grind back to life.'),
+        {
+          type: 'statBlock',
+          attrs: {
+            nodeId: 'stat1',
+            name: 'Gearwright Sentinel',
+            size: 'Large',
+            type: 'construct',
+            alignment: 'unaligned',
+            ac: 17,
+            hp: 136,
+            hitDice: '16d10 + 48',
+            speed: '30 ft.',
+            str: 20,
+            dex: 10,
+            con: 16,
+            int: 6,
+            wis: 12,
+            cha: 5,
+            traits: JSON.stringify([
+              { name: 'Immutable Form', description: 'The sentinel is immune to any spell or effect that would alter its form.' },
+              { name: 'Siege Monster', description: 'The sentinel deals double damage to objects and structures.' },
+              { name: 'Clockwork Recovery', description: 'At the start of each of its turns, the sentinel regains 10 hit points unless it took lightning damage since the end of its last turn.' },
+              { name: 'Stabilized Core', description: 'If reduced below half hit points, the sentinel emits waves of distortion that force nearby creatures to reorient themselves.' },
+            ]),
+            actions: JSON.stringify([
+              { name: 'Multiattack', description: 'The sentinel makes two slam attacks and one gearburst attack.' },
+              { name: 'Slam', description: 'Melee Weapon Attack: +8 to hit, reach 10 ft., one target. Hit: 17 (2d10 + 6) bludgeoning damage.' },
+              { name: 'Gearburst', description: 'Ranged Weapon Attack: +7 to hit, range 60/180 ft., one target. Hit: 14 (3d6 + 4) force damage, and the target must succeed on a DC 15 Dexterity saving throw or be knocked prone.' },
+              { name: 'Temporal Shunt (Recharge 5-6)', description: 'The sentinel opens a rip in local time. Each creature within 15 feet must succeed on a DC 16 Constitution saving throw or lose its reaction and have its speed halved until the end of its next turn.' },
+            ]),
+          },
+        },
+        paragraph('The workshop floor trembles as the sentinel advances, forcing the party to choose between cover and speed.'),
+      ],
+    };
+
+    const resolved = resolveLayoutPlan(content, null, {
+      documentKind: 'chapter',
+      documentTitle: 'The Missing Hour',
+    });
+    const flow = compileFlowModel(content, resolved.layoutPlan, 'editor_preview', {
+      documentKind: 'chapter',
+      documentTitle: 'The Missing Hour',
+    });
+    const statUnit = flow.flow.units.find((unit) => unit.fragmentNodeIds.includes('stat1'));
+    const html = renderContentWithLayoutPlan({
+      content,
+      layoutPlan: resolved.layoutPlan,
+      preset: 'editor_preview',
+      options: {
+        documentKind: 'chapter',
+        documentTitle: 'The Missing Hour',
+      },
+    }).html;
+
+    expect(statUnit?.flowBehavior).toBe('wide_block');
+    expect(statUnit?.wrapEligible).toBe(true);
+    expect(html).not.toContain('layout-group-wrap');
+    expect(html).toContain('layout-node-statBlock');
   });
 
   it('builds a measured multi-page model with a hero opener and balanced body flow', () => {
@@ -928,7 +1047,11 @@ describe('layout-plan', () => {
     });
 
     const groupIds = flow.flow.fragments.map((fragment) => fragment.groupId).filter(Boolean);
-    expect(groupIds.every((groupId) => groupId === 'tail-packet-1' || groupId === 'terminal-tail-packet-1')).toBe(true);
+    expect(groupIds.every((groupId) => (
+      groupId === 'tail-packet-1'
+      || groupId === 'terminal-tail-packet-1'
+      || groupId === 'wrap-flow-1'
+    ))).toBe(true);
   });
 
   it('groups local utility packets around random tables in chapter hero layouts', () => {
@@ -976,7 +1099,9 @@ describe('layout-plan', () => {
     );
 
     expect(utilityGroupIds.size).toBe(1);
-    expect(flow.flow.fragments.find((fragment) => fragment.nodeType === 'randomTable')?.placement).toBe('side_panel');
+    const randomTableFragment = flow.flow.fragments.find((fragment) => fragment.nodeType === 'randomTable');
+    expect(randomTableFragment?.placement).toBe('inline');
+    expect(randomTableFragment?.flowBehavior).toBe('wrap_end');
 
     const pageModel = compileMeasuredPageModel(flow.flow, flow.flow.units.map((unit, index) => ({
       unitId: unit.id,
