@@ -98,16 +98,21 @@ connection.on('end', () => {
   console.warn('[worker.lifecycle] redis connection ended');
 });
 
+function formatWorkerErrorMessage(error: { message?: string } | null | undefined, fallback: string): string {
+  const message = String(error?.message ?? '').trim();
+  return message || fallback;
+}
+
 worker.on('completed', (job) => console.log(`Job ${job.id} completed`));
-worker.on('failed', (job, err) => console.error(`[worker.export] job ${job?.id} failed:`, err.message));
-worker.on('error', (err) => console.error('[Worker] Error:', err.message));
-cleanupWorker.on('error', (err) => console.error('[Cleanup Worker] Error:', err.message));
+worker.on('failed', (job, err) => console.error(`[worker.export] job ${job?.id} failed:`, formatWorkerErrorMessage(err, 'Export worker job failed.')));
+worker.on('error', (err) => console.error('[Worker] Error:', formatWorkerErrorMessage(err, 'Worker error.')));
+cleanupWorker.on('error', (err) => console.error('[Cleanup Worker] Error:', formatWorkerErrorMessage(err, 'Cleanup worker error.')));
 generationWorker.on('completed', (job) => console.log(`Generation job ${job.id} completed`));
-generationWorker.on('failed', (job, err) => console.error(`[worker.generation] job ${job?.id} failed:`, err.message));
-generationWorker.on('error', (err) => console.error('[Generation Worker] Error:', err.message));
+generationWorker.on('failed', (job, err) => console.error(`[worker.generation] job ${job?.id} failed:`, formatWorkerErrorMessage(err, 'Generation worker job failed.')));
+generationWorker.on('error', (err) => console.error('[Generation Worker] Error:', formatWorkerErrorMessage(err, 'Generation worker error.')));
 agentWorker.on('completed', (job) => console.log(`Agent job ${job.id} completed`));
-agentWorker.on('failed', (job, err) => console.error(`[worker.agent] job ${job?.id} failed:`, err.message));
-agentWorker.on('error', (err) => console.error('[Agent Worker] Error:', err.message));
+agentWorker.on('failed', (job, err) => console.error(`[worker.agent] job ${job?.id} failed:`, formatWorkerErrorMessage(err, 'Agent worker job failed.')));
+agentWorker.on('error', (err) => console.error('[Agent Worker] Error:', formatWorkerErrorMessage(err, 'Agent worker error.')));
 
 const stopRuntimeAudit = startRuntimeAuditLoop(
   undefined,

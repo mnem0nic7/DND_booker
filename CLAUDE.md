@@ -93,11 +93,12 @@ When reapplying accepted art placements after document rebuilds, do not trust st
 
 Any server-side `ProjectDocument` mutation that changes document body content should update `content`, `canonicalDocJson`, `editorProjectionJson`, and `typstSource` together. Prefer `buildResolvedPublicationDocumentWriteData(...)` in `server/src/services/document-publication.service.ts` instead of hand-written `projectDocument.update()` payloads.
 After any `ProjectDocument` mutation, rebuild `Project.content` from ordered project documents. `Project.content` is now a compatibility cache, not an authoritative source.
-AI wizard apply now counts as a canonical document mutation. Do not append directly into `Project.content`; route it through `saveCanonicalProjectContent(...)` so publication fields and document splits stay synchronized.
+AI wizard apply now counts as a canonical document mutation. Keep it document-aware: insert generated chapter content before back matter, and replace untouched template placeholder chapter scaffolds instead of flattening the whole project through `saveCanonicalProjectContent(...)`.
 
 PDF export now keeps the HTML/Playwright measurement pass for preflight and review, but the final production PDF render is Typst-based. Typst workspaces must stage referenced `uploads/...` assets explicitly because production uploads live in GCS, not a shared local disk.
 Export job creation should materialize `ProjectDocument` rows before queueing work. The worker's monolithic `Project.content` fallback is defensive compatibility-only, not an active runtime source of truth.
 Canon expansion now uses schema-native `generateObject(...)` output instead of `generateText(...)` plus ad hoc JSON repair. Keep that node on structured output so preview-model JSON quirks do not stall generation retries.
+Normalize empty worker/export error strings before persisting or logging them. Typst/compiler failures can surface as `Error('')`, and blank production logs make export triage much slower than it needs to be.
 
 ### Persisted run graphs
 Generation runs and agent runs now checkpoint the current graph node into `graphStateJson.runtime`. BullMQ retries should resume from that node instead of replaying the whole orchestration function.

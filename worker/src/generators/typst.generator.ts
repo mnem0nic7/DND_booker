@@ -20,7 +20,13 @@ export async function generateTypstPdf(
     fontArgs: [{ fontPaths: fontPaths || [FONTS_DIR] }],
   });
   try {
-    const pdf = compiler.pdf({ mainFileContent: typstSource });
+    let pdf: Uint8Array | undefined;
+    try {
+      pdf = compiler.pdf({ mainFileContent: typstSource });
+    } catch (error) {
+      const message = error instanceof Error ? error.message.trim() : String(error ?? '').trim();
+      throw new Error(message || 'Typst compilation failed.');
+    }
     if (!pdf || pdf.length === 0) {
       throw new Error('Typst compilation produced empty output');
     }

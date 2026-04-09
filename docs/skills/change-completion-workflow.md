@@ -32,7 +32,7 @@ Do not stop after code edits unless the user explicitly says not to ship.
 - keep aggregate project content saves on `PATCH /api/v1/projects/:projectId` and manual layout saves on `PATCH /api/v1/projects/:projectId/documents/:docId/layout`; do not reintroduce runtime writes against the old project/document content endpoints
 - if a server-side change mutates `ProjectDocument.content`, keep `canonicalDocJson`, `editorProjectionJson`, and `typstSource` in sync in the same write; prefer `buildResolvedPublicationDocumentWriteData(...)` over ad hoc update payloads
 - after any document mutation, rebuild `Project.content` from ordered `ProjectDocument[]`; it is a compatibility cache, not the source of truth
-- AI wizard apply and similar section-assembly flows count as document mutations; they should merge against canonical project content and save back through the canonical project-content service instead of updating `Project.content` directly
+- AI wizard apply and similar section-assembly flows count as document mutations; they should update `ProjectDocument` rows directly, insert generated content before back matter, and replace untouched template placeholder chapter scaffolds instead of flattening everything back through `Project.content`
 - export creation should ensure `ProjectDocument` rows exist before queueing worker jobs; keep `Project.content` fallbacks as defensive compatibility only
 - generation nodes that already have strong Zod schemas, like canon expansion, should prefer schema-native `generateObject(...)` over `generateText(...)` plus post-parse repair
 - when the local server integration test depends on Cloud SQL access, record the exact GCP blocker if it cannot run

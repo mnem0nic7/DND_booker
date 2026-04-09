@@ -9,6 +9,7 @@ import {
   parseOutlineResponse,
   summarizeSection,
 } from '../services/ai-wizard.service.js';
+import { createProjectWithDocuments } from '../services/project-document-bootstrap.service.js';
 
 // ── Unit tests (no database needed) ─────────────────────────────
 
@@ -778,6 +779,120 @@ describe('AI Wizard Routes', () => {
           },
         },
       });
+    });
+
+    it('should replace blank template chapter scaffold and keep generated content ahead of back matter', async () => {
+      const templateProject = await createProjectWithDocuments(testUserId, {
+        title: 'Template Wizard Campaign',
+        type: 'campaign',
+        settings: {} as any,
+        templateContent: {
+          type: 'doc',
+          content: [
+            { type: 'titlePage', attrs: { title: 'Campaign Title', subtitle: 'A D&D 5e Adventure', author: 'Author Name', coverImageUrl: '' } },
+            { type: 'pageBreak' },
+            { type: 'tableOfContents', attrs: { title: 'Table of Contents' } },
+            { type: 'pageBreak' },
+            { type: 'heading', attrs: { level: 1 }, content: [{ type: 'text', text: 'Chapter 1' }] },
+            { type: 'paragraph', content: [{ type: 'text', text: 'Begin writing your first chapter here...' }] },
+            { type: 'pageBreak' },
+            { type: 'heading', attrs: { level: 1 }, content: [{ type: 'text', text: 'Chapter 2' }] },
+            { type: 'paragraph', content: [{ type: 'text', text: 'Continue your adventure here...' }] },
+            { type: 'pageBreak' },
+            { type: 'heading', attrs: { level: 1 }, content: [{ type: 'text', text: 'Chapter 3' }] },
+            { type: 'paragraph', content: [{ type: 'text', text: 'Conclude or continue your story here...' }] },
+            { type: 'pageBreak' },
+            { type: 'creditsPage', attrs: { credits: 'Written by Author Name', legalText: '', copyrightYear: '2026' } },
+            { type: 'pageBreak' },
+            { type: 'backCover', attrs: { blurb: 'Back cover copy', authorBio: 'Author bio', authorImageUrl: '' } },
+          ],
+        } as any,
+      });
+
+      try {
+        await prisma.aiWizardSession.upsert({
+          where: { projectId_userId: { projectId: templateProject.id, userId: testUserId } },
+          create: {
+            projectId: templateProject.id,
+            userId: testUserId,
+            phase: 'review',
+            sections: [
+              {
+                sectionId: 'section-1',
+                title: 'The Missing Hour',
+                markdown: '## The Missing Hour\n\nTime fractures around the town square.',
+                status: 'completed',
+                content: {
+                  type: 'doc',
+                  content: [
+                    { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'The Missing Hour' }] },
+                    { type: 'paragraph', content: [{ type: 'text', text: 'Time fractures around the town square.' }] },
+                  ],
+                },
+              },
+            ],
+          },
+          update: {
+            phase: 'review',
+            sections: [
+              {
+                sectionId: 'section-1',
+                title: 'The Missing Hour',
+                markdown: '## The Missing Hour\n\nTime fractures around the town square.',
+                status: 'completed',
+                content: {
+                  type: 'doc',
+                  content: [
+                    { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'The Missing Hour' }] },
+                    { type: 'paragraph', content: [{ type: 'text', text: 'Time fractures around the town square.' }] },
+                  ],
+                },
+              },
+            ],
+          },
+        });
+
+        const res = await request(app)
+          .post(`/api/v1/projects/${templateProject.id}/ai/wizard/apply`)
+          .set('Authorization', `Bearer ${accessToken}`)
+          .send({ sectionIds: ['section-1'] });
+
+        expect(res.status).toBe(200);
+
+        const documents = await prisma.projectDocument.findMany({
+          where: { projectId: templateProject.id },
+          orderBy: { sortOrder: 'asc' },
+          select: {
+            title: true,
+            slug: true,
+            kind: true,
+            sortOrder: true,
+            content: true,
+          },
+        });
+
+        expect(documents.map((document) => ({
+          title: document.title,
+          slug: document.slug,
+          kind: document.kind,
+          sortOrder: document.sortOrder,
+        }))).toEqual([
+          { title: 'Title Page', slug: 'title-page', kind: 'front_matter', sortOrder: 0 },
+          { title: 'Table of Contents', slug: 'table-of-contents', kind: 'front_matter', sortOrder: 1 },
+          { title: 'The Missing Hour', slug: 'the-missing-hour', kind: 'chapter', sortOrder: 2 },
+          { title: 'Credits', slug: 'credits', kind: 'back_matter', sortOrder: 3 },
+          { title: 'Back Cover', slug: 'back-cover', kind: 'back_matter', sortOrder: 4 },
+        ]);
+        expect(JSON.stringify(documents[2].content)).toContain('Time fractures around the town square.');
+      } finally {
+        await prisma.aiWizardSession.deleteMany({
+          where: {
+            projectId: templateProject.id,
+            userId: testUserId,
+          },
+        });
+        await prisma.project.delete({ where: { id: templateProject.id } });
+      }
     });
 
     it('should reject empty sectionIds', async () => {

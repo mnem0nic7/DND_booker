@@ -161,7 +161,7 @@ async function waitForExportCompletion(exportJobId: string) {
     if (!exportJob) throw new Error('Export job not found.');
     if (exportJob.status === 'completed') return exportJob;
     if (exportJob.status === 'failed') {
-      throw new Error(exportJob.errorMessage ?? 'Export failed.');
+      throw new Error(exportJob.errorMessage?.trim() || 'Export failed.');
     }
     await sleep(2000);
   }

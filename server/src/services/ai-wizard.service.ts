@@ -1,7 +1,15 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '../config/database.js';
 import { generateText } from 'ai';
-import type { WizardPhase, WizardParameters, WizardOutline, WizardOutlineSection, WizardGeneratedSection, WizardQuestion } from '@dnd-booker/shared';
+import type {
+  DocumentContent,
+  WizardPhase,
+  WizardParameters,
+  WizardOutline,
+  WizardOutlineSection,
+  WizardGeneratedSection,
+  WizardQuestion,
+} from '@dnd-booker/shared';
 import {
   normalizeEncounterTableAttrs,
   normalizeNpcProfileAttrs,
@@ -11,7 +19,8 @@ import {
 import { getSupportedBlockTypes } from './ai-content.service.js';
 import { normalizeGeneratedMarkdown } from './generation/markdown-normalizer.js';
 import { parseJsonResponse } from './generation/parse-json.js';
-import { getCanonicalProjectContent, saveCanonicalProjectContent } from './project-document-content.service.js';
+import { buildResolvedPublicationDocumentWriteData } from './document-publication.service.js';
+import { getCanonicalProjectContent, rebuildProjectContentCache } from './project-document-content.service.js';
 
 // ── Session CRUD ────────────────────────────────────────────────
 
@@ -1257,6 +1266,220 @@ export function summarizeSection(markdown: string): string {
 
 // ── Apply to Project ────────────────────────────────────────────
 
+const TEMPLATE_PLACEHOLDER_PARAGRAPHS = new Set([
+  'Begin writing your first chapter here...',
+  'Continue your adventure here...',
+  'Conclude or continue your story here...',
+  'Begin writing your one-shot adventure here...',
+  'Begin your first section of supplementary content...',
+  'Continue with additional content...',
+]);
+
+type WizardApplyDocumentRecord = {
+  id: string;
+  projectId: string;
+  kind: 'front_matter' | 'chapter' | 'appendix' | 'back_matter';
+  title: string;
+  slug: string;
+  sortOrder: number;
+  content: unknown;
+  layoutPlan: unknown;
+  canonicalVersion: number | null;
+  editorProjectionVersion: number | null;
+  typstVersion: number | null;
+};
+
+function readNodeText(node: DocumentContent | null | undefined): string {
+  if (!node) return '';
+  if (node.type === 'text') {
+    return String(node.text ?? '').trim();
+  }
+
+  return (node.content ?? [])
+    .map((child) => readNodeText(child as DocumentContent))
+    .join(' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function asTipTapDoc(value: unknown): DocumentContent | null {
+  if (!value || typeof value !== 'object' || !('type' in (value as Record<string, unknown>))) {
+    return null;
+  }
+
+  return value as DocumentContent;
+}
+
+function isPlaceholderScaffoldDocument(document: WizardApplyDocumentRecord): boolean {
+  if (document.kind !== 'chapter' && document.kind !== 'appendix') {
+    return false;
+  }
+
+  const content = asTipTapDoc(document.content);
+  const nodes = content?.type === 'doc' && Array.isArray(content.content) ? content.content : [];
+  if (nodes.length === 1) {
+    return nodes[0]?.type === 'paragraph' && readNodeText(nodes[0] as DocumentContent) === '';
+  }
+
+  if (nodes.length !== 2) return false;
+
+  const [leadNode, bodyNode] = nodes as DocumentContent[];
+  const isHeadingBoundary = leadNode.type === 'chapterHeader'
+    || (leadNode.type === 'heading' && Number(leadNode.attrs?.level ?? 0) === 1);
+  if (!isHeadingBoundary || bodyNode.type !== 'paragraph') {
+    return false;
+  }
+
+  return TEMPLATE_PLACEHOLDER_PARAGRAPHS.has(readNodeText(bodyNode));
+}
+
+function slugifyWizardTitle(value: string): string {
+  const slug = value
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+
+  return slug || 'generated-content';
+}
+
+function ensureUniqueWizardSlug(base: string, existingSlugs: Iterable<string>): string {
+  const used = new Set(Array.from(existingSlugs).filter(Boolean));
+  let candidate = base || 'generated-content';
+  let suffix = 2;
+
+  while (used.has(candidate)) {
+    candidate = `${base || 'generated-content'}-${suffix}`;
+    suffix += 1;
+  }
+
+  return candidate;
+}
+
+function inferWizardDocumentTitle(
+  selectedSections: WizardGeneratedSection[],
+  content: DocumentContent,
+): string {
+  for (const section of selectedSections) {
+    const title = String(section.title ?? '').trim();
+    if (title) return title;
+  }
+
+  for (const node of content.content ?? []) {
+    if (node.type === 'chapterHeader') {
+      const title = String(node.attrs?.title ?? '').trim();
+      if (title) return title;
+    }
+
+    if (node.type === 'heading') {
+      const title = readNodeText(node);
+      if (title) return title;
+    }
+  }
+
+  return 'Generated Adventure';
+}
+
+async function upsertWizardContentDocument(input: {
+  tx: Prisma.TransactionClient;
+  projectId: string;
+  documents: WizardApplyDocumentRecord[];
+  selectedSections: WizardGeneratedSection[];
+  newContent: DocumentContent;
+}): Promise<void> {
+  const { tx, projectId, documents, selectedSections, newContent } = input;
+
+  const placeholderDocs = documents.filter((document) => isPlaceholderScaffoldDocument(document));
+  const chapterLikeDocs = documents.filter((document) => document.kind === 'chapter' || document.kind === 'appendix');
+  const meaningfulChapterDocs = chapterLikeDocs.filter((document) => !isPlaceholderScaffoldDocument(document));
+  const nextTitle = inferWizardDocumentTitle(selectedSections, newContent);
+  const existingSlugs = documents.map((document) => document.slug);
+  const firstBackMatterIndex = documents.findIndex((document) => document.kind === 'back_matter');
+  const insertionIndex = firstBackMatterIndex === -1 ? documents.length : firstBackMatterIndex;
+
+  if (placeholderDocs.length > 0 && meaningfulChapterDocs.length === 0) {
+    const [anchor, ...redundantPlaceholders] = placeholderDocs;
+    const writeData = buildResolvedPublicationDocumentWriteData({
+      content: newContent,
+      kind: 'chapter',
+      title: nextTitle,
+      versions: {
+        canonicalVersion: anchor.canonicalVersion,
+        editorProjectionVersion: anchor.editorProjectionVersion,
+        typstVersion: anchor.typstVersion,
+      },
+      bumpVersions: true,
+    });
+
+    const nextSlug = ensureUniqueWizardSlug(
+      slugifyWizardTitle(nextTitle),
+      existingSlugs.filter((slug) => slug !== anchor.slug),
+    );
+
+    await tx.projectDocument.update({
+      where: { id: anchor.id },
+      data: {
+        kind: 'chapter',
+        title: nextTitle,
+        slug: nextSlug,
+        status: 'edited',
+        layoutPlan: writeData.layoutPlan,
+        content: writeData.content,
+        canonicalDocJson: writeData.canonicalDocJson,
+        editorProjectionJson: writeData.editorProjectionJson,
+        typstSource: writeData.typstSource,
+        canonicalVersion: writeData.canonicalVersion,
+        editorProjectionVersion: writeData.editorProjectionVersion,
+        typstVersion: writeData.typstVersion,
+      },
+    });
+
+    if (redundantPlaceholders.length > 0) {
+      await tx.projectDocument.deleteMany({
+        where: {
+          id: {
+            in: redundantPlaceholders.map((document) => document.id),
+          },
+        },
+      });
+    }
+
+    return;
+  }
+
+  const writeData = buildResolvedPublicationDocumentWriteData({
+    content: newContent,
+    kind: 'chapter',
+    title: nextTitle,
+    bumpVersions: true,
+  });
+  const nextSlug = ensureUniqueWizardSlug(slugifyWizardTitle(nextTitle), existingSlugs);
+
+  await tx.projectDocument.create({
+    data: {
+      projectId,
+      runId: null,
+      kind: 'chapter',
+      title: nextTitle,
+      slug: nextSlug,
+      sortOrder: insertionIndex,
+      targetPageCount: null,
+      outlineJson: Prisma.JsonNull,
+      layoutPlan: writeData.layoutPlan,
+      content: writeData.content,
+      canonicalDocJson: writeData.canonicalDocJson,
+      editorProjectionJson: writeData.editorProjectionJson,
+      typstSource: writeData.typstSource,
+      canonicalVersion: writeData.canonicalVersion,
+      editorProjectionVersion: writeData.editorProjectionVersion,
+      typstVersion: writeData.typstVersion,
+      status: 'edited',
+      sourceArtifactId: null,
+    },
+  });
+}
+
 export async function applyToProject(
   projectId: string,
   userId: string,
@@ -1284,29 +1507,72 @@ export async function applyToProject(
   }
 
   if (newNodes.length === 0) return null;
+  const newContent: DocumentContent = { type: 'doc', content: newNodes as DocumentContent[] };
+
+  const updatedProject = await prisma.$transaction(async (tx) => {
+    const project = await tx.project.findFirst({
+      where: { id: projectId, userId },
+      select: {
+        id: true,
+        userId: true,
+      },
+    });
+    if (!project) return null;
+
+    const documents = await tx.projectDocument.findMany({
+      where: { projectId },
+      orderBy: { sortOrder: 'asc' },
+      select: {
+        id: true,
+        projectId: true,
+        kind: true,
+        title: true,
+        slug: true,
+        sortOrder: true,
+        content: true,
+        layoutPlan: true,
+        canonicalVersion: true,
+        editorProjectionVersion: true,
+        typstVersion: true,
+      },
+    }) as WizardApplyDocumentRecord[];
+
+    await upsertWizardContentDocument({
+      tx,
+      projectId,
+      documents,
+      selectedSections,
+      newContent,
+    });
+
+    const orderedDocuments = await tx.projectDocument.findMany({
+      where: { projectId },
+      orderBy: [
+        { sortOrder: 'asc' },
+        { createdAt: 'asc' },
+      ],
+      select: { id: true },
+    });
+
+    await Promise.all(
+      orderedDocuments.map((document, index) => tx.projectDocument.update({
+        where: { id: document.id },
+        data: { sortOrder: index },
+      })),
+    );
+
+    await rebuildProjectContentCache(projectId, tx);
+    return project;
+  });
+
+  if (!updatedProject) return null;
 
   const snapshot = await getCanonicalProjectContent(projectId, userId);
   if (!snapshot) return null;
-  const existingNodes = snapshot.content.content ?? [];
-
-  // Add a pageBreak before the new content if there's existing content
-  const mergedNodes = existingNodes.length > 0
-    ? [...existingNodes, { type: 'pageBreak' }, ...newNodes]
-    : newNodes;
-
-  const saveResult = await saveCanonicalProjectContent(
-    projectId,
-    userId,
-    { type: 'doc', content: mergedNodes },
-    snapshot.updatedAt.toISOString(),
-  );
-  if (saveResult.status !== 'success') {
-    return null;
-  }
 
   return {
-    ...saveResult.project,
-    content: saveResult.content,
-    updatedAt: saveResult.updatedAt,
+    ...snapshot.project,
+    content: snapshot.content,
+    updatedAt: snapshot.updatedAt,
   };
 }

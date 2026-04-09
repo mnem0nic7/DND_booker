@@ -81,6 +81,12 @@ interface PreflightCandidate {
   review: ExportReview;
 }
 
+function normalizeJobErrorMessage(error: unknown, fallback: string): string {
+  const raw = error instanceof Error ? error.message : String(error ?? '');
+  const message = raw.slice(0, 500).trim();
+  return message || fallback;
+}
+
 function getServerBaseUrl(): string {
   const configured = process.env.SERVER_BASE_URL?.trim();
   if (configured) {
@@ -608,7 +614,7 @@ export async function processExportJob(job: Job<ExportJobData>): Promise<void> {
 
     console.log(`[export.job] Export ${exportJobId} completed -> ${outputUrl}`);
   } catch (error: unknown) {
-    const message = (error instanceof Error ? error.message : String(error)).slice(0, 500);
+    const message = normalizeJobErrorMessage(error, 'Export failed.');
 
     // Update export job with failure
     try {
