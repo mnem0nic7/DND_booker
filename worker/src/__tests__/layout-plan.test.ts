@@ -637,6 +637,58 @@ describe('layout-plan', () => {
     expect(statBlockPlan?.groupId).toBeTruthy();
   });
 
+  it('re-groups showcase utility blocks with their section intro so short pages do not checkerboard', () => {
+    const content: DocumentContent = {
+      type: 'doc',
+      content: [
+        { type: 'heading', attrs: { level: 2, nodeId: 'h1' }, content: [{ type: 'text', text: 'A Souvenir of a Dead Future' }] },
+        paragraph('As the party gathers their gear from the scorched workshop, they uncover a relic from the timeline that never was.'),
+        {
+          type: 'magicItem',
+          attrs: {
+            nodeId: 'mi1',
+            name: 'Echo of the Unwritten Age',
+            type: 'Wondrous Item',
+            rarity: 'Rare',
+            description: 'This brass pocket watch hums a second before danger strikes and remembers futures that never survived.',
+          },
+        },
+        { type: 'heading', attrs: { level: 2, nodeId: 'h2' }, content: [{ type: 'text', text: "The Inventor's Legacy" }] },
+        paragraph('Whether Master Geargrind was consumed by the core or cast into another branch of reality, no sign of him remains.'),
+      ],
+    };
+
+    const resolved = resolveLayoutPlan(content, null, {
+      documentKind: 'chapter',
+      documentTitle: 'The Missing Hour',
+    });
+
+    const headingPlan = resolved.layoutPlan.blocks.find((block) => block.nodeId === 'h1');
+    const introParagraphPlan = resolved.layoutPlan.blocks.find((block) =>
+      block.nodeId === String(resolved.content.content?.[1]?.attrs?.nodeId),
+    );
+    const magicItemPlan = resolved.layoutPlan.blocks.find((block) => block.nodeId === 'mi1');
+
+    expect(headingPlan?.groupId).toBeTruthy();
+    expect(headingPlan?.groupId).toBe(magicItemPlan?.groupId);
+    expect(introParagraphPlan?.groupId).toBe(magicItemPlan?.groupId);
+    expect(magicItemPlan?.groupId?.startsWith('utility-table-')).toBe(true);
+    expect(magicItemPlan?.placement).toBe('side_panel');
+
+    const html = renderContentWithLayoutPlan({
+      content,
+      layoutPlan: resolved.layoutPlan,
+      preset: 'standard_pdf',
+      options: {
+        documentKind: 'chapter',
+        documentTitle: 'The Missing Hour',
+      },
+    }).html;
+
+    expect(html).toContain('layout-group-packet');
+    expect(html).toContain('layout-node-magicItem');
+  });
+
   it('builds a measured multi-page model with a hero opener and balanced body flow', () => {
     const content: DocumentContent = {
       type: 'doc',

@@ -82,6 +82,12 @@ const LOCAL_UTILITY_ANCHOR_TYPES = new Set([
   'randomTable',
   'encounterTable',
 ]);
+const LOCAL_SHOWCASE_UTILITY_ANCHOR_TYPES = new Set([
+  'magicItem',
+  'spellCard',
+  'classFeature',
+  'raceBlock',
+]);
 const LOCAL_UTILITY_SUPPORT_TYPES = new Set([
   'heading',
   'paragraph',
@@ -90,6 +96,12 @@ const LOCAL_UTILITY_SUPPORT_TYPES = new Set([
   'readAloudBox',
   'sidebarCallout',
 ]);
+const REGROUPABLE_UTILITY_SUPPORT_GROUP_PREFIXES = [
+  'section-packet-',
+  'lead-label-packet-',
+  'tail-packet-',
+  'terminal-tail-packet-',
+];
 
 interface PagePresetMetrics {
   pageWidthPx: number;
@@ -528,15 +540,35 @@ function applyLocalUtilityPacketGrouping(
 
   for (let index = 0; index < blocks.length; index += 1) {
     const block = blocks[index];
-    if (!LOCAL_UTILITY_ANCHOR_TYPES.has(block?.type ?? '') || layoutBlocks[index]?.groupId) continue;
+    const blockType = block?.type ?? '';
+    const isUtilityAnchor = LOCAL_UTILITY_ANCHOR_TYPES.has(blockType) || LOCAL_SHOWCASE_UTILITY_ANCHOR_TYPES.has(blockType);
+    const canRegroupSupportPacket = LOCAL_SHOWCASE_UTILITY_ANCHOR_TYPES.has(blockType);
+    if (!isUtilityAnchor || layoutBlocks[index]?.groupId) continue;
 
     const members = [index];
     let start = index;
 
     const previous = blocks[index - 1];
+    const previousPlan = layoutBlocks[index - 1];
     if (
-      previous
-      && !layoutBlocks[index - 1]?.groupId
+      canRegroupSupportPacket
+      && previousPlan?.groupId
+      && REGROUPABLE_UTILITY_SUPPORT_GROUP_PREFIXES.some((prefix) => previousPlan.groupId?.startsWith(prefix))
+    ) {
+      const regroupedMembers = layoutBlocks
+        .map((plan, planIndex) => ({ plan, planIndex }))
+        .filter(({ planIndex, plan }) => planIndex < index && plan.groupId === previousPlan.groupId)
+        .map(({ planIndex }) => planIndex);
+      if (regroupedMembers.length > 0) {
+        start = regroupedMembers[0] ?? start;
+        members.unshift(...regroupedMembers);
+      }
+    }
+
+    if (
+      members.length === 1
+      && previous
+      && !previousPlan?.groupId
       && LOCAL_UTILITY_SUPPORT_TYPES.has(previous.type)
       && (previous.type === 'heading' || isShortSupportBlock(previous))
     ) {

@@ -38,7 +38,14 @@ function renderGroup(groupId: string, fragments: Array<LayoutFlowFragment | Page
   const nodeTypes = new Set(fragments.map((fragment) => fragment.nodeType));
   const isNpcGrid = recipe === 'npc_roster_grid' || (nodeTypes.size === 1 && nodeTypes.has('npcProfile'));
   const isEncounterPacket = recipe === 'encounter_packet_spread' || nodeTypes.has('statBlock') || nodeTypes.has('encounterTable');
-  const isUtilityPacket = recipe === 'utility_table_spread' || nodeTypes.has('mapBlock') || nodeTypes.has('randomTable') || nodeTypes.has('handout');
+  const isUtilityPacket = recipe === 'utility_table_spread'
+    || nodeTypes.has('mapBlock')
+    || nodeTypes.has('randomTable')
+    || nodeTypes.has('handout')
+    || nodeTypes.has('magicItem')
+    || nodeTypes.has('spellCard')
+    || nodeTypes.has('classFeature')
+    || nodeTypes.has('raceBlock');
   const hasWideRandomTable = fragments.some((fragment) => fragment.nodeType === 'randomTable' && fragment.span === 'both_columns');
   const dataAttr = unitId ? ` data-layout-unit-id="${unitId}"` : '';
 
