@@ -97,6 +97,7 @@ AI wizard apply now counts as a canonical document mutation. Keep it document-aw
 
 PDF export now keeps the HTML/Playwright measurement pass for preflight and review, but the final production PDF render is Typst-based. Typst workspaces must stage referenced `uploads/...` assets explicitly because production uploads live in GCS, not a shared local disk.
 Export job creation should materialize `ProjectDocument` rows before queueing work. The worker's monolithic `Project.content` fallback is defensive compatibility-only, not an active runtime source of truth.
+Keep Typst keep-together wrappers away from manual `pageBreak` and `columnBreak` nodes. If a renderer groups a heading packet into `#block(...)[...]`, it must stop before structural breaks, or Typst will fail with `pagebreaks are not allowed inside of containers`.
 Canon expansion now uses schema-native `generateObject(...)` output instead of `generateText(...)` plus ad hoc JSON repair. Keep that node on structured output so preview-model JSON quirks do not stall generation retries.
 Normalize empty worker/export error strings before persisting or logging them. Typst/compiler failures can surface as `Error('')`, and blank production logs make export triage much slower than it needs to be.
 

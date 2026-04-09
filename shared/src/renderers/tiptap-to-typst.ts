@@ -352,6 +352,10 @@ function isKeepTogetherFollower(node: TipTapNode): boolean {
   ].includes(node.type);
 }
 
+function isStructuralBreakNode(node: TipTapNode | undefined): boolean {
+  return node?.type === 'pageBreak' || node?.type === 'columnBreak';
+}
+
 function collectSmallKeepTogetherSection(nodes: TipTapNode[], startIndex: number): TipTapNode[] | null {
   const startNode = nodes[startIndex];
   if (startNode.type !== 'heading' || Number(startNode.attrs?.level ?? 0) !== 3) {
@@ -361,6 +365,9 @@ function collectSmallKeepTogetherSection(nodes: TipTapNode[], startIndex: number
   let endIndex = startIndex + 1;
   while (endIndex < nodes.length) {
     const node = nodes[endIndex];
+    if (isStructuralBreakNode(node)) {
+      break;
+    }
     if (node.type === 'heading' && Number(node.attrs?.level ?? 0) <= 3) {
       break;
     }

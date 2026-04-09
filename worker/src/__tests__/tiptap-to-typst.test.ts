@@ -280,6 +280,24 @@ describe('TipTap-to-Typst Renderer', () => {
       expect(result).toContain('Flank from the shadows.');
       expect(result).toContain('Reveal a clue on success.');
     });
+
+    it('keeps manual page breaks outside compact level-3 section packets', () => {
+      const result = tiptapToTypst(node({
+        type: 'doc',
+        content: [
+          { type: 'heading', attrs: { level: 3 }, content: [{ type: 'text', text: 'The Smoking Remains' }] },
+          { type: 'paragraph', content: [{ type: 'text', text: 'Reality buckles around the workshop.' }] },
+          { type: 'pageBreak' },
+          { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'The Gear-Gate Entrance' }] },
+        ],
+      }));
+
+      expect(result).toContain('#block(width: 100%, breakable: false)[');
+      expect(result).toContain('The Smoking Remains');
+      expect(result).not.toContain('#pagebreak()\n]');
+      expect(result).toContain('Reality buckles around the workshop.\n\n]\n\n#pagebreak()\n');
+      expect(result).toContain('== The Gear-Gate Entrance');
+    });
   });
 
   // ── D&D Blocks ──
