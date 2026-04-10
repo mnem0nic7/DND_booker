@@ -1,4 +1,8 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import { describe, it, expect } from 'vitest';
+import { NodeCompiler } from '@myriaddreamin/typst-ts-node-compiler';
+import { resolveLayoutPlan, type DocumentContent } from '@dnd-booker/shared';
 import { assembleTypst } from '../renderers/typst-assembler.js';
 
 function paragraph(text: string) {
@@ -737,6 +741,64 @@ describe('Typst Assembler', () => {
       expect(source).toContain('[The Gravel Guardian\'s Chamber]');
       expect(source).not.toContain('= Chapter 3: The Gravel Guardian\'s Chamber');
       expect(source).not.toContain('= Chapter 1: The Gravel Guardian\'s Chamber');
+    });
+
+    it('compiles wrap-enabled documents through the vendored flow-wrap shim', async () => {
+      const content: DocumentContent = {
+        type: 'doc',
+        content: [
+          { type: 'heading', attrs: { level: 2, nodeId: 'h1' }, content: [{ type: 'text', text: 'Temporal Instability' }] },
+          paragraph('The gears hum with a rhythm that feels just a half-step out of phase with the room.'),
+          {
+            type: 'sidebarCallout',
+            attrs: { nodeId: 'callout1', title: 'DM Tip', calloutType: 'info' },
+            content: [paragraph('Ask the players to narrate one small thing that feels wrong before the effect becomes dangerous.')],
+          },
+          paragraph('Once the party notices the pattern, they can match their movement to the prime rhythm and pass the corridor safely.'),
+        ],
+      };
+      const resolved = resolveLayoutPlan(content, null, {
+        documentKind: 'chapter',
+        documentTitle: 'The Missing Hour',
+      });
+      const source = assembleTypst({
+        documents: [
+          {
+            title: 'The Missing Hour',
+            kind: 'chapter',
+            sortOrder: 1,
+            content,
+            layoutPlan: resolved.layoutPlan,
+          },
+        ],
+        theme: 'clean-modern',
+        projectTitle: 'Smoke Gate',
+      });
+
+      const compiler = NodeCompiler.create();
+      const assetsRoot = path.resolve(process.cwd(), 'assets/typst');
+      const previousPackagePath = process.env.TYPST_PACKAGE_PATH;
+      const workspace = path.resolve(process.cwd(), '.tmp-typst-flow-wrap-test');
+
+      fs.rmSync(workspace, { recursive: true, force: true });
+      fs.mkdirSync(workspace, { recursive: true });
+      fs.symlinkSync(assetsRoot, path.join(workspace, 'typst'));
+      fs.writeFileSync(path.join(workspace, 'main.typ'), source);
+      process.env.TYPST_PACKAGE_PATH = path.join(assetsRoot, 'packages');
+
+      try {
+        const result = await compiler.pdf({
+          mainFilePath: path.join(workspace, 'main.typ'),
+        });
+        expect(result).toBeDefined();
+      } finally {
+        fs.rmSync(workspace, { recursive: true, force: true });
+        if (previousPackagePath == null) {
+          delete process.env.TYPST_PACKAGE_PATH;
+        } else {
+          process.env.TYPST_PACKAGE_PATH = previousPackagePath;
+        }
+      }
     });
   });
 });
