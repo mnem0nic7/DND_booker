@@ -22,6 +22,7 @@ Do not stop after code edits unless the user explicitly says not to ship.
 - default to `npm run verify:ship`
 - `npm run verify:ship` means:
   - `npm run verify`
+  - `npm run test --workspace=worker -- layout-visual-parity.test.ts`
   - `npm run test:unit --workspace=client`
   - `npm run test:server:local -- auth.test.ts ai-routes.test.ts ai-wizard.test.ts assets.test.ts templates.test.ts documents.v1.test.ts projects.v1.test.ts runs.v1.test.ts agent-runs.test.ts src/__tests__/exports.v1.test.ts src/__tests__/legacy-routes.test.ts src/__tests__/generation/canon.test.ts src/__tests__/generation/routes.test.ts`
 - when `api/v1` routes validate responses against schemas with ISO timestamps, normalize transport DTOs before schema parsing instead of feeding raw Prisma rows directly into the validator
@@ -40,11 +41,14 @@ Do not stop after code edits unless the user explicitly says not to ship.
 - the hidden parity measurement host must inherit the same `.ProseMirror` typography context as the visible preview without duplicating editor column-count rules; otherwise paragraph and boxed-callout heights are under-measured and preview pagination clips blocks that export renders correctly
 - keep showcase blocks like `magicItem`, `spellCard`, `classFeature`, and `raceBlock` eligible for local utility-packet regrouping with the short section intro immediately before them; if the intro gets left behind as a separate section packet, the preview drifts into sparse checkerboard pages even when export compiles cleanly
 - keep the vendored Typst `@preview/wrap-it:0.1.1` package under `worker/assets/typst/packages` and the `worker/assets/typst/lib/flow-wrap.typ` shim in sync; the worker compile path depends on that local package root via `TYPST_PACKAGE_PATH`
+- when layout parity coverage changes, keep the worker-side screenshot regression current; `layout-visual-parity.test.ts` is the default guard for preview vs Typst export drift on compact wrap-heavy chapter content
+- keep Playwright browser path resolution tolerant of user-local Chrome installs for local worker verification. This repo cannot assume `/usr/bin/chromium` exists on every machine
 - keep Typst keep-together renderers from swallowing manual `pageBreak` or `columnBreak` nodes; structural breaks must render at the top level, not inside `#block(...)[...]`, or PDF compilation will fail
 - generation nodes that already have strong Zod schemas, like outline generation and canon expansion, should prefer schema-native `generateObject(...)` over `generateText(...)` plus post-parse repair
 - when the local server integration test depends on Cloud SQL access, record the exact GCP blocker if it cannot run
 - remove accidental compiled artifacts from source directories before commit
 - if infrastructure blocks a test or deploy, record the exact blocker
+- for BullMQ-backed production reliability, keep Memorystore on `maxmemory-policy=noeviction` and validate with `npm run ops:redis:check` after Redis or network changes
 - for Cloud Run launch hardening, keep monitoring install and validation scripts up to date: `npm run monitor:cloudrun:install` and `npm run monitor:cloudrun:validate`
 - if worker runtime audit coverage changes, keep the backlog and interrupt semantics reflected in the runbook and worker manifest env defaults
 

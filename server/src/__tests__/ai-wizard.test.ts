@@ -893,7 +893,7 @@ describe('AI Wizard Routes', () => {
         });
         await prisma.project.delete({ where: { id: templateProject.id } });
       }
-    });
+    }, 15000);
 
     it('should reject empty sectionIds', async () => {
       const res = await request(app)

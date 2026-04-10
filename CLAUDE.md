@@ -148,6 +148,7 @@ PropertiesPanel shows document stats and a Document Outline that includes both H
 
 Docker Compose runs `postgres`, `redis`, `server`, `worker`, and `client`. Production Cloud Run is split into a web service (`client + server + cloudsql-proxy`) and a worker service (`worker + cloudsql-proxy`).
 The worker service runs a periodic runtime audit for stale queued runs, stale queued exports, stale BullMQ queue backlog, and stale pending interrupts. Audit violations log as `OPS_AUDIT_VIOLATION`; install Cloud Monitoring policies against that signal with `npm run monitor:cloudrun:install`.
+Production Redis must stay on `maxmemory-policy=noeviction`. BullMQ is not safe on `volatile-lru` or similar eviction modes; validate live config with `npm run ops:redis:check` after infra changes and during ship triage if worker logs warn about eviction policy.
 
 Rebuild and restart the local services that match the changed packages:
 
@@ -167,7 +168,8 @@ Unless the user explicitly says not to, treat this as the default after every co
    - `npm run verify:ship` for the normal shippable path.
    - `npm run verify` is the lighter build-only pass when you explicitly do not need the full ship checks.
    - If cloud-backed server integration is unavailable, record the exact blocker instead of silently skipping it.
-   - `verify:ship` now includes auth, AI, wizard apply, asset, template, document, v1 export, legacy-compatibility header, canon expansion, project, run, agent restore, and generation-route coverage through the local Cloud SQL Proxy + Redis harness; keep new `api/v1` route regressions in that path when they touch transport serialization or run orchestration APIs.
+   - `verify:ship` now includes the worker `layout-visual-parity.test.ts` regression before the client and server suites, plus auth, AI, wizard apply, asset, template, document, v1 export, legacy-compatibility header, canon expansion, project, run, agent restore, and generation-route coverage through the local Cloud SQL Proxy + Redis harness; keep new `api/v1` route regressions in that path when they touch transport serialization or run orchestration APIs.
+   - For runtime or infra work that can affect queue durability, add `npm run ops:redis:check` to the ship pass or incident triage.
 3. Update repo memory and docs when behavior, workflow, deployment steps, or architecture changed.
    - Memory: this file and any other standing repo guidance.
    - Docs: `README.md`, `deploy/cloudrun/README.md`, `docs/runbooks/cloudrun-web-worker.md`, or the closest feature/runbook doc.

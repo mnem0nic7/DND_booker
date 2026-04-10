@@ -193,11 +193,14 @@ function getWrapClusterFragments(
 function renderTypstWrapBlock(
   side: WrapRenderSide,
   widthRatio: number | null | undefined,
+  widthPx: number | null | undefined,
   insertMarkup: string,
   bodyMarkup: string,
 ): string {
-  const widthPercent = Math.max(24, Math.min(42, Math.round((widthRatio ?? 0.38) * 100)));
-  return `#booker-wrap-${side}([\n${indentTypst(insertMarkup)}\n], [\n${indentTypst(bodyMarkup)}\n], width: ${widthPercent}%)\n\n`;
+  const widthArg = Number.isFinite(widthPx)
+    ? `${Math.max(112, Math.min(180, Number(widthPx))).toFixed(1)}pt`
+    : `${Math.max(24, Math.min(42, Math.round((widthRatio ?? 0.38) * 100)))}%`;
+  return `#booker-wrap-${side}([\n${indentTypst(insertMarkup)}\n], [\n${indentTypst(bodyMarkup)}\n], width: ${widthArg})\n\n`;
 }
 
 function renderDocumentChildrenWithFlow(
@@ -240,6 +243,7 @@ function renderDocumentChildrenWithFlow(
     return prefixMarkup + renderTypstWrapBlock(
       unit.wrapSide ?? 'end',
       unit.wrapWidthRatio,
+      unit.wrapWidthPx,
       insertMarkup,
       bodyMarkup.trim(),
     );

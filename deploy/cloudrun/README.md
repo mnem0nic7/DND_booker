@@ -160,8 +160,14 @@ If a container build starts failing on a missing workspace package such as `@dnd
    - `roles/secretmanager.secretAccessor`
    - bucket-level `roles/storage.objectAdmin`
 6. Configure Cloud Run VPC egress so it can reach Memorystore.
+7. Keep the Redis instance on `maxmemory-policy=noeviction`.
 
 For Redis, prefer Direct VPC egress unless you already standardize on Serverless VPC Access.
+BullMQ is not safe on `volatile-lru` or similar eviction modes. Validate the live instance with:
+
+```bash
+npm run ops:redis:check
+```
 
 For this service, keep `run.googleapis.com/vpc-access-egress: private-ranges-only`. Using `all-traffic` without Cloud NAT breaks the Cloud SQL proxy because it cannot reach `sqladmin.googleapis.com`.
 
@@ -205,6 +211,12 @@ git push origin main
 npm run deploy:cloudrun
 ```
 
+For queue durability changes or after Redis maintenance, run this before deploy:
+
+```bash
+npm run ops:redis:check
+```
+
 `npm run deploy:cloudrun` wraps the safest repeatable production flow for this repo:
 
 1. `gcloud builds submit --config deploy/cloudrun/cloudbuild.yaml --substitutions _REGION=us-west4,_REPO=dnd-booker,_TAG=<git-sha>`
@@ -233,7 +245,7 @@ After deploy, verify:
 - note that the smoke now creates a temporary project, drives a generation run to the publication-review interrupt, approves and resumes it, creates an export job, downloads the resulting PDF, validates the `%PDF-` header, and then deletes the temp project
 - project aggregate content saves, document layout saves, chat history loads, asset uploads/browses, and template loads all flow through `api/v1` now, so production editor regressions are more likely to show up in the same typed transport path the SDK uses
 
-Local ship verification should also cover the `api/v1` project and run surfaces before deploy. `npm run verify:ship` now includes auth, AI, assets, templates, documents, projects, runs, agent restore, and generation route coverage through the Cloud SQL Proxy + local Redis harness so transport and orchestration regressions are caught before production.
+Local ship verification should also cover the `api/v1` project and run surfaces before deploy. `npm run verify:ship` now includes the worker `layout-visual-parity.test.ts` regression plus auth, AI, assets, templates, documents, projects, runs, agent restore, and generation route coverage through the Cloud SQL Proxy + local Redis harness so transport, orchestration, and preview/export layout drift regressions are caught before production.
 
 ## Seed Templates
 

@@ -1,3 +1,5 @@
+import { existsSync } from 'node:fs';
+import path from 'node:path';
 import { chromium, type Page } from 'playwright-core';
 import {
   buildTextLayoutParityAnalysis,
@@ -19,14 +21,16 @@ import { assembleHtml } from '../renderers/html-assembler.js';
 
 const DEFAULT_EXECUTABLE_PATHS = [
   process.env.CHROMIUM_PATH,
+  process.env.GOOGLE_CHROME_BIN,
   '/usr/bin/chromium',
   '/usr/bin/chromium-browser',
   '/usr/bin/google-chrome-stable',
   '/usr/bin/google-chrome',
+  process.env.HOME ? path.join(process.env.HOME, '.local/bin/google-chrome-stable') : null,
 ].filter((value): value is string => Boolean(value));
 
 function resolveChromiumExecutablePath(): string {
-  return DEFAULT_EXECUTABLE_PATHS[0];
+  return DEFAULT_EXECUTABLE_PATHS.find((candidate) => existsSync(candidate)) ?? DEFAULT_EXECUTABLE_PATHS[0];
 }
 
 async function waitForDocumentReady(page: Page) {

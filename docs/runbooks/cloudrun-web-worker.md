@@ -117,10 +117,15 @@ SMOKE_TEST_EMAIL=... SMOKE_TEST_PASSWORD=... npm run smoke:cloudrun:v1
    ```
 3. Look specifically for:
    - `[Redis] Connection error`
+   - `IMPORTANT! Eviction policy is ... It should be "noeviction"`
    - `[worker.lifecycle] redis connection closed`
    - startup probe failures
    - Cloud SQL proxy connection failures
 4. If this began after a deploy, redeploy the previous worker revision only.
+5. Confirm Memorystore is still on the supported BullMQ policy:
+   ```bash
+   npm run ops:redis:check
+   ```
 
 ## Worker Error Burst After Deploy
 
@@ -154,6 +159,7 @@ If `dnd-booker ops audit violations` fires but the worker service is still Ready
    SMOKE_TEST_EMAIL=... SMOKE_TEST_PASSWORD=... npm run smoke:cloudrun:v1
    ```
 4. If smoke hangs in generation/export and the queue backlog keeps growing, roll back the worker revision first.
+5. If the worker logs also warn about Redis eviction policy, fix Redis before treating the backlog as a pure application regression. BullMQ requires `maxmemory-policy=noeviction`.
 
 ## Rollback
 
