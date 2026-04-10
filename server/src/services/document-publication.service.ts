@@ -8,6 +8,7 @@ import {
   canonicalPublicationDocumentToTypstSource,
   normalizePublicationDocumentContent,
   parseLayoutDocumentV2,
+  resolvePublicationDocumentLayoutSnapshotState,
   type PublicationDocument,
   type LayoutPlan,
   type PagePreset,
@@ -117,6 +118,8 @@ export interface PublicationDocumentSummary {
   layoutSnapshotJson: unknown | null;
   layoutEngineVersion: number | null;
   layoutSnapshotUpdatedAt: string | null;
+  layoutSnapshotStatus: 'missing' | 'invalid' | 'stale' | 'current';
+  layoutDiagnostics: PublicationDocument['layoutDiagnostics'];
   canonicalVersion: number;
   editorProjectionVersion: number;
   typstVersion: number;
@@ -149,11 +152,7 @@ export function buildPublicationDocumentStorageFields(
   const canonicalDocJson = normalizePublicationDocumentContent(canonicalSource);
   const editorProjectionJson = normalizePublicationDocumentContent(canonicalSource);
   const typstSource = String(
-    input.typstSource ?? canonicalPublicationDocumentToTypstSource(canonicalDocJson, {
-      layoutPlan: (input.layoutPlan ?? null) as any,
-      kind: input.kind ?? null,
-      title: input.title ?? null,
-    }),
+    input.typstSource ?? '',
   );
   const layoutSnapshotPreset = input.layoutSnapshotPreset ?? 'standard_pdf';
   const parsedLayoutSnapshot = parseLayoutDocumentV2(input.layoutSnapshotJson);
@@ -169,6 +168,12 @@ export function buildPublicationDocumentStorageFields(
         measurementMode: 'deterministic',
         respectManualPageBreaks: true,
       });
+  const resolvedTypstSource = typstSource || canonicalPublicationDocumentToTypstSource(canonicalDocJson, {
+    layoutPlan: (input.layoutPlan ?? null) as any,
+    kind: input.kind ?? null,
+    title: input.title ?? null,
+    layoutSnapshotJson,
+  });
 
   const currentCanonicalVersion = versions.canonicalVersion ?? 1;
   const currentEditorProjectionVersion = versions.editorProjectionVersion ?? 1;
@@ -179,7 +184,7 @@ export function buildPublicationDocumentStorageFields(
     content: canonicalDocJson as unknown as Prisma.InputJsonValue,
     canonicalDocJson: canonicalDocJson as unknown as Prisma.InputJsonValue,
     editorProjectionJson: editorProjectionJson as unknown as Prisma.InputJsonValue,
-    typstSource,
+    typstSource: resolvedTypstSource,
     layoutSnapshotJson: layoutSnapshotJson as unknown as Prisma.InputJsonValue,
     layoutEngineVersion: layoutSnapshotJson.version,
     layoutSnapshotUpdatedAt: new Date(),
@@ -271,6 +276,12 @@ export function toPublicationDocumentSnapshot(
 function toPublicationDocumentSummary(
   document: Prisma.ProjectDocumentGetPayload<{ select: typeof publicationDocumentListSelect }>,
 ): PublicationDocumentSummary {
+  const layoutSnapshotState = resolvePublicationDocumentLayoutSnapshotState({
+    layoutSnapshotJson: document.layoutSnapshotJson,
+    layoutEngineVersion: document.layoutEngineVersion,
+    layoutSnapshotUpdatedAt: document.layoutSnapshotUpdatedAt,
+    updatedAt: document.updatedAt,
+  });
   return {
     id: document.id,
     projectId: document.projectId,
@@ -283,9 +294,11 @@ function toPublicationDocumentSummary(
     layoutPlan: document.layoutPlan,
     status: document.status,
     sourceArtifactId: document.sourceArtifactId,
-    layoutSnapshotJson: document.layoutSnapshotJson,
-    layoutEngineVersion: document.layoutEngineVersion,
-    layoutSnapshotUpdatedAt: document.layoutSnapshotUpdatedAt?.toISOString() ?? null,
+    layoutSnapshotJson: layoutSnapshotState.layoutSnapshotJson,
+    layoutEngineVersion: layoutSnapshotState.layoutEngineVersion,
+    layoutSnapshotUpdatedAt: layoutSnapshotState.layoutSnapshotUpdatedAt,
+    layoutSnapshotStatus: layoutSnapshotState.status,
+    layoutDiagnostics: layoutSnapshotState.diagnostics,
     canonicalVersion: document.canonicalVersion ?? 1,
     editorProjectionVersion: document.editorProjectionVersion ?? 1,
     typstVersion: document.typstVersion ?? 1,

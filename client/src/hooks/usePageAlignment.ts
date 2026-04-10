@@ -10,7 +10,7 @@ const MIN_CONTENT_FOR_FULL_PAGE = 80;
 
 /** Read --page-content-height from .page-canvas via computed style. */
 function getPageContentHeight(pmEl: HTMLElement): number {
-  const canvas = pmEl.closest('.page-canvas') as HTMLElement | null;
+  const canvas = pmEl.closest('.page-canvas, .parity-live-editor-shell') as HTMLElement | null;
   if (!canvas) return DEFAULT_PAGE_CONTENT_HEIGHT;
   const raw = getComputedStyle(canvas).getPropertyValue('--page-content-height').trim();
   return parseInt(raw, 10) || DEFAULT_PAGE_CONTENT_HEIGHT;
@@ -28,9 +28,10 @@ export function usePageAlignment(editor: Editor | null) {
   const rafRef = useRef(0);
 
   useEffect(() => {
-    if (!editor) return;
+    if (!editor || !editor.view?.dom) return;
 
     const align = () => {
+      if (!editor.view?.dom) return;
       const pmEl = editor.view.dom as HTMLElement;
       const pageBreaks = pmEl.querySelectorAll<HTMLElement>('.node-pageBreak');
       if (!pageBreaks.length) return;
@@ -82,6 +83,12 @@ export function usePageAlignment(editor: Editor | null) {
     editor.on('update', scheduleAlign);
 
     // Re-align when editor resizes (e.g. column toggle, panel open/close)
+    if (typeof ResizeObserver === 'undefined') {
+      return () => {
+        cancelAnimationFrame(rafRef.current);
+        editor.off('update', scheduleAlign);
+      };
+    }
     const observer = new ResizeObserver(scheduleAlign);
     observer.observe(editor.view.dom);
 

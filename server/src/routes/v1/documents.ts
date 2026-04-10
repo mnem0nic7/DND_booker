@@ -45,6 +45,14 @@ function toRouteDocumentResponse(document: {
   layoutSnapshotJson?: unknown | null;
   layoutEngineVersion?: number | null;
   layoutSnapshotUpdatedAt?: string | Date | null;
+  layoutSnapshotStatus?: 'missing' | 'invalid' | 'stale' | 'current';
+  layoutDiagnostics?: Array<{
+    severity: 'info' | 'warning' | 'error';
+    code: string;
+    message: string;
+    nodeId: string | null;
+    fragmentId: string | null;
+  }>;
   canonicalVersion: number;
   editorProjectionVersion: number;
   typstVersion: number;
@@ -71,6 +79,8 @@ function toRouteDocumentResponse(document: {
     layoutSnapshotUpdatedAt: document.layoutSnapshotUpdatedAt instanceof Date
       ? document.layoutSnapshotUpdatedAt.toISOString()
       : document.layoutSnapshotUpdatedAt ?? null,
+    layoutSnapshotStatus: document.layoutSnapshotStatus ?? 'missing',
+    layoutDiagnostics: document.layoutDiagnostics ?? [],
     canonicalVersion: document.canonicalVersion,
     editorProjectionVersion: document.editorProjectionVersion,
     typstVersion: document.typstVersion,

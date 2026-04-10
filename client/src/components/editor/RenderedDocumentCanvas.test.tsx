@@ -20,6 +20,7 @@ describe('RenderedDocumentCanvas', () => {
   it('wraps the hidden measurement html in a ProseMirror typography shell', () => {
     const { container } = renderWithProviders(
       <RenderedDocumentCanvas
+        editor={null}
         theme="gilded-folio"
         measuredDocument={createMeasuredDocument()}
         selectedNodeId={null}

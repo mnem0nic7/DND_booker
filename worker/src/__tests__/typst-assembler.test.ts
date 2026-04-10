@@ -219,6 +219,152 @@ describe('Typst Assembler', () => {
       expect(source).toContain('#set text(font: body-font, size: 9.5pt, fill: theme-text)');
     });
 
+    it('renders snapshot-driven page boundaries without reintroducing synthetic structure', () => {
+      const source = assembleTypst({
+        documents: [
+          {
+            title: 'Chapter 1',
+            sortOrder: 1,
+            kind: 'chapter',
+            layoutSnapshotJson: {
+              version: 2,
+              preset: 'standard_pdf',
+              sectionRecipe: null,
+              columnBalanceTarget: 'balanced',
+              layoutPlan: null,
+              measureProfile: {
+                preset: 'standard_pdf',
+                frame: {
+                  pageWidthPx: 816,
+                  pageHeightPx: 1056,
+                  contentWidthPx: 696,
+                  contentHeightPx: 880,
+                  columnWidthPx: 339,
+                  columnCount: 2,
+                  columnGapPx: 18,
+                },
+                theme: 'classic-parchment',
+                documentKind: 'chapter',
+                documentTitle: 'Chapter 1',
+                respectManualPageBreaks: true,
+                measurementMode: 'deterministic',
+                fallbackScopeIds: [],
+              },
+              pages: [
+                {
+                  index: 1,
+                  preset: 'standard_pdf',
+                  recipe: null,
+                  fragmentIds: ['fragment:p-1'],
+                  contentHeightPx: 240,
+                  fillRatio: 0.27,
+                  columnMetrics: { leftFillRatio: 0.27, rightFillRatio: null, deltaRatio: null },
+                  nodeIds: ['p-1'],
+                  documentIds: [],
+                  openerDocumentId: null,
+                  boundaryType: 'autoGap',
+                  boundaryNodeId: 'p-1',
+                  boundarySourceIndex: 0,
+                },
+                {
+                  index: 2,
+                  preset: 'standard_pdf',
+                  recipe: null,
+                  fragmentIds: ['fragment:p-2'],
+                  contentHeightPx: 220,
+                  fillRatio: 0.25,
+                  columnMetrics: { leftFillRatio: 0.25, rightFillRatio: null, deltaRatio: null },
+                  nodeIds: ['p-2'],
+                  documentIds: [],
+                  openerDocumentId: null,
+                  boundaryType: 'end',
+                  boundaryNodeId: null,
+                  boundarySourceIndex: null,
+                },
+              ],
+              fragments: [
+                {
+                  id: 'fragment:p-1',
+                  nodeId: 'p-1',
+                  unitId: 'unit:p-1',
+                  sourceIndex: 0,
+                  presentationOrder: 0,
+                  span: 'column',
+                  placement: 'inline',
+                  flowBehavior: 'wide_block',
+                  wrapSide: null,
+                  wrapEligible: false,
+                  wrapWidthPx: null,
+                  wrapWidthRatio: null,
+                  groupId: null,
+                  keepTogether: false,
+                  allowWrapBelow: true,
+                  nodeType: 'paragraph',
+                  content: { type: 'paragraph', attrs: { nodeId: 'p-1' }, content: [{ type: 'text', text: 'Page one paragraph.' }] },
+                  pageIndex: 1,
+                  columnIndex: 1,
+                  region: 'column_left',
+                  bounds: { x: 0, y: 0, width: 339, height: 120 },
+                  isHero: false,
+                  isOpener: false,
+                },
+                {
+                  id: 'fragment:p-2',
+                  nodeId: 'p-2',
+                  unitId: 'unit:p-2',
+                  sourceIndex: 1,
+                  presentationOrder: 1,
+                  span: 'column',
+                  placement: 'inline',
+                  flowBehavior: 'wide_block',
+                  wrapSide: null,
+                  wrapEligible: false,
+                  wrapWidthPx: null,
+                  wrapWidthRatio: null,
+                  groupId: null,
+                  keepTogether: false,
+                  allowWrapBelow: true,
+                  nodeType: 'paragraph',
+                  content: { type: 'paragraph', attrs: { nodeId: 'p-2' }, content: [{ type: 'text', text: 'Page two paragraph.' }] },
+                  pageIndex: 2,
+                  columnIndex: 1,
+                  region: 'column_left',
+                  bounds: { x: 0, y: 0, width: 339, height: 120 },
+                  isHero: false,
+                  isOpener: false,
+                },
+              ],
+              anchors: [],
+              diagnostics: [],
+              metrics: {
+                fragmentCount: 2,
+                heroFragmentCount: 0,
+                groupedFragmentCount: 0,
+                keepTogetherCount: 0,
+                pageCount: 2,
+              },
+              generatedAt: '2026-04-10T00:00:00.000Z',
+            },
+            content: {
+              type: 'doc',
+              content: [
+                { type: 'paragraph', attrs: { nodeId: 'p-1' }, content: [{ type: 'text', text: 'Page one paragraph.' }] },
+                { type: 'paragraph', attrs: { nodeId: 'p-2' }, content: [{ type: 'text', text: 'Page two paragraph.' }] },
+              ],
+            },
+          },
+        ],
+        theme: 'classic-parchment',
+        projectTitle: 'Parity Test',
+        allowSyntheticStructure: false,
+      });
+
+      expect(source).toContain('#pagebreak()');
+      expect(source).toContain('Page one paragraph.');
+      expect(source).toContain('Page two paragraph.');
+      expect(source).not.toContain('#outline(');
+    });
+
     it('should use default theme for unknown theme name', () => {
       const source = assembleTypst({
         documents: [],

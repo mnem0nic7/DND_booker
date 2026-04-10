@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useEditor, EditorContent } from '@tiptap/react';
+import { useEditor } from '@tiptap/react';
 import type { DocumentContent, LayoutDocumentV2, LayoutPlan } from '@dnd-booker/shared';
 import { ensureStableNodeIds } from '@dnd-booker/shared';
 import { buildEditorExtensions } from '../../lib/buildEditorExtensions';
@@ -14,6 +14,7 @@ import { PreviewPanel } from '../preview/PreviewPanel';
 import { useThemeStore } from '../../stores/themeStore';
 import { useExportStore } from '../../stores/exportStore';
 import { useAiStore } from '../../stores/aiStore';
+import { usePageAlignment } from '../../hooks/usePageAlignment';
 import { AiSettingsModal } from '../ai/AiSettingsModal';
 import { AiChatPanel } from '../ai/AiChatPanel';
 import { AutonomousGenerationDialog } from '../ai/AutonomousGenerationDialog';
@@ -91,10 +92,14 @@ export function EditorLayout({
   const [localLayoutPlan, setLocalLayoutPlan] = useState<LayoutPlan | null>(layoutPlan);
   const [isClearingTextLayoutFallbacks, setIsClearingTextLayoutFallbacks] = useState(false);
   const layoutSnapshotRef = useRef<LayoutDocumentV2 | null>(layoutSnapshot);
+  const liveLayoutSnapshotRef = useRef<LayoutDocumentV2 | null>(layoutSnapshot);
   const lastPublishedLayoutSignatureRef = useRef<string | null>(layoutSnapshotSignature(layoutSnapshot));
 
   const editor = useEditor({
-    extensions: buildEditorExtensions(),
+    extensions: buildEditorExtensions({
+      includeSnapshotPagination: true,
+      getLayoutSnapshot: () => liveLayoutSnapshotRef.current,
+    }),
     content: ensureStableNodeIds(content),
     immediatelyRender: false,
     onUpdate: ({ editor: ed }) => {
@@ -157,9 +162,19 @@ export function EditorLayout({
     footerTitle: resolvedDocumentTitle,
   });
 
+  usePageAlignment(editor);
+
   useEffect(() => {
     layoutSnapshotRef.current = measuredDocument.layoutSnapshot ?? layoutSnapshot ?? null;
+    liveLayoutSnapshotRef.current = measuredDocument.layoutSnapshot ?? layoutSnapshot ?? null;
   }, [layoutSnapshot, measuredDocument.layoutSnapshot, layoutSnapshotRef]);
+
+  useEffect(() => {
+    if (!editor || !editor.view) return;
+    editor.view.dispatch(
+      editor.state.tr.setMeta('snapshotPaginationRefresh', Date.now()),
+    );
+  }, [editor, measuredDocument.layoutSnapshot]);
 
   useEffect(() => {
     lastPublishedLayoutSignatureRef.current = layoutSnapshotSignature(layoutSnapshot);
@@ -185,6 +200,35 @@ export function EditorLayout({
   }, [editor]);
 
   const handleReorderNode = useCallback(async (draggedNodeId: string, targetNodeId: string, placement: 'before' | 'after') => {
+    if (!editor) return;
+
+    const locateNode = (nodeId: string): { pos: number; size: number } | null => {
+      let match: { pos: number; size: number } | null = null;
+      editor.state.doc.forEach((node, offset) => {
+        if (String(node.attrs?.nodeId ?? '') !== nodeId) return;
+        match = {
+          pos: offset + 1,
+          size: node.nodeSize,
+        };
+      });
+      return match;
+    };
+
+    const dragged = locateNode(draggedNodeId);
+    const target = locateNode(targetNodeId);
+    if (!dragged || !target) return;
+
+    const draggedNode = editor.state.doc.nodeAt(dragged.pos);
+    if (!draggedNode) return;
+
+    const transaction = editor.state.tr.delete(dragged.pos, dragged.pos + dragged.size);
+    const adjustedTargetPos = dragged.pos < target.pos ? target.pos - dragged.size : target.pos;
+    const insertPos = placement === 'before'
+      ? adjustedTargetPos
+      : adjustedTargetPos + target.size;
+    transaction.insert(insertPos, draggedNode);
+    editor.view.dispatch(transaction);
+
     if (!localLayoutPlan || !onLayoutPlanUpdate) return;
 
     const orderedBlocks = [...localLayoutPlan.blocks].sort((left, right) => left.presentationOrder - right.presentationOrder);
@@ -211,7 +255,7 @@ export function EditorLayout({
     } catch {
       setLocalLayoutPlan(localLayoutPlan);
     }
-  }, [localLayoutPlan, onLayoutPlanUpdate]);
+  }, [editor, localLayoutPlan, onLayoutPlanUpdate]);
 
   const handleClearTextLayoutFallbacks = useCallback(async () => {
     if (!onClearTextLayoutFallbacks || isClearingTextLayoutFallbacks) return;
@@ -349,11 +393,6 @@ export function EditorLayout({
           />
         )}
 
-        {/* Hidden source editor keeps TipTap as the canonical content engine. */}
-        <div className="sr-only" aria-hidden="true">
-          {editor && <EditorContent editor={editor} />}
-        </div>
-
         {textLayoutFallbackScopeCount > 0 && (
           <div className="mx-4 mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
             <div className="flex items-start justify-between gap-3">
@@ -375,6 +414,7 @@ export function EditorLayout({
         )}
 
         <RenderedDocumentCanvas
+          editor={editor}
           theme={currentTheme}
           measuredDocument={measuredDocument}
           selectedNodeId={selectedNodeId}

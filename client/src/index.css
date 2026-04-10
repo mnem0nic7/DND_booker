@@ -179,27 +179,49 @@
    TipTap wraps custom blocks in .node-<name> divs via ReactNodeViewRenderer,
    so we target those wrapper classes (not the inner .stat-block etc.) */
 .page-canvas .ProseMirror > .node-statBlock,
+.parity-live-editor-shell .ProseMirror > .node-statBlock,
 .page-canvas .ProseMirror > .node-spellCard,
+.parity-live-editor-shell .ProseMirror > .node-spellCard,
 .page-canvas .ProseMirror > .node-magicItem,
+.parity-live-editor-shell .ProseMirror > .node-magicItem,
 .page-canvas .ProseMirror > .node-readAloudBox,
+.parity-live-editor-shell .ProseMirror > .node-readAloudBox,
 .page-canvas .ProseMirror > .node-sidebarCallout,
+.parity-live-editor-shell .ProseMirror > .node-sidebarCallout,
 .page-canvas .ProseMirror > .node-npcProfile,
+.parity-live-editor-shell .ProseMirror > .node-npcProfile,
 .page-canvas .ProseMirror > .node-randomTable,
+.parity-live-editor-shell .ProseMirror > .node-randomTable,
 .page-canvas .ProseMirror > .node-encounterTable,
+.parity-live-editor-shell .ProseMirror > .node-encounterTable,
 .page-canvas .ProseMirror > .node-classFeature,
+.parity-live-editor-shell .ProseMirror > .node-classFeature,
 .page-canvas .ProseMirror > .node-raceBlock,
+.parity-live-editor-shell .ProseMirror > .node-raceBlock,
 .page-canvas .ProseMirror > .node-handout,
+.parity-live-editor-shell .ProseMirror > .node-handout,
 .page-canvas .ProseMirror > .node-mapBlock,
+.parity-live-editor-shell .ProseMirror > .node-mapBlock,
 .page-canvas .ProseMirror > .node-pageBorder,
+.parity-live-editor-shell .ProseMirror > .node-pageBorder,
 .page-canvas .ProseMirror > .node-fullBleedImage,
+.parity-live-editor-shell .ProseMirror > .node-fullBleedImage,
 .page-canvas .ProseMirror > .node-chapterHeader,
+.parity-live-editor-shell .ProseMirror > .node-chapterHeader,
 .page-canvas .ProseMirror > blockquote,
+.parity-live-editor-shell .ProseMirror > blockquote,
 .page-canvas .ProseMirror > pre,
-.page-canvas .ProseMirror > table {
+.parity-live-editor-shell .ProseMirror > pre,
+.page-canvas .ProseMirror > table,
+.parity-live-editor-shell .ProseMirror > table {
   break-inside: avoid;
 }
 
 .page-canvas .ProseMirror .node-columnBreak {
+  break-after: column;
+}
+
+.parity-live-editor-shell .ProseMirror .node-columnBreak {
   break-after: column;
 }
 
@@ -211,6 +233,13 @@
      paddingBottom creates a "top margin" on the next page (parchment shows through). */
   padding: 0 0 var(--margin-reserve) 0;
   /* Transparent so the parchment from .page-canvas shows through the fill area */
+  background: transparent;
+}
+
+.parity-live-editor-shell .ProseMirror .node-pageBreak {
+  column-span: all;
+  margin: 0 calc(-1 * var(--page-padding, 60px));
+  padding: 0 0 calc(var(--margin-reserve, 56px) + 4px) 0;
   background: transparent;
 }
 
@@ -248,11 +277,17 @@
 }
 
 .page-canvas .ProseMirror .node-titlePage,
+.parity-live-editor-shell .ProseMirror .node-titlePage,
 .page-canvas .ProseMirror .node-creditsPage,
+.parity-live-editor-shell .ProseMirror .node-creditsPage,
 .page-canvas .ProseMirror .node-backCover,
+.parity-live-editor-shell .ProseMirror .node-backCover,
 .page-canvas .ProseMirror .node-tableOfContents,
+.parity-live-editor-shell .ProseMirror .node-tableOfContents,
 .page-canvas .ProseMirror .node-chapterHeader,
-.page-canvas .ProseMirror .node-fullBleedImage {
+.parity-live-editor-shell .ProseMirror .node-chapterHeader,
+.page-canvas .ProseMirror .node-fullBleedImage,
+.parity-live-editor-shell .ProseMirror .node-fullBleedImage {
   column-span: all;
 }
 
@@ -508,33 +543,77 @@
   min-height: inherit;
 }
 
-.parity-render-surface [data-node-id] {
+.parity-live-canvas {
+  position: relative;
+  width: var(--page-width, 816px);
+  margin: 0 auto;
+}
+
+.parity-live-page-stack {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.parity-live-page-bg {
+  position: absolute;
+  left: 0;
+  right: 0;
+  width: var(--page-width, 816px);
+  height: var(--page-height, 1056px);
+  background-color: var(--page-bg);
+  background-image: var(--page-texture);
+  background-size: var(--page-width, 816px) var(--page-height, 1056px);
+  background-repeat: repeat-y;
+  background-position: top center;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+}
+
+.parity-live-editor-shell {
+  position: relative;
+  width: var(--page-width, 816px);
+  padding: var(--page-padding, 60px);
+  box-sizing: border-box;
+}
+
+.parity-live-editor-shell .ProseMirror {
+  column-count: 2;
+  column-gap: var(--layout-column-gap, 18px);
+  column-rule: 1px solid var(--column-rule-color, rgba(0, 0, 0, 0.06));
+  min-height: inherit;
+  outline: none;
+}
+
+.parity-live-editor-shell .ProseMirror > [data-node-id] {
   cursor: pointer;
   transition: box-shadow 120ms ease, outline-color 120ms ease, transform 120ms ease;
   outline: 1px solid transparent;
   border-radius: 4px;
 }
 
-.parity-render-surface [data-node-id]:hover {
+.parity-live-editor-shell .ProseMirror > [data-node-id]:hover {
   outline-color: rgba(124, 58, 237, 0.25);
 }
 
-.parity-render-surface .layout-editor-selected {
+.parity-live-editor-shell .ProseMirror > .layout-editor-selected {
   outline-color: rgba(124, 58, 237, 0.9);
   box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.18);
 }
 
-.parity-render-surface .layout-editor-drop-before {
+.parity-live-editor-shell .ProseMirror > .layout-editor-drop-before {
   box-shadow: inset 0 4px 0 0 rgba(124, 58, 237, 0.95);
 }
 
-.parity-render-surface .layout-editor-drop-after {
+.parity-live-editor-shell .ProseMirror > .layout-editor-drop-after {
   box-shadow: inset 0 -4px 0 0 rgba(124, 58, 237, 0.95);
 }
 
-.parity-render-surface .layout-flow > .layout-fragment,
-.parity-render-surface .layout-unit {
-  margin-bottom: 0.35rem;
+.parity-live-editor-shell .ProseMirror > .layout-snapshot-column-break-before {
+  break-before: column;
+}
+
+.parity-live-editor-shell .auto-page-gap {
+  padding-bottom: calc(var(--margin-reserve, 56px) + 4px);
 }
 
 .selected-block-editor .tiptap,
@@ -548,7 +627,15 @@
   list-style-type: circle;
 }
 
+.parity-live-editor-shell .ProseMirror ul ul {
+  list-style-type: circle;
+}
+
 .page-canvas .ProseMirror ul ul ul {
+  list-style-type: square;
+}
+
+.parity-live-editor-shell .ProseMirror ul ul ul {
   list-style-type: square;
 }
 
@@ -556,7 +643,16 @@
   margin-bottom: 0.2em;
 }
 
+.parity-live-editor-shell .ProseMirror li {
+  margin-bottom: 0.2em;
+}
+
 .page-canvas .ProseMirror li p {
+  text-indent: 0;
+  margin-bottom: 0.15em;
+}
+
+.parity-live-editor-shell .ProseMirror li p {
   text-indent: 0;
   margin-bottom: 0.15em;
 }

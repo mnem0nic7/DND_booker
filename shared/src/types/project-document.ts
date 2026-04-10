@@ -20,6 +20,14 @@ export interface ProjectDocument {
   layoutSnapshotJson?: LayoutDocumentV2 | null;
   layoutEngineVersion?: number | null;
   layoutSnapshotUpdatedAt?: string | null;
+  layoutSnapshotStatus?: 'missing' | 'invalid' | 'stale' | 'current';
+  layoutDiagnostics?: Array<{
+    severity: 'info' | 'warning' | 'error';
+    code: string;
+    message: string;
+    nodeId: string | null;
+    fragmentId: string | null;
+  }>;
   canonicalVersion?: number;
   editorProjectionVersion?: number;
   typstVersion?: number;

@@ -12,6 +12,7 @@ import type {
 } from '@dnd-booker/shared';
 import {
   buildLayoutDocumentV2,
+  canonicalPublicationDocumentToTypstSource,
   layoutDocumentV2ToPageModel,
   normalizePublicationDocumentContent,
   parseLayoutDocumentV2,
@@ -29,7 +30,6 @@ import {
   buildUnavailableExportReview,
   finalizeExportReview,
   isBetterExportReview,
-  planExportAutoFixes,
   reviewMeasuredExportLayout,
   reviewPdfExport,
 } from '../services/export-review.service.js';
@@ -66,6 +66,10 @@ interface RenderableDocument {
   layoutEngineVersion?: number | null;
   layoutSnapshotUpdatedAt?: string | null;
   updatedAt?: string | null;
+  status?: string | null;
+  canonicalVersion?: number | null;
+  editorProjectionVersion?: number | null;
+  typstVersion?: number | null;
   fallbackScopeIds?: string[];
 }
 
@@ -349,23 +353,63 @@ async function buildPreflightCandidate(input: {
   };
 }
 
-async function persistMeasuredLayoutSnapshots(docs: MeasuredRenderableDocument[]): Promise<void> {
-  const writes = docs
-    .filter((doc): doc is MeasuredRenderableDocument & { id: string; layoutSnapshot: LayoutDocumentV2 } => (
-      Boolean(doc.id)
-      && Boolean(doc.layoutSnapshot)
-      && doc.shouldPersistLayoutSnapshot === true
-    ))
-    .map((doc) =>
-      prisma.projectDocument.update({
-        where: { id: doc.id },
-        data: {
-          layoutSnapshotJson: doc.layoutSnapshot as any,
-          layoutEngineVersion: doc.layoutSnapshot.version,
-          layoutSnapshotUpdatedAt: new Date(doc.layoutSnapshot.generatedAt),
-        },
-      }),
-    );
+async function persistPreparedDocuments(input: {
+  docs: MeasuredRenderableDocument[];
+  currentDocsById: ReadonlyMap<string, RenderableDocument>;
+  pagePreset: 'standard_pdf' | 'print_pdf';
+  theme: string;
+}): Promise<void> {
+  const writes = input.docs
+    .filter((doc): doc is MeasuredRenderableDocument & { id: string } => Boolean(doc.id))
+    .flatMap((doc) => {
+      const current = input.currentDocsById.get(doc.id);
+      if (!current || !doc.content) return [];
+
+      const nextContent = normalizePublicationDocumentContent(doc.content);
+      const nextLayoutPlan = doc.layoutPlan ?? null;
+      const nextLayoutSnapshot = doc.layoutSnapshot ?? parseLayoutDocumentV2(current.layoutSnapshotJson) ?? buildLayoutDocumentV2({
+        content: nextContent,
+        layoutPlan: nextLayoutPlan,
+        preset: input.pagePreset,
+        theme: input.theme,
+        documentKind: doc.kind ?? null,
+        documentTitle: doc.title,
+        measurementMode: 'deterministic',
+        respectManualPageBreaks: true,
+      });
+      const nextTypstSource = canonicalPublicationDocumentToTypstSource(nextContent, {
+        layoutPlan: nextLayoutPlan,
+        kind: doc.kind ?? null,
+        title: doc.title,
+        layoutSnapshotJson: nextLayoutSnapshot,
+      });
+
+      const contentChanged = JSON.stringify(nextContent) !== JSON.stringify(current.content ?? null);
+      const layoutPlanChanged = JSON.stringify(nextLayoutPlan) !== JSON.stringify(current.layoutPlan ?? null);
+      const layoutSnapshotChanged = JSON.stringify(nextLayoutSnapshot) !== JSON.stringify(parseLayoutDocumentV2(current.layoutSnapshotJson));
+      if (!contentChanged && !layoutPlanChanged && !layoutSnapshotChanged) return [];
+
+      const bumpVersions = contentChanged || layoutPlanChanged;
+      return [
+        prisma.projectDocument.update({
+          where: { id: doc.id },
+          data: {
+            content: nextContent as any,
+            canonicalDocJson: nextContent as any,
+            editorProjectionJson: nextContent as any,
+            typstSource: nextTypstSource,
+            layoutPlan: nextLayoutPlan as any,
+            layoutSnapshotJson: nextLayoutSnapshot as any,
+            layoutEngineVersion: nextLayoutSnapshot.version,
+            layoutSnapshotUpdatedAt: new Date(),
+            canonicalVersion: bumpVersions ? (current.canonicalVersion ?? 1) + 1 : (current.canonicalVersion ?? 1),
+            editorProjectionVersion: bumpVersions ? (current.editorProjectionVersion ?? 1) + 1 : (current.editorProjectionVersion ?? 1),
+            typstVersion: bumpVersions ? (current.typstVersion ?? 1) + 1 : (current.typstVersion ?? 1),
+            status: bumpVersions ? 'edited' : (current.status ?? 'draft'),
+          },
+        }),
+      ];
+    });
 
   if (writes.length === 0) return;
   await Promise.all(writes);
@@ -555,6 +599,10 @@ export async function processExportJob(job: Job<ExportJobData>): Promise<void> {
         layoutSnapshotJson: true,
         layoutEngineVersion: true,
         layoutSnapshotUpdatedAt: true,
+        status: true,
+        canonicalVersion: true,
+        editorProjectionVersion: true,
+        typstVersion: true,
         updatedAt: true,
       },
     });
@@ -563,7 +611,7 @@ export async function processExportJob(job: Job<ExportJobData>): Promise<void> {
       console.warn(`[export.job] Project ${exportJob.projectId} has no ProjectDocuments; using legacy content fallback.`);
     }
 
-    const rawDocs = projectDocuments.length > 0
+    const rawDocs: RenderableDocument[] = projectDocuments.length > 0
       ? projectDocuments.map(doc => ({
           id: doc.id,
           title: doc.title,
@@ -579,6 +627,10 @@ export async function processExportJob(job: Job<ExportJobData>): Promise<void> {
           layoutSnapshotJson: doc.layoutSnapshotJson,
           layoutEngineVersion: doc.layoutEngineVersion,
           layoutSnapshotUpdatedAt: doc.layoutSnapshotUpdatedAt?.toISOString() ?? null,
+          status: doc.status,
+          canonicalVersion: doc.canonicalVersion,
+          editorProjectionVersion: doc.editorProjectionVersion,
+          typstVersion: doc.typstVersion,
           updatedAt: doc.updatedAt.toISOString(),
           fallbackScopeIds: resolveTextLayoutFallbackScopeIds(exportJob.project.settings, doc.id),
         }))
@@ -607,9 +659,15 @@ export async function processExportJob(job: Job<ExportJobData>): Promise<void> {
       const filename = `${exportJob.projectId}-${Date.now()}.${ext}`;
       const filepath = path.join(outputDir, filename);
 
-      const baseRender = await renderPdfVariant({
+      const currentDocsById = new Map(
+        rawDocs
+          .filter((doc): doc is RenderableDocument & { id: string } => 'id' in doc && typeof doc.id === 'string' && doc.id.length > 0)
+          .map((doc) => [doc.id, doc] as const),
+      );
+      const selected = await renderPdfVariant({
         filepath,
         docs,
+        currentDocsById,
         theme,
         projectTitle: exportTitle,
         projectId: exportJob.projectId,
@@ -617,44 +675,6 @@ export async function processExportJob(job: Job<ExportJobData>): Promise<void> {
         projectType: exportJob.project.type,
         printReady: format === 'print_pdf',
       });
-
-      let selected = baseRender;
-      const autoFixes = planExportAutoFixes(baseRender.review);
-
-      if (autoFixes.length > 0) {
-        const polishedFilepath = filepath.replace(/\.pdf$/, '.polished.pdf');
-        const polishedRender = await renderPdfVariant({
-          filepath: polishedFilepath,
-          docs,
-          theme,
-          projectTitle: exportTitle,
-          projectId: exportJob.projectId,
-          userId: exportJob.userId,
-          projectType: exportJob.project.type,
-          printReady: format === 'print_pdf',
-          autoFixes,
-          reviewCodes: baseRender.review.findings.map((finding) => finding.code),
-        });
-
-        if (isBetterExportReview(polishedRender.review, baseRender.review)) {
-          await fs.rename(polishedFilepath, filepath);
-          selected = {
-            buffer: polishedRender.buffer,
-            review: finalizeExportReview(polishedRender.review, autoFixes, 2),
-          };
-        } else {
-          await fs.rm(polishedFilepath, { force: true });
-          selected = {
-            buffer: baseRender.buffer,
-            review: finalizeExportReview(baseRender.review, [], 1),
-          };
-        }
-      } else {
-        selected = {
-          buffer: baseRender.buffer,
-          review: finalizeExportReview(baseRender.review, [], 1),
-        };
-      }
 
       buffer = selected.buffer;
       review = selected.review;
@@ -746,6 +766,7 @@ export async function processExportJob(job: Job<ExportJobData>): Promise<void> {
 async function renderPdfVariant(input: {
   filepath: string;
   docs: RenderableDocument[];
+  currentDocsById: ReadonlyMap<string, RenderableDocument>;
   theme: string;
   projectTitle: string;
   projectId: string;
@@ -758,6 +779,7 @@ async function renderPdfVariant(input: {
   const {
     filepath,
     docs,
+    currentDocsById,
     theme,
     projectTitle,
     projectId,
@@ -796,8 +818,16 @@ async function renderPdfVariant(input: {
   const selectedCandidate = correctedCandidate && isBetterExportReview(correctedCandidate.review, baseCandidate.review)
     ? correctedCandidate
     : baseCandidate;
-  await persistMeasuredLayoutSnapshots(selectedCandidate.measuredDocs);
-  const typstDocs = rewriteUploadUrlsInDocs(selectedCandidate.measuredDocs);
+  await persistPreparedDocuments({
+    docs: selectedCandidate.measuredDocs,
+    currentDocsById,
+    pagePreset,
+    theme,
+  });
+  const typstDocs = rewriteUploadUrlsInDocs(selectedCandidate.measuredDocs).map((doc, index) => ({
+    ...doc,
+    layoutSnapshotJson: selectedCandidate.measuredDocs[index]?.layoutSnapshot ?? selectedCandidate.measuredDocs[index]?.layoutSnapshotJson ?? null,
+  }));
   const workspace = await createTypstWorkspace(path.dirname(filepath));
   let buffer: Buffer;
   try {
@@ -807,6 +837,7 @@ async function renderPdfVariant(input: {
       theme,
       projectTitle,
       projectType,
+      allowSyntheticStructure: false,
       printReady,
     });
     buffer = await generateTypstPdf(typstSource, undefined, workspace);
@@ -832,7 +863,7 @@ async function renderPdfVariant(input: {
       filepath,
       reviewedDocs,
     );
-    return { buffer, review };
+    return { buffer, review: finalizeExportReview(review, [], 1) };
   } catch (reviewError) {
     const message = reviewError instanceof Error ? reviewError.message : String(reviewError);
     console.error(`[export.job] Export review failed for ${path.basename(filepath)}:`, message);

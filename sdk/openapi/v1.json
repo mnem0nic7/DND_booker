@@ -2625,6 +2625,57 @@
                         "format": "date-time",
                         "nullable": true
                       },
+                      "layoutSnapshotStatus": {
+                        "type": "string",
+                        "enum": [
+                          "missing",
+                          "invalid",
+                          "stale",
+                          "current"
+                        ]
+                      },
+                      "layoutDiagnostics": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "severity": {
+                              "type": "string",
+                              "enum": [
+                                "info",
+                                "warning",
+                                "error"
+                              ]
+                            },
+                            "code": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "message": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "nodeId": {
+                              "type": "string",
+                              "minLength": 1,
+                              "nullable": true
+                            },
+                            "fragmentId": {
+                              "type": "string",
+                              "minLength": 1,
+                              "nullable": true
+                            }
+                          },
+                          "required": [
+                            "severity",
+                            "code",
+                            "message",
+                            "nodeId",
+                            "fragmentId"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
                       "canonicalVersion": {
                         "type": "integer"
                       },
@@ -3644,6 +3695,57 @@
                       "format": "date-time",
                       "nullable": true
                     },
+                    "layoutSnapshotStatus": {
+                      "type": "string",
+                      "enum": [
+                        "missing",
+                        "invalid",
+                        "stale",
+                        "current"
+                      ]
+                    },
+                    "layoutDiagnostics": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "severity": {
+                            "type": "string",
+                            "enum": [
+                              "info",
+                              "warning",
+                              "error"
+                            ]
+                          },
+                          "code": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "message": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "nodeId": {
+                            "type": "string",
+                            "minLength": 1,
+                            "nullable": true
+                          },
+                          "fragmentId": {
+                            "type": "string",
+                            "minLength": 1,
+                            "nullable": true
+                          }
+                        },
+                        "required": [
+                          "severity",
+                          "code",
+                          "message",
+                          "nodeId",
+                          "fragmentId"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
                     "canonicalVersion": {
                       "type": "integer",
                       "minimum": 1
@@ -3771,6 +3873,8 @@
                     "layoutSnapshotJson",
                     "layoutEngineVersion",
                     "layoutSnapshotUpdatedAt",
+                    "layoutSnapshotStatus",
+                    "layoutDiagnostics",
                     "canonicalVersion",
                     "editorProjectionVersion",
                     "typstVersion",
@@ -4766,6 +4870,57 @@
                       "format": "date-time",
                       "nullable": true
                     },
+                    "layoutSnapshotStatus": {
+                      "type": "string",
+                      "enum": [
+                        "missing",
+                        "invalid",
+                        "stale",
+                        "current"
+                      ]
+                    },
+                    "layoutDiagnostics": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "severity": {
+                            "type": "string",
+                            "enum": [
+                              "info",
+                              "warning",
+                              "error"
+                            ]
+                          },
+                          "code": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "message": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "nodeId": {
+                            "type": "string",
+                            "minLength": 1,
+                            "nullable": true
+                          },
+                          "fragmentId": {
+                            "type": "string",
+                            "minLength": 1,
+                            "nullable": true
+                          }
+                        },
+                        "required": [
+                          "severity",
+                          "code",
+                          "message",
+                          "nodeId",
+                          "fragmentId"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
                     "canonicalVersion": {
                       "type": "integer",
                       "minimum": 1
@@ -4893,6 +5048,8 @@
                     "layoutSnapshotJson",
                     "layoutEngineVersion",
                     "layoutSnapshotUpdatedAt",
+                    "layoutSnapshotStatus",
+                    "layoutDiagnostics",
                     "canonicalVersion",
                     "editorProjectionVersion",
                     "typstVersion",
@@ -7104,6 +7261,57 @@
                       "format": "date-time",
                       "nullable": true
                     },
+                    "layoutSnapshotStatus": {
+                      "type": "string",
+                      "enum": [
+                        "missing",
+                        "invalid",
+                        "stale",
+                        "current"
+                      ]
+                    },
+                    "layoutDiagnostics": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "severity": {
+                            "type": "string",
+                            "enum": [
+                              "info",
+                              "warning",
+                              "error"
+                            ]
+                          },
+                          "code": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "message": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "nodeId": {
+                            "type": "string",
+                            "minLength": 1,
+                            "nullable": true
+                          },
+                          "fragmentId": {
+                            "type": "string",
+                            "minLength": 1,
+                            "nullable": true
+                          }
+                        },
+                        "required": [
+                          "severity",
+                          "code",
+                          "message",
+                          "nodeId",
+                          "fragmentId"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
                     "canonicalVersion": {
                       "type": "integer",
                       "minimum": 1
@@ -7231,6 +7439,8 @@
                     "layoutSnapshotJson",
                     "layoutEngineVersion",
                     "layoutSnapshotUpdatedAt",
+                    "layoutSnapshotStatus",
+                    "layoutDiagnostics",
                     "canonicalVersion",
                     "editorProjectionVersion",
                     "typstVersion",

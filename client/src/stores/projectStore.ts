@@ -279,6 +279,8 @@ function toProjectDocumentFromV1(
   const layoutSnapshotJson = 'layoutSnapshotJson' in document ? document.layoutSnapshotJson ?? null : null;
   const layoutEngineVersion = 'layoutEngineVersion' in document ? document.layoutEngineVersion ?? null : null;
   const layoutSnapshotUpdatedAt = 'layoutSnapshotUpdatedAt' in document ? document.layoutSnapshotUpdatedAt ?? null : null;
+  const layoutSnapshotStatus = 'layoutSnapshotStatus' in document ? document.layoutSnapshotStatus ?? 'missing' : 'missing';
+  const layoutDiagnostics = 'layoutDiagnostics' in document ? document.layoutDiagnostics ?? [] : [];
 
   return {
     id: documentId,
@@ -298,6 +300,8 @@ function toProjectDocumentFromV1(
     layoutSnapshotJson,
     layoutEngineVersion,
     layoutSnapshotUpdatedAt,
+    layoutSnapshotStatus,
+    layoutDiagnostics,
     canonicalVersion: document.canonicalVersion,
     editorProjectionVersion: document.editorProjectionVersion,
     typstVersion: document.typstVersion,
@@ -675,6 +679,8 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
             layoutSnapshotJson: layoutSnapshot,
             layoutEngineVersion: layoutSnapshot?.version ?? state.activeDocument.layoutEngineVersion ?? null,
             layoutSnapshotUpdatedAt: layoutSnapshot?.generatedAt ?? state.activeDocument.layoutSnapshotUpdatedAt ?? null,
+            layoutSnapshotStatus: layoutSnapshot ? 'current' : state.activeDocument.layoutSnapshotStatus ?? 'missing',
+            layoutDiagnostics: layoutSnapshot?.diagnostics ?? state.activeDocument.layoutDiagnostics ?? [],
           }
         : state.activeDocument,
       documents: state.documents.map((item) => item.id === doc.id
@@ -685,6 +691,8 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
             layoutSnapshotJson: layoutSnapshot,
             layoutEngineVersion: layoutSnapshot?.version ?? item.layoutEngineVersion ?? null,
             layoutSnapshotUpdatedAt: layoutSnapshot?.generatedAt ?? item.layoutSnapshotUpdatedAt ?? null,
+            layoutSnapshotStatus: layoutSnapshot ? 'current' : item.layoutSnapshotStatus ?? 'missing',
+            layoutDiagnostics: layoutSnapshot?.diagnostics ?? item.layoutDiagnostics ?? [],
           }
         : item),
     }));

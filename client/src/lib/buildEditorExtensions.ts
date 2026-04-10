@@ -1,4 +1,5 @@
 import type { AnyExtension } from '@tiptap/core';
+import type { LayoutDocumentV2 } from '@dnd-booker/shared';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
 import Link from '@tiptap/extension-link';
@@ -15,6 +16,7 @@ import { FontSize } from '../extensions/FontSize';
 import { DropCap } from '../extensions/DropCap';
 import { StableNodeIds } from '../extensions/StableNodeIds';
 import { AutoPagination } from '../extensions/AutoPagination';
+import { SnapshotPagination } from '../extensions/SnapshotPagination';
 import { StatBlock } from '../components/blocks/StatBlock/StatBlockExtension';
 import { ReadAloudBox } from '../components/blocks/ReadAloudBox/ReadAloudBoxExtension';
 import { SidebarCallout } from '../components/blocks/SidebarCallout/SidebarCalloutExtension';
@@ -39,8 +41,11 @@ import { BackCover } from '../components/blocks/BackCover/BackCoverExtension';
 
 export function buildEditorExtensions(options?: {
   includeAutoPagination?: boolean;
+  includeSnapshotPagination?: boolean;
+  getLayoutSnapshot?: () => LayoutDocumentV2 | null;
 }): AnyExtension[] {
   const includeAutoPagination = options?.includeAutoPagination ?? false;
+  const includeSnapshotPagination = options?.includeSnapshotPagination ?? true;
 
   const extensions: AnyExtension[] = [
     StarterKit.configure({ link: false, underline: false }),
@@ -80,6 +85,12 @@ export function buildEditorExtensions(options?: {
     CreditsPage,
     BackCover,
   ];
+
+  if (includeSnapshotPagination) {
+    extensions.push(SnapshotPagination.configure({
+      getLayoutSnapshot: options?.getLayoutSnapshot ?? (() => null),
+    }));
+  }
 
   if (includeAutoPagination) {
     extensions.push(AutoPagination);

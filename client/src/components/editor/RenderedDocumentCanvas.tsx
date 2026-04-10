@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type DragEvent, type MouseEvent } from 'react';
+import { EditorContent, type Editor } from '@tiptap/react';
 import {
   getCanonicalLayoutCss,
 } from '@dnd-booker/shared';
@@ -7,6 +8,7 @@ import type { MeasuredLayoutDocumentResult } from '../../lib/useMeasuredLayoutDo
 type DropPlacement = 'before' | 'after';
 
 interface RenderedDocumentCanvasProps {
+  editor: Editor | null;
   theme: string;
   measuredDocument: MeasuredLayoutDocumentResult;
   selectedNodeId: string | null;
@@ -20,6 +22,7 @@ interface DropTargetState {
 }
 
 export function RenderedDocumentCanvas({
+  editor,
   theme,
   measuredDocument,
   selectedNodeId,
@@ -29,13 +32,13 @@ export function RenderedDocumentCanvas({
   const [dropTarget, setDropTarget] = useState<DropTargetState | null>(null);
   const draggedNodeIdRef = useRef<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const { measurementHtml, renderedHtml, measurementRef } = measuredDocument;
+  const { layoutSnapshot, measurementHtml, measurementRef } = measuredDocument;
 
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
-    container.querySelectorAll<HTMLElement>('[data-node-id]').forEach((element) => {
+    container.querySelectorAll<HTMLElement>('.ProseMirror > [data-node-id]').forEach((element) => {
       element.classList.remove('layout-editor-selected', 'layout-editor-drop-before', 'layout-editor-drop-after');
       if (selectedNodeId && element.dataset.nodeId === selectedNodeId) {
         element.classList.add('layout-editor-selected');
@@ -43,8 +46,9 @@ export function RenderedDocumentCanvas({
       if (dropTarget && element.dataset.nodeId === dropTarget.nodeId) {
         element.classList.add(dropTarget.placement === 'before' ? 'layout-editor-drop-before' : 'layout-editor-drop-after');
       }
+      element.setAttribute('draggable', 'true');
     });
-  }, [dropTarget, renderedHtml, selectedNodeId]);
+  }, [dropTarget, editor?.state.doc, selectedNodeId]);
 
   const getDropPlacement = (event: DragEvent<HTMLElement>, element: HTMLElement): DropPlacement => {
     const rect = element.getBoundingClientRect();
@@ -117,19 +121,17 @@ export function RenderedDocumentCanvas({
     draggedNodeIdRef.current = null;
   };
 
-  const canvasHtml = useMemo(
-    () => ({
-      __html: renderedHtml,
-    }),
-    [renderedHtml],
-  );
-
   const measurementMarkup = useMemo(
     () => ({
       __html: measurementHtml,
     }),
     [measurementHtml],
   );
+
+  const pageCount = Math.max(1, layoutSnapshot?.pages.length ?? 1);
+  const pageHeight = 1056;
+  const pageGap = 32;
+  const totalHeight = (pageCount * pageHeight) + (Math.max(0, pageCount - 1) * pageGap);
 
   return (
     <div className="editor-outer parity-editor-outer relative" data-theme={theme}>
@@ -146,15 +148,30 @@ export function RenderedDocumentCanvas({
       <div className="editor-themed-content parity-page-canvas">
         <div
           ref={containerRef}
-          className="parity-render-surface"
+          className="parity-live-canvas"
           onClick={handleNodeClick}
           onDragStart={handleDragStart}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
           onDragEnd={handleDragEnd}
-          dangerouslySetInnerHTML={canvasHtml}
-        />
+        >
+          <div className="parity-live-page-stack" aria-hidden="true">
+            {Array.from({ length: pageCount }, (_entry, index) => (
+              <div
+                key={`page-bg-${index + 1}`}
+                className="parity-live-page-bg"
+                style={{ top: `${index * (pageHeight + pageGap)}px` }}
+              />
+            ))}
+          </div>
+          <div
+            className="parity-live-editor-shell"
+            style={{ minHeight: `${totalHeight}px` }}
+          >
+            {editor && <EditorContent editor={editor} className="parity-live-editor-content" />}
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -4,7 +4,12 @@
  * setup, typography, heading show rules, and rendered document content.
  */
 
-import { DocumentContent, DocumentKind, normalizeChapterHeaderTitle } from '@dnd-booker/shared';
+import {
+  DocumentContent,
+  DocumentKind,
+  materializePublicationDocumentForLayoutSnapshot,
+  normalizeChapterHeaderTitle,
+} from '@dnd-booker/shared';
 import { tiptapToTypst } from './tiptap-to-typst.js';
 import { getTypstThemeVariables } from './typst-themes.js';
 
@@ -15,6 +20,7 @@ interface AssembleTypstDocument {
   kind?: DocumentKind | null;
   chapterNumberLabel?: string | null;
   layoutPlan?: unknown | null;
+  layoutSnapshotJson?: unknown | null;
 }
 
 type EndCapMode = 'inline' | 'full_page';
@@ -25,6 +31,7 @@ export interface AssembleTypstOptions {
   theme: string;
   projectTitle: string;
   projectType?: string | null;
+  allowSyntheticStructure?: boolean;
   printReady?: boolean;
   exportPolish?: {
     h1SizePt?: number;
@@ -38,14 +45,22 @@ export interface AssembleTypstOptions {
  * theme, and title.
  */
 export function assembleTypst(options: AssembleTypstOptions): string {
-  const { documents, theme, projectTitle, projectType = null, printReady = false, exportPolish } = options;
+  const {
+    documents,
+    theme,
+    projectTitle,
+    projectType = null,
+    allowSyntheticStructure = true,
+    printReady = false,
+    exportPolish,
+  } = options;
   const h1SizePt = exportPolish?.h1SizePt ?? 23;
   const endCapMode = exportPolish?.endCapMode ?? 'inline';
   const chapterOpenerMode = exportPolish?.chapterOpenerMode ?? 'inline';
 
   // Sort documents by sortOrder
   const sorted = [...documents].sort((a, b) => a.sortOrder - b.sortOrder);
-  const renderQueue = buildRenderQueue(sorted, projectTitle, chapterOpenerMode, projectType);
+  const renderQueue = buildRenderQueue(sorted, projectTitle, chapterOpenerMode, projectType, allowSyntheticStructure);
 
   // 1. Theme variables
   const themeVars = getTypstThemeVariables(theme);
@@ -140,7 +155,8 @@ export function assembleTypst(options: AssembleTypstOptions): string {
 
   for (const doc of renderQueue) {
     if (doc.content == null) continue;
-    let rendered = tiptapToTypst(doc.content, {
+    const materializedContent = materializePublicationDocumentForLayoutSnapshot(doc.content, doc.layoutSnapshotJson);
+    let rendered = tiptapToTypst(materializedContent, {
       layoutPlan: doc.layoutPlan as any,
       documentKind: doc.kind ?? null,
       documentTitle: doc.title,
@@ -153,7 +169,7 @@ export function assembleTypst(options: AssembleTypstOptions): string {
 
     if (chapterOpenerMode === 'dedicated_page' && (doc.kind === 'chapter' || doc.kind === 'appendix')) {
       t += renderDedicatedChapterOpening(doc.title, doc.chapterNumberLabel);
-      rendered = tiptapToTypst(stripLeadingSectionOpener(doc.content, doc.title, doc.chapterNumberLabel ?? null), {
+      rendered = tiptapToTypst(stripLeadingSectionOpener(materializedContent, doc.title, doc.chapterNumberLabel ?? null), {
         layoutPlan: doc.layoutPlan as any,
         documentKind: doc.kind ?? null,
         documentTitle: doc.title,
@@ -181,7 +197,8 @@ function buildRenderQueue(
   documents: AssembleTypstDocument[],
   projectTitle: string,
   chapterOpenerMode: ChapterOpenerMode,
-  projectType: string | null
+  projectType: string | null,
+  allowSyntheticStructure: boolean,
 ): AssembleTypstDocument[] {
   const longForm = isLongFormBook(documents);
   const syntheticToc = shouldInjectSyntheticTableOfContents(documents, projectType);
@@ -204,14 +221,14 @@ function buildRenderQueue(
       return withChapterMeta;
     }
 
-    return longForm ? ensureDocumentSectionOpener(withChapterMeta, chapterNumber) : withChapterMeta;
+    return allowSyntheticStructure && longForm ? ensureDocumentSectionOpener(withChapterMeta, chapterNumber) : withChapterMeta;
   });
 
-  if (longForm && !hasTitlePage) {
+  if (allowSyntheticStructure && longForm && !hasTitlePage) {
     queue.unshift(createSyntheticTitlePage(projectTitle));
   }
 
-  if (syntheticToc && !hasTableOfContents) {
+  if (allowSyntheticStructure && syntheticToc && !hasTableOfContents) {
     const insertAt = queue.findIndex((doc) => doc.kind === 'chapter' || doc.kind === 'appendix' || doc.kind === 'back_matter');
     queue.splice(insertAt === -1 ? queue.length : insertAt, 0, createSyntheticTableOfContents(syntheticTocDepth));
   }
