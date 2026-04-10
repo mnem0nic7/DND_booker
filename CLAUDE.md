@@ -132,7 +132,7 @@ Assembly is replay-safe by upserting `ProjectDocument` rows on `(projectId, slug
 
 Agent checkpoint restore now carries canonical publication fields (`canonicalDocJson`, `editorProjectionJson`, `typstSource`, and their versions) alongside document `content`. Restores should bring publication snapshots back exactly, not rebuild them from stale legacy fields later.
 
-Generation orchestration should resolve models per stage through `server/src/services/agent/model-resolution.service.ts`, not by inheriting the raw user-selected chat model for the whole worker run. This keeps structured nodes like `agent.outline` and `agent.chapter_draft` on the stable routed presets even when the user has a preview Gemini model saved for chat.
+Generation orchestration should resolve models per stage through `server/src/services/llm/router.ts`, not by inheriting the raw user-selected chat model for the whole worker run. This keeps structured nodes like `agent.outline` and `agent.chapter_draft` on the stable routed presets even when the user has a preview Gemini model saved for chat. Quick-mode Google runs intentionally downgrade the heavier generation stages (`agent.bible`, `agent.outline`, `agent.canon`, `agent.chapter_draft`, `agent.layout`) onto `gemini-2.5-flash` for reliability; polished runs keep the stronger preset lane.
 
 ### Authentication
 JWT access token (15min) + refresh token (7d, httpOnly cookie). Token version incremented on logout. Client axios interceptor auto-refreshes on 401.

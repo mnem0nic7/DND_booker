@@ -47,6 +47,7 @@ Do not stop after code edits unless the user explicitly says not to ship.
 - keep Typst keep-together renderers from swallowing manual `pageBreak` or `columnBreak` nodes; structural breaks must render at the top level, not inside `#block(...)[...]`, or PDF compilation will fail
 - generation nodes that already have strong Zod schemas, like outline generation and canon expansion, should prefer schema-native `generateObject(...)` over `generateText(...)` plus post-parse repair
 - generation and agent workers should resolve per-stage models through the routed agent presets instead of using the raw user chat model for every node; this is especially important when users save Google preview models that are acceptable for chat but unreliable for long-running structured orchestration
+- keep the quick-mode Google downgrade rule covered: `agent.bible`, `agent.outline`, `agent.canon`, `agent.chapter_draft`, and `agent.layout` should prefer the Flash lane in quick mode so deploy smoke and lightweight invite-only runs do not depend on live `gemini-2.5-pro` capacity
 - when the local server integration test depends on Cloud SQL access, record the exact GCP blocker if it cannot run
 - remove accidental compiled artifacts from source directories before commit
 - if infrastructure blocks a test or deploy, record the exact blocker

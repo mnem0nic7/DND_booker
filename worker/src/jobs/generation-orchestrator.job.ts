@@ -207,10 +207,22 @@ async function loadGenerationControlState(runId: string) {
   return 'active' as const;
 }
 
-async function resolveModelForUser(userId: string, projectId: string) {
-  const { resolveAgentModelForUser } = await import('../../../server/src/services/agent/model-resolution.service.js');
+const QUICK_MODE_GOOGLE_FLASH_AGENT_KEYS = new Set([
+  'agent.bible',
+  'agent.outline',
+  'agent.canon',
+  'agent.chapter_draft',
+  'agent.layout',
+]);
 
-  const resolvedModels = new Map<string, Awaited<ReturnType<typeof resolveAgentModelForUser>>>();
+export function shouldPreferQuickModeGoogleFlash(agentKey: string, isPolished: boolean) {
+  return !isPolished && QUICK_MODE_GOOGLE_FLASH_AGENT_KEYS.has(agentKey);
+}
+
+async function resolveModelForUser(userId: string, projectId: string, isPolished: boolean) {
+  const { resolveAgentLanguageModel } = await import('../../../server/src/services/llm/router.js');
+
+  const resolvedModels = new Map<string, Awaited<ReturnType<typeof resolveAgentLanguageModel>>>();
 
   return async (agentKey: string) => {
     const cached = resolvedModels.get(agentKey);
@@ -218,9 +230,14 @@ async function resolveModelForUser(userId: string, projectId: string) {
       return cached;
     }
 
-    const resolved = await resolveAgentModelForUser(userId, {
-      agentKey,
+    const useQuickModeGoogleFlash = shouldPreferQuickModeGoogleFlash(agentKey, isPolished);
+    const resolved = await resolveAgentLanguageModel({
+      userId,
       projectId,
+      agentKey,
+      agentOverride: useQuickModeGoogleFlash
+        ? { model: 'gemini-2.5-flash' }
+        : undefined,
     });
     console.info(`[generation.model] ${agentKey} -> ${resolved.selection.provider}/${resolved.selection.model ?? 'default'}`);
     resolvedModels.set(agentKey, resolved);
@@ -265,7 +282,7 @@ export async function processGenerationJob(job: Job<GenerationJobData>): Promise
   };
   const isPolished = fullRun.quality === 'polished';
   const dependencies = await loadGenerationDependencies();
-  const resolveModelForAgent = await resolveModelForUser(userId, projectId);
+  const resolveModelForAgent = await resolveModelForUser(userId, projectId, isPolished);
 
   async function publishProgress(status: RunStatus, progressPercent: number) {
     const updated = await dependencies.updateRunProgress(runId, userId, status, progressPercent);
