@@ -41,7 +41,7 @@ Do not stop after code edits unless the user explicitly says not to ship.
 - keep showcase blocks like `magicItem`, `spellCard`, `classFeature`, and `raceBlock` eligible for local utility-packet regrouping with the short section intro immediately before them; if the intro gets left behind as a separate section packet, the preview drifts into sparse checkerboard pages even when export compiles cleanly
 - keep the vendored Typst `@preview/wrap-it:0.1.1` package under `worker/assets/typst/packages` and the `worker/assets/typst/lib/flow-wrap.typ` shim in sync; the worker compile path depends on that local package root via `TYPST_PACKAGE_PATH`
 - keep Typst keep-together renderers from swallowing manual `pageBreak` or `columnBreak` nodes; structural breaks must render at the top level, not inside `#block(...)[...]`, or PDF compilation will fail
-- generation nodes that already have strong Zod schemas, like canon expansion, should prefer schema-native `generateObject(...)` over `generateText(...)` plus post-parse repair
+- generation nodes that already have strong Zod schemas, like outline generation and canon expansion, should prefer schema-native `generateObject(...)` over `generateText(...)` plus post-parse repair
 - when the local server integration test depends on Cloud SQL access, record the exact GCP blocker if it cannot run
 - remove accidental compiled artifacts from source directories before commit
 - if infrastructure blocks a test or deploy, record the exact blocker

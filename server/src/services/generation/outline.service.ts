@@ -3,9 +3,8 @@ import { z } from 'zod';
 import type { BibleContent, ChapterOutline } from '@dnd-booker/shared';
 import { prisma } from '../../config/database.js';
 import { publishGenerationEvent } from './pubsub.service.js';
-import { parseJsonResponse } from './parse-json.js';
 import { normalizeGenerationContentType } from './content-type-normalizer.js';
-import { generateTextWithTimeout } from './model-timeouts.js';
+import { generateObjectWithTimeout } from './model-timeouts.js';
 import {
   buildChapterOutlineSystemPrompt,
   buildChapterOutlineUserPrompt,
@@ -83,12 +82,11 @@ export async function executeOutlineGeneration(
   const system = buildChapterOutlineSystemPrompt();
   const prompt = buildChapterOutlineUserPrompt(bible);
 
-  const { text, usage } = await generateTextWithTimeout('Chapter outline generation', {
+  const { object, usage } = await generateObjectWithTimeout('Chapter outline generation', {
     model, system, prompt, maxOutputTokens,
+    schema: ChapterOutlineSchema,
   });
-
-  const parsed = parseJsonResponse(text);
-  const outline = ChapterOutlineSchema.parse(parsed) as ChapterOutline;
+  const outline = ChapterOutlineSchema.parse(object) as ChapterOutline;
 
   const totalTokens = (usage?.inputTokens ?? 0) + (usage?.outputTokens ?? 0);
 
