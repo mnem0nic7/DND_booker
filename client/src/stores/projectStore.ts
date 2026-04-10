@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import axios from 'axios';
 import type {
   DocumentContent,
+  LayoutDocumentV2,
   LayoutPlan,
   ProjectCreateRequest,
   ProjectDetail as V1ProjectDetail,
@@ -68,7 +69,7 @@ interface ProjectState {
   isLoadingDocument: boolean;
   fetchDocuments: (projectId: string) => Promise<void>;
   loadDocument: (projectId: string, docId: string) => Promise<void>;
-  updateDocumentContent: (content: DocumentContent) => void;
+  updateDocumentContent: (content: DocumentContent, options?: { layoutSnapshot?: LayoutDocumentV2 | null }) => void;
   updateDocumentLayoutPlan: (layoutPlan: LayoutPlan) => Promise<void>;
   clearActiveDocument: () => Promise<void>;
 }
@@ -239,6 +240,7 @@ async function saveDocContentWithRetry(
   projectId: string,
   docId: string,
   content: DocumentContent,
+  layoutSnapshot: LayoutDocumentV2 | null,
   expectedUpdatedAt?: string,
   maxAttempts = 3,
 ): Promise<PublicationDocumentDetail> {
@@ -251,6 +253,7 @@ async function saveDocContentWithRetry(
         { projectId, docId },
         {
           editorProjectionJson: content,
+          ...(layoutSnapshot ? { layoutSnapshotJson: layoutSnapshot } : {}),
           ...(expectedUpdatedAt ? { expectedUpdatedAt } : {}),
         },
       );
@@ -336,10 +339,12 @@ let pendingSaveId: string | null = null;
 let pendingSaveContent: DocumentContent | null = null;
 let pendingSaveDocId: string | null = null;
 let pendingSaveDocUpdatedAt: string | null = null;
+let pendingSaveDocLayoutSnapshot: LayoutDocumentV2 | null = null;
 let failedSaveId: string | null = null;
 let failedSaveContent: DocumentContent | null = null;
 let failedSaveDocId: string | null = null;
 let failedSaveDocUpdatedAt: string | null = null;
+let failedSaveDocLayoutSnapshot: LayoutDocumentV2 | null = null;
 
 export const useProjectStore = create<ProjectState>((set, get) => ({
   // Dashboard list
@@ -403,6 +408,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     pendingSaveId = project.id;
     pendingSaveContent = content;
     pendingSaveDocId = null;
+    pendingSaveDocLayoutSnapshot = null;
 
     // Debounced save to server (1 second)
     if (saveTimeout) clearTimeout(saveTimeout);
@@ -414,6 +420,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       pendingSaveContent = null;
       pendingSaveDocId = null;
       pendingSaveDocUpdatedAt = null;
+      pendingSaveDocLayoutSnapshot = null;
       saveTimeout = null;
 
       if (!saveId || !saveContent) return;
@@ -423,6 +430,9 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         clearBackup(saveId);
         failedSaveId = null;
         failedSaveContent = null;
+        failedSaveDocId = null;
+        failedSaveDocUpdatedAt = null;
+        failedSaveDocLayoutSnapshot = null;
         set({
           currentProject: toProjectFromV1(updatedProject),
           isSaving: false,
@@ -432,6 +442,9 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         saveBackup(saveId, saveContent);
         failedSaveId = saveId;
         failedSaveContent = saveContent;
+        failedSaveDocId = null;
+        failedSaveDocUpdatedAt = null;
+        failedSaveDocLayoutSnapshot = null;
         set({ isSaving: false, saveError: classifySaveError(err) });
       }
     }, 1000);
@@ -448,6 +461,8 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     pendingSaveId = null;
     pendingSaveContent = null;
     pendingSaveDocId = null;
+    const saveDocLayoutSnapshot = pendingSaveDocLayoutSnapshot;
+    pendingSaveDocLayoutSnapshot = null;
     const saveDocUpdatedAt = pendingSaveDocUpdatedAt;
     pendingSaveDocUpdatedAt = null;
 
@@ -455,7 +470,13 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     set({ isSaving: true, saveError: null });
     try {
       if (saveDocId) {
-        const updatedDoc = await saveDocContentWithRetry(saveId, saveDocId, saveContent, saveDocUpdatedAt ?? undefined);
+        const updatedDoc = await saveDocContentWithRetry(
+          saveId,
+          saveDocId,
+          saveContent,
+          saveDocLayoutSnapshot,
+          saveDocUpdatedAt ?? undefined,
+        );
         clearDocBackup(saveDocId);
         const nextDoc = toProjectDocumentFromV1(updatedDoc);
         set((state) => ({
@@ -471,6 +492,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       failedSaveContent = null;
       failedSaveDocId = null;
       failedSaveDocUpdatedAt = null;
+      failedSaveDocLayoutSnapshot = null;
       set({ isSaving: false, hasPendingChanges: false });
     } catch (err) {
       if (saveDocId) {
@@ -479,6 +501,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         failedSaveContent = saveContent;
         failedSaveDocId = saveDocId;
         failedSaveDocUpdatedAt = saveDocUpdatedAt;
+        failedSaveDocLayoutSnapshot = saveDocLayoutSnapshot;
       } else {
         saveBackup(saveId, saveContent);
         failedSaveId = saveId;
@@ -497,6 +520,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     pendingSaveContent = null;
     pendingSaveDocId = null;
     pendingSaveDocUpdatedAt = null;
+    pendingSaveDocLayoutSnapshot = null;
     set({ hasPendingChanges: false });
   },
 
@@ -505,12 +529,19 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     const saveContent = failedSaveContent;
     const saveDocId = failedSaveDocId;
     const saveDocUpdatedAt = failedSaveDocUpdatedAt;
+    const saveDocLayoutSnapshot = failedSaveDocLayoutSnapshot;
     if (!saveId || !saveContent) return;
 
     set({ isSaving: true, saveError: null });
     try {
       if (saveDocId) {
-        const updatedDoc = await saveDocContentWithRetry(saveId, saveDocId, saveContent, saveDocUpdatedAt ?? undefined);
+        const updatedDoc = await saveDocContentWithRetry(
+          saveId,
+          saveDocId,
+          saveContent,
+          saveDocLayoutSnapshot,
+          saveDocUpdatedAt ?? undefined,
+        );
         clearDocBackup(saveDocId);
         const nextDoc = toProjectDocumentFromV1(updatedDoc);
         set((state) => ({
@@ -526,6 +557,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       failedSaveContent = null;
       failedSaveDocId = null;
       failedSaveDocUpdatedAt = null;
+      failedSaveDocLayoutSnapshot = null;
       set({ isSaving: false, hasPendingChanges: false });
     } catch (err) {
       if (saveDocId) {
@@ -627,19 +659,42 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     }
   },
 
-  updateDocumentContent: (content) => {
+  updateDocumentContent: (content, options) => {
     const doc = get().activeDocument;
     const project = get().currentProject;
     if (!doc || !project) return;
+    const layoutSnapshot = options?.layoutSnapshot ?? doc.layoutSnapshotJson ?? null;
 
     // Update local state immediately
-    set({ activeDocument: { ...doc, content } });
+    set((state) => ({
+      activeDocument: state.activeDocument?.id === doc.id
+        ? {
+            ...state.activeDocument,
+            content,
+            editorProjectionJson: content,
+            layoutSnapshotJson: layoutSnapshot,
+            layoutEngineVersion: layoutSnapshot?.version ?? state.activeDocument.layoutEngineVersion ?? null,
+            layoutSnapshotUpdatedAt: layoutSnapshot?.generatedAt ?? state.activeDocument.layoutSnapshotUpdatedAt ?? null,
+          }
+        : state.activeDocument,
+      documents: state.documents.map((item) => item.id === doc.id
+        ? {
+            ...item,
+            content,
+            editorProjectionJson: content,
+            layoutSnapshotJson: layoutSnapshot,
+            layoutEngineVersion: layoutSnapshot?.version ?? item.layoutEngineVersion ?? null,
+            layoutSnapshotUpdatedAt: layoutSnapshot?.generatedAt ?? item.layoutSnapshotUpdatedAt ?? null,
+          }
+        : item),
+    }));
 
     // Track what needs saving (shared timeout with project content saves)
     pendingSaveId = project.id;
     pendingSaveContent = content;
     pendingSaveDocId = doc.id;
     pendingSaveDocUpdatedAt = doc.updatedAt;
+    pendingSaveDocLayoutSnapshot = layoutSnapshot;
 
     // Debounced save to server (1 second)
     if (saveTimeout) clearTimeout(saveTimeout);
@@ -649,10 +704,12 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       const saveContent = pendingSaveContent;
       const saveDocId = pendingSaveDocId;
       const saveDocUpdatedAt = pendingSaveDocUpdatedAt;
+      const saveDocLayoutSnapshot = pendingSaveDocLayoutSnapshot;
       pendingSaveId = null;
       pendingSaveContent = null;
       pendingSaveDocId = null;
       pendingSaveDocUpdatedAt = null;
+      pendingSaveDocLayoutSnapshot = null;
       saveTimeout = null;
 
       if (!saveProjectId || !saveContent || !saveDocId) return;
@@ -662,6 +719,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
           saveProjectId,
           saveDocId,
           saveContent,
+          saveDocLayoutSnapshot,
           saveDocUpdatedAt ?? undefined,
         );
         clearDocBackup(saveDocId);
@@ -669,6 +727,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         failedSaveContent = null;
         failedSaveDocId = null;
         failedSaveDocUpdatedAt = null;
+        failedSaveDocLayoutSnapshot = null;
         const nextDoc = toProjectDocumentFromV1(updatedDoc);
         set((state) => ({
           activeDocument: state.activeDocument?.id === nextDoc.id ? nextDoc : state.activeDocument,
@@ -682,6 +741,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         failedSaveContent = saveContent;
         failedSaveDocId = saveDocId;
         failedSaveDocUpdatedAt = saveDocUpdatedAt;
+        failedSaveDocLayoutSnapshot = saveDocLayoutSnapshot;
         set({ isSaving: false, saveError: classifySaveError(err) });
       }
     }, 1000);

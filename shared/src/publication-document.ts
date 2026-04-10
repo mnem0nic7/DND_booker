@@ -57,13 +57,15 @@ export const PublicationDocumentPatchSchema = z.object({
   status: z.string().min(1).max(50).optional(),
   canonicalDocJson: CanonicalTypstNodeSchema.optional(),
   editorProjectionJson: EditorProjectionSchema.optional(),
+  layoutSnapshotJson: LayoutDocumentV2Schema.nullable().optional(),
 }).refine(
   (value) =>
     value.title !== undefined
     || value.slug !== undefined
     || value.status !== undefined
     || value.canonicalDocJson !== undefined
-    || value.editorProjectionJson !== undefined,
+    || value.editorProjectionJson !== undefined
+    || value.layoutSnapshotJson !== undefined,
   { message: 'At least one field must be provided.' },
 );
 

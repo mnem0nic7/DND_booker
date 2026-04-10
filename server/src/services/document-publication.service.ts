@@ -182,7 +182,7 @@ export function buildPublicationDocumentStorageFields(
     typstSource,
     layoutSnapshotJson: layoutSnapshotJson as unknown as Prisma.InputJsonValue,
     layoutEngineVersion: layoutSnapshotJson.version,
-    layoutSnapshotUpdatedAt: new Date(layoutSnapshotJson.generatedAt),
+    layoutSnapshotUpdatedAt: new Date(),
     canonicalVersion: bump ? currentCanonicalVersion + 1 : currentCanonicalVersion,
     editorProjectionVersion: bump ? currentEditorProjectionVersion + 1 : currentEditorProjectionVersion,
     typstVersion: bump ? currentTypstVersion + 1 : currentTypstVersion,
@@ -333,6 +333,7 @@ export interface UpdatePublicationDocumentInput {
   status?: string;
   canonicalDocJson?: unknown;
   editorProjectionJson?: unknown;
+  layoutSnapshotJson?: unknown;
 }
 
 export async function updatePublicationDocument(
@@ -351,6 +352,8 @@ export async function updatePublicationDocument(
   }
 
   const hasBodyUpdate = patch.canonicalDocJson !== undefined || patch.editorProjectionJson !== undefined;
+  const hasLayoutSnapshotUpdate = patch.layoutSnapshotJson !== undefined;
+  const needsTypstRefresh = hasBodyUpdate || patch.title !== undefined;
   const nextBodySource = patch.canonicalDocJson ?? patch.editorProjectionJson ?? document.content;
   const resolvedLayout = hasBodyUpdate
     ? resolveDocumentLayout({
@@ -369,7 +372,8 @@ export async function updatePublicationDocument(
       content: resolvedLayout.content,
       canonicalDocJson: patch.canonicalDocJson,
       editorProjectionJson: patch.editorProjectionJson,
-      typstSource: hasBodyUpdate ? null : document.typstSource,
+      typstSource: needsTypstRefresh ? null : document.typstSource,
+      layoutSnapshotJson: hasLayoutSnapshotUpdate ? patch.layoutSnapshotJson : document.layoutSnapshotJson,
       layoutPlan: resolvedLayout.layoutPlan,
       kind: document.kind,
       title: patch.title ?? document.title,

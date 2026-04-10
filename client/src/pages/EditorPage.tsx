@@ -1,6 +1,6 @@
 import { useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import type { DocumentContent, LayoutPlan } from '@dnd-booker/shared';
+import type { DocumentContent, LayoutDocumentV2, LayoutPlan } from '@dnd-booker/shared';
 import { useProjectStore } from '../stores/projectStore';
 import { useAuthStore } from '../stores/authStore';
 import { useThemeStore } from '../stores/themeStore';
@@ -75,8 +75,8 @@ export default function EditorPage() {
   );
 
   const handleDocumentContentUpdate = useCallback(
-    (content: DocumentContent) => {
-      updateDocumentContent(content);
+    (content: DocumentContent, options?: { layoutSnapshot?: LayoutDocumentV2 | null }) => {
+      updateDocumentContent(content, options);
     },
     [updateDocumentContent],
   );
@@ -173,6 +173,7 @@ export default function EditorPage() {
               projectId={projectId!}
               content={activeDocument.content as DocumentContent}
               layoutPlan={activeDocument.layoutPlan}
+              layoutSnapshot={activeDocument.layoutSnapshotJson}
               textLayoutFallbackScopeIds={activeDocumentFallbackScopeIds}
               textLayoutFallbackScopeCount={activeDocumentFallbackScopeCount}
               documentKind={activeDocument.kind}

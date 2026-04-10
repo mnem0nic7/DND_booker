@@ -1,6 +1,6 @@
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import type { DocumentContent } from '@dnd-booker/shared';
+import type { DocumentContent, LayoutDocumentV2 } from '@dnd-booker/shared';
 import { EditorLayout } from './EditorLayout';
 import { renderWithProviders } from '../../test/render';
 
@@ -22,6 +22,17 @@ const mockEditor = vi.hoisted(() => ({
   off: vi.fn(),
   getJSON: () => ({ type: 'doc', content: [] }),
 }));
+const mockUseMeasuredLayoutDocument = vi.hoisted(() => vi.fn(() => ({
+  measurementHtml: '',
+  renderedHtml: '',
+  measurementRef: { current: null },
+  layoutSnapshot: null,
+  pageModel: null,
+  measurements: [],
+  pageMetrics: null,
+  textLayoutTelemetry: null,
+  shadowTelemetry: null,
+})));
 
 vi.mock('@tiptap/react', () => ({
   useEditor: () => mockEditor,
@@ -33,11 +44,7 @@ vi.mock('../../lib/buildEditorExtensions', () => ({
 }));
 
 vi.mock('../../lib/useMeasuredLayoutDocument', () => ({
-  useMeasuredLayoutDocument: () => ({
-    pageMetrics: null,
-    pages: [],
-    fragments: [],
-  }),
+  useMeasuredLayoutDocument: mockUseMeasuredLayoutDocument,
 }));
 
 vi.mock('../../stores/themeStore', () => ({
@@ -73,8 +80,49 @@ function createDeferred<T>() {
 }
 
 const emptyDoc: DocumentContent = { type: 'doc', content: [] };
+const persistedSnapshot: LayoutDocumentV2 = {
+  version: 2,
+  preset: 'standard_pdf',
+  sectionRecipe: null,
+  columnBalanceTarget: 'balanced',
+  layoutPlan: null,
+  measureProfile: {
+    preset: 'standard_pdf',
+    frame: {
+      pageWidthPx: 816,
+      pageHeightPx: 1056,
+      contentWidthPx: 696,
+      contentHeightPx: 880,
+      columnWidthPx: 339,
+      columnCount: 2,
+      columnGapPx: 18,
+    },
+    theme: 'gilded-folio',
+    documentKind: 'chapter',
+    documentTitle: 'Hydrated Chapter',
+    respectManualPageBreaks: true,
+    measurementMode: 'deterministic',
+    fallbackScopeIds: [],
+  },
+  pages: [],
+  fragments: [],
+  anchors: [],
+  diagnostics: [],
+  metrics: {
+    fragmentCount: 0,
+    heroFragmentCount: 0,
+    groupedFragmentCount: 0,
+    keepTogetherCount: 0,
+    pageCount: 0,
+  },
+  generatedAt: '2026-04-10T12:00:00.000Z',
+};
 
 describe('EditorLayout fallback banner', () => {
+  beforeEach(() => {
+    mockUseMeasuredLayoutDocument.mockClear();
+  });
+
   it('shows the banner only when fallback scopes are active', () => {
     const { rerender } = renderWithProviders(
       <EditorLayout
@@ -126,5 +174,26 @@ describe('EditorLayout fallback banner', () => {
     await waitFor(() => {
       expect(screen.getByRole('button', { name: 'Clear fallback' })).toBeEnabled();
     });
+  });
+
+  it('hydrates the paginated layout runtime from the persisted standard-pdf snapshot', () => {
+    renderWithProviders(
+      <EditorLayout
+        projectId="project-1"
+        content={emptyDoc}
+        layoutSnapshot={persistedSnapshot}
+        documentKind="chapter"
+        documentTitle="Hydrated Chapter"
+        onUpdate={vi.fn()}
+      />,
+    );
+
+    expect(mockUseMeasuredLayoutDocument).toHaveBeenCalledWith(expect.objectContaining({
+      initialContent: emptyDoc,
+      initialLayoutSnapshot: persistedSnapshot,
+      preset: 'standard_pdf',
+      documentKind: 'chapter',
+      documentTitle: 'Hydrated Chapter',
+    }));
   });
 });

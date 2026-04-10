@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
-import type { DocumentContent, LayoutPlan } from '@dnd-booker/shared';
+import type { DocumentContent, LayoutDocumentV2, LayoutPlan } from '@dnd-booker/shared';
 import { ensureStableNodeIds } from '@dnd-booker/shared';
 import { buildEditorExtensions } from '../../lib/buildEditorExtensions';
 import { useMeasuredLayoutDocument } from '../../lib/useMeasuredLayoutDocument';
@@ -25,19 +25,46 @@ interface EditorLayoutProps {
   projectId: string;
   content: DocumentContent;
   layoutPlan?: LayoutPlan | null;
+  layoutSnapshot?: LayoutDocumentV2 | null;
   textLayoutFallbackScopeIds?: string[];
   textLayoutFallbackScopeCount?: number;
   documentKind?: string | null;
   documentTitle?: string | null;
   onClearTextLayoutFallbacks?: () => Promise<void> | void;
-  onUpdate: (content: DocumentContent) => void;
+  onUpdate: (content: DocumentContent, options?: { layoutSnapshot?: LayoutDocumentV2 | null }) => void;
   onLayoutPlanUpdate?: (layoutPlan: LayoutPlan) => Promise<void> | void;
+}
+
+function layoutSnapshotSignature(snapshot: LayoutDocumentV2 | null | undefined): string | null {
+  if (!snapshot) return null;
+  return JSON.stringify({
+    preset: snapshot.preset,
+    sectionRecipe: snapshot.sectionRecipe,
+    pageCount: snapshot.metrics.pageCount,
+    fragmentCount: snapshot.metrics.fragmentCount,
+    pages: snapshot.pages.map((page) => ({
+      index: page.index,
+      fragmentIds: page.fragmentIds,
+      boundaryType: page.boundaryType,
+      boundaryNodeId: page.boundaryNodeId,
+    })),
+    fragments: snapshot.fragments.map((fragment) => ({
+      id: fragment.id,
+      nodeId: fragment.nodeId,
+      pageIndex: fragment.pageIndex,
+      columnIndex: fragment.columnIndex,
+      region: fragment.region,
+      flowBehavior: fragment.flowBehavior,
+      bounds: fragment.bounds,
+    })),
+  });
 }
 
 export function EditorLayout({
   projectId,
   content,
   layoutPlan = null,
+  layoutSnapshot = null,
   textLayoutFallbackScopeIds = [],
   textLayoutFallbackScopeCount = 0,
   documentKind = null,
@@ -63,13 +90,15 @@ export function EditorLayout({
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [localLayoutPlan, setLocalLayoutPlan] = useState<LayoutPlan | null>(layoutPlan);
   const [isClearingTextLayoutFallbacks, setIsClearingTextLayoutFallbacks] = useState(false);
+  const layoutSnapshotRef = useRef<LayoutDocumentV2 | null>(layoutSnapshot);
+  const lastPublishedLayoutSignatureRef = useRef<string | null>(layoutSnapshotSignature(layoutSnapshot));
 
   const editor = useEditor({
     extensions: buildEditorExtensions(),
     content: ensureStableNodeIds(content),
     immediatelyRender: false,
     onUpdate: ({ editor: ed }) => {
-      onUpdate(ed.getJSON());
+      onUpdate(ed.getJSON(), { layoutSnapshot: layoutSnapshotRef.current });
     },
   });
 
@@ -117,14 +146,32 @@ export function EditorLayout({
   const resolvedDocumentTitle = documentTitle ?? sectionName ?? null;
   const measuredDocument = useMeasuredLayoutDocument({
     editor,
+    initialContent: content,
+    initialLayoutSnapshot: layoutSnapshot,
     theme: currentTheme,
     layoutPlan: localLayoutPlan,
     fallbackScopeIds: textLayoutFallbackScopeIds,
     documentKind,
     documentTitle: resolvedDocumentTitle,
-    preset: 'editor_preview',
+    preset: 'standard_pdf',
     footerTitle: resolvedDocumentTitle,
   });
+
+  useEffect(() => {
+    layoutSnapshotRef.current = measuredDocument.layoutSnapshot ?? layoutSnapshot ?? null;
+  }, [layoutSnapshot, measuredDocument.layoutSnapshot, layoutSnapshotRef]);
+
+  useEffect(() => {
+    lastPublishedLayoutSignatureRef.current = layoutSnapshotSignature(layoutSnapshot);
+  }, [layoutSnapshot, lastPublishedLayoutSignatureRef]);
+
+  useEffect(() => {
+    if (!editor || !documentKind || !measuredDocument.layoutSnapshot) return;
+    const nextSignature = layoutSnapshotSignature(measuredDocument.layoutSnapshot);
+    if (!nextSignature || nextSignature === lastPublishedLayoutSignatureRef.current) return;
+    lastPublishedLayoutSignatureRef.current = nextSignature;
+    onUpdate(editor.getJSON() as DocumentContent, { layoutSnapshot: measuredDocument.layoutSnapshot });
+  }, [documentKind, editor, measuredDocument.layoutSnapshot, onUpdate]);
 
   const selectNodeById = useCallback((nodeId: string) => {
     if (!editor) return;

@@ -24,6 +24,8 @@ import {
 
 interface UseMeasuredLayoutDocumentOptions {
   editor: Editor | null;
+  initialContent: DocumentContent;
+  initialLayoutSnapshot?: LayoutDocumentV2 | null;
   theme?: string | null;
   layoutPlan?: LayoutPlan | null;
   fallbackScopeIds?: string[];
@@ -43,6 +45,14 @@ export interface MeasuredLayoutDocumentResult {
   pageMetrics: PageMetricsSnapshot | null;
   textLayoutTelemetry: FlowTextLayoutTelemetry | null;
   shadowTelemetry: FlowTextLayoutShadowTelemetry | null;
+}
+
+interface InitialMeasuredLayoutState {
+  measurementHtml: string;
+  renderedHtml: string;
+  layoutSnapshot: LayoutDocumentV2 | null;
+  pageModel: PageModel | null;
+  pageMetrics: PageMetricsSnapshot | null;
 }
 
 function collectUnitMeasurements(root: HTMLElement, unitIds?: readonly string[]): MeasuredLayoutUnitMetric[] {
@@ -67,8 +77,66 @@ function collectUnitMeasurements(root: HTMLElement, unitIds?: readonly string[])
     .filter((entry): entry is MeasuredLayoutUnitMetric => Boolean(entry));
 }
 
+function buildInitialMeasuredLayoutState(input: {
+  content: DocumentContent;
+  initialLayoutSnapshot?: LayoutDocumentV2 | null;
+  theme: string | null;
+  layoutPlan: LayoutPlan | null;
+  documentKind: string | null;
+  documentTitle: string | null;
+  preset: PagePreset;
+  footerTitle: string | null;
+}): InitialMeasuredLayoutState {
+  const measurementHtml = renderFlowContentWithLayoutPlan({
+    content: input.content,
+    layoutPlan: input.layoutPlan,
+    preset: input.preset,
+    options: {
+      documentKind: input.documentKind,
+      documentTitle: input.documentTitle,
+    },
+  }).html;
+
+  const layoutSnapshot = input.initialLayoutSnapshot && input.initialLayoutSnapshot.preset === input.preset
+    ? input.initialLayoutSnapshot
+    : buildLayoutDocumentV2({
+        content: input.content,
+        layoutPlan: input.layoutPlan,
+        preset: input.preset,
+        theme: input.theme ?? 'gilded-folio',
+        documentKind: input.documentKind,
+        documentTitle: input.documentTitle,
+        measurementMode: 'deterministic',
+        respectManualPageBreaks: true,
+      });
+  const pageModel = layoutDocumentV2ToPageModel(layoutSnapshot);
+
+  return {
+    measurementHtml,
+    renderedHtml: renderContentWithLayoutPlan({
+      content: input.content,
+      layoutPlan: input.layoutPlan,
+      pageModel,
+      preset: input.preset,
+      options: {
+        documentKind: input.documentKind,
+        documentTitle: input.documentTitle,
+      },
+      footerTitle: input.footerTitle,
+    }).html,
+    layoutSnapshot,
+    pageModel,
+    pageMetrics: buildPageMetricsSnapshotFromPageModel(pageModel, {
+      documentKind: input.documentKind,
+      documentTitle: input.documentTitle,
+    }),
+  };
+}
+
 export function useMeasuredLayoutDocument({
   editor,
+  initialContent,
+  initialLayoutSnapshot = null,
   theme = 'gilded-folio',
   layoutPlan = null,
   fallbackScopeIds = [],
@@ -82,12 +150,26 @@ export function useMeasuredLayoutDocument({
   const measurementRef = useRef<HTMLDivElement>(null);
   const flowModelRef = useRef<LayoutFlowModel | null>(null);
   const contentRef = useRef<DocumentContent | null>(null);
-  const [measurementHtml, setMeasurementHtml] = useState('');
-  const [renderedHtml, setRenderedHtml] = useState('');
-  const [layoutSnapshot, setLayoutSnapshot] = useState<LayoutDocumentV2 | null>(null);
-  const [pageModel, setPageModel] = useState<PageModel | null>(null);
+  const initialStateRef = useRef<InitialMeasuredLayoutState | null>(null);
+  if (initialStateRef.current === null) {
+    initialStateRef.current = buildInitialMeasuredLayoutState({
+      content: initialContent,
+      initialLayoutSnapshot,
+      theme,
+      layoutPlan,
+      documentKind,
+      documentTitle,
+      preset,
+      footerTitle,
+    });
+  }
+  const initialState = initialStateRef.current;
+  const [measurementHtml, setMeasurementHtml] = useState(initialState.measurementHtml);
+  const [renderedHtml, setRenderedHtml] = useState(initialState.renderedHtml);
+  const [layoutSnapshot, setLayoutSnapshot] = useState<LayoutDocumentV2 | null>(initialState.layoutSnapshot);
+  const [pageModel, setPageModel] = useState<PageModel | null>(initialState.pageModel);
   const [measurements, setMeasurements] = useState<MeasuredLayoutUnitMetric[]>([]);
-  const [pageMetrics, setPageMetrics] = useState<PageMetricsSnapshot | null>(null);
+  const [pageMetrics, setPageMetrics] = useState<PageMetricsSnapshot | null>(initialState.pageMetrics);
   const [textLayoutTelemetry, setTextLayoutTelemetry] = useState<FlowTextLayoutTelemetry | null>(null);
   const [shadowTelemetry, setShadowTelemetry] = useState<FlowTextLayoutShadowTelemetry | null>(null);
 

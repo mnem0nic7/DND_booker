@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import request from 'supertest';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
+import { buildLayoutDocumentV2 } from '@dnd-booker/shared';
 import app from '../index.js';
 import { prisma } from '../config/database.js';
 
@@ -141,6 +142,51 @@ describe('Document API v1', () => {
     expect(JSON.stringify(project.content)).toContain('Chapter Alpha Revised');
   });
 
+  it('accepts client-provided layout snapshots for the saved document revision', async () => {
+    const nextProjection = {
+      type: 'doc',
+      content: [
+        { type: 'heading', attrs: { level: 1 }, content: [{ type: 'text', text: 'Chapter Alpha Revised' }] },
+        { type: 'paragraph', attrs: { nodeId: 'paragraph-1' }, content: [{ type: 'text', text: 'Persist the saved page layout.' }] },
+      ],
+    };
+    const clientSnapshot = buildLayoutDocumentV2({
+      content: nextProjection,
+      layoutPlan: null,
+      preset: 'standard_pdf',
+      theme: 'gilded-folio',
+      documentKind: 'chapter',
+      documentTitle: 'Chapter Alpha Revised',
+      measurementMode: 'deterministic',
+      respectManualPageBreaks: true,
+      generatedAt: new Date('2026-04-10T12:00:00.000Z'),
+    });
+
+    const res = await request(app)
+      .patch(`/api/v1/projects/${projectId}/documents/${docId}`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        editorProjectionJson: nextProjection,
+        layoutSnapshotJson: clientSnapshot,
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body.layoutSnapshotJson?.preset).toBe('standard_pdf');
+    expect(res.body.layoutSnapshotJson?.metrics?.fragmentCount).toBe(clientSnapshot.metrics.fragmentCount);
+    expect(res.body.layoutEngineVersion).toBe(2);
+    expect(res.body.layoutSnapshotUpdatedAt).toBeTruthy();
+
+    const document = await prisma.projectDocument.findUniqueOrThrow({
+      where: { id: docId },
+      select: {
+        layoutSnapshotJson: true,
+        layoutEngineVersion: true,
+      },
+    });
+    expect((document.layoutSnapshotJson as { preset?: string })?.preset).toBe('standard_pdf');
+    expect(document.layoutEngineVersion).toBe(2);
+  });
+
   it('updates layout plans through the v1 document route', async () => {
     const patch = {
       version: 1,
@@ -183,6 +229,6 @@ describe('Document API v1', () => {
     expect(updated.body.layoutEngineVersion).toBe(2);
 
     const project = await prisma.project.findUniqueOrThrow({ where: { id: projectId } });
-    expect(JSON.stringify(project.content)).toContain('The story continues.');
+    expect(JSON.stringify(project.content)).toContain('Persist the saved page layout.');
   });
 });
