@@ -57,6 +57,7 @@ PDF exports now use a split pipeline:
 That includes AI wizard apply flows: they must merge against canonical project content and save back through the canonical project-content service instead of patching `Project.content` directly.
 Export creation now materializes `ProjectDocument` rows before queueing worker jobs. The worker still has a final monolithic `Project.content` fallback for older compatibility cases, but that path should not be the active source of truth.
 The worker now treats the saved `LayoutRuntimeV2` snapshot as the pagination contract for preview/export preflight. When a document is missing a current snapshot, export rebuilds and persists it before final PDF rendering.
+Generation orchestration also routes model selection per stage through the checked-in agent model presets. That prevents a user's experimental chat model from becoming the structured-output model for outline, canon, chapter draft, or evaluation nodes during the deploy smoke or live generation runs.
 Legacy product `/api/*` compatibility routes have been removed. Keep health and infra probes on `/api/health`, and use `/api/v1/*` for app traffic, smoke tests, and operator tooling.
 
 ## Invite-Only Registration

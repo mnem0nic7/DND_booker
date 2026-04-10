@@ -207,32 +207,24 @@ async function loadGenerationControlState(runId: string) {
   return 'active' as const;
 }
 
-async function resolveModelForUser(userId: string) {
-  const { getAiSettings, getDecryptedApiKey } = await import('../../../server/src/services/ai-settings.service.js');
-  const { createModel } = await import('../../../server/src/services/ai-provider.service.js');
+async function resolveModelForUser(userId: string, projectId: string) {
+  const { resolveAgentModelForUser } = await import('../../../server/src/services/agent/model-resolution.service.js');
 
-  const settings = await getAiSettings(userId);
-  if (!settings?.provider) throw new Error('AI not configured for user');
+  const resolvedModels = new Map<string, Awaited<ReturnType<typeof resolveAgentModelForUser>>>();
 
-  const maxOutputTokens = settings.provider === 'ollama' ? 1024 : 16384;
+  return async (agentKey: string) => {
+    const cached = resolvedModels.get(agentKey);
+    if (cached) {
+      return cached;
+    }
 
-  if (settings.provider === 'ollama') {
-    const ollamaModel = settings.model && !settings.model.startsWith('claude-') && !settings.model.startsWith('gpt-')
-      ? settings.model
-      : undefined;
-    return {
-      model: createModel(settings.provider, 'ollama', ollamaModel, settings.baseUrl ?? undefined),
-      maxOutputTokens,
-    };
-  }
-
-  if (!settings.hasApiKey) throw new Error('No API key configured');
-  const apiKey = await getDecryptedApiKey(userId);
-  if (!apiKey) throw new Error('Failed to decrypt API key');
-
-  return {
-    model: createModel(settings.provider, apiKey, settings.model ?? undefined),
-    maxOutputTokens,
+    const resolved = await resolveAgentModelForUser(userId, {
+      agentKey,
+      projectId,
+    });
+    console.info(`[generation.model] ${agentKey} -> ${resolved.selection.provider}/${resolved.selection.model ?? 'default'}`);
+    resolvedModels.set(agentKey, resolved);
+    return resolved;
   };
 }
 
@@ -273,7 +265,7 @@ export async function processGenerationJob(job: Job<GenerationJobData>): Promise
   };
   const isPolished = fullRun.quality === 'polished';
   const dependencies = await loadGenerationDependencies();
-  const { model, maxOutputTokens } = await resolveModelForUser(userId);
+  const resolveModelForAgent = await resolveModelForUser(userId, projectId);
 
   async function publishProgress(status: RunStatus, progressPercent: number) {
     const updated = await dependencies.updateRunProgress(runId, userId, status, progressPercent);
@@ -315,6 +307,7 @@ export async function processGenerationJob(job: Job<GenerationJobData>): Promise
       return existing;
     }
 
+    const { model, maxOutputTokens } = await resolveModelForAgent('agent.intake');
     const { normalizedInput } = await dependencies.executeIntake(runEnvelope, model, maxOutputTokens);
     return normalizedInput as NormalizedInput;
   }
@@ -324,6 +317,7 @@ export async function processGenerationJob(job: Job<GenerationJobData>): Promise
     if (existing) return existing;
 
     const normalizedInput = await ensureNormalizedInput();
+    const { model, maxOutputTokens } = await resolveModelForAgent('agent.bible');
     const result = await dependencies.executeBibleGeneration(runEnvelope, normalizedInput, model, maxOutputTokens);
     const created = await loadBibleContent(runId);
     if (created) return created;
@@ -335,6 +329,7 @@ export async function processGenerationJob(job: Job<GenerationJobData>): Promise
     if (existing) return existing;
 
     const bibleContent = await ensureBibleContent();
+    const { model, maxOutputTokens } = await resolveModelForAgent('agent.outline');
     const result = await dependencies.executeOutlineGeneration(runEnvelope, bibleContent, model, maxOutputTokens);
     const created = await loadOutline(runId);
     if (created) return created;
@@ -495,6 +490,7 @@ export async function processGenerationJob(job: Job<GenerationJobData>): Promise
             return { nextNode: 'canon_expansion' };
           }
 
+          const { model, maxOutputTokens } = await resolveModelForAgent('agent.canon');
           await dependencies.expandCanonEntity(
             runEnvelope,
             nextEntity,
@@ -533,6 +529,7 @@ export async function processGenerationJob(job: Job<GenerationJobData>): Promise
             return { nextNode: 'chapter_drafts' };
           }
 
+          const { model, maxOutputTokens } = await resolveModelForAgent('agent.chapter_plan');
           await dependencies.executeChapterPlanGeneration(
             runEnvelope,
             nextChapter,
@@ -583,6 +580,7 @@ export async function processGenerationJob(job: Job<GenerationJobData>): Promise
             .slice(0, outline.chapters.findIndex((chapter) => chapter.slug === nextChapter.slug))
             .map((chapter) => chapter.slug);
 
+          const { model, maxOutputTokens } = await resolveModelForAgent('agent.chapter_draft');
           await dependencies.executeChapterDraftGeneration(
             runEnvelope,
             nextChapter,
@@ -641,12 +639,14 @@ export async function processGenerationJob(job: Job<GenerationJobData>): Promise
 
           const bibleContent = await ensureBibleContent();
           let currentArtifactId = nextArtifact.id;
+          const evaluatorModel = await resolveModelForAgent('agent.evaluator');
+          const reviserModel = await resolveModelForAgent('agent.reviser');
           let evalResult = await dependencies.evaluateArtifact(
             { id: runId },
             currentArtifactId,
             bibleContent,
-            model,
-            maxOutputTokens,
+            evaluatorModel.model,
+            evaluatorModel.maxOutputTokens,
           );
           const artifactCategory = dependencies.getArtifactCategory(nextArtifact.artifactType);
 
@@ -660,43 +660,43 @@ export async function processGenerationJob(job: Job<GenerationJobData>): Promise
 
           if (!evalResult.passed) {
             await setRunStatus('revising', 84);
-            const revised = await dependencies.reviseArtifact(
-              { id: runId },
-              currentArtifactId,
-              evalResult.findings,
-              bibleContent,
-              model,
-              maxOutputTokens,
-            );
-            if (revised) {
-              currentArtifactId = revised.newArtifactId;
-              evalResult = await dependencies.evaluateArtifact(
+              const revised = await dependencies.reviseArtifact(
                 { id: runId },
                 currentArtifactId,
+                evalResult.findings,
                 bibleContent,
-                model,
-                maxOutputTokens,
+                reviserModel.model,
+                reviserModel.maxOutputTokens,
               );
-              if (!evalResult.passed) {
-                const revisedAgain = await dependencies.reviseArtifact(
+              if (revised) {
+                currentArtifactId = revised.newArtifactId;
+                evalResult = await dependencies.evaluateArtifact(
                   { id: runId },
                   currentArtifactId,
-                  evalResult.findings,
                   bibleContent,
-                  model,
-                  maxOutputTokens,
+                  evaluatorModel.model,
+                  evaluatorModel.maxOutputTokens,
                 );
-                if (revisedAgain) {
-                  currentArtifactId = revisedAgain.newArtifactId;
-                  evalResult = await dependencies.evaluateArtifact(
+                if (!evalResult.passed) {
+                  const revisedAgain = await dependencies.reviseArtifact(
                     { id: runId },
                     currentArtifactId,
+                    evalResult.findings,
                     bibleContent,
-                    model,
-                    maxOutputTokens,
+                    reviserModel.model,
+                    reviserModel.maxOutputTokens,
                   );
+                  if (revisedAgain) {
+                    currentArtifactId = revisedAgain.newArtifactId;
+                    evalResult = await dependencies.evaluateArtifact(
+                      { id: runId },
+                      currentArtifactId,
+                      bibleContent,
+                      evaluatorModel.model,
+                      evaluatorModel.maxOutputTokens,
+                    );
+                  }
                 }
-              }
             }
 
             if (!evalResult.passed) {
@@ -870,7 +870,10 @@ export async function processGenerationJob(job: Job<GenerationJobData>): Promise
             try {
               const artDirection = await withOptionalStageTimeout(
                 'Art direction pass',
-                dependencies.executeArtDirectionPass(runEnvelope, model, maxOutputTokens),
+                (async () => {
+                  const { model, maxOutputTokens } = await resolveModelForAgent('agent.layout');
+                  return dependencies.executeArtDirectionPass(runEnvelope, model, maxOutputTokens);
+                })(),
               );
               if (artDirection.generatedImageCount > 0) {
                 await dependencies.publishGenerationEvent(runId, {
