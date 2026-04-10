@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
 import type { Editor } from '@tiptap/react';
 import {
+  buildLayoutDocumentV2,
   buildFlowTextLayoutShadowTelemetry,
   buildPageMetricsSnapshotFromPageModel,
   compileMeasuredPageModel,
+  layoutDocumentV2ToPageModel,
   measureFlowTextUnits,
   parseTextLayoutEngineMode,
   renderContentWithLayoutPlan,
@@ -11,6 +13,7 @@ import {
   type DocumentContent,
   type FlowTextLayoutShadowTelemetry,
   type FlowTextLayoutTelemetry,
+  type LayoutDocumentV2,
   type LayoutPlan,
   type LayoutFlowModel,
   type MeasuredLayoutUnitMetric,
@@ -34,6 +37,7 @@ export interface MeasuredLayoutDocumentResult {
   measurementHtml: string;
   renderedHtml: string;
   measurementRef: RefObject<HTMLDivElement | null>;
+  layoutSnapshot: LayoutDocumentV2 | null;
   pageModel: PageModel | null;
   measurements: MeasuredLayoutUnitMetric[];
   pageMetrics: PageMetricsSnapshot | null;
@@ -80,6 +84,7 @@ export function useMeasuredLayoutDocument({
   const contentRef = useRef<DocumentContent | null>(null);
   const [measurementHtml, setMeasurementHtml] = useState('');
   const [renderedHtml, setRenderedHtml] = useState('');
+  const [layoutSnapshot, setLayoutSnapshot] = useState<LayoutDocumentV2 | null>(null);
   const [pageModel, setPageModel] = useState<PageModel | null>(null);
   const [measurements, setMeasurements] = useState<MeasuredLayoutUnitMetric[]>([]);
   const [pageMetrics, setPageMetrics] = useState<PageMetricsSnapshot | null>(null);
@@ -102,9 +107,21 @@ export function useMeasuredLayoutDocument({
     });
 
     flowModelRef.current = rendered.flowModel;
+    const initialSnapshot = buildLayoutDocumentV2({
+      content,
+      layoutPlan,
+      preset,
+      theme,
+      documentKind,
+      documentTitle,
+      measurementMode: textLayoutMode === 'legacy' ? 'estimated' : 'deterministic',
+      respectManualPageBreaks: true,
+    });
+    const initialPageModel = layoutDocumentV2ToPageModel(initialSnapshot);
     setMeasurementHtml(rendered.html);
-    setPageModel(rendered.pageModel);
-    setPageMetrics(buildPageMetricsSnapshotFromPageModel(rendered.pageModel, {
+    setLayoutSnapshot(initialSnapshot);
+    setPageModel(initialPageModel);
+    setPageMetrics(buildPageMetricsSnapshotFromPageModel(initialPageModel, {
       documentKind,
       documentTitle,
     }));
@@ -144,6 +161,7 @@ export function useMeasuredLayoutDocument({
       let legacyPageModel: PageModel | null = null;
       let finalMeasurements: MeasuredLayoutUnitMetric[] = [];
       let measuredPageModel: PageModel | null = null;
+      let nextLayoutSnapshot: LayoutDocumentV2 | null = null;
       let nextTextLayoutTelemetry: FlowTextLayoutTelemetry | null = null;
       let nextShadowTelemetry: FlowTextLayoutShadowTelemetry | null = null;
 
@@ -226,7 +244,22 @@ export function useMeasuredLayoutDocument({
 
       if (!measuredPageModel) return;
 
+      nextLayoutSnapshot = buildLayoutDocumentV2({
+        content: contentRef.current!,
+        layoutPlan,
+        preset,
+        theme,
+        measurements: finalMeasurements,
+        fallbackScopeIds,
+        documentKind,
+        documentTitle,
+        measurementMode: textLayoutMode === 'legacy' ? 'browser_capture' : 'deterministic',
+        respectManualPageBreaks: true,
+      });
+      measuredPageModel = layoutDocumentV2ToPageModel(nextLayoutSnapshot);
+
       setMeasurements(finalMeasurements);
+      setLayoutSnapshot(nextLayoutSnapshot);
       setTextLayoutTelemetry(nextTextLayoutTelemetry);
       setShadowTelemetry(nextShadowTelemetry);
       setPageMetrics(buildPageMetricsSnapshotFromPageModel(measuredPageModel, {
@@ -258,6 +291,7 @@ export function useMeasuredLayoutDocument({
     measurementHtml,
     renderedHtml,
     measurementRef,
+    layoutSnapshot,
     pageModel,
     measurements,
     pageMetrics,

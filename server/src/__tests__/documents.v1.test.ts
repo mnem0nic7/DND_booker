@@ -78,6 +78,10 @@ describe('Document API v1', () => {
     expect(res.body.canonicalDocJson).toBeDefined();
     expect(res.body.editorProjectionJson).toBeDefined();
     expect(res.body.typstSource).toContain('Chapter Alpha');
+    expect(res.body.layoutSnapshotJson).toBeDefined();
+    expect(res.body.layoutSnapshotJson.version).toBe(2);
+    expect(res.body.layoutEngineVersion).toBe(2);
+    expect(typeof res.body.layoutSnapshotUpdatedAt).toBe('string');
   });
 
   it('returns canonical doc, editor projection, and typst endpoints', async () => {
@@ -122,6 +126,8 @@ describe('Document API v1', () => {
     expect(res.body.title).toBe('Chapter Alpha Revised');
     expect(res.body.editorProjectionJson.content[1].content[0].text).toBe('The story continues.');
     expect(res.body.typstSource).toContain('Chapter Alpha Revised');
+    expect(res.body.layoutSnapshotJson?.pages?.length).toBeGreaterThan(0);
+    expect(res.body.layoutEngineVersion).toBe(2);
 
     const updated = await request(app)
       .get(`/api/v1/projects/${projectId}/documents/${docId}`)
@@ -129,6 +135,7 @@ describe('Document API v1', () => {
     expect(updated.status).toBe(200);
     expect(updated.body.title).toBe('Chapter Alpha Revised');
     expect(updated.body.typstSource).toContain('Chapter Alpha Revised');
+    expect(updated.body.layoutSnapshotJson?.metrics?.pageCount).toBeGreaterThan(0);
 
     const project = await prisma.project.findUniqueOrThrow({ where: { id: projectId } });
     expect(JSON.stringify(project.content)).toContain('Chapter Alpha Revised');
@@ -172,6 +179,8 @@ describe('Document API v1', () => {
     expect(updated.body.layoutPlan?.sectionRecipe).toBe('chapter_hero_split');
     expect(updated.body.layoutPlan?.columnBalanceTarget).toBe('balanced');
     expect(updated.body.layoutPlan.blocks.length).toBeGreaterThan(0);
+    expect(updated.body.layoutSnapshotJson?.layoutPlan?.sectionRecipe).toBe('chapter_hero_split');
+    expect(updated.body.layoutEngineVersion).toBe(2);
 
     const project = await prisma.project.findUniqueOrThrow({ where: { id: projectId } });
     expect(JSON.stringify(project.content)).toContain('The story continues.');

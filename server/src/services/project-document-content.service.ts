@@ -165,6 +165,9 @@ export async function saveCanonicalProjectContent(
         layoutPlan: resolvedLayout.layoutPlan,
         kind: document.kind,
         title: document.title,
+        theme: typeof (project.settings as Record<string, unknown> | null)?.theme === 'string'
+          ? String((project.settings as Record<string, unknown>).theme)
+          : null,
       });
 
       await tx.projectDocument.create({
@@ -182,6 +185,9 @@ export async function saveCanonicalProjectContent(
           canonicalDocJson: publicationFields.canonicalDocJson,
           editorProjectionJson: publicationFields.editorProjectionJson,
           typstSource: publicationFields.typstSource,
+          layoutSnapshotJson: publicationFields.layoutSnapshotJson,
+          layoutEngineVersion: publicationFields.layoutEngineVersion,
+          layoutSnapshotUpdatedAt: publicationFields.layoutSnapshotUpdatedAt,
           canonicalVersion: publicationFields.canonicalVersion,
           editorProjectionVersion: publicationFields.editorProjectionVersion,
           typstVersion: publicationFields.typstVersion,

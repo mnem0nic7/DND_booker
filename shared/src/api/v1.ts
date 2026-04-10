@@ -5,6 +5,7 @@ import {
   PublicationDocumentPatchSchema,
   PublicationDocumentSchema,
 } from '../publication-document.js';
+import { LayoutDocumentV2Schema } from '../layout-runtime-v2.js';
 
 export const ApiProblemSchema = z.object({
   type: z.string().optional(),
@@ -597,6 +598,9 @@ export const V1PublicationDocumentSummarySchema = z.object({
   layoutPlan: LayoutPlanSchema.nullable().optional(),
   status: z.string(),
   sourceArtifactId: z.string().uuid().nullable(),
+  layoutSnapshotJson: LayoutDocumentV2Schema.nullable().optional(),
+  layoutEngineVersion: z.number().int().positive().nullable().optional(),
+  layoutSnapshotUpdatedAt: z.string().datetime().nullable().optional(),
   canonicalVersion: z.number().int(),
   editorProjectionVersion: z.number().int(),
   typstVersion: z.number().int(),

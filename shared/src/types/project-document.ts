@@ -1,4 +1,4 @@
-import type { LayoutPlan } from './layout-plan.js';
+import type { LayoutDocumentV2, LayoutPlan } from './layout-plan.js';
 
 export type DocumentKind = 'front_matter' | 'chapter' | 'appendix' | 'back_matter';
 
@@ -17,6 +17,9 @@ export interface ProjectDocument {
   canonicalDocJson?: unknown | null;
   editorProjectionJson?: unknown | null;
   typstSource?: string | null;
+  layoutSnapshotJson?: LayoutDocumentV2 | null;
+  layoutEngineVersion?: number | null;
+  layoutSnapshotUpdatedAt?: string | null;
   canonicalVersion?: number;
   editorProjectionVersion?: number;
   typstVersion?: number;

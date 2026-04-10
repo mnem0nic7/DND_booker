@@ -10,6 +10,7 @@ export * from './types/ai-tools.js';
 export * from './constants/index.js';
 export * from './renderers/index.js';
 export * from './publication-document.js';
+export * from './layout-runtime-v2.js';
 export * from './types/generation-run.js';
 export * from './types/generation-task.js';
 export * from './types/generated-artifact.js';

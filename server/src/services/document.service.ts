@@ -56,6 +56,9 @@ export async function updateDocumentContent(
       layoutPlan: resolvedLayout.layoutPlan,
       kind: doc.kind,
       title: doc.title,
+      theme: typeof (doc.project.settings as Record<string, unknown> | null)?.theme === 'string'
+        ? String((doc.project.settings as Record<string, unknown>).theme)
+        : null,
     },
     {
       canonicalVersion: doc.canonicalVersion,
@@ -73,6 +76,9 @@ export async function updateDocumentContent(
       canonicalDocJson: publicationFields.canonicalDocJson,
       editorProjectionJson: publicationFields.editorProjectionJson,
       typstSource: publicationFields.typstSource,
+      layoutSnapshotJson: publicationFields.layoutSnapshotJson,
+      layoutEngineVersion: publicationFields.layoutEngineVersion,
+      layoutSnapshotUpdatedAt: publicationFields.layoutSnapshotUpdatedAt,
       canonicalVersion: publicationFields.canonicalVersion,
       editorProjectionVersion: publicationFields.editorProjectionVersion,
       typstVersion: publicationFields.typstVersion,
@@ -110,6 +116,9 @@ export async function updateDocumentLayout(
       layoutPlan: resolvedLayout.layoutPlan,
       kind: doc.kind,
       title: doc.title,
+      theme: typeof (doc.project.settings as Record<string, unknown> | null)?.theme === 'string'
+        ? String((doc.project.settings as Record<string, unknown>).theme)
+        : null,
     },
     {
       canonicalVersion: doc.canonicalVersion,
@@ -126,6 +135,9 @@ export async function updateDocumentLayout(
       canonicalDocJson: publicationFields.canonicalDocJson,
       editorProjectionJson: publicationFields.editorProjectionJson,
       typstSource: publicationFields.typstSource,
+      layoutSnapshotJson: publicationFields.layoutSnapshotJson,
+      layoutEngineVersion: publicationFields.layoutEngineVersion,
+      layoutSnapshotUpdatedAt: publicationFields.layoutSnapshotUpdatedAt,
       canonicalVersion: publicationFields.canonicalVersion,
       editorProjectionVersion: publicationFields.editorProjectionVersion,
       typstVersion: publicationFields.typstVersion,

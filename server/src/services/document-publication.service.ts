@@ -3,10 +3,14 @@ import { prisma } from '../config/database.js';
 import { resolveDocumentLayout } from './layout-plan.service.js';
 import { rebuildProjectContentCache } from './project-document-content.service.js';
 import {
+  buildLayoutDocumentV2,
   buildPublicationDocumentSnapshot,
   canonicalPublicationDocumentToTypstSource,
   normalizePublicationDocumentContent,
+  parseLayoutDocumentV2,
   type PublicationDocument,
+  type LayoutPlan,
+  type PagePreset,
 } from '@dnd-booker/shared';
 
 export const publicationDocumentFullSelect = {
@@ -24,6 +28,9 @@ export const publicationDocumentFullSelect = {
   canonicalDocJson: true,
   editorProjectionJson: true,
   typstSource: true,
+  layoutSnapshotJson: true,
+  layoutEngineVersion: true,
+  layoutSnapshotUpdatedAt: true,
   canonicalVersion: true,
   editorProjectionVersion: true,
   typstVersion: true,
@@ -49,6 +56,9 @@ export const publicationDocumentListSelect = {
   layoutPlan: true,
   status: true,
   sourceArtifactId: true,
+  layoutSnapshotJson: true,
+  layoutEngineVersion: true,
+  layoutSnapshotUpdatedAt: true,
   canonicalVersion: true,
   editorProjectionVersion: true,
   typstVersion: true,
@@ -61,6 +71,9 @@ export interface PublicationDocumentStorageInput {
   canonicalDocJson?: unknown;
   editorProjectionJson?: unknown;
   typstSource?: string | null;
+  layoutSnapshotJson?: unknown;
+  layoutSnapshotPreset?: PagePreset;
+  theme?: string | null;
   layoutPlan?: unknown;
   kind?: string | null;
   title?: string | null;
@@ -77,6 +90,9 @@ export interface PublicationDocumentStorageFields {
   canonicalDocJson: Prisma.InputJsonValue;
   editorProjectionJson: Prisma.InputJsonValue;
   typstSource: string;
+  layoutSnapshotJson: Prisma.InputJsonValue;
+  layoutEngineVersion: number;
+  layoutSnapshotUpdatedAt: Date;
   canonicalVersion: number;
   editorProjectionVersion: number;
   typstVersion: number;
@@ -98,6 +114,9 @@ export interface PublicationDocumentSummary {
   layoutPlan: unknown | null;
   status: string;
   sourceArtifactId: string | null;
+  layoutSnapshotJson: unknown | null;
+  layoutEngineVersion: number | null;
+  layoutSnapshotUpdatedAt: string | null;
   canonicalVersion: number;
   editorProjectionVersion: number;
   typstVersion: number;
@@ -108,6 +127,12 @@ export interface PublicationDocumentSummary {
 export interface PublicationDocumentDetail extends PublicationDocument {
   runId: string | null;
   layoutPlan: unknown | null;
+}
+
+function resolveThemeName(settings: unknown): string {
+  if (!settings || typeof settings !== 'object' || Array.isArray(settings)) return 'gilded-folio';
+  const theme = (settings as Record<string, unknown>).theme;
+  return typeof theme === 'string' && theme.trim().length > 0 ? theme : 'gilded-folio';
 }
 
 export type PublicationDocumentUpdateResult =
@@ -130,6 +155,20 @@ export function buildPublicationDocumentStorageFields(
       title: input.title ?? null,
     }),
   );
+  const layoutSnapshotPreset = input.layoutSnapshotPreset ?? 'standard_pdf';
+  const parsedLayoutSnapshot = parseLayoutDocumentV2(input.layoutSnapshotJson);
+  const layoutSnapshotJson = parsedLayoutSnapshot && parsedLayoutSnapshot.preset === layoutSnapshotPreset
+    ? parsedLayoutSnapshot
+    : buildLayoutDocumentV2({
+        content: canonicalDocJson,
+        layoutPlan: (input.layoutPlan ?? null) as LayoutPlan | null,
+        preset: layoutSnapshotPreset,
+        theme: input.theme ?? 'gilded-folio',
+        documentKind: input.kind ?? null,
+        documentTitle: input.title ?? null,
+        measurementMode: 'deterministic',
+        respectManualPageBreaks: true,
+      });
 
   const currentCanonicalVersion = versions.canonicalVersion ?? 1;
   const currentEditorProjectionVersion = versions.editorProjectionVersion ?? 1;
@@ -141,6 +180,9 @@ export function buildPublicationDocumentStorageFields(
     canonicalDocJson: canonicalDocJson as unknown as Prisma.InputJsonValue,
     editorProjectionJson: editorProjectionJson as unknown as Prisma.InputJsonValue,
     typstSource,
+    layoutSnapshotJson: layoutSnapshotJson as unknown as Prisma.InputJsonValue,
+    layoutEngineVersion: layoutSnapshotJson.version,
+    layoutSnapshotUpdatedAt: new Date(layoutSnapshotJson.generatedAt),
     canonicalVersion: bump ? currentCanonicalVersion + 1 : currentCanonicalVersion,
     editorProjectionVersion: bump ? currentEditorProjectionVersion + 1 : currentEditorProjectionVersion,
     typstVersion: bump ? currentTypstVersion + 1 : currentTypstVersion,
@@ -152,6 +194,8 @@ export function buildResolvedPublicationDocumentWriteData(input: {
   layoutPlan?: unknown;
   kind?: string | null;
   title?: string | null;
+  theme?: string | null;
+  layoutSnapshotPreset?: PagePreset;
   versions?: PublicationDocumentVersionState;
   bumpVersions?: boolean;
 }): PublicationDocumentWriteData {
@@ -167,6 +211,8 @@ export function buildResolvedPublicationDocumentWriteData(input: {
       layoutPlan: resolvedLayout.layoutPlan,
       kind: input.kind ?? null,
       title: input.title ?? null,
+      theme: input.theme ?? null,
+      layoutSnapshotPreset: input.layoutSnapshotPreset,
     },
     input.versions,
     { bumpVersions: input.bumpVersions === true },
@@ -179,8 +225,22 @@ export function buildResolvedPublicationDocumentWriteData(input: {
 }
 
 export function toPublicationDocumentSnapshot(
-  document: PublicationDocumentRecord,
+  document: PublicationDocumentRecord & { project?: { settings?: unknown } | null },
 ): PublicationDocumentDetail {
+  const canonicalDocJson = document.canonicalDocJson ?? document.content;
+  const editorProjectionJson = document.editorProjectionJson ?? document.canonicalDocJson ?? document.content;
+  const layoutSnapshotJson = parseLayoutDocumentV2(document.layoutSnapshotJson)
+    ?? buildLayoutDocumentV2({
+      content: normalizePublicationDocumentContent(canonicalDocJson),
+      layoutPlan: (document.layoutPlan ?? null) as LayoutPlan | null,
+      preset: 'standard_pdf',
+      theme: resolveThemeName(document.project?.settings),
+      documentKind: document.kind,
+      documentTitle: document.title,
+      measurementMode: 'deterministic',
+      respectManualPageBreaks: true,
+    });
+
   return {
     ...buildPublicationDocumentSnapshot({
       documentId: document.id,
@@ -192,9 +252,12 @@ export function toPublicationDocumentSnapshot(
       targetPageCount: document.targetPageCount,
       status: document.status,
       sourceArtifactId: document.sourceArtifactId,
-      canonicalDocJson: document.canonicalDocJson ?? document.content,
-      editorProjectionJson: document.editorProjectionJson ?? document.canonicalDocJson ?? document.content,
+      canonicalDocJson,
+      editorProjectionJson,
       typstSource: document.typstSource,
+      layoutSnapshotJson,
+      layoutEngineVersion: document.layoutEngineVersion ?? layoutSnapshotJson.version,
+      layoutSnapshotUpdatedAt: document.layoutSnapshotUpdatedAt ?? document.updatedAt,
       canonicalVersion: document.canonicalVersion ?? 1,
       editorProjectionVersion: document.editorProjectionVersion ?? 1,
       typstVersion: document.typstVersion ?? 1,
@@ -220,6 +283,9 @@ function toPublicationDocumentSummary(
     layoutPlan: document.layoutPlan,
     status: document.status,
     sourceArtifactId: document.sourceArtifactId,
+    layoutSnapshotJson: document.layoutSnapshotJson,
+    layoutEngineVersion: document.layoutEngineVersion,
+    layoutSnapshotUpdatedAt: document.layoutSnapshotUpdatedAt?.toISOString() ?? null,
     canonicalVersion: document.canonicalVersion ?? 1,
     editorProjectionVersion: document.editorProjectionVersion ?? 1,
     typstVersion: document.typstVersion ?? 1,
@@ -307,6 +373,7 @@ export async function updatePublicationDocument(
       layoutPlan: resolvedLayout.layoutPlan,
       kind: document.kind,
       title: patch.title ?? document.title,
+      theme: resolveThemeName(document.project.settings),
     },
     {
       canonicalVersion: document.canonicalVersion,
@@ -326,6 +393,9 @@ export async function updatePublicationDocument(
       canonicalDocJson: publicationFields.canonicalDocJson,
       editorProjectionJson: publicationFields.editorProjectionJson,
       typstSource: publicationFields.typstSource,
+      layoutSnapshotJson: publicationFields.layoutSnapshotJson,
+      layoutEngineVersion: publicationFields.layoutEngineVersion,
+      layoutSnapshotUpdatedAt: publicationFields.layoutSnapshotUpdatedAt,
       canonicalVersion: publicationFields.canonicalVersion,
       editorProjectionVersion: publicationFields.editorProjectionVersion,
       typstVersion: publicationFields.typstVersion,
@@ -365,6 +435,7 @@ export async function updatePublicationDocumentLayout(
       layoutPlan: resolvedLayout.layoutPlan,
       kind: document.kind,
       title: document.title,
+      theme: resolveThemeName(document.project.settings),
     },
     {
       canonicalVersion: document.canonicalVersion,
@@ -381,6 +452,9 @@ export async function updatePublicationDocumentLayout(
       canonicalDocJson: publicationFields.canonicalDocJson,
       editorProjectionJson: publicationFields.editorProjectionJson,
       typstSource: publicationFields.typstSource,
+      layoutSnapshotJson: publicationFields.layoutSnapshotJson,
+      layoutEngineVersion: publicationFields.layoutEngineVersion,
+      layoutSnapshotUpdatedAt: publicationFields.layoutSnapshotUpdatedAt,
       canonicalVersion: publicationFields.canonicalVersion,
       editorProjectionVersion: publicationFields.editorProjectionVersion,
       typstVersion: publicationFields.typstVersion,

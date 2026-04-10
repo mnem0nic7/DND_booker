@@ -168,6 +168,105 @@ export interface PageModel {
   };
 }
 
+export type LayoutDiagnosticSeverity = 'info' | 'warning' | 'error';
+export type LayoutMeasurementMode = 'estimated' | 'deterministic' | 'browser_capture';
+
+export interface LayoutAnchor {
+  id: string;
+  unitId: string;
+  fragmentIds: string[];
+  fragmentNodeIds: string[];
+  fragmentIndexes: number[];
+  span: LayoutSpan;
+  placement: LayoutPlacement;
+  flowBehavior: LayoutFlowBehavior;
+  wrapSide: LayoutWrapSide | null;
+  wrapEligible: boolean;
+  wrapWidthPx: number | null;
+  wrapWidthRatio: number | null;
+  groupId: string | null;
+  keepTogether: boolean;
+  allowWrapBelow: boolean;
+  isHero: boolean;
+  isOpener: boolean;
+}
+
+export interface LayoutFragment {
+  id: string;
+  nodeId: string;
+  unitId: string;
+  sourceIndex: number;
+  presentationOrder: number;
+  span: LayoutSpan;
+  placement: LayoutPlacement;
+  flowBehavior: LayoutFlowBehavior;
+  wrapSide: LayoutWrapSide | null;
+  wrapEligible: boolean;
+  wrapWidthPx: number | null;
+  wrapWidthRatio: number | null;
+  groupId: string | null;
+  keepTogether: boolean;
+  allowWrapBelow: boolean;
+  nodeType: string;
+  content: DocumentContent;
+  pageIndex: number;
+  columnIndex: number | null;
+  region: PageRegionKind;
+  bounds: MeasuredLayoutBounds;
+  isHero: boolean;
+  isOpener: boolean;
+}
+
+export interface LayoutPage {
+  index: number;
+  preset: PagePreset;
+  recipe: LayoutRecipe | null;
+  fragmentIds: string[];
+  contentHeightPx: number;
+  fillRatio: number;
+  columnMetrics: PageModelColumnMetrics;
+  nodeIds: string[];
+  documentIds: string[];
+  openerDocumentId: string | null;
+  boundaryType: PageBoundaryType;
+  boundaryNodeId: string | null;
+  boundarySourceIndex: number | null;
+}
+
+export interface LayoutMeasureProfile {
+  preset: PagePreset;
+  frame: LayoutMeasurementFrame;
+  theme: string | null;
+  documentKind: string | null;
+  documentTitle: string | null;
+  respectManualPageBreaks: boolean;
+  measurementMode: LayoutMeasurementMode;
+  fallbackScopeIds: string[];
+}
+
+export interface LayoutDiagnostic {
+  severity: LayoutDiagnosticSeverity;
+  code: string;
+  message: string;
+  nodeId: string | null;
+  fragmentId: string | null;
+}
+
+export interface LayoutDocumentV2 {
+  version: 2;
+  preset: PagePreset;
+  sectionRecipe: LayoutRecipe | null;
+  columnBalanceTarget: LayoutColumnBalanceTarget;
+  layoutPlan: LayoutPlan | null;
+  measureProfile: LayoutMeasureProfile;
+  pages: LayoutPage[];
+  fragments: LayoutFragment[];
+  anchors: LayoutAnchor[];
+  diagnostics: LayoutDiagnostic[];
+  metrics: PageModel['metrics'];
+  generatedAt: string;
+}
+
 export interface LayoutPlanValidationResult {
   valid: boolean;
   errors: string[];

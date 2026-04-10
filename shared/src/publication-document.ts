@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { ensureStableNodeIds } from './layout-plan.js';
+import { LayoutDocumentV2Schema, parseLayoutDocumentV2 } from './layout-runtime-v2.js';
 import { tiptapToTypst } from './renderers/tiptap-to-typst.js';
 import type { DocumentContent } from './types/document.js';
 import type { LayoutPlan } from './types/layout-plan.js';
@@ -40,6 +41,9 @@ export const PublicationDocumentSchema = z.object({
   canonicalDocJson: CanonicalTypstNodeSchema,
   editorProjectionJson: EditorProjectionSchema,
   typstSource: z.string(),
+  layoutSnapshotJson: LayoutDocumentV2Schema.nullable(),
+  layoutEngineVersion: z.number().int().positive().nullable(),
+  layoutSnapshotUpdatedAt: z.string().datetime().nullable(),
   canonicalVersion: z.number().int().min(1),
   editorProjectionVersion: z.number().int().min(1),
   typstVersion: z.number().int().min(1),
@@ -80,6 +84,9 @@ export interface PublicationDocumentSnapshotInput {
   editorProjectionJson?: unknown;
   content?: unknown;
   typstSource?: string | null;
+  layoutSnapshotJson?: unknown;
+  layoutEngineVersion?: number | null;
+  layoutSnapshotUpdatedAt?: Date | null;
   canonicalVersion?: number | null;
   editorProjectionVersion?: number | null;
   typstVersion?: number | null;
@@ -139,6 +146,7 @@ export function buildPublicationDocumentSnapshot(
   const typstSource = String(
     input.typstSource ?? canonicalPublicationDocumentToTypstSource(editorProjectionJson),
   );
+  const layoutSnapshotJson = parseLayoutDocumentV2(input.layoutSnapshotJson);
 
   return {
     schemaVersion: PUBLICATION_DOCUMENT_SCHEMA_VERSION,
@@ -154,6 +162,9 @@ export function buildPublicationDocumentSnapshot(
     canonicalDocJson,
     editorProjectionJson,
     typstSource,
+    layoutSnapshotJson: layoutSnapshotJson as PublicationDocument['layoutSnapshotJson'],
+    layoutEngineVersion: input.layoutEngineVersion ?? null,
+    layoutSnapshotUpdatedAt: input.layoutSnapshotUpdatedAt?.toISOString() ?? null,
     canonicalVersion: input.canonicalVersion ?? 1,
     editorProjectionVersion: input.editorProjectionVersion ?? 1,
     typstVersion: input.typstVersion ?? 1,

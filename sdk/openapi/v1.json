@@ -1856,6 +1856,775 @@
                         "format": "uuid",
                         "nullable": true
                       },
+                      "layoutSnapshotJson": {
+                        "type": "object",
+                        "properties": {
+                          "version": {
+                            "type": "number",
+                            "enum": [
+                              2
+                            ]
+                          },
+                          "preset": {
+                            "type": "string",
+                            "enum": [
+                              "standard_pdf",
+                              "print_pdf",
+                              "editor_preview",
+                              "epub"
+                            ]
+                          },
+                          "sectionRecipe": {
+                            "type": "string",
+                            "enum": [
+                              "chapter_hero_split",
+                              "intro_split_spread",
+                              "npc_roster_grid",
+                              "encounter_packet_spread",
+                              "utility_table_spread",
+                              "full_page_insert"
+                            ],
+                            "nullable": true
+                          },
+                          "columnBalanceTarget": {
+                            "type": "string",
+                            "enum": [
+                              "balanced",
+                              "dense_left",
+                              "dense_right"
+                            ]
+                          },
+                          "layoutPlan": {
+                            "type": "object",
+                            "properties": {
+                              "version": {
+                                "type": "number",
+                                "enum": [
+                                  1
+                                ]
+                              },
+                              "sectionRecipe": {
+                                "type": "string",
+                                "enum": [
+                                  "chapter_hero_split",
+                                  "intro_split_spread",
+                                  "npc_roster_grid",
+                                  "encounter_packet_spread",
+                                  "utility_table_spread",
+                                  "full_page_insert"
+                                ],
+                                "nullable": true
+                              },
+                              "columnBalanceTarget": {
+                                "type": "string",
+                                "enum": [
+                                  "balanced",
+                                  "dense_left",
+                                  "dense_right"
+                                ]
+                              },
+                              "blocks": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "nodeId": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    },
+                                    "presentationOrder": {
+                                      "type": "integer"
+                                    },
+                                    "span": {
+                                      "type": "string",
+                                      "enum": [
+                                        "column",
+                                        "both_columns",
+                                        "full_page"
+                                      ]
+                                    },
+                                    "placement": {
+                                      "type": "string",
+                                      "enum": [
+                                        "inline",
+                                        "hero_top",
+                                        "side_panel",
+                                        "bottom_panel",
+                                        "full_page_insert"
+                                      ]
+                                    },
+                                    "groupId": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "nullable": true
+                                    },
+                                    "keepTogether": {
+                                      "type": "boolean"
+                                    },
+                                    "allowWrapBelow": {
+                                      "type": "boolean"
+                                    }
+                                  },
+                                  "required": [
+                                    "nodeId",
+                                    "presentationOrder",
+                                    "span",
+                                    "placement",
+                                    "groupId",
+                                    "keepTogether",
+                                    "allowWrapBelow"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              }
+                            },
+                            "required": [
+                              "version",
+                              "sectionRecipe",
+                              "columnBalanceTarget",
+                              "blocks"
+                            ],
+                            "additionalProperties": false,
+                            "nullable": true
+                          },
+                          "measureProfile": {
+                            "type": "object",
+                            "properties": {
+                              "preset": {
+                                "type": "string",
+                                "enum": [
+                                  "standard_pdf",
+                                  "print_pdf",
+                                  "editor_preview",
+                                  "epub"
+                                ]
+                              },
+                              "frame": {
+                                "type": "object",
+                                "properties": {
+                                  "pageWidthPx": {
+                                    "type": "number"
+                                  },
+                                  "pageHeightPx": {
+                                    "type": "number"
+                                  },
+                                  "contentWidthPx": {
+                                    "type": "number"
+                                  },
+                                  "contentHeightPx": {
+                                    "type": "number"
+                                  },
+                                  "columnWidthPx": {
+                                    "type": "number"
+                                  },
+                                  "columnCount": {
+                                    "type": "integer"
+                                  },
+                                  "columnGapPx": {
+                                    "type": "number"
+                                  }
+                                },
+                                "required": [
+                                  "pageWidthPx",
+                                  "pageHeightPx",
+                                  "contentWidthPx",
+                                  "contentHeightPx",
+                                  "columnWidthPx",
+                                  "columnCount",
+                                  "columnGapPx"
+                                ],
+                                "additionalProperties": false
+                              },
+                              "theme": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "documentKind": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "documentTitle": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "respectManualPageBreaks": {
+                                "type": "boolean"
+                              },
+                              "measurementMode": {
+                                "type": "string",
+                                "enum": [
+                                  "estimated",
+                                  "deterministic",
+                                  "browser_capture"
+                                ]
+                              },
+                              "fallbackScopeIds": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            "required": [
+                              "preset",
+                              "frame",
+                              "theme",
+                              "documentKind",
+                              "documentTitle",
+                              "respectManualPageBreaks",
+                              "measurementMode",
+                              "fallbackScopeIds"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "pages": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "index": {
+                                  "type": "integer",
+                                  "minimum": 1
+                                },
+                                "preset": {
+                                  "type": "string",
+                                  "enum": [
+                                    "standard_pdf",
+                                    "print_pdf",
+                                    "editor_preview",
+                                    "epub"
+                                  ]
+                                },
+                                "recipe": {
+                                  "type": "string",
+                                  "enum": [
+                                    "chapter_hero_split",
+                                    "intro_split_spread",
+                                    "npc_roster_grid",
+                                    "encounter_packet_spread",
+                                    "utility_table_spread",
+                                    "full_page_insert"
+                                  ],
+                                  "nullable": true
+                                },
+                                "fragmentIds": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  }
+                                },
+                                "contentHeightPx": {
+                                  "type": "number"
+                                },
+                                "fillRatio": {
+                                  "type": "number"
+                                },
+                                "columnMetrics": {
+                                  "type": "object",
+                                  "properties": {
+                                    "leftFillRatio": {
+                                      "type": "number",
+                                      "nullable": true
+                                    },
+                                    "rightFillRatio": {
+                                      "type": "number",
+                                      "nullable": true
+                                    },
+                                    "deltaRatio": {
+                                      "type": "number",
+                                      "nullable": true
+                                    }
+                                  },
+                                  "required": [
+                                    "leftFillRatio",
+                                    "rightFillRatio",
+                                    "deltaRatio"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                "nodeIds": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  }
+                                },
+                                "documentIds": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  }
+                                },
+                                "openerDocumentId": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "nullable": true
+                                },
+                                "boundaryType": {
+                                  "type": "string",
+                                  "enum": [
+                                    "pageBreak",
+                                    "autoGap",
+                                    "end"
+                                  ]
+                                },
+                                "boundaryNodeId": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "nullable": true
+                                },
+                                "boundarySourceIndex": {
+                                  "type": "integer",
+                                  "nullable": true
+                                }
+                              },
+                              "required": [
+                                "index",
+                                "preset",
+                                "recipe",
+                                "fragmentIds",
+                                "contentHeightPx",
+                                "fillRatio",
+                                "columnMetrics",
+                                "nodeIds",
+                                "documentIds",
+                                "openerDocumentId",
+                                "boundaryType",
+                                "boundaryNodeId",
+                                "boundarySourceIndex"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
+                          "fragments": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "nodeId": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "unitId": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "sourceIndex": {
+                                  "type": "integer"
+                                },
+                                "presentationOrder": {
+                                  "type": "integer"
+                                },
+                                "span": {
+                                  "type": "string",
+                                  "enum": [
+                                    "column",
+                                    "both_columns",
+                                    "full_page"
+                                  ]
+                                },
+                                "placement": {
+                                  "type": "string",
+                                  "enum": [
+                                    "inline",
+                                    "hero_top",
+                                    "side_panel",
+                                    "bottom_panel",
+                                    "full_page_insert"
+                                  ]
+                                },
+                                "flowBehavior": {
+                                  "type": "string",
+                                  "enum": [
+                                    "wrap_start",
+                                    "wrap_end",
+                                    "wide_block",
+                                    "full_page"
+                                  ]
+                                },
+                                "wrapSide": {
+                                  "type": "string",
+                                  "enum": [
+                                    "start",
+                                    "end"
+                                  ],
+                                  "nullable": true
+                                },
+                                "wrapEligible": {
+                                  "type": "boolean"
+                                },
+                                "wrapWidthPx": {
+                                  "type": "number",
+                                  "nullable": true
+                                },
+                                "wrapWidthRatio": {
+                                  "type": "number",
+                                  "nullable": true
+                                },
+                                "groupId": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "nullable": true
+                                },
+                                "keepTogether": {
+                                  "type": "boolean"
+                                },
+                                "allowWrapBelow": {
+                                  "type": "boolean"
+                                },
+                                "nodeType": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "content": {
+                                  "type": "object",
+                                  "properties": {
+                                    "type": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    },
+                                    "content": {
+                                      "type": "array",
+                                      "items": {}
+                                    },
+                                    "attrs": {
+                                      "type": "object",
+                                      "additionalProperties": {}
+                                    },
+                                    "marks": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "object",
+                                        "properties": {
+                                          "type": {
+                                            "type": "string",
+                                            "minLength": 1
+                                          },
+                                          "attrs": {
+                                            "type": "object",
+                                            "additionalProperties": {}
+                                          }
+                                        },
+                                        "required": [
+                                          "type"
+                                        ],
+                                        "additionalProperties": false
+                                      }
+                                    },
+                                    "text": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "type"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                "pageIndex": {
+                                  "type": "integer",
+                                  "minimum": 1
+                                },
+                                "columnIndex": {
+                                  "type": "integer",
+                                  "nullable": true
+                                },
+                                "region": {
+                                  "type": "string",
+                                  "enum": [
+                                    "hero",
+                                    "full_width",
+                                    "column_left",
+                                    "column_right",
+                                    "full_page"
+                                  ]
+                                },
+                                "bounds": {
+                                  "type": "object",
+                                  "properties": {
+                                    "x": {
+                                      "type": "number"
+                                    },
+                                    "y": {
+                                      "type": "number"
+                                    },
+                                    "width": {
+                                      "type": "number"
+                                    },
+                                    "height": {
+                                      "type": "number"
+                                    }
+                                  },
+                                  "required": [
+                                    "x",
+                                    "y",
+                                    "width",
+                                    "height"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                "isHero": {
+                                  "type": "boolean"
+                                },
+                                "isOpener": {
+                                  "type": "boolean"
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "nodeId",
+                                "unitId",
+                                "sourceIndex",
+                                "presentationOrder",
+                                "span",
+                                "placement",
+                                "flowBehavior",
+                                "wrapSide",
+                                "wrapEligible",
+                                "wrapWidthPx",
+                                "wrapWidthRatio",
+                                "groupId",
+                                "keepTogether",
+                                "allowWrapBelow",
+                                "nodeType",
+                                "content",
+                                "pageIndex",
+                                "columnIndex",
+                                "region",
+                                "bounds",
+                                "isHero",
+                                "isOpener"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
+                          "anchors": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "unitId": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "fragmentIds": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  }
+                                },
+                                "fragmentNodeIds": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  }
+                                },
+                                "fragmentIndexes": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "integer"
+                                  }
+                                },
+                                "span": {
+                                  "type": "string",
+                                  "enum": [
+                                    "column",
+                                    "both_columns",
+                                    "full_page"
+                                  ]
+                                },
+                                "placement": {
+                                  "type": "string",
+                                  "enum": [
+                                    "inline",
+                                    "hero_top",
+                                    "side_panel",
+                                    "bottom_panel",
+                                    "full_page_insert"
+                                  ]
+                                },
+                                "flowBehavior": {
+                                  "type": "string",
+                                  "enum": [
+                                    "wrap_start",
+                                    "wrap_end",
+                                    "wide_block",
+                                    "full_page"
+                                  ]
+                                },
+                                "wrapSide": {
+                                  "type": "string",
+                                  "enum": [
+                                    "start",
+                                    "end"
+                                  ],
+                                  "nullable": true
+                                },
+                                "wrapEligible": {
+                                  "type": "boolean"
+                                },
+                                "wrapWidthPx": {
+                                  "type": "number",
+                                  "nullable": true
+                                },
+                                "wrapWidthRatio": {
+                                  "type": "number",
+                                  "nullable": true
+                                },
+                                "groupId": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "nullable": true
+                                },
+                                "keepTogether": {
+                                  "type": "boolean"
+                                },
+                                "allowWrapBelow": {
+                                  "type": "boolean"
+                                },
+                                "isHero": {
+                                  "type": "boolean"
+                                },
+                                "isOpener": {
+                                  "type": "boolean"
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "unitId",
+                                "fragmentIds",
+                                "fragmentNodeIds",
+                                "fragmentIndexes",
+                                "span",
+                                "placement",
+                                "flowBehavior",
+                                "wrapSide",
+                                "wrapEligible",
+                                "wrapWidthPx",
+                                "wrapWidthRatio",
+                                "groupId",
+                                "keepTogether",
+                                "allowWrapBelow",
+                                "isHero",
+                                "isOpener"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
+                          "diagnostics": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "severity": {
+                                  "type": "string",
+                                  "enum": [
+                                    "info",
+                                    "warning",
+                                    "error"
+                                  ]
+                                },
+                                "code": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "message": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "nodeId": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "nullable": true
+                                },
+                                "fragmentId": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "nullable": true
+                                }
+                              },
+                              "required": [
+                                "severity",
+                                "code",
+                                "message",
+                                "nodeId",
+                                "fragmentId"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
+                          "metrics": {
+                            "type": "object",
+                            "properties": {
+                              "fragmentCount": {
+                                "type": "integer"
+                              },
+                              "heroFragmentCount": {
+                                "type": "integer"
+                              },
+                              "groupedFragmentCount": {
+                                "type": "integer"
+                              },
+                              "keepTogetherCount": {
+                                "type": "integer"
+                              },
+                              "pageCount": {
+                                "type": "integer"
+                              }
+                            },
+                            "required": [
+                              "fragmentCount",
+                              "heroFragmentCount",
+                              "groupedFragmentCount",
+                              "keepTogetherCount",
+                              "pageCount"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "generatedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        },
+                        "required": [
+                          "version",
+                          "preset",
+                          "sectionRecipe",
+                          "columnBalanceTarget",
+                          "layoutPlan",
+                          "measureProfile",
+                          "pages",
+                          "fragments",
+                          "anchors",
+                          "diagnostics",
+                          "metrics",
+                          "generatedAt"
+                        ],
+                        "additionalProperties": false,
+                        "nullable": true
+                      },
+                      "layoutEngineVersion": {
+                        "type": "integer",
+                        "exclusiveMinimum": true,
+                        "minimum": 0,
+                        "nullable": true
+                      },
+                      "layoutSnapshotUpdatedAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
+                      },
                       "canonicalVersion": {
                         "type": "integer"
                       },
@@ -2106,6 +2875,775 @@
                     "typstSource": {
                       "type": "string"
                     },
+                    "layoutSnapshotJson": {
+                      "type": "object",
+                      "properties": {
+                        "version": {
+                          "type": "number",
+                          "enum": [
+                            2
+                          ]
+                        },
+                        "preset": {
+                          "type": "string",
+                          "enum": [
+                            "standard_pdf",
+                            "print_pdf",
+                            "editor_preview",
+                            "epub"
+                          ]
+                        },
+                        "sectionRecipe": {
+                          "type": "string",
+                          "enum": [
+                            "chapter_hero_split",
+                            "intro_split_spread",
+                            "npc_roster_grid",
+                            "encounter_packet_spread",
+                            "utility_table_spread",
+                            "full_page_insert"
+                          ],
+                          "nullable": true
+                        },
+                        "columnBalanceTarget": {
+                          "type": "string",
+                          "enum": [
+                            "balanced",
+                            "dense_left",
+                            "dense_right"
+                          ]
+                        },
+                        "layoutPlan": {
+                          "type": "object",
+                          "properties": {
+                            "version": {
+                              "type": "number",
+                              "enum": [
+                                1
+                              ]
+                            },
+                            "sectionRecipe": {
+                              "type": "string",
+                              "enum": [
+                                "chapter_hero_split",
+                                "intro_split_spread",
+                                "npc_roster_grid",
+                                "encounter_packet_spread",
+                                "utility_table_spread",
+                                "full_page_insert"
+                              ],
+                              "nullable": true
+                            },
+                            "columnBalanceTarget": {
+                              "type": "string",
+                              "enum": [
+                                "balanced",
+                                "dense_left",
+                                "dense_right"
+                              ]
+                            },
+                            "blocks": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "nodeId": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "presentationOrder": {
+                                    "type": "integer"
+                                  },
+                                  "span": {
+                                    "type": "string",
+                                    "enum": [
+                                      "column",
+                                      "both_columns",
+                                      "full_page"
+                                    ]
+                                  },
+                                  "placement": {
+                                    "type": "string",
+                                    "enum": [
+                                      "inline",
+                                      "hero_top",
+                                      "side_panel",
+                                      "bottom_panel",
+                                      "full_page_insert"
+                                    ]
+                                  },
+                                  "groupId": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "nullable": true
+                                  },
+                                  "keepTogether": {
+                                    "type": "boolean"
+                                  },
+                                  "allowWrapBelow": {
+                                    "type": "boolean"
+                                  }
+                                },
+                                "required": [
+                                  "nodeId",
+                                  "presentationOrder",
+                                  "span",
+                                  "placement",
+                                  "groupId",
+                                  "keepTogether",
+                                  "allowWrapBelow"
+                                ],
+                                "additionalProperties": false
+                              }
+                            }
+                          },
+                          "required": [
+                            "version",
+                            "sectionRecipe",
+                            "columnBalanceTarget",
+                            "blocks"
+                          ],
+                          "additionalProperties": false,
+                          "nullable": true
+                        },
+                        "measureProfile": {
+                          "type": "object",
+                          "properties": {
+                            "preset": {
+                              "type": "string",
+                              "enum": [
+                                "standard_pdf",
+                                "print_pdf",
+                                "editor_preview",
+                                "epub"
+                              ]
+                            },
+                            "frame": {
+                              "type": "object",
+                              "properties": {
+                                "pageWidthPx": {
+                                  "type": "number"
+                                },
+                                "pageHeightPx": {
+                                  "type": "number"
+                                },
+                                "contentWidthPx": {
+                                  "type": "number"
+                                },
+                                "contentHeightPx": {
+                                  "type": "number"
+                                },
+                                "columnWidthPx": {
+                                  "type": "number"
+                                },
+                                "columnCount": {
+                                  "type": "integer"
+                                },
+                                "columnGapPx": {
+                                  "type": "number"
+                                }
+                              },
+                              "required": [
+                                "pageWidthPx",
+                                "pageHeightPx",
+                                "contentWidthPx",
+                                "contentHeightPx",
+                                "columnWidthPx",
+                                "columnCount",
+                                "columnGapPx"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "theme": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "documentKind": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "documentTitle": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "respectManualPageBreaks": {
+                              "type": "boolean"
+                            },
+                            "measurementMode": {
+                              "type": "string",
+                              "enum": [
+                                "estimated",
+                                "deterministic",
+                                "browser_capture"
+                              ]
+                            },
+                            "fallbackScopeIds": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "required": [
+                            "preset",
+                            "frame",
+                            "theme",
+                            "documentKind",
+                            "documentTitle",
+                            "respectManualPageBreaks",
+                            "measurementMode",
+                            "fallbackScopeIds"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "pages": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "index": {
+                                "type": "integer",
+                                "minimum": 1
+                              },
+                              "preset": {
+                                "type": "string",
+                                "enum": [
+                                  "standard_pdf",
+                                  "print_pdf",
+                                  "editor_preview",
+                                  "epub"
+                                ]
+                              },
+                              "recipe": {
+                                "type": "string",
+                                "enum": [
+                                  "chapter_hero_split",
+                                  "intro_split_spread",
+                                  "npc_roster_grid",
+                                  "encounter_packet_spread",
+                                  "utility_table_spread",
+                                  "full_page_insert"
+                                ],
+                                "nullable": true
+                              },
+                              "fragmentIds": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "minLength": 1
+                                }
+                              },
+                              "contentHeightPx": {
+                                "type": "number"
+                              },
+                              "fillRatio": {
+                                "type": "number"
+                              },
+                              "columnMetrics": {
+                                "type": "object",
+                                "properties": {
+                                  "leftFillRatio": {
+                                    "type": "number",
+                                    "nullable": true
+                                  },
+                                  "rightFillRatio": {
+                                    "type": "number",
+                                    "nullable": true
+                                  },
+                                  "deltaRatio": {
+                                    "type": "number",
+                                    "nullable": true
+                                  }
+                                },
+                                "required": [
+                                  "leftFillRatio",
+                                  "rightFillRatio",
+                                  "deltaRatio"
+                                ],
+                                "additionalProperties": false
+                              },
+                              "nodeIds": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "minLength": 1
+                                }
+                              },
+                              "documentIds": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "minLength": 1
+                                }
+                              },
+                              "openerDocumentId": {
+                                "type": "string",
+                                "minLength": 1,
+                                "nullable": true
+                              },
+                              "boundaryType": {
+                                "type": "string",
+                                "enum": [
+                                  "pageBreak",
+                                  "autoGap",
+                                  "end"
+                                ]
+                              },
+                              "boundaryNodeId": {
+                                "type": "string",
+                                "minLength": 1,
+                                "nullable": true
+                              },
+                              "boundarySourceIndex": {
+                                "type": "integer",
+                                "nullable": true
+                              }
+                            },
+                            "required": [
+                              "index",
+                              "preset",
+                              "recipe",
+                              "fragmentIds",
+                              "contentHeightPx",
+                              "fillRatio",
+                              "columnMetrics",
+                              "nodeIds",
+                              "documentIds",
+                              "openerDocumentId",
+                              "boundaryType",
+                              "boundaryNodeId",
+                              "boundarySourceIndex"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "fragments": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "nodeId": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "unitId": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "sourceIndex": {
+                                "type": "integer"
+                              },
+                              "presentationOrder": {
+                                "type": "integer"
+                              },
+                              "span": {
+                                "type": "string",
+                                "enum": [
+                                  "column",
+                                  "both_columns",
+                                  "full_page"
+                                ]
+                              },
+                              "placement": {
+                                "type": "string",
+                                "enum": [
+                                  "inline",
+                                  "hero_top",
+                                  "side_panel",
+                                  "bottom_panel",
+                                  "full_page_insert"
+                                ]
+                              },
+                              "flowBehavior": {
+                                "type": "string",
+                                "enum": [
+                                  "wrap_start",
+                                  "wrap_end",
+                                  "wide_block",
+                                  "full_page"
+                                ]
+                              },
+                              "wrapSide": {
+                                "type": "string",
+                                "enum": [
+                                  "start",
+                                  "end"
+                                ],
+                                "nullable": true
+                              },
+                              "wrapEligible": {
+                                "type": "boolean"
+                              },
+                              "wrapWidthPx": {
+                                "type": "number",
+                                "nullable": true
+                              },
+                              "wrapWidthRatio": {
+                                "type": "number",
+                                "nullable": true
+                              },
+                              "groupId": {
+                                "type": "string",
+                                "minLength": 1,
+                                "nullable": true
+                              },
+                              "keepTogether": {
+                                "type": "boolean"
+                              },
+                              "allowWrapBelow": {
+                                "type": "boolean"
+                              },
+                              "nodeType": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "content": {
+                                "type": "object",
+                                "properties": {
+                                  "type": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "content": {
+                                    "type": "array",
+                                    "items": {}
+                                  },
+                                  "attrs": {
+                                    "type": "object",
+                                    "additionalProperties": {}
+                                  },
+                                  "marks": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "type": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        },
+                                        "attrs": {
+                                          "type": "object",
+                                          "additionalProperties": {}
+                                        }
+                                      },
+                                      "required": [
+                                        "type"
+                                      ],
+                                      "additionalProperties": false
+                                    }
+                                  },
+                                  "text": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "type"
+                                ],
+                                "additionalProperties": false
+                              },
+                              "pageIndex": {
+                                "type": "integer",
+                                "minimum": 1
+                              },
+                              "columnIndex": {
+                                "type": "integer",
+                                "nullable": true
+                              },
+                              "region": {
+                                "type": "string",
+                                "enum": [
+                                  "hero",
+                                  "full_width",
+                                  "column_left",
+                                  "column_right",
+                                  "full_page"
+                                ]
+                              },
+                              "bounds": {
+                                "type": "object",
+                                "properties": {
+                                  "x": {
+                                    "type": "number"
+                                  },
+                                  "y": {
+                                    "type": "number"
+                                  },
+                                  "width": {
+                                    "type": "number"
+                                  },
+                                  "height": {
+                                    "type": "number"
+                                  }
+                                },
+                                "required": [
+                                  "x",
+                                  "y",
+                                  "width",
+                                  "height"
+                                ],
+                                "additionalProperties": false
+                              },
+                              "isHero": {
+                                "type": "boolean"
+                              },
+                              "isOpener": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "nodeId",
+                              "unitId",
+                              "sourceIndex",
+                              "presentationOrder",
+                              "span",
+                              "placement",
+                              "flowBehavior",
+                              "wrapSide",
+                              "wrapEligible",
+                              "wrapWidthPx",
+                              "wrapWidthRatio",
+                              "groupId",
+                              "keepTogether",
+                              "allowWrapBelow",
+                              "nodeType",
+                              "content",
+                              "pageIndex",
+                              "columnIndex",
+                              "region",
+                              "bounds",
+                              "isHero",
+                              "isOpener"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "anchors": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "unitId": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "fragmentIds": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "minLength": 1
+                                }
+                              },
+                              "fragmentNodeIds": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "minLength": 1
+                                }
+                              },
+                              "fragmentIndexes": {
+                                "type": "array",
+                                "items": {
+                                  "type": "integer"
+                                }
+                              },
+                              "span": {
+                                "type": "string",
+                                "enum": [
+                                  "column",
+                                  "both_columns",
+                                  "full_page"
+                                ]
+                              },
+                              "placement": {
+                                "type": "string",
+                                "enum": [
+                                  "inline",
+                                  "hero_top",
+                                  "side_panel",
+                                  "bottom_panel",
+                                  "full_page_insert"
+                                ]
+                              },
+                              "flowBehavior": {
+                                "type": "string",
+                                "enum": [
+                                  "wrap_start",
+                                  "wrap_end",
+                                  "wide_block",
+                                  "full_page"
+                                ]
+                              },
+                              "wrapSide": {
+                                "type": "string",
+                                "enum": [
+                                  "start",
+                                  "end"
+                                ],
+                                "nullable": true
+                              },
+                              "wrapEligible": {
+                                "type": "boolean"
+                              },
+                              "wrapWidthPx": {
+                                "type": "number",
+                                "nullable": true
+                              },
+                              "wrapWidthRatio": {
+                                "type": "number",
+                                "nullable": true
+                              },
+                              "groupId": {
+                                "type": "string",
+                                "minLength": 1,
+                                "nullable": true
+                              },
+                              "keepTogether": {
+                                "type": "boolean"
+                              },
+                              "allowWrapBelow": {
+                                "type": "boolean"
+                              },
+                              "isHero": {
+                                "type": "boolean"
+                              },
+                              "isOpener": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "unitId",
+                              "fragmentIds",
+                              "fragmentNodeIds",
+                              "fragmentIndexes",
+                              "span",
+                              "placement",
+                              "flowBehavior",
+                              "wrapSide",
+                              "wrapEligible",
+                              "wrapWidthPx",
+                              "wrapWidthRatio",
+                              "groupId",
+                              "keepTogether",
+                              "allowWrapBelow",
+                              "isHero",
+                              "isOpener"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "diagnostics": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "severity": {
+                                "type": "string",
+                                "enum": [
+                                  "info",
+                                  "warning",
+                                  "error"
+                                ]
+                              },
+                              "code": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "message": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "nodeId": {
+                                "type": "string",
+                                "minLength": 1,
+                                "nullable": true
+                              },
+                              "fragmentId": {
+                                "type": "string",
+                                "minLength": 1,
+                                "nullable": true
+                              }
+                            },
+                            "required": [
+                              "severity",
+                              "code",
+                              "message",
+                              "nodeId",
+                              "fragmentId"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "metrics": {
+                          "type": "object",
+                          "properties": {
+                            "fragmentCount": {
+                              "type": "integer"
+                            },
+                            "heroFragmentCount": {
+                              "type": "integer"
+                            },
+                            "groupedFragmentCount": {
+                              "type": "integer"
+                            },
+                            "keepTogetherCount": {
+                              "type": "integer"
+                            },
+                            "pageCount": {
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "fragmentCount",
+                            "heroFragmentCount",
+                            "groupedFragmentCount",
+                            "keepTogetherCount",
+                            "pageCount"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "generatedAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      },
+                      "required": [
+                        "version",
+                        "preset",
+                        "sectionRecipe",
+                        "columnBalanceTarget",
+                        "layoutPlan",
+                        "measureProfile",
+                        "pages",
+                        "fragments",
+                        "anchors",
+                        "diagnostics",
+                        "metrics",
+                        "generatedAt"
+                      ],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "layoutEngineVersion": {
+                      "type": "integer",
+                      "exclusiveMinimum": true,
+                      "minimum": 0,
+                      "nullable": true
+                    },
+                    "layoutSnapshotUpdatedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "nullable": true
+                    },
                     "canonicalVersion": {
                       "type": "integer",
                       "minimum": 1
@@ -2230,6 +3768,9 @@
                     "canonicalDocJson",
                     "editorProjectionJson",
                     "typstSource",
+                    "layoutSnapshotJson",
+                    "layoutEngineVersion",
+                    "layoutSnapshotUpdatedAt",
                     "canonicalVersion",
                     "editorProjectionVersion",
                     "typstVersion",
@@ -2456,6 +3997,775 @@
                     "typstSource": {
                       "type": "string"
                     },
+                    "layoutSnapshotJson": {
+                      "type": "object",
+                      "properties": {
+                        "version": {
+                          "type": "number",
+                          "enum": [
+                            2
+                          ]
+                        },
+                        "preset": {
+                          "type": "string",
+                          "enum": [
+                            "standard_pdf",
+                            "print_pdf",
+                            "editor_preview",
+                            "epub"
+                          ]
+                        },
+                        "sectionRecipe": {
+                          "type": "string",
+                          "enum": [
+                            "chapter_hero_split",
+                            "intro_split_spread",
+                            "npc_roster_grid",
+                            "encounter_packet_spread",
+                            "utility_table_spread",
+                            "full_page_insert"
+                          ],
+                          "nullable": true
+                        },
+                        "columnBalanceTarget": {
+                          "type": "string",
+                          "enum": [
+                            "balanced",
+                            "dense_left",
+                            "dense_right"
+                          ]
+                        },
+                        "layoutPlan": {
+                          "type": "object",
+                          "properties": {
+                            "version": {
+                              "type": "number",
+                              "enum": [
+                                1
+                              ]
+                            },
+                            "sectionRecipe": {
+                              "type": "string",
+                              "enum": [
+                                "chapter_hero_split",
+                                "intro_split_spread",
+                                "npc_roster_grid",
+                                "encounter_packet_spread",
+                                "utility_table_spread",
+                                "full_page_insert"
+                              ],
+                              "nullable": true
+                            },
+                            "columnBalanceTarget": {
+                              "type": "string",
+                              "enum": [
+                                "balanced",
+                                "dense_left",
+                                "dense_right"
+                              ]
+                            },
+                            "blocks": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "nodeId": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "presentationOrder": {
+                                    "type": "integer"
+                                  },
+                                  "span": {
+                                    "type": "string",
+                                    "enum": [
+                                      "column",
+                                      "both_columns",
+                                      "full_page"
+                                    ]
+                                  },
+                                  "placement": {
+                                    "type": "string",
+                                    "enum": [
+                                      "inline",
+                                      "hero_top",
+                                      "side_panel",
+                                      "bottom_panel",
+                                      "full_page_insert"
+                                    ]
+                                  },
+                                  "groupId": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "nullable": true
+                                  },
+                                  "keepTogether": {
+                                    "type": "boolean"
+                                  },
+                                  "allowWrapBelow": {
+                                    "type": "boolean"
+                                  }
+                                },
+                                "required": [
+                                  "nodeId",
+                                  "presentationOrder",
+                                  "span",
+                                  "placement",
+                                  "groupId",
+                                  "keepTogether",
+                                  "allowWrapBelow"
+                                ],
+                                "additionalProperties": false
+                              }
+                            }
+                          },
+                          "required": [
+                            "version",
+                            "sectionRecipe",
+                            "columnBalanceTarget",
+                            "blocks"
+                          ],
+                          "additionalProperties": false,
+                          "nullable": true
+                        },
+                        "measureProfile": {
+                          "type": "object",
+                          "properties": {
+                            "preset": {
+                              "type": "string",
+                              "enum": [
+                                "standard_pdf",
+                                "print_pdf",
+                                "editor_preview",
+                                "epub"
+                              ]
+                            },
+                            "frame": {
+                              "type": "object",
+                              "properties": {
+                                "pageWidthPx": {
+                                  "type": "number"
+                                },
+                                "pageHeightPx": {
+                                  "type": "number"
+                                },
+                                "contentWidthPx": {
+                                  "type": "number"
+                                },
+                                "contentHeightPx": {
+                                  "type": "number"
+                                },
+                                "columnWidthPx": {
+                                  "type": "number"
+                                },
+                                "columnCount": {
+                                  "type": "integer"
+                                },
+                                "columnGapPx": {
+                                  "type": "number"
+                                }
+                              },
+                              "required": [
+                                "pageWidthPx",
+                                "pageHeightPx",
+                                "contentWidthPx",
+                                "contentHeightPx",
+                                "columnWidthPx",
+                                "columnCount",
+                                "columnGapPx"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "theme": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "documentKind": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "documentTitle": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "respectManualPageBreaks": {
+                              "type": "boolean"
+                            },
+                            "measurementMode": {
+                              "type": "string",
+                              "enum": [
+                                "estimated",
+                                "deterministic",
+                                "browser_capture"
+                              ]
+                            },
+                            "fallbackScopeIds": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "required": [
+                            "preset",
+                            "frame",
+                            "theme",
+                            "documentKind",
+                            "documentTitle",
+                            "respectManualPageBreaks",
+                            "measurementMode",
+                            "fallbackScopeIds"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "pages": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "index": {
+                                "type": "integer",
+                                "minimum": 1
+                              },
+                              "preset": {
+                                "type": "string",
+                                "enum": [
+                                  "standard_pdf",
+                                  "print_pdf",
+                                  "editor_preview",
+                                  "epub"
+                                ]
+                              },
+                              "recipe": {
+                                "type": "string",
+                                "enum": [
+                                  "chapter_hero_split",
+                                  "intro_split_spread",
+                                  "npc_roster_grid",
+                                  "encounter_packet_spread",
+                                  "utility_table_spread",
+                                  "full_page_insert"
+                                ],
+                                "nullable": true
+                              },
+                              "fragmentIds": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "minLength": 1
+                                }
+                              },
+                              "contentHeightPx": {
+                                "type": "number"
+                              },
+                              "fillRatio": {
+                                "type": "number"
+                              },
+                              "columnMetrics": {
+                                "type": "object",
+                                "properties": {
+                                  "leftFillRatio": {
+                                    "type": "number",
+                                    "nullable": true
+                                  },
+                                  "rightFillRatio": {
+                                    "type": "number",
+                                    "nullable": true
+                                  },
+                                  "deltaRatio": {
+                                    "type": "number",
+                                    "nullable": true
+                                  }
+                                },
+                                "required": [
+                                  "leftFillRatio",
+                                  "rightFillRatio",
+                                  "deltaRatio"
+                                ],
+                                "additionalProperties": false
+                              },
+                              "nodeIds": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "minLength": 1
+                                }
+                              },
+                              "documentIds": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "minLength": 1
+                                }
+                              },
+                              "openerDocumentId": {
+                                "type": "string",
+                                "minLength": 1,
+                                "nullable": true
+                              },
+                              "boundaryType": {
+                                "type": "string",
+                                "enum": [
+                                  "pageBreak",
+                                  "autoGap",
+                                  "end"
+                                ]
+                              },
+                              "boundaryNodeId": {
+                                "type": "string",
+                                "minLength": 1,
+                                "nullable": true
+                              },
+                              "boundarySourceIndex": {
+                                "type": "integer",
+                                "nullable": true
+                              }
+                            },
+                            "required": [
+                              "index",
+                              "preset",
+                              "recipe",
+                              "fragmentIds",
+                              "contentHeightPx",
+                              "fillRatio",
+                              "columnMetrics",
+                              "nodeIds",
+                              "documentIds",
+                              "openerDocumentId",
+                              "boundaryType",
+                              "boundaryNodeId",
+                              "boundarySourceIndex"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "fragments": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "nodeId": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "unitId": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "sourceIndex": {
+                                "type": "integer"
+                              },
+                              "presentationOrder": {
+                                "type": "integer"
+                              },
+                              "span": {
+                                "type": "string",
+                                "enum": [
+                                  "column",
+                                  "both_columns",
+                                  "full_page"
+                                ]
+                              },
+                              "placement": {
+                                "type": "string",
+                                "enum": [
+                                  "inline",
+                                  "hero_top",
+                                  "side_panel",
+                                  "bottom_panel",
+                                  "full_page_insert"
+                                ]
+                              },
+                              "flowBehavior": {
+                                "type": "string",
+                                "enum": [
+                                  "wrap_start",
+                                  "wrap_end",
+                                  "wide_block",
+                                  "full_page"
+                                ]
+                              },
+                              "wrapSide": {
+                                "type": "string",
+                                "enum": [
+                                  "start",
+                                  "end"
+                                ],
+                                "nullable": true
+                              },
+                              "wrapEligible": {
+                                "type": "boolean"
+                              },
+                              "wrapWidthPx": {
+                                "type": "number",
+                                "nullable": true
+                              },
+                              "wrapWidthRatio": {
+                                "type": "number",
+                                "nullable": true
+                              },
+                              "groupId": {
+                                "type": "string",
+                                "minLength": 1,
+                                "nullable": true
+                              },
+                              "keepTogether": {
+                                "type": "boolean"
+                              },
+                              "allowWrapBelow": {
+                                "type": "boolean"
+                              },
+                              "nodeType": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "content": {
+                                "type": "object",
+                                "properties": {
+                                  "type": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "content": {
+                                    "type": "array",
+                                    "items": {}
+                                  },
+                                  "attrs": {
+                                    "type": "object",
+                                    "additionalProperties": {}
+                                  },
+                                  "marks": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "type": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        },
+                                        "attrs": {
+                                          "type": "object",
+                                          "additionalProperties": {}
+                                        }
+                                      },
+                                      "required": [
+                                        "type"
+                                      ],
+                                      "additionalProperties": false
+                                    }
+                                  },
+                                  "text": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "type"
+                                ],
+                                "additionalProperties": false
+                              },
+                              "pageIndex": {
+                                "type": "integer",
+                                "minimum": 1
+                              },
+                              "columnIndex": {
+                                "type": "integer",
+                                "nullable": true
+                              },
+                              "region": {
+                                "type": "string",
+                                "enum": [
+                                  "hero",
+                                  "full_width",
+                                  "column_left",
+                                  "column_right",
+                                  "full_page"
+                                ]
+                              },
+                              "bounds": {
+                                "type": "object",
+                                "properties": {
+                                  "x": {
+                                    "type": "number"
+                                  },
+                                  "y": {
+                                    "type": "number"
+                                  },
+                                  "width": {
+                                    "type": "number"
+                                  },
+                                  "height": {
+                                    "type": "number"
+                                  }
+                                },
+                                "required": [
+                                  "x",
+                                  "y",
+                                  "width",
+                                  "height"
+                                ],
+                                "additionalProperties": false
+                              },
+                              "isHero": {
+                                "type": "boolean"
+                              },
+                              "isOpener": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "nodeId",
+                              "unitId",
+                              "sourceIndex",
+                              "presentationOrder",
+                              "span",
+                              "placement",
+                              "flowBehavior",
+                              "wrapSide",
+                              "wrapEligible",
+                              "wrapWidthPx",
+                              "wrapWidthRatio",
+                              "groupId",
+                              "keepTogether",
+                              "allowWrapBelow",
+                              "nodeType",
+                              "content",
+                              "pageIndex",
+                              "columnIndex",
+                              "region",
+                              "bounds",
+                              "isHero",
+                              "isOpener"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "anchors": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "unitId": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "fragmentIds": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "minLength": 1
+                                }
+                              },
+                              "fragmentNodeIds": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "minLength": 1
+                                }
+                              },
+                              "fragmentIndexes": {
+                                "type": "array",
+                                "items": {
+                                  "type": "integer"
+                                }
+                              },
+                              "span": {
+                                "type": "string",
+                                "enum": [
+                                  "column",
+                                  "both_columns",
+                                  "full_page"
+                                ]
+                              },
+                              "placement": {
+                                "type": "string",
+                                "enum": [
+                                  "inline",
+                                  "hero_top",
+                                  "side_panel",
+                                  "bottom_panel",
+                                  "full_page_insert"
+                                ]
+                              },
+                              "flowBehavior": {
+                                "type": "string",
+                                "enum": [
+                                  "wrap_start",
+                                  "wrap_end",
+                                  "wide_block",
+                                  "full_page"
+                                ]
+                              },
+                              "wrapSide": {
+                                "type": "string",
+                                "enum": [
+                                  "start",
+                                  "end"
+                                ],
+                                "nullable": true
+                              },
+                              "wrapEligible": {
+                                "type": "boolean"
+                              },
+                              "wrapWidthPx": {
+                                "type": "number",
+                                "nullable": true
+                              },
+                              "wrapWidthRatio": {
+                                "type": "number",
+                                "nullable": true
+                              },
+                              "groupId": {
+                                "type": "string",
+                                "minLength": 1,
+                                "nullable": true
+                              },
+                              "keepTogether": {
+                                "type": "boolean"
+                              },
+                              "allowWrapBelow": {
+                                "type": "boolean"
+                              },
+                              "isHero": {
+                                "type": "boolean"
+                              },
+                              "isOpener": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "unitId",
+                              "fragmentIds",
+                              "fragmentNodeIds",
+                              "fragmentIndexes",
+                              "span",
+                              "placement",
+                              "flowBehavior",
+                              "wrapSide",
+                              "wrapEligible",
+                              "wrapWidthPx",
+                              "wrapWidthRatio",
+                              "groupId",
+                              "keepTogether",
+                              "allowWrapBelow",
+                              "isHero",
+                              "isOpener"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "diagnostics": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "severity": {
+                                "type": "string",
+                                "enum": [
+                                  "info",
+                                  "warning",
+                                  "error"
+                                ]
+                              },
+                              "code": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "message": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "nodeId": {
+                                "type": "string",
+                                "minLength": 1,
+                                "nullable": true
+                              },
+                              "fragmentId": {
+                                "type": "string",
+                                "minLength": 1,
+                                "nullable": true
+                              }
+                            },
+                            "required": [
+                              "severity",
+                              "code",
+                              "message",
+                              "nodeId",
+                              "fragmentId"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "metrics": {
+                          "type": "object",
+                          "properties": {
+                            "fragmentCount": {
+                              "type": "integer"
+                            },
+                            "heroFragmentCount": {
+                              "type": "integer"
+                            },
+                            "groupedFragmentCount": {
+                              "type": "integer"
+                            },
+                            "keepTogetherCount": {
+                              "type": "integer"
+                            },
+                            "pageCount": {
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "fragmentCount",
+                            "heroFragmentCount",
+                            "groupedFragmentCount",
+                            "keepTogetherCount",
+                            "pageCount"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "generatedAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      },
+                      "required": [
+                        "version",
+                        "preset",
+                        "sectionRecipe",
+                        "columnBalanceTarget",
+                        "layoutPlan",
+                        "measureProfile",
+                        "pages",
+                        "fragments",
+                        "anchors",
+                        "diagnostics",
+                        "metrics",
+                        "generatedAt"
+                      ],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "layoutEngineVersion": {
+                      "type": "integer",
+                      "exclusiveMinimum": true,
+                      "minimum": 0,
+                      "nullable": true
+                    },
+                    "layoutSnapshotUpdatedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "nullable": true
+                    },
                     "canonicalVersion": {
                       "type": "integer",
                       "minimum": 1
@@ -2580,6 +4890,9 @@
                     "canonicalDocJson",
                     "editorProjectionJson",
                     "typstSource",
+                    "layoutSnapshotJson",
+                    "layoutEngineVersion",
+                    "layoutSnapshotUpdatedAt",
                     "canonicalVersion",
                     "editorProjectionVersion",
                     "typstVersion",
@@ -3264,6 +5577,775 @@
                     "typstSource": {
                       "type": "string"
                     },
+                    "layoutSnapshotJson": {
+                      "type": "object",
+                      "properties": {
+                        "version": {
+                          "type": "number",
+                          "enum": [
+                            2
+                          ]
+                        },
+                        "preset": {
+                          "type": "string",
+                          "enum": [
+                            "standard_pdf",
+                            "print_pdf",
+                            "editor_preview",
+                            "epub"
+                          ]
+                        },
+                        "sectionRecipe": {
+                          "type": "string",
+                          "enum": [
+                            "chapter_hero_split",
+                            "intro_split_spread",
+                            "npc_roster_grid",
+                            "encounter_packet_spread",
+                            "utility_table_spread",
+                            "full_page_insert"
+                          ],
+                          "nullable": true
+                        },
+                        "columnBalanceTarget": {
+                          "type": "string",
+                          "enum": [
+                            "balanced",
+                            "dense_left",
+                            "dense_right"
+                          ]
+                        },
+                        "layoutPlan": {
+                          "type": "object",
+                          "properties": {
+                            "version": {
+                              "type": "number",
+                              "enum": [
+                                1
+                              ]
+                            },
+                            "sectionRecipe": {
+                              "type": "string",
+                              "enum": [
+                                "chapter_hero_split",
+                                "intro_split_spread",
+                                "npc_roster_grid",
+                                "encounter_packet_spread",
+                                "utility_table_spread",
+                                "full_page_insert"
+                              ],
+                              "nullable": true
+                            },
+                            "columnBalanceTarget": {
+                              "type": "string",
+                              "enum": [
+                                "balanced",
+                                "dense_left",
+                                "dense_right"
+                              ]
+                            },
+                            "blocks": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "nodeId": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "presentationOrder": {
+                                    "type": "integer"
+                                  },
+                                  "span": {
+                                    "type": "string",
+                                    "enum": [
+                                      "column",
+                                      "both_columns",
+                                      "full_page"
+                                    ]
+                                  },
+                                  "placement": {
+                                    "type": "string",
+                                    "enum": [
+                                      "inline",
+                                      "hero_top",
+                                      "side_panel",
+                                      "bottom_panel",
+                                      "full_page_insert"
+                                    ]
+                                  },
+                                  "groupId": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "nullable": true
+                                  },
+                                  "keepTogether": {
+                                    "type": "boolean"
+                                  },
+                                  "allowWrapBelow": {
+                                    "type": "boolean"
+                                  }
+                                },
+                                "required": [
+                                  "nodeId",
+                                  "presentationOrder",
+                                  "span",
+                                  "placement",
+                                  "groupId",
+                                  "keepTogether",
+                                  "allowWrapBelow"
+                                ],
+                                "additionalProperties": false
+                              }
+                            }
+                          },
+                          "required": [
+                            "version",
+                            "sectionRecipe",
+                            "columnBalanceTarget",
+                            "blocks"
+                          ],
+                          "additionalProperties": false,
+                          "nullable": true
+                        },
+                        "measureProfile": {
+                          "type": "object",
+                          "properties": {
+                            "preset": {
+                              "type": "string",
+                              "enum": [
+                                "standard_pdf",
+                                "print_pdf",
+                                "editor_preview",
+                                "epub"
+                              ]
+                            },
+                            "frame": {
+                              "type": "object",
+                              "properties": {
+                                "pageWidthPx": {
+                                  "type": "number"
+                                },
+                                "pageHeightPx": {
+                                  "type": "number"
+                                },
+                                "contentWidthPx": {
+                                  "type": "number"
+                                },
+                                "contentHeightPx": {
+                                  "type": "number"
+                                },
+                                "columnWidthPx": {
+                                  "type": "number"
+                                },
+                                "columnCount": {
+                                  "type": "integer"
+                                },
+                                "columnGapPx": {
+                                  "type": "number"
+                                }
+                              },
+                              "required": [
+                                "pageWidthPx",
+                                "pageHeightPx",
+                                "contentWidthPx",
+                                "contentHeightPx",
+                                "columnWidthPx",
+                                "columnCount",
+                                "columnGapPx"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "theme": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "documentKind": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "documentTitle": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "respectManualPageBreaks": {
+                              "type": "boolean"
+                            },
+                            "measurementMode": {
+                              "type": "string",
+                              "enum": [
+                                "estimated",
+                                "deterministic",
+                                "browser_capture"
+                              ]
+                            },
+                            "fallbackScopeIds": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "required": [
+                            "preset",
+                            "frame",
+                            "theme",
+                            "documentKind",
+                            "documentTitle",
+                            "respectManualPageBreaks",
+                            "measurementMode",
+                            "fallbackScopeIds"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "pages": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "index": {
+                                "type": "integer",
+                                "minimum": 1
+                              },
+                              "preset": {
+                                "type": "string",
+                                "enum": [
+                                  "standard_pdf",
+                                  "print_pdf",
+                                  "editor_preview",
+                                  "epub"
+                                ]
+                              },
+                              "recipe": {
+                                "type": "string",
+                                "enum": [
+                                  "chapter_hero_split",
+                                  "intro_split_spread",
+                                  "npc_roster_grid",
+                                  "encounter_packet_spread",
+                                  "utility_table_spread",
+                                  "full_page_insert"
+                                ],
+                                "nullable": true
+                              },
+                              "fragmentIds": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "minLength": 1
+                                }
+                              },
+                              "contentHeightPx": {
+                                "type": "number"
+                              },
+                              "fillRatio": {
+                                "type": "number"
+                              },
+                              "columnMetrics": {
+                                "type": "object",
+                                "properties": {
+                                  "leftFillRatio": {
+                                    "type": "number",
+                                    "nullable": true
+                                  },
+                                  "rightFillRatio": {
+                                    "type": "number",
+                                    "nullable": true
+                                  },
+                                  "deltaRatio": {
+                                    "type": "number",
+                                    "nullable": true
+                                  }
+                                },
+                                "required": [
+                                  "leftFillRatio",
+                                  "rightFillRatio",
+                                  "deltaRatio"
+                                ],
+                                "additionalProperties": false
+                              },
+                              "nodeIds": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "minLength": 1
+                                }
+                              },
+                              "documentIds": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "minLength": 1
+                                }
+                              },
+                              "openerDocumentId": {
+                                "type": "string",
+                                "minLength": 1,
+                                "nullable": true
+                              },
+                              "boundaryType": {
+                                "type": "string",
+                                "enum": [
+                                  "pageBreak",
+                                  "autoGap",
+                                  "end"
+                                ]
+                              },
+                              "boundaryNodeId": {
+                                "type": "string",
+                                "minLength": 1,
+                                "nullable": true
+                              },
+                              "boundarySourceIndex": {
+                                "type": "integer",
+                                "nullable": true
+                              }
+                            },
+                            "required": [
+                              "index",
+                              "preset",
+                              "recipe",
+                              "fragmentIds",
+                              "contentHeightPx",
+                              "fillRatio",
+                              "columnMetrics",
+                              "nodeIds",
+                              "documentIds",
+                              "openerDocumentId",
+                              "boundaryType",
+                              "boundaryNodeId",
+                              "boundarySourceIndex"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "fragments": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "nodeId": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "unitId": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "sourceIndex": {
+                                "type": "integer"
+                              },
+                              "presentationOrder": {
+                                "type": "integer"
+                              },
+                              "span": {
+                                "type": "string",
+                                "enum": [
+                                  "column",
+                                  "both_columns",
+                                  "full_page"
+                                ]
+                              },
+                              "placement": {
+                                "type": "string",
+                                "enum": [
+                                  "inline",
+                                  "hero_top",
+                                  "side_panel",
+                                  "bottom_panel",
+                                  "full_page_insert"
+                                ]
+                              },
+                              "flowBehavior": {
+                                "type": "string",
+                                "enum": [
+                                  "wrap_start",
+                                  "wrap_end",
+                                  "wide_block",
+                                  "full_page"
+                                ]
+                              },
+                              "wrapSide": {
+                                "type": "string",
+                                "enum": [
+                                  "start",
+                                  "end"
+                                ],
+                                "nullable": true
+                              },
+                              "wrapEligible": {
+                                "type": "boolean"
+                              },
+                              "wrapWidthPx": {
+                                "type": "number",
+                                "nullable": true
+                              },
+                              "wrapWidthRatio": {
+                                "type": "number",
+                                "nullable": true
+                              },
+                              "groupId": {
+                                "type": "string",
+                                "minLength": 1,
+                                "nullable": true
+                              },
+                              "keepTogether": {
+                                "type": "boolean"
+                              },
+                              "allowWrapBelow": {
+                                "type": "boolean"
+                              },
+                              "nodeType": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "content": {
+                                "type": "object",
+                                "properties": {
+                                  "type": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "content": {
+                                    "type": "array",
+                                    "items": {}
+                                  },
+                                  "attrs": {
+                                    "type": "object",
+                                    "additionalProperties": {}
+                                  },
+                                  "marks": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "type": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        },
+                                        "attrs": {
+                                          "type": "object",
+                                          "additionalProperties": {}
+                                        }
+                                      },
+                                      "required": [
+                                        "type"
+                                      ],
+                                      "additionalProperties": false
+                                    }
+                                  },
+                                  "text": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "type"
+                                ],
+                                "additionalProperties": false
+                              },
+                              "pageIndex": {
+                                "type": "integer",
+                                "minimum": 1
+                              },
+                              "columnIndex": {
+                                "type": "integer",
+                                "nullable": true
+                              },
+                              "region": {
+                                "type": "string",
+                                "enum": [
+                                  "hero",
+                                  "full_width",
+                                  "column_left",
+                                  "column_right",
+                                  "full_page"
+                                ]
+                              },
+                              "bounds": {
+                                "type": "object",
+                                "properties": {
+                                  "x": {
+                                    "type": "number"
+                                  },
+                                  "y": {
+                                    "type": "number"
+                                  },
+                                  "width": {
+                                    "type": "number"
+                                  },
+                                  "height": {
+                                    "type": "number"
+                                  }
+                                },
+                                "required": [
+                                  "x",
+                                  "y",
+                                  "width",
+                                  "height"
+                                ],
+                                "additionalProperties": false
+                              },
+                              "isHero": {
+                                "type": "boolean"
+                              },
+                              "isOpener": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "nodeId",
+                              "unitId",
+                              "sourceIndex",
+                              "presentationOrder",
+                              "span",
+                              "placement",
+                              "flowBehavior",
+                              "wrapSide",
+                              "wrapEligible",
+                              "wrapWidthPx",
+                              "wrapWidthRatio",
+                              "groupId",
+                              "keepTogether",
+                              "allowWrapBelow",
+                              "nodeType",
+                              "content",
+                              "pageIndex",
+                              "columnIndex",
+                              "region",
+                              "bounds",
+                              "isHero",
+                              "isOpener"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "anchors": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "unitId": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "fragmentIds": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "minLength": 1
+                                }
+                              },
+                              "fragmentNodeIds": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "minLength": 1
+                                }
+                              },
+                              "fragmentIndexes": {
+                                "type": "array",
+                                "items": {
+                                  "type": "integer"
+                                }
+                              },
+                              "span": {
+                                "type": "string",
+                                "enum": [
+                                  "column",
+                                  "both_columns",
+                                  "full_page"
+                                ]
+                              },
+                              "placement": {
+                                "type": "string",
+                                "enum": [
+                                  "inline",
+                                  "hero_top",
+                                  "side_panel",
+                                  "bottom_panel",
+                                  "full_page_insert"
+                                ]
+                              },
+                              "flowBehavior": {
+                                "type": "string",
+                                "enum": [
+                                  "wrap_start",
+                                  "wrap_end",
+                                  "wide_block",
+                                  "full_page"
+                                ]
+                              },
+                              "wrapSide": {
+                                "type": "string",
+                                "enum": [
+                                  "start",
+                                  "end"
+                                ],
+                                "nullable": true
+                              },
+                              "wrapEligible": {
+                                "type": "boolean"
+                              },
+                              "wrapWidthPx": {
+                                "type": "number",
+                                "nullable": true
+                              },
+                              "wrapWidthRatio": {
+                                "type": "number",
+                                "nullable": true
+                              },
+                              "groupId": {
+                                "type": "string",
+                                "minLength": 1,
+                                "nullable": true
+                              },
+                              "keepTogether": {
+                                "type": "boolean"
+                              },
+                              "allowWrapBelow": {
+                                "type": "boolean"
+                              },
+                              "isHero": {
+                                "type": "boolean"
+                              },
+                              "isOpener": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "unitId",
+                              "fragmentIds",
+                              "fragmentNodeIds",
+                              "fragmentIndexes",
+                              "span",
+                              "placement",
+                              "flowBehavior",
+                              "wrapSide",
+                              "wrapEligible",
+                              "wrapWidthPx",
+                              "wrapWidthRatio",
+                              "groupId",
+                              "keepTogether",
+                              "allowWrapBelow",
+                              "isHero",
+                              "isOpener"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "diagnostics": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "severity": {
+                                "type": "string",
+                                "enum": [
+                                  "info",
+                                  "warning",
+                                  "error"
+                                ]
+                              },
+                              "code": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "message": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "nodeId": {
+                                "type": "string",
+                                "minLength": 1,
+                                "nullable": true
+                              },
+                              "fragmentId": {
+                                "type": "string",
+                                "minLength": 1,
+                                "nullable": true
+                              }
+                            },
+                            "required": [
+                              "severity",
+                              "code",
+                              "message",
+                              "nodeId",
+                              "fragmentId"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "metrics": {
+                          "type": "object",
+                          "properties": {
+                            "fragmentCount": {
+                              "type": "integer"
+                            },
+                            "heroFragmentCount": {
+                              "type": "integer"
+                            },
+                            "groupedFragmentCount": {
+                              "type": "integer"
+                            },
+                            "keepTogetherCount": {
+                              "type": "integer"
+                            },
+                            "pageCount": {
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "fragmentCount",
+                            "heroFragmentCount",
+                            "groupedFragmentCount",
+                            "keepTogetherCount",
+                            "pageCount"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "generatedAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      },
+                      "required": [
+                        "version",
+                        "preset",
+                        "sectionRecipe",
+                        "columnBalanceTarget",
+                        "layoutPlan",
+                        "measureProfile",
+                        "pages",
+                        "fragments",
+                        "anchors",
+                        "diagnostics",
+                        "metrics",
+                        "generatedAt"
+                      ],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "layoutEngineVersion": {
+                      "type": "integer",
+                      "exclusiveMinimum": true,
+                      "minimum": 0,
+                      "nullable": true
+                    },
+                    "layoutSnapshotUpdatedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "nullable": true
+                    },
                     "canonicalVersion": {
                       "type": "integer",
                       "minimum": 1
@@ -3388,6 +6470,9 @@
                     "canonicalDocJson",
                     "editorProjectionJson",
                     "typstSource",
+                    "layoutSnapshotJson",
+                    "layoutEngineVersion",
+                    "layoutSnapshotUpdatedAt",
                     "canonicalVersion",
                     "editorProjectionVersion",
                     "typstVersion",

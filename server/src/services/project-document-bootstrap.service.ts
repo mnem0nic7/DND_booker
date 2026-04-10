@@ -44,6 +44,7 @@ type ProjectWithContent = {
   userId: string;
   title: string;
   type: ProjectType;
+  settings?: unknown;
   content: unknown;
 };
 
@@ -159,7 +160,7 @@ export async function ensureProjectDocuments(projectId: string, userId: string) 
     return await prisma.$transaction(async (tx) => {
       const project = await tx.project.findFirst({
         where: { id: projectId, userId },
-        select: { id: true, userId: true, title: true, type: true, content: true },
+        select: { id: true, userId: true, title: true, type: true, settings: true, content: true },
       });
       if (!project) return null;
 
@@ -220,6 +221,7 @@ export async function createProjectWithDocuments(
       userId: project.userId,
       title: project.title,
       type: project.type,
+      settings: project.settings,
       content: project.content,
     });
 
@@ -248,6 +250,9 @@ async function materializeProjectDocuments(
       layoutPlan: resolvedLayout.layoutPlan,
       kind: doc.kind,
       title: doc.title,
+      theme: typeof (project.settings as Record<string, unknown> | null)?.theme === 'string'
+        ? String((project.settings as Record<string, unknown>).theme)
+        : null,
     });
 
     await tx.projectDocument.create({
@@ -265,6 +270,9 @@ async function materializeProjectDocuments(
         canonicalDocJson: publicationFields.canonicalDocJson,
         editorProjectionJson: publicationFields.editorProjectionJson,
         typstSource: publicationFields.typstSource,
+        layoutSnapshotJson: publicationFields.layoutSnapshotJson,
+        layoutEngineVersion: publicationFields.layoutEngineVersion,
+        layoutSnapshotUpdatedAt: publicationFields.layoutSnapshotUpdatedAt,
         canonicalVersion: publicationFields.canonicalVersion,
         editorProjectionVersion: publicationFields.editorProjectionVersion,
         typstVersion: publicationFields.typstVersion,

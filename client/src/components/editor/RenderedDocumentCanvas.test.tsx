@@ -7,6 +7,7 @@ function createMeasuredDocument(): MeasuredLayoutDocumentResult {
     measurementHtml: '<div class="layout-flow-root"><div data-layout-unit-id="unit:sidebarcallout-1"><div data-node-id="sidebarcallout-1"></div></div></div>',
     renderedHtml: '<div class="layout-page-stack"></div>',
     measurementRef: { current: null },
+    layoutSnapshot: null,
     pageModel: null,
     measurements: [],
     pageMetrics: null,

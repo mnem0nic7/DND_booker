@@ -28,6 +28,9 @@ interface DocumentSnapshot {
   canonicalDocJson?: unknown | null;
   editorProjectionJson?: unknown | null;
   typstSource?: string | null;
+  layoutSnapshotJson?: unknown | null;
+  layoutEngineVersion?: number | null;
+  layoutSnapshotUpdatedAt?: string | null;
   canonicalVersion?: number | null;
   editorProjectionVersion?: number | null;
   typstVersion?: number | null;
@@ -97,6 +100,9 @@ export async function createAgentCheckpoint(input: {
         canonicalDocJson: true,
         editorProjectionJson: true,
         typstSource: true,
+        layoutSnapshotJson: true,
+        layoutEngineVersion: true,
+        layoutSnapshotUpdatedAt: true,
         canonicalVersion: true,
         editorProjectionVersion: true,
         typstVersion: true,
@@ -143,6 +149,9 @@ export async function createAgentCheckpoint(input: {
     canonicalDocJson: document.canonicalDocJson,
     editorProjectionJson: document.editorProjectionJson,
     typstSource: document.typstSource,
+    layoutSnapshotJson: document.layoutSnapshotJson,
+    layoutEngineVersion: document.layoutEngineVersion,
+    layoutSnapshotUpdatedAt: document.layoutSnapshotUpdatedAt?.toISOString() ?? null,
     canonicalVersion: document.canonicalVersion,
     editorProjectionVersion: document.editorProjectionVersion,
     typstVersion: document.typstVersion,
@@ -269,6 +278,13 @@ export async function restoreAgentCheckpoint(runId: string, checkpointId: string
           canonicalDocJson: document.canonicalDocJson ?? document.content,
           editorProjectionJson: document.editorProjectionJson ?? document.canonicalDocJson ?? document.content,
           typstSource: document.typstSource ?? null,
+          layoutSnapshotJson: document.layoutSnapshotJson ?? null,
+          theme: typeof (projectSnapshot.settings as Record<string, unknown> | null)?.theme === 'string'
+            ? String((projectSnapshot.settings as Record<string, unknown>).theme)
+            : null,
+          layoutPlan: document.layoutPlan,
+          kind: document.kind,
+          title: document.title,
         },
         {
           canonicalVersion: document.canonicalVersion,
@@ -291,6 +307,9 @@ export async function restoreAgentCheckpoint(runId: string, checkpointId: string
           canonicalDocJson: publicationFields.canonicalDocJson,
           editorProjectionJson: publicationFields.editorProjectionJson,
           typstSource: publicationFields.typstSource,
+          layoutSnapshotJson: publicationFields.layoutSnapshotJson,
+          layoutEngineVersion: publicationFields.layoutEngineVersion,
+          layoutSnapshotUpdatedAt: publicationFields.layoutSnapshotUpdatedAt,
           canonicalVersion: publicationFields.canonicalVersion,
           editorProjectionVersion: publicationFields.editorProjectionVersion,
           typstVersion: publicationFields.typstVersion,
@@ -312,6 +331,9 @@ export async function restoreAgentCheckpoint(runId: string, checkpointId: string
           canonicalDocJson: publicationFields.canonicalDocJson,
           editorProjectionJson: publicationFields.editorProjectionJson,
           typstSource: publicationFields.typstSource,
+          layoutSnapshotJson: publicationFields.layoutSnapshotJson,
+          layoutEngineVersion: publicationFields.layoutEngineVersion,
+          layoutSnapshotUpdatedAt: publicationFields.layoutSnapshotUpdatedAt,
           canonicalVersion: publicationFields.canonicalVersion,
           editorProjectionVersion: publicationFields.editorProjectionVersion,
           typstVersion: publicationFields.typstVersion,

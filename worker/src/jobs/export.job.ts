@@ -8,9 +8,13 @@ import type {
   ExportReviewTextLayoutParityMetrics,
   LayoutPlan,
   PageModel,
+  LayoutDocumentV2,
 } from '@dnd-booker/shared';
 import {
+  buildLayoutDocumentV2,
+  layoutDocumentV2ToPageModel,
   normalizePublicationDocumentContent,
+  parseLayoutDocumentV2,
   recommendLayoutPlan,
   resolveLayoutPlan,
   resolveTextLayoutFallbackScopeIds,
@@ -19,7 +23,6 @@ import { prisma } from '../config/database.js';
 import { assembleHtml } from '../renderers/html-assembler.js';
 import { assembleTypst } from '../renderers/typst-assembler.js';
 import { normalizeExportDocuments } from '../renderers/export-document-normalizer.js';
-import { measureDocumentPageModels } from '../generators/html-pdf.generator.js';
 import { generateTypstPdf } from '../generators/typst.generator.js';
 import { generateEpub } from '../generators/epub.generator.js';
 import {
@@ -59,10 +62,16 @@ interface RenderableDocument {
   sortOrder: number;
   kind?: DocumentKind | null;
   layoutPlan?: LayoutPlan | null;
+  layoutSnapshotJson?: unknown | null;
+  layoutEngineVersion?: number | null;
+  layoutSnapshotUpdatedAt?: string | null;
+  updatedAt?: string | null;
   fallbackScopeIds?: string[];
 }
 
 interface MeasuredRenderableDocument extends RenderableDocument {
+  layoutSnapshot?: LayoutDocumentV2 | null;
+  shouldPersistLayoutSnapshot?: boolean;
   pageModel: PageModel | null;
   textLayoutParity?: ExportReviewTextLayoutParityMetrics | null;
   textLayoutParityFindings?: ExportReviewFinding[];
@@ -233,23 +242,90 @@ function shouldGenerateSpotArtForCodes(codes: Set<string>): boolean {
     || codes.has('EXPORT_MISSED_ART_OPPORTUNITY');
 }
 
+function hasFreshSavedLayoutSnapshot(
+  doc: RenderableDocument,
+  pagePreset: 'standard_pdf' | 'print_pdf',
+): doc is RenderableDocument & {
+  layoutSnapshotJson: LayoutDocumentV2;
+  layoutEngineVersion: number;
+} {
+  const parsed = parseLayoutDocumentV2(doc.layoutSnapshotJson);
+  if (!parsed) return false;
+  if (doc.layoutEngineVersion !== parsed.version) return false;
+  if (parsed.preset !== pagePreset) return false;
+  if (!doc.layoutSnapshotUpdatedAt) return false;
+  if (doc.updatedAt && new Date(doc.layoutSnapshotUpdatedAt) < new Date(doc.updatedAt)) {
+    return false;
+  }
+  (doc as RenderableDocument & { layoutSnapshotJson: LayoutDocumentV2 }).layoutSnapshotJson = parsed;
+  return true;
+}
+
+function resolveRenderableLayoutSnapshot(input: {
+  doc: RenderableDocument;
+  theme: string;
+  pagePreset: 'standard_pdf' | 'print_pdf';
+}): {
+  layoutSnapshot: LayoutDocumentV2 | null;
+  pageModel: PageModel | null;
+  shouldPersistLayoutSnapshot: boolean;
+} {
+  if (!input.doc.content) {
+    return {
+      layoutSnapshot: null,
+      pageModel: null,
+      shouldPersistLayoutSnapshot: false,
+    };
+  }
+
+  if (hasFreshSavedLayoutSnapshot(input.doc, input.pagePreset)) {
+    return {
+      layoutSnapshot: input.doc.layoutSnapshotJson,
+      pageModel: layoutDocumentV2ToPageModel(input.doc.layoutSnapshotJson),
+      shouldPersistLayoutSnapshot: false,
+    };
+  }
+
+  const layoutSnapshot = buildLayoutDocumentV2({
+    content: input.doc.content,
+    layoutPlan: input.doc.layoutPlan ?? null,
+    preset: input.pagePreset,
+    theme: input.theme,
+    fallbackScopeIds: input.doc.fallbackScopeIds ?? [],
+    documentKind: input.doc.kind ?? null,
+    documentTitle: input.doc.title,
+    measurementMode: 'deterministic',
+    respectManualPageBreaks: true,
+  });
+
+  return {
+    layoutSnapshot,
+    pageModel: layoutDocumentV2ToPageModel(layoutSnapshot),
+    shouldPersistLayoutSnapshot: Boolean(input.doc.id),
+  };
+}
+
 async function measureRenderableDocs(input: {
   docs: RenderableDocument[];
   theme: string;
   pagePreset: 'standard_pdf' | 'print_pdf';
 }): Promise<MeasuredRenderableDocument[]> {
-  const measuredPageModels = await measureDocumentPageModels({
-    documents: input.docs,
-    theme: input.theme,
-    pagePreset: input.pagePreset,
-  });
+  return input.docs.map((doc) => {
+    const resolved = resolveRenderableLayoutSnapshot({
+      doc,
+      theme: input.theme,
+      pagePreset: input.pagePreset,
+    });
 
-  return input.docs.map((doc, index) => ({
-    ...doc,
-    pageModel: measuredPageModels[index]?.pageModel ?? null,
-    textLayoutParity: measuredPageModels[index]?.textLayoutParity ?? null,
-    textLayoutParityFindings: measuredPageModels[index]?.textLayoutParityFindings ?? [],
-  }));
+    return {
+      ...doc,
+      layoutSnapshot: resolved.layoutSnapshot,
+      shouldPersistLayoutSnapshot: resolved.shouldPersistLayoutSnapshot,
+      pageModel: resolved.pageModel,
+      textLayoutParity: null,
+      textLayoutParityFindings: [],
+    };
+  });
 }
 
 async function buildPreflightCandidate(input: {
@@ -271,6 +347,28 @@ async function buildPreflightCandidate(input: {
     measuredDocs,
     review,
   };
+}
+
+async function persistMeasuredLayoutSnapshots(docs: MeasuredRenderableDocument[]): Promise<void> {
+  const writes = docs
+    .filter((doc): doc is MeasuredRenderableDocument & { id: string; layoutSnapshot: LayoutDocumentV2 } => (
+      Boolean(doc.id)
+      && Boolean(doc.layoutSnapshot)
+      && doc.shouldPersistLayoutSnapshot === true
+    ))
+    .map((doc) =>
+      prisma.projectDocument.update({
+        where: { id: doc.id },
+        data: {
+          layoutSnapshotJson: doc.layoutSnapshot as any,
+          layoutEngineVersion: doc.layoutSnapshot.version,
+          layoutSnapshotUpdatedAt: new Date(doc.layoutSnapshot.generatedAt),
+        },
+      }),
+    );
+
+  if (writes.length === 0) return;
+  await Promise.all(writes);
 }
 
 async function applyPreflightCorrections(input: {
@@ -454,6 +552,10 @@ export async function processExportJob(job: Job<ExportJobData>): Promise<void> {
         sortOrder: true,
         kind: true,
         layoutPlan: true,
+        layoutSnapshotJson: true,
+        layoutEngineVersion: true,
+        layoutSnapshotUpdatedAt: true,
+        updatedAt: true,
       },
     });
 
@@ -474,6 +576,10 @@ export async function processExportJob(job: Job<ExportJobData>): Promise<void> {
           sortOrder: doc.sortOrder,
           kind: doc.kind as DocumentKind,
           layoutPlan: doc.layoutPlan as LayoutPlan | null,
+          layoutSnapshotJson: doc.layoutSnapshotJson,
+          layoutEngineVersion: doc.layoutEngineVersion,
+          layoutSnapshotUpdatedAt: doc.layoutSnapshotUpdatedAt?.toISOString() ?? null,
+          updatedAt: doc.updatedAt.toISOString(),
           fallbackScopeIds: resolveTextLayoutFallbackScopeIds(exportJob.project.settings, doc.id),
         }))
       : [{
@@ -690,6 +796,7 @@ async function renderPdfVariant(input: {
   const selectedCandidate = correctedCandidate && isBetterExportReview(correctedCandidate.review, baseCandidate.review)
     ? correctedCandidate
     : baseCandidate;
+  await persistMeasuredLayoutSnapshots(selectedCandidate.measuredDocs);
   const typstDocs = rewriteUploadUrlsInDocs(selectedCandidate.measuredDocs);
   const workspace = await createTypstWorkspace(path.dirname(filepath));
   let buffer: Buffer;

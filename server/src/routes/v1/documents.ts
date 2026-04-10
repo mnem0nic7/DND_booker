@@ -42,6 +42,9 @@ function toRouteDocumentResponse(document: {
   canonicalDocJson: unknown;
   editorProjectionJson: unknown;
   typstSource: string;
+  layoutSnapshotJson?: unknown | null;
+  layoutEngineVersion?: number | null;
+  layoutSnapshotUpdatedAt?: string | Date | null;
   canonicalVersion: number;
   editorProjectionVersion: number;
   typstVersion: number;
@@ -63,6 +66,11 @@ function toRouteDocumentResponse(document: {
     canonicalDocJson: document.canonicalDocJson,
     editorProjectionJson: document.editorProjectionJson,
     typstSource: document.typstSource,
+    layoutSnapshotJson: document.layoutSnapshotJson ?? null,
+    layoutEngineVersion: document.layoutEngineVersion ?? null,
+    layoutSnapshotUpdatedAt: document.layoutSnapshotUpdatedAt instanceof Date
+      ? document.layoutSnapshotUpdatedAt.toISOString()
+      : document.layoutSnapshotUpdatedAt ?? null,
     canonicalVersion: document.canonicalVersion,
     editorProjectionVersion: document.editorProjectionVersion,
     typstVersion: document.typstVersion,

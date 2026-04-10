@@ -273,6 +273,9 @@ function toProjectDocumentFromV1(
   const editorProjectionJson = 'editorProjectionJson' in document ? document.editorProjectionJson : null;
   const typstSource = 'typstSource' in document ? document.typstSource : null;
   const layoutPlan = 'layoutPlan' in document ? document.layoutPlan ?? null : null;
+  const layoutSnapshotJson = 'layoutSnapshotJson' in document ? document.layoutSnapshotJson ?? null : null;
+  const layoutEngineVersion = 'layoutEngineVersion' in document ? document.layoutEngineVersion ?? null : null;
+  const layoutSnapshotUpdatedAt = 'layoutSnapshotUpdatedAt' in document ? document.layoutSnapshotUpdatedAt ?? null : null;
 
   return {
     id: documentId,
@@ -289,6 +292,9 @@ function toProjectDocumentFromV1(
     canonicalDocJson,
     editorProjectionJson,
     typstSource,
+    layoutSnapshotJson,
+    layoutEngineVersion,
+    layoutSnapshotUpdatedAt,
     canonicalVersion: document.canonicalVersion,
     editorProjectionVersion: document.editorProjectionVersion,
     typstVersion: document.typstVersion,
