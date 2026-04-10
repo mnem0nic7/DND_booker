@@ -101,6 +101,7 @@ The visible paginated editor is now the real TipTap surface. Do not reintroduce 
 Saved `LayoutRuntimeV2` snapshots are now the authoritative parity contract at page/block/column granularity. Export may refresh or repair a snapshot, but only by persisting the corrected document and snapshot first; do not add export-only structural injection or export-only layout fixes that the editor cannot see.
 Clicks inside prose on the visible paginated surface must preserve normal caret placement. Do not force a top-level `NodeSelection` for content-editable blocks just to drive the inspector UI.
 `layoutSnapshotJson` remains the authoritative saved editor snapshot for `standard_pdf`. `print_pdf` exports may build a format-specific snapshot in memory, but they must not overwrite the persisted standard snapshot slot.
+Manual page breaks in the live parity editor must consume the full remaining page height. The old “compact near-blank page” separator behavior is legacy-only and should not run inside `.parity-live-editor-shell`.
 
 PDF export now keeps the HTML/Playwright measurement pass for preflight and review, but the final production PDF render is Typst-based. Typst workspaces must stage referenced `uploads/...` assets explicitly because production uploads live in GCS, not a shared local disk.
 Export job creation should materialize `ProjectDocument` rows before queueing work. The worker's monolithic `Project.content` fallback is defensive compatibility-only, not an active runtime source of truth.

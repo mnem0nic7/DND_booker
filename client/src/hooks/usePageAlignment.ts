@@ -7,6 +7,7 @@ const DEFAULT_PAGE_CONTENT_HEIGHT = 864;
 // Pages with less than this much content collapse to a compact separator
 // instead of filling a near-blank page. ~80px ≈ one heading line.
 const MIN_CONTENT_FOR_FULL_PAGE = 80;
+const COMPACT_SEPARATOR_FILL = 48;
 
 /** Read --page-content-height from .page-canvas via computed style. */
 function getPageContentHeight(pmEl: HTMLElement): number {
@@ -14,6 +15,23 @@ function getPageContentHeight(pmEl: HTMLElement): number {
   if (!canvas) return DEFAULT_PAGE_CONTENT_HEIGHT;
   const raw = getComputedStyle(canvas).getPropertyValue('--page-content-height').trim();
   return parseInt(raw, 10) || DEFAULT_PAGE_CONTENT_HEIGHT;
+}
+
+export function shouldCompactNearBlankPageBreaks(pmEl: HTMLElement): boolean {
+  return !pmEl.closest('.parity-live-editor-shell');
+}
+
+export function resolvePageBreakFillHeight(
+  rawFill: number,
+  pageContentHeight: number,
+  compactNearBlankPages: boolean,
+): number {
+  if (!compactNearBlankPages) {
+    return rawFill;
+  }
+  return rawFill > pageContentHeight - MIN_CONTENT_FOR_FULL_PAGE
+    ? COMPACT_SEPARATOR_FILL
+    : rawFill;
 }
 
 /**
@@ -37,6 +55,7 @@ export function usePageAlignment(editor: Editor | null) {
       if (!pageBreaks.length) return;
 
       const PAGE_CONTENT_HEIGHT = getPageContentHeight(pmEl);
+      const compactNearBlankPages = shouldCompactNearBlankPageBreaks(pmEl);
 
       // Reset all fills to 0 so we measure natural positions
       pageBreaks.forEach((pb) => {
@@ -58,10 +77,12 @@ export function usePageAlignment(editor: Editor | null) {
         }
 
         // Fill from current position to the page boundary.
-        // If the page would be nearly blank, collapse to a compact separator
-        // to avoid wasting a full page of blank space in the editor.
         const rawFill = Math.max(0, nextPageEnd - pbTop);
-        const fill = rawFill > PAGE_CONTENT_HEIGHT - MIN_CONTENT_FOR_FULL_PAGE ? 48 : rawFill;
+        const fill = resolvePageBreakFillHeight(
+          rawFill,
+          PAGE_CONTENT_HEIGHT,
+          compactNearBlankPages,
+        );
         pb.style.paddingTop = `${fill}px`;
 
         // Force reflow so subsequent measurements are accurate
