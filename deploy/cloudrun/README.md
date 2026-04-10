@@ -58,6 +58,7 @@ That includes AI wizard apply flows: they must merge against canonical project c
 Export creation now materializes `ProjectDocument` rows before queueing worker jobs. The worker still has a final monolithic `Project.content` fallback for older compatibility cases, but that path should not be the active source of truth.
 The worker now treats the saved `LayoutRuntimeV2` snapshot as the pagination contract for preview/export preflight. When a document is missing a current snapshot, export rebuilds and persists it before final PDF rendering.
 Generation orchestration also routes model selection per stage through the checked-in agent model presets. That prevents a user's experimental chat model from becoming the structured-output model for outline, canon, chapter draft, or evaluation nodes during the deploy smoke or live generation runs. Quick-mode Google generations intentionally use the Flash lane for the heavier structured stages so deploy smoke and invite-only one-shot generation do not depend on `gemini-2.5-pro` capacity being available in that moment.
+The worker also enforces a hard timeout on the core generation nodes. If a provider call hangs inside intake, bible, outline, canon expansion, chapter planning, or chapter drafting, the node now errors and retries from the last persisted checkpoint instead of leaving the run stuck indefinitely.
 Legacy product `/api/*` compatibility routes have been removed. Keep health and infra probes on `/api/health`, and use `/api/v1/*` for app traffic, smoke tests, and operator tooling.
 
 ## Invite-Only Registration

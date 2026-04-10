@@ -48,6 +48,7 @@ Do not stop after code edits unless the user explicitly says not to ship.
 - generation nodes that already have strong Zod schemas, like outline generation and canon expansion, should prefer schema-native `generateObject(...)` over `generateText(...)` plus post-parse repair
 - generation and agent workers should resolve per-stage models through the routed agent presets instead of using the raw user chat model for every node; this is especially important when users save Google preview models that are acceptable for chat but unreliable for long-running structured orchestration
 - keep the quick-mode Google downgrade rule covered: `agent.bible`, `agent.outline`, `agent.canon`, `agent.chapter_draft`, and `agent.layout` should prefer the Flash lane in quick mode so deploy smoke and lightweight invite-only runs do not depend on live `gemini-2.5-pro` capacity
+- keep core generation node timeouts in place. Intake, bible, outline, canon expansion, chapter planning, and chapter drafting should fail and retry from a checkpoint if a provider call hangs, not sit indefinitely on a stale `currentNode`
 - when the local server integration test depends on Cloud SQL access, record the exact GCP blocker if it cannot run
 - remove accidental compiled artifacts from source directories before commit
 - if infrastructure blocks a test or deploy, record the exact blocker

@@ -37,6 +37,7 @@ interface StoredPreflightResult {
 }
 
 const DEFAULT_OPTIONAL_STAGE_TIMEOUT_MS = 4 * 60 * 1000;
+const DEFAULT_CORE_STAGE_TIMEOUT_MS = 6 * 60 * 1000;
 const REVISION_ELIGIBLE_CATEGORIES = new Set(['written']);
 const SUPPORTED_CANON_ENTITY_TYPES: Record<string, string> = {
   npc: 'npc_dossier',
@@ -67,8 +68,36 @@ function resolveOptionalStageTimeoutMs(): number {
   return DEFAULT_OPTIONAL_STAGE_TIMEOUT_MS;
 }
 
+function resolveCoreStageTimeoutMs(): number {
+  const parsed = Number.parseInt(process.env.GENERATION_CORE_STAGE_TIMEOUT_MS ?? '', 10);
+  if (Number.isFinite(parsed) && parsed > 0) {
+    return parsed;
+  }
+  return DEFAULT_CORE_STAGE_TIMEOUT_MS;
+}
+
 async function withOptionalStageTimeout<T>(label: string, task: Promise<T>): Promise<T> {
   const timeoutMs = resolveOptionalStageTimeoutMs();
+
+  return await new Promise<T>((resolve, reject) => {
+    const timeoutHandle = setTimeout(() => {
+      reject(new Error(`${label} timed out after ${Math.round(timeoutMs / 1000)}s`));
+    }, timeoutMs);
+
+    task
+      .then((value) => {
+        clearTimeout(timeoutHandle);
+        resolve(value);
+      })
+      .catch((error) => {
+        clearTimeout(timeoutHandle);
+        reject(error);
+      });
+  });
+}
+
+async function withCoreStageTimeout<T>(label: string, task: Promise<T>): Promise<T> {
+  const timeoutMs = resolveCoreStageTimeoutMs();
 
   return await new Promise<T>((resolve, reject) => {
     const timeoutHandle = setTimeout(() => {
@@ -437,28 +466,28 @@ export async function processGenerationJob(job: Job<GenerationJobData>): Promise
         ));
       },
       nodes: {
-        intake: async () => {
+        intake: async () => withCoreStageTimeout('Generation intake node', (async () => {
           await setRunStatus('planning', 5);
           await ensureNormalizedInput();
           await publishProgress('planning', 15);
           return { nextNode: 'bible' };
-        },
+        })()),
 
-        bible: async () => {
+        bible: async () => withCoreStageTimeout('Generation bible node', (async () => {
           await setRunStatus('planning', 15);
           await ensureBibleContent();
           await publishProgress('planning', 30);
           return { nextNode: 'outline' };
-        },
+        })()),
 
-        outline: async () => {
+        outline: async () => withCoreStageTimeout('Generation outline node', (async () => {
           await setRunStatus('planning', 30);
           await ensureOutline();
           await publishProgress('planning', 40);
           return { nextNode: 'front_matter' };
-        },
+        })()),
 
-        front_matter: async () => {
+        front_matter: async () => withCoreStageTimeout('Generation front matter node', (async () => {
           await setRunStatus('planning', 40);
           const existing = await loadArtifactByKey(runId, 'front-matter');
           if (!existing) {
@@ -469,9 +498,9 @@ export async function processGenerationJob(job: Job<GenerationJobData>): Promise
             await dependencies.executeFrontMatterGeneration(runEnvelope, bibleContent, outline);
           }
           return { nextNode: 'canon_expansion' };
-        },
+        })()),
 
-        canon_expansion: async () => {
+        canon_expansion: async () => withCoreStageTimeout('Generation canon expansion node', (async () => {
           await setRunStatus('generating_assets', 45);
           const bibleContent = await ensureBibleContent();
           const entities = await prisma.canonEntity.findMany({
@@ -524,9 +553,9 @@ export async function processGenerationJob(job: Job<GenerationJobData>): Promise
           await publishProgress('generating_assets', nextPercent);
 
           return { nextNode: 'canon_expansion' };
-        },
+        })()),
 
-        chapter_plans: async () => {
+        chapter_plans: async () => withCoreStageTimeout('Generation chapter plans node', (async () => {
           await setRunStatus('generating_assets', 55);
           const [outline, bibleContent, enrichedEntities] = await Promise.all([
             ensureOutline(),
@@ -570,9 +599,9 @@ export async function processGenerationJob(job: Job<GenerationJobData>): Promise
           );
 
           return { nextNode: 'chapter_plans' };
-        },
+        })()),
 
-        chapter_drafts: async () => {
+        chapter_drafts: async () => withCoreStageTimeout('Generation chapter drafts node', (async () => {
           await setRunStatus('generating_prose', 65);
           const [outline, bibleContent] = await Promise.all([
             ensureOutline(),
@@ -617,7 +646,7 @@ export async function processGenerationJob(job: Job<GenerationJobData>): Promise
           );
 
           return { nextNode: 'chapter_drafts' };
-        },
+        })()),
 
         evaluation: async ({ data }) => {
           if (!isPolished) {
