@@ -7,10 +7,30 @@ import type { MeasuredLayoutDocumentResult } from '../../lib/useMeasuredLayoutDo
 
 type DropPlacement = 'before' | 'after';
 
+function resolvePageHeightPx(pageSize: 'letter' | 'a4' | 'a5', layoutSnapshot: MeasuredLayoutDocumentResult['layoutSnapshot']): number {
+  const snapshotHeight = layoutSnapshot?.measureProfile.frame.pageHeightPx;
+  if (typeof snapshotHeight === 'number' && Number.isFinite(snapshotHeight) && snapshotHeight > 0) {
+    return snapshotHeight;
+  }
+
+  switch (pageSize) {
+    case 'a4':
+      return 1123;
+    case 'a5':
+      return 794;
+    case 'letter':
+    default:
+      return 1056;
+  }
+}
+
 interface RenderedDocumentCanvasProps {
   editor: Editor | null;
   theme: string;
   measuredDocument: MeasuredLayoutDocumentResult;
+  pageSize: 'letter' | 'a4' | 'a5';
+  columnCount: 1 | 2;
+  showTexture: boolean;
   selectedNodeId: string | null;
   onSelectNodeId: (nodeId: string) => void;
   onReorderNode: (draggedNodeId: string, targetNodeId: string, placement: DropPlacement) => void;
@@ -25,6 +45,9 @@ export function RenderedDocumentCanvas({
   editor,
   theme,
   measuredDocument,
+  pageSize,
+  columnCount,
+  showTexture,
   selectedNodeId,
   onSelectNodeId,
   onReorderNode,
@@ -60,6 +83,7 @@ export function RenderedDocumentCanvas({
     const nodeElement = target?.closest<HTMLElement>('[data-node-id]');
     const nodeId = nodeElement?.dataset.nodeId;
     if (!nodeId) return;
+    if (nodeElement?.isContentEditable) return;
     onSelectNodeId(nodeId);
   };
 
@@ -129,7 +153,7 @@ export function RenderedDocumentCanvas({
   );
 
   const pageCount = Math.max(1, layoutSnapshot?.pages.length ?? 1);
-  const pageHeight = 1056;
+  const pageHeight = resolvePageHeightPx(pageSize, layoutSnapshot);
   const pageGap = 32;
   const totalHeight = (pageCount * pageHeight) + (Math.max(0, pageCount - 1) * pageGap);
 
@@ -145,10 +169,18 @@ export function RenderedDocumentCanvas({
           />
         </div>
       </div>
-      <div className="editor-themed-content parity-page-canvas">
+      <div
+        className="editor-themed-content parity-page-canvas"
+        data-page-size={pageSize}
+        data-columns={columnCount}
+        data-texture-off={showTexture ? undefined : ''}
+      >
         <div
           ref={containerRef}
           className="parity-live-canvas"
+          data-page-size={pageSize}
+          data-columns={columnCount}
+          data-texture-off={showTexture ? undefined : ''}
           onClick={handleNodeClick}
           onDragStart={handleDragStart}
           onDragOver={handleDragOver}

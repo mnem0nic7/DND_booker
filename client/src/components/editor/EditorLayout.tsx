@@ -1,7 +1,12 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useEditor } from '@tiptap/react';
-import type { DocumentContent, LayoutDocumentV2, LayoutPlan } from '@dnd-booker/shared';
-import { ensureStableNodeIds } from '@dnd-booker/shared';
+import {
+  buildLayoutDocumentV2,
+  ensureStableNodeIds,
+  type DocumentContent,
+  type LayoutDocumentV2,
+  type LayoutPlan,
+} from '@dnd-booker/shared';
 import { buildEditorExtensions } from '../../lib/buildEditorExtensions';
 import { useMeasuredLayoutDocument } from '../../lib/useMeasuredLayoutDocument';
 import { Toolbar } from './Toolbar';
@@ -91,9 +96,15 @@ export function EditorLayout({
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [localLayoutPlan, setLocalLayoutPlan] = useState<LayoutPlan | null>(layoutPlan);
   const [isClearingTextLayoutFallbacks, setIsClearingTextLayoutFallbacks] = useState(false);
+  const resolvedDocumentTitle = documentTitle ?? sectionName ?? null;
   const layoutSnapshotRef = useRef<LayoutDocumentV2 | null>(layoutSnapshot);
   const liveLayoutSnapshotRef = useRef<LayoutDocumentV2 | null>(layoutSnapshot);
   const lastPublishedLayoutSignatureRef = useRef<string | null>(layoutSnapshotSignature(layoutSnapshot));
+  const themeRef = useRef(currentTheme);
+  const layoutPlanRef = useRef<LayoutPlan | null>(layoutPlan);
+  const documentKindRef = useRef<string | null>(documentKind);
+  const documentTitleRef = useRef<string | null>(resolvedDocumentTitle);
+  const suppressOnUpdateRef = useRef(false);
 
   const editor = useEditor({
     extensions: buildEditorExtensions({
@@ -103,13 +114,45 @@ export function EditorLayout({
     content: ensureStableNodeIds(content),
     immediatelyRender: false,
     onUpdate: ({ editor: ed }) => {
-      onUpdate(ed.getJSON(), { layoutSnapshot: layoutSnapshotRef.current });
+      if (suppressOnUpdateRef.current) {
+        return;
+      }
+      const nextContent = ed.getJSON() as DocumentContent;
+      const nextLayoutSnapshot = buildLayoutDocumentV2({
+        content: nextContent,
+        layoutPlan: layoutPlanRef.current,
+        preset: 'standard_pdf',
+        theme: themeRef.current,
+        documentKind: documentKindRef.current,
+        documentTitle: documentTitleRef.current,
+        measurementMode: 'deterministic',
+        respectManualPageBreaks: true,
+      });
+      layoutSnapshotRef.current = nextLayoutSnapshot;
+      liveLayoutSnapshotRef.current = nextLayoutSnapshot;
+      onUpdate(nextContent, { layoutSnapshot: nextLayoutSnapshot });
     },
   });
 
   useEffect(() => {
     setLocalLayoutPlan(layoutPlan);
   }, [layoutPlan]);
+
+  useEffect(() => {
+    themeRef.current = currentTheme;
+  }, [currentTheme]);
+
+  useEffect(() => {
+    layoutPlanRef.current = localLayoutPlan;
+  }, [localLayoutPlan]);
+
+  useEffect(() => {
+    documentKindRef.current = documentKind;
+  }, [documentKind]);
+
+  useEffect(() => {
+    documentTitleRef.current = resolvedDocumentTitle;
+  }, [resolvedDocumentTitle]);
 
   useEffect(() => {
     if (!editor) return;
@@ -148,7 +191,6 @@ export function EditorLayout({
     }
   }, [pageSize, columnCount]);
 
-  const resolvedDocumentTitle = documentTitle ?? sectionName ?? null;
   const measuredDocument = useMeasuredLayoutDocument({
     editor,
     initialContent: content,
@@ -181,12 +223,12 @@ export function EditorLayout({
   }, [layoutSnapshot, lastPublishedLayoutSignatureRef]);
 
   useEffect(() => {
-    if (!editor || !documentKind || !measuredDocument.layoutSnapshot) return;
+    if (!editor || !measuredDocument.layoutSnapshot) return;
     const nextSignature = layoutSnapshotSignature(measuredDocument.layoutSnapshot);
     if (!nextSignature || nextSignature === lastPublishedLayoutSignatureRef.current) return;
     lastPublishedLayoutSignatureRef.current = nextSignature;
     onUpdate(editor.getJSON() as DocumentContent, { layoutSnapshot: measuredDocument.layoutSnapshot });
-  }, [documentKind, editor, measuredDocument.layoutSnapshot, onUpdate]);
+  }, [editor, measuredDocument.layoutSnapshot, onUpdate]);
 
   const selectNodeById = useCallback((nodeId: string) => {
     if (!editor) return;
@@ -201,6 +243,8 @@ export function EditorLayout({
 
   const handleReorderNode = useCallback(async (draggedNodeId: string, targetNodeId: string, placement: 'before' | 'after') => {
     if (!editor) return;
+    const previousContent = editor.getJSON() as DocumentContent;
+    const previousLayoutPlan = localLayoutPlan;
 
     const locateNode = (nodeId: string): { pos: number; size: number } | null => {
       let match: { pos: number; size: number } | null = null;
@@ -253,7 +297,10 @@ export function EditorLayout({
     try {
       await onLayoutPlanUpdate(nextLayoutPlan);
     } catch {
-      setLocalLayoutPlan(localLayoutPlan);
+      suppressOnUpdateRef.current = true;
+      editor.commands.setContent(previousContent, { emitUpdate: false });
+      suppressOnUpdateRef.current = false;
+      setLocalLayoutPlan(previousLayoutPlan);
     }
   }, [editor, localLayoutPlan, onLayoutPlanUpdate]);
 
@@ -417,6 +464,9 @@ export function EditorLayout({
           editor={editor}
           theme={currentTheme}
           measuredDocument={measuredDocument}
+          pageSize={pageSize}
+          columnCount={columnCount}
+          showTexture={showTexture}
           selectedNodeId={selectedNodeId}
           onSelectNodeId={selectNodeById}
           onReorderNode={handleReorderNode}

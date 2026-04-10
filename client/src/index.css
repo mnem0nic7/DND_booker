@@ -145,6 +145,14 @@
   --page-content-height: 923px;
 }
 
+.parity-page-canvas[data-page-size="a4"],
+.parity-live-canvas[data-page-size="a4"] {
+  --page-width: 794px;
+  --page-height: 1123px;
+  --content-height: 979px;
+  --page-content-height: 923px;
+}
+
 /* A5: 148×210mm ≈ 559×794px at 96dpi */
 .page-canvas[data-page-size="a5"] {
   --page-width: 559px;
@@ -154,7 +162,21 @@
   --page-content-height: 642px;
 }
 
+.parity-page-canvas[data-page-size="a5"],
+.parity-live-canvas[data-page-size="a5"] {
+  --page-width: 559px;
+  --page-height: 794px;
+  --page-padding: 48px;
+  --content-height: 698px;
+  --page-content-height: 642px;
+}
+
 .page-canvas[data-texture-off] {
+  background-image: none;
+}
+
+.parity-page-canvas[data-texture-off] .parity-live-page-bg,
+.parity-live-canvas[data-texture-off] .parity-live-page-bg {
   background-image: none;
 }
 
@@ -171,7 +193,17 @@
   column-count: 1;
 }
 
+.parity-page-canvas[data-page-size="a5"] .ProseMirror,
+.parity-live-canvas[data-page-size="a5"] .ProseMirror {
+  column-count: 1;
+}
+
 .page-canvas[data-columns="1"] .ProseMirror {
+  column-count: 1;
+}
+
+.parity-page-canvas[data-columns="1"] .ProseMirror,
+.parity-live-canvas[data-columns="1"] .ProseMirror {
   column-count: 1;
 }
 
@@ -585,7 +617,6 @@
 }
 
 .parity-live-editor-shell .ProseMirror > [data-node-id] {
-  cursor: pointer;
   transition: box-shadow 120ms ease, outline-color 120ms ease, transform 120ms ease;
   outline: 1px solid transparent;
   border-radius: 4px;

@@ -23,6 +23,9 @@ describe('RenderedDocumentCanvas', () => {
         editor={null}
         theme="gilded-folio"
         measuredDocument={createMeasuredDocument()}
+        pageSize="letter"
+        columnCount={2}
+        showTexture
         selectedNodeId={null}
         onSelectNodeId={vi.fn()}
         onReorderNode={vi.fn()}
@@ -34,5 +37,26 @@ describe('RenderedDocumentCanvas', () => {
     const typographyShell = measurementCanvas?.querySelector('.parity-measure-flow.ProseMirror');
     expect(typographyShell).toBeTruthy();
     expect(typographyShell?.querySelector('[data-layout-unit-id="unit:sidebarcallout-1"]')).toBeTruthy();
+  });
+
+  it('applies the live page-size and column-count attributes to the paginated surface', () => {
+    const { container } = renderWithProviders(
+      <RenderedDocumentCanvas
+        editor={null}
+        theme="gilded-folio"
+        measuredDocument={createMeasuredDocument()}
+        pageSize="a5"
+        columnCount={1}
+        showTexture={false}
+        selectedNodeId={null}
+        onSelectNodeId={vi.fn()}
+        onReorderNode={vi.fn()}
+      />,
+    );
+
+    const liveCanvas = container.querySelector('.parity-live-canvas');
+    expect(liveCanvas).toHaveAttribute('data-page-size', 'a5');
+    expect(liveCanvas).toHaveAttribute('data-columns', '1');
+    expect(liveCanvas).toHaveAttribute('data-texture-off', '');
   });
 });

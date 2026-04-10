@@ -6,6 +6,9 @@ import { renderWithProviders } from '../../test/render';
 
 const mockOpenExportDialog = vi.hoisted(() => vi.fn());
 const mockSetSettingsModalOpen = vi.hoisted(() => vi.fn());
+const capturedEditorOptions = vi.hoisted(() => ({
+  onUpdate: null as null | ((payload: { editor: any }) => void),
+}));
 const mockEditor = vi.hoisted(() => ({
   state: {
     selection: { $anchor: { pos: 0 } },
@@ -13,14 +16,21 @@ const mockEditor = vi.hoisted(() => ({
       forEach: () => undefined,
       nodesBetween: () => undefined,
     },
+    tr: {
+      setMeta: vi.fn(() => ({ mocked: true })),
+    },
   },
   commands: {
     focus: vi.fn(),
     setNodeSelection: vi.fn(),
+    setContent: vi.fn(),
   },
   on: vi.fn(),
   off: vi.fn(),
   getJSON: () => ({ type: 'doc', content: [] }),
+  view: {
+    dispatch: vi.fn(),
+  },
 }));
 const mockUseMeasuredLayoutDocument = vi.hoisted(() => vi.fn(() => ({
   measurementHtml: '',
@@ -35,7 +45,10 @@ const mockUseMeasuredLayoutDocument = vi.hoisted(() => vi.fn(() => ({
 })));
 
 vi.mock('@tiptap/react', () => ({
-  useEditor: () => mockEditor,
+  useEditor: (options: { onUpdate?: (payload: { editor: any }) => void }) => {
+    capturedEditorOptions.onUpdate = options.onUpdate ?? null;
+    return mockEditor;
+  },
   EditorContent: () => null,
 }));
 
@@ -121,6 +134,7 @@ const persistedSnapshot: LayoutDocumentV2 = {
 describe('EditorLayout fallback banner', () => {
   beforeEach(() => {
     mockUseMeasuredLayoutDocument.mockClear();
+    capturedEditorOptions.onUpdate = null;
   });
 
   it('shows the banner only when fallback scopes are active', () => {
@@ -195,5 +209,29 @@ describe('EditorLayout fallback banner', () => {
       documentKind: 'chapter',
       documentTitle: 'Hydrated Chapter',
     }));
+  });
+
+  it('publishes a fresh layout snapshot on edit even when documentKind is not set', () => {
+    const onUpdate = vi.fn();
+
+    renderWithProviders(
+      <EditorLayout
+        projectId="project-1"
+        content={emptyDoc}
+        onUpdate={onUpdate}
+      />,
+    );
+
+    expect(capturedEditorOptions.onUpdate).toBeTruthy();
+    capturedEditorOptions.onUpdate?.({ editor: mockEditor });
+
+    expect(onUpdate).toHaveBeenCalledWith(
+      emptyDoc,
+      expect.objectContaining({
+        layoutSnapshot: expect.objectContaining({
+          preset: 'standard_pdf',
+        }),
+      }),
+    );
   });
 });

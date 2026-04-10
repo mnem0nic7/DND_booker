@@ -367,16 +367,31 @@ async function persistPreparedDocuments(input: {
 
       const nextContent = normalizePublicationDocumentContent(doc.content);
       const nextLayoutPlan = doc.layoutPlan ?? null;
-      const nextLayoutSnapshot = doc.layoutSnapshot ?? parseLayoutDocumentV2(current.layoutSnapshotJson) ?? buildLayoutDocumentV2({
-        content: nextContent,
-        layoutPlan: nextLayoutPlan,
-        preset: input.pagePreset,
-        theme: input.theme,
-        documentKind: doc.kind ?? null,
-        documentTitle: doc.title,
-        measurementMode: 'deterministic',
-        respectManualPageBreaks: true,
-      });
+      const currentPersistedLayoutSnapshot = (() => {
+        const parsed = parseLayoutDocumentV2(current.layoutSnapshotJson);
+        return parsed?.preset === 'standard_pdf' ? parsed : null;
+      })();
+      const nextLayoutSnapshot = input.pagePreset === 'standard_pdf'
+        ? (doc.layoutSnapshot ?? currentPersistedLayoutSnapshot ?? buildLayoutDocumentV2({
+            content: nextContent,
+            layoutPlan: nextLayoutPlan,
+            preset: 'standard_pdf',
+            theme: input.theme,
+            documentKind: doc.kind ?? null,
+            documentTitle: doc.title,
+            measurementMode: 'deterministic',
+            respectManualPageBreaks: true,
+          }))
+        : buildLayoutDocumentV2({
+          content: nextContent,
+          layoutPlan: nextLayoutPlan,
+          preset: 'standard_pdf',
+          theme: input.theme,
+          documentKind: doc.kind ?? null,
+          documentTitle: doc.title,
+          measurementMode: 'deterministic',
+          respectManualPageBreaks: true,
+        });
       const nextTypstSource = canonicalPublicationDocumentToTypstSource(nextContent, {
         layoutPlan: nextLayoutPlan,
         kind: doc.kind ?? null,
@@ -386,7 +401,7 @@ async function persistPreparedDocuments(input: {
 
       const contentChanged = JSON.stringify(nextContent) !== JSON.stringify(current.content ?? null);
       const layoutPlanChanged = JSON.stringify(nextLayoutPlan) !== JSON.stringify(current.layoutPlan ?? null);
-      const layoutSnapshotChanged = JSON.stringify(nextLayoutSnapshot) !== JSON.stringify(parseLayoutDocumentV2(current.layoutSnapshotJson));
+      const layoutSnapshotChanged = JSON.stringify(nextLayoutSnapshot) !== JSON.stringify(currentPersistedLayoutSnapshot);
       if (!contentChanged && !layoutPlanChanged && !layoutSnapshotChanged) return [];
 
       const bumpVersions = contentChanged || layoutPlanChanged;
