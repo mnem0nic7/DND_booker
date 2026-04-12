@@ -38,6 +38,7 @@ import type {
   ImprovementLoopRunDetail,
   ImprovementLoopRunIdParams,
   ImprovementLoopRunSummary,
+  ImprovementLoopWorkspaceRunSummary,
   Problem,
   ProjectCreateRequest,
   ProjectDetail,
@@ -119,6 +120,7 @@ export interface V1Client {
   };
   improvementLoops: {
     getDefaultImprovementLoopEngineeringTarget(config?: AxiosRequestConfig): Promise<ImprovementLoopDefaultEngineeringTarget>;
+    listRecentImprovementLoops(config?: AxiosRequestConfig): Promise<ImprovementLoopWorkspaceRunSummary[]>;
     createImprovementLoopAndProject(body: CreateImprovementLoopAndProjectRequest, config?: AxiosRequestConfig): Promise<ImprovementLoopRun>;
     createImprovementLoop(params: ProjectIdParams, body: CreateImprovementLoopRequest, config?: AxiosRequestConfig): Promise<ImprovementLoopRun>;
     listImprovementLoops(params: ProjectIdParams, config?: AxiosRequestConfig): Promise<ImprovementLoopRunSummary[]>;
@@ -335,6 +337,10 @@ export function createV1Client(axios: AxiosInstance): V1Client {
     improvementLoops: {
       async getDefaultImprovementLoopEngineeringTarget(config?: AxiosRequestConfig) {
         const { data } = await axios.get<ImprovementLoopDefaultEngineeringTarget>('/v1/improvement-loops/default-engineering-target', config);
+        return data;
+      },
+      async listRecentImprovementLoops(config?: AxiosRequestConfig) {
+        const { data } = await axios.get<ImprovementLoopWorkspaceRunSummary[]>('/v1/improvement-loops/recent', config);
         return data;
       },
       async createImprovementLoopAndProject(body: CreateImprovementLoopAndProjectRequest, config?: AxiosRequestConfig) {

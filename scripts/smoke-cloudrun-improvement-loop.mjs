@@ -257,6 +257,34 @@ async function main() {
       throw new Error('expected an engineering draft PR URL, but none was recorded');
     }
 
+    const recentRuns = await apiJson(
+      '/api/v1/improvement-loops/recent',
+      {},
+      'list recent improvement loops',
+    );
+    const recentRun = Array.isArray(recentRuns)
+      ? recentRuns.find((candidate) => candidate.runId === runId)
+      : null;
+
+    if (!recentRun) {
+      throw new Error(`recent improvement loops did not include run ${runId}`);
+    }
+    if (recentRun.projectId !== projectId) {
+      throw new Error(`recent improvement loop summary reported project ${recentRun.projectId} for run ${runId}, expected ${projectId}`);
+    }
+    if (recentRun.status !== 'completed') {
+      throw new Error(`recent improvement loop summary reported status ${recentRun.status} for run ${runId}, expected completed`);
+    }
+    if (recentRun.artifactCount < REQUIRED_ARTIFACT_TYPES.length) {
+      throw new Error(`recent improvement loop summary reported artifactCount ${recentRun.artifactCount}, expected at least ${REQUIRED_ARTIFACT_TYPES.length}`);
+    }
+    if (recentRun.editorRecommendation !== completedRun.editorFinalReport.recommendation) {
+      throw new Error(`recent improvement loop summary reported editor recommendation ${recentRun.editorRecommendation}, expected ${completedRun.editorFinalReport.recommendation}`);
+    }
+    if (recentRun.editorScore !== completedRun.editorFinalReport.overallScore) {
+      throw new Error(`recent improvement loop summary reported editor score ${recentRun.editorScore}, expected ${completedRun.editorFinalReport.overallScore}`);
+    }
+
     console.log(JSON.stringify({
       ok: true,
       projectId,
@@ -267,6 +295,7 @@ async function main() {
       engineeringStatus: completedRun.engineeringApplyResult.status,
       githubBranchName: completedRun.githubBranchName,
       githubPullRequestUrl: completedRun.githubPullRequestUrl,
+      recentRunProjectTitle: recentRun.projectTitle,
       artifactTypes: artifacts.map((artifact) => artifact.artifactType),
     }));
   } finally {

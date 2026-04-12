@@ -13,6 +13,7 @@ import type {
   ImprovementLoopRunMode,
   ImprovementLoopRunStatus,
   ImprovementLoopRunSummary,
+  ImprovementLoopWorkspaceRunSummary,
 } from '@dnd-booker/shared';
 import { IMPROVEMENT_LOOP_STATUS_TRANSITIONS } from '@dnd-booker/shared';
 import { Prisma } from '@prisma/client';
@@ -22,6 +23,18 @@ import { prisma } from '../../config/database.js';
 const RUN_WITH_ROLES_INCLUDE = {
   roleRuns: {
     orderBy: { createdAt: 'asc' },
+  },
+} satisfies Prisma.ImprovementLoopRunInclude;
+
+const WORKSPACE_RUN_SUMMARY_INCLUDE = {
+  roleRuns: {
+    orderBy: { createdAt: 'asc' },
+  },
+  project: {
+    select: { title: true },
+  },
+  _count: {
+    select: { artifacts: true },
   },
 } satisfies Prisma.ImprovementLoopRunInclude;
 
@@ -151,6 +164,45 @@ function serializeSummary(run: any): ImprovementLoopRunSummary {
   };
 }
 
+function parseEditorFinalReport(run: { editorFinalReportJson?: unknown }) {
+  const report = run.editorFinalReportJson;
+  if (!report || typeof report !== 'object' || Array.isArray(report)) {
+    return null;
+  }
+
+  const candidate = report as Record<string, unknown>;
+  return {
+    recommendation: typeof candidate.recommendation === 'string'
+      ? candidate.recommendation as ImprovementLoopWorkspaceRunSummary['editorRecommendation']
+      : null,
+    score: typeof candidate.overallScore === 'number' ? candidate.overallScore : null,
+  };
+}
+
+function serializeWorkspaceSummary(run: any): ImprovementLoopWorkspaceRunSummary {
+  const editorFinalReport = parseEditorFinalReport(run);
+  return {
+    runId: run.id,
+    projectId: run.projectId,
+    projectTitle: run.project?.title ?? 'Untitled Project',
+    mode: run.mode,
+    status: run.status,
+    currentStage: run.currentStage ?? null,
+    progressPercent: run.progressPercent ?? 0,
+    roles: sortRoleRuns(run.roleRuns).map(serializeRoleRun),
+    linkedGenerationRunId: run.linkedGenerationRunId ?? null,
+    linkedAgentRunId: run.linkedAgentRunId ?? null,
+    editorRecommendation: editorFinalReport?.recommendation ?? null,
+    editorScore: editorFinalReport?.score ?? null,
+    githubPullRequestNumber: run.githubPullRequestNumber ?? null,
+    githubPullRequestUrl: run.githubPullRequestUrl ?? null,
+    artifactCount: run._count?.artifacts ?? 0,
+    failureReason: run.failureReason ?? null,
+    createdAt: run.createdAt.toISOString(),
+    updatedAt: run.updatedAt.toISOString(),
+  };
+}
+
 function buildInput(mode: ImprovementLoopRunMode, request: CreateImprovementLoopRequest & { projectTitle?: string | null }): ImprovementLoopInput {
   return {
     mode,
@@ -274,6 +326,20 @@ export async function listImprovementLoopRuns(projectId: string, userId: string)
     orderBy: { createdAt: 'desc' },
   });
   return runs.map(serializeSummary);
+}
+
+export async function listRecentImprovementLoopRuns(userId: string, limit = 24): Promise<ImprovementLoopWorkspaceRunSummary[]> {
+  const runs = await prisma.improvementLoopRun.findMany({
+    where: { userId },
+    include: WORKSPACE_RUN_SUMMARY_INCLUDE,
+    orderBy: [
+      { updatedAt: 'desc' },
+      { createdAt: 'desc' },
+    ],
+    take: Math.max(1, Math.min(limit, 100)),
+  });
+
+  return runs.map(serializeWorkspaceSummary);
 }
 
 export async function transitionImprovementLoopStatus(

@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import type { ImprovementLoopWorkspaceRunSummary } from '@dnd-booker/shared';
 import { useAuthStore } from '../stores/authStore';
 import { useProjectStore } from '../stores/projectStore';
 import { useImprovementLoopStore } from '../stores/improvementLoopStore';
 import { ImprovementLoopPanel } from '../components/ai/ImprovementLoopPanel';
+import { formatRelativeTime } from '../lib/formatRelativeTime';
 
 type LaunchTab = 'current_project' | 'create_campaign';
 
@@ -56,25 +58,43 @@ function toBindingPayload(binding: RepoBindingFormState) {
   };
 }
 
+function statusTone(status: ImprovementLoopWorkspaceRunSummary['status']) {
+  if (status === 'completed') return 'bg-emerald-100 text-emerald-700';
+  if (status === 'failed' || status === 'cancelled') return 'bg-red-100 text-red-700';
+  if (status === 'paused') return 'bg-amber-100 text-amber-700';
+  return 'bg-sky-100 text-sky-700';
+}
+
+function roleStatusTone(status: ImprovementLoopWorkspaceRunSummary['roles'][number]['status']) {
+  if (status === 'completed') return 'bg-emerald-100 text-emerald-700';
+  if (status === 'failed') return 'bg-red-100 text-red-700';
+  if (status === 'skipped') return 'bg-stone-200 text-stone-600';
+  if (status === 'running') return 'bg-sky-100 text-sky-700';
+  return 'bg-stone-100 text-stone-600';
+}
+
 export default function AiTeamPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const selectedRunProjectParam = searchParams.get('projectId');
+  const selectedRunIdParam = searchParams.get('runId');
   const { user, logout } = useAuthStore();
   const { projects, isLoading, fetchError, fetchProjects } = useProjectStore();
   const {
     currentRun,
+    recentRuns,
     binding,
     validation,
     defaultEngineeringTarget,
     isLoadingDefaultEngineeringTarget,
+    isLoadingRecentRuns,
     isSavingBinding,
     isValidatingBinding,
     isStarting,
     error,
-    fetchRun,
     fetchLatestRun,
-    fetchArtifacts,
-    subscribeToRun,
+    fetchRecentRuns,
+    selectRun,
     fetchBinding,
     fetchDefaultEngineeringTarget,
     saveBinding,
@@ -84,7 +104,7 @@ export default function AiTeamPage() {
   } = useImprovementLoopStore();
 
   const [tab, setTab] = useState<LaunchTab>('current_project');
-  const [selectedProjectId, setSelectedProjectId] = useState('');
+  const [launchProjectId, setLaunchProjectId] = useState('');
   const [projectTitle, setProjectTitle] = useState('The Lantern Company');
   const [objective, setObjective] = useState('Have the AI team create, improve, review, and engineer a stronger campaign package for DND Booker.');
   const [prompt, setPrompt] = useState('Create a campaign with practical DM tools, strong encounter packets, reusable tables, and publication-ready pacing.');
@@ -93,25 +113,38 @@ export default function AiTeamPage() {
   useEffect(() => {
     void fetchProjects();
     void fetchDefaultEngineeringTarget();
-  }, [fetchProjects, fetchDefaultEngineeringTarget]);
+    void fetchRecentRuns();
+  }, [fetchProjects, fetchDefaultEngineeringTarget, fetchRecentRuns]);
 
   useEffect(() => {
-    const projectId = searchParams.get('projectId') ?? '';
-    const runId = searchParams.get('runId');
-    if (!projectId) return;
-
-    setSelectedProjectId(projectId);
-    setTab('current_project');
-
-    if (runId) {
-      void fetchRun(projectId, runId);
-      void fetchArtifacts(projectId, runId);
-      subscribeToRun(projectId, runId);
+    if (selectedRunProjectParam && selectedRunIdParam) {
+      if (currentRun?.id !== selectedRunIdParam || currentRun.projectId !== selectedRunProjectParam) {
+        void selectRun(selectedRunProjectParam, selectedRunIdParam);
+      }
       return;
     }
 
-    void fetchLatestRun(projectId);
-  }, [searchParams, fetchRun, fetchArtifacts, fetchLatestRun, subscribeToRun]);
+    if (selectedRunProjectParam && !selectedRunIdParam) {
+      setLaunchProjectId(selectedRunProjectParam);
+      void fetchLatestRun(selectedRunProjectParam);
+    }
+  }, [selectedRunProjectParam, selectedRunIdParam, currentRun, selectRun, fetchLatestRun]);
+
+  useEffect(() => {
+    if (launchProjectId) return;
+    if (projects.length === 0) return;
+    setLaunchProjectId(projects[0].id);
+  }, [projects, launchProjectId]);
+
+  useEffect(() => {
+    if (!selectedRunProjectParam && !selectedRunIdParam && !currentRun && recentRuns.length > 0) {
+      const latest = recentRuns[0];
+      setSearchParams({
+        projectId: latest.projectId,
+        runId: latest.runId,
+      }, { replace: true });
+    }
+  }, [currentRun, recentRuns, selectedRunProjectParam, selectedRunIdParam, setSearchParams]);
 
   useEffect(() => {
     if (!defaultEngineeringTarget) return;
@@ -121,15 +154,12 @@ export default function AiTeamPage() {
   }, [defaultEngineeringTarget]);
 
   useEffect(() => {
-    if (!selectedProjectId) return;
-    void fetchBinding(selectedProjectId);
-    if (!searchParams.get('runId')) {
-      void fetchLatestRun(selectedProjectId);
-    }
+    if (!launchProjectId) return;
+    void fetchBinding(launchProjectId);
     if (defaultEngineeringTarget) {
       setRepoBinding(bindingFormFromTarget(defaultEngineeringTarget));
     }
-  }, [selectedProjectId, defaultEngineeringTarget, fetchBinding, fetchLatestRun, searchParams]);
+  }, [launchProjectId, defaultEngineeringTarget, fetchBinding]);
 
   useEffect(() => {
     if (!binding) return;
@@ -137,28 +167,49 @@ export default function AiTeamPage() {
   }, [binding]);
 
   const selectedProject = useMemo(
-    () => projects.find((project) => project.id === selectedProjectId) ?? null,
-    [projects, selectedProjectId],
+    () => projects.find((project) => project.id === launchProjectId) ?? null,
+    [projects, launchProjectId],
   );
 
+  const selectedWorkspaceRun = useMemo(
+    () => recentRuns.find((run) => run.runId === currentRun?.id) ?? null,
+    [recentRuns, currentRun],
+  );
+
+  const previousRunForProject = useMemo(() => {
+    if (!currentRun) return null;
+    const runsForProject = recentRuns.filter((run) => run.projectId === currentRun.projectId);
+    const currentIndex = runsForProject.findIndex((run) => run.runId === currentRun.id);
+    if (currentIndex < 0) return null;
+    return runsForProject[currentIndex + 1] ?? null;
+  }, [recentRuns, currentRun]);
+
+  const selectedRunProjectTitle = useMemo(() => {
+    if (!currentRun) return null;
+    return selectedWorkspaceRun?.projectTitle
+      ?? projects.find((project) => project.id === currentRun.projectId)?.title
+      ?? currentRun.input.projectTitle
+      ?? 'Selected project';
+  }, [currentRun, projects, selectedWorkspaceRun]);
+
   async function handleSaveBinding() {
-    if (!selectedProjectId) return null;
-    return saveBinding(selectedProjectId, toBindingPayload(repoBinding));
+    if (!launchProjectId) return null;
+    return saveBinding(launchProjectId, toBindingPayload(repoBinding));
   }
 
   async function handleValidateBinding() {
-    if (!selectedProjectId) return null;
+    if (!launchProjectId) return null;
     const saved = await handleSaveBinding();
     if (!saved) return null;
-    return validateBinding(selectedProjectId);
+    return validateBinding(launchProjectId);
   }
 
   async function handleStartCurrentProjectRun() {
-    if (!selectedProjectId) return;
+    if (!launchProjectId) return;
     const bindingValidation = await handleValidateBinding();
     if (!bindingValidation || bindingValidation.status !== 'valid') return;
 
-    const run = await startRun(selectedProjectId, {
+    const run = await startRun(launchProjectId, {
       prompt: prompt.trim() || undefined,
       objective: objective.trim() || undefined,
       generationMode: 'campaign',
@@ -184,6 +235,8 @@ export default function AiTeamPage() {
     if (!run) return;
 
     setTab('current_project');
+    setLaunchProjectId(run.projectId);
+    void fetchProjects();
     setSearchParams({
       projectId: run.projectId,
       runId: run.id,
@@ -207,7 +260,7 @@ export default function AiTeamPage() {
             </button>
             <div>
               <h1 className="text-xl font-semibold text-stone-900">AI Team</h1>
-              <p className="text-xs text-stone-500">Creator, designer, editor, and engineer working as one dashboard-first loop.</p>
+              <p className="text-xs text-stone-500">Creator, designer, editor, and engineer working from one dashboard-first control surface.</p>
             </div>
           </div>
           <div className="flex items-center gap-4">
@@ -230,7 +283,7 @@ export default function AiTeamPage() {
                 <div className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700">Launch</div>
                 <h2 className="mt-1 text-2xl font-semibold text-stone-900">Run the AI team from the dashboard</h2>
                 <p className="mt-2 max-w-2xl text-sm text-stone-600">
-                  The supported path lives here now. The editor can still show existing loop status, but new AI-team work should start from this page.
+                  Launch from the current project or start a fresh campaign, then keep the creative, editorial, and engineering outputs visible in one place.
                 </p>
               </div>
               <div className={`rounded-full px-3 py-1 text-xs font-medium ${
@@ -264,13 +317,15 @@ export default function AiTeamPage() {
 
           <section className="rounded-3xl border border-stone-200 bg-gradient-to-br from-emerald-950 via-emerald-900 to-stone-900 p-6 text-white shadow-sm">
             <div className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-200">Focus</div>
-            <h2 className="mt-1 text-2xl font-semibold">AI team first</h2>
+            <h2 className="mt-1 text-2xl font-semibold">All-projects AI-team control</h2>
             <p className="mt-3 text-sm leading-6 text-emerald-50/85">
-              We’re intentionally de-emphasizing the WYSIWYG editor for this iteration. The creator, designer, editor, and engineer roles now drive the primary loop, and this page keeps their outputs in one place.
+              This page now tracks recent AI-team runs across the workspace, so you can compare outcomes, editor ratings, and engineering follow-through without opening the editor.
             </p>
             <div className="mt-4 text-sm text-emerald-100/90">
-              {selectedProject ? (
-                <>Current project target: <span className="font-semibold text-white">{selectedProject.title}</span></>
+              {selectedRunProjectTitle ? (
+                <>Selected run target: <span className="font-semibold text-white">{selectedRunProjectTitle}</span></>
+              ) : selectedProject ? (
+                <>Launch target: <span className="font-semibold text-white">{selectedProject.title}</span></>
               ) : (
                 <>Choose an existing project or create a fresh campaign to start.</>
               )}
@@ -278,7 +333,7 @@ export default function AiTeamPage() {
           </section>
         </div>
 
-        <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+        <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
           <section className="rounded-3xl border border-stone-200 bg-white p-6 shadow-sm">
             <div className="mb-4 flex gap-2">
               <button
@@ -305,18 +360,10 @@ export default function AiTeamPage() {
 
             {tab === 'current_project' && (
               <div className="mb-4">
-                <label className="mb-1 block text-sm font-medium text-stone-700">Project</label>
+                <label className="mb-1 block text-sm font-medium text-stone-700">Launch Project</label>
                 <select
-                  value={selectedProjectId}
-                  onChange={(event) => {
-                    const nextProjectId = event.target.value;
-                    setSelectedProjectId(nextProjectId);
-                    if (nextProjectId) {
-                      setSearchParams({ projectId: nextProjectId });
-                    } else {
-                      setSearchParams({});
-                    }
-                  }}
+                  value={launchProjectId}
+                  onChange={(event) => setLaunchProjectId(event.target.value)}
                   className="w-full rounded-2xl border border-stone-300 bg-white px-3 py-2 text-sm text-stone-800 focus:border-emerald-500 focus:outline-none"
                 >
                   <option value="">Select a project</option>
@@ -449,14 +496,14 @@ export default function AiTeamPage() {
                   <>
                     <button
                       onClick={() => void handleSaveBinding()}
-                      disabled={isSavingBinding || !selectedProjectId}
+                      disabled={isSavingBinding || !launchProjectId}
                       className="rounded-full border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       {isSavingBinding ? 'Saving...' : 'Save Target'}
                     </button>
                     <button
                       onClick={() => void handleValidateBinding()}
-                      disabled={isSavingBinding || isValidatingBinding || !selectedProjectId}
+                      disabled={isSavingBinding || isValidatingBinding || !launchProjectId}
                       className="rounded-full bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       {isValidatingBinding ? 'Validating...' : 'Validate Project Target'}
@@ -465,7 +512,7 @@ export default function AiTeamPage() {
                 )}
                 <button
                   onClick={() => void (tab === 'current_project' ? handleStartCurrentProjectRun() : handleCreateCampaignAndRun())}
-                  disabled={isStarting || !repoBinding.repositoryFullName.trim() || (tab === 'current_project' && !selectedProjectId)}
+                  disabled={isStarting || !repoBinding.repositoryFullName.trim() || (tab === 'current_project' && !launchProjectId)}
                   className="rounded-full bg-stone-900 px-4 py-2 text-sm font-medium text-white hover:bg-stone-700 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {isStarting ? 'Starting...' : tab === 'current_project' ? 'Start AI Team Run' : 'Create Campaign And Run'}
@@ -485,19 +532,125 @@ export default function AiTeamPage() {
           </section>
 
           <section className="rounded-3xl border border-stone-200 bg-white p-6 shadow-sm">
-            {currentRun ? (
-              <ImprovementLoopPanel projectId={currentRun.projectId} title="AI Team Run" />
-            ) : (
-              <div className="rounded-3xl border border-dashed border-stone-200 bg-stone-50 px-5 py-10 text-center">
-                <div className="text-xs font-semibold uppercase tracking-[0.2em] text-stone-500">Run Monitor</div>
-                <h2 className="mt-2 text-xl font-semibold text-stone-900">No AI team run selected</h2>
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700">Recent Runs</div>
+                <h2 className="mt-1 text-2xl font-semibold text-stone-900">Workspace AI-team history</h2>
                 <p className="mt-2 text-sm text-stone-600">
-                  Pick a project, create a new campaign, or use the query parameters after a run starts to keep watching progress here.
+                  Compare run outcomes across all projects and jump straight into the run detail that matters.
                 </p>
+              </div>
+              <button
+                onClick={() => void fetchRecentRuns()}
+                className="rounded-full border border-stone-300 bg-white px-3 py-1.5 text-xs font-medium text-stone-700 hover:bg-stone-100"
+              >
+                Refresh
+              </button>
+            </div>
+
+            {isLoadingRecentRuns && recentRuns.length === 0 ? (
+              <div className="rounded-3xl border border-dashed border-stone-200 bg-stone-50 px-5 py-10 text-center text-sm text-stone-500">
+                Loading recent AI-team runs...
+              </div>
+            ) : recentRuns.length === 0 ? (
+              <div className="rounded-3xl border border-dashed border-stone-200 bg-stone-50 px-5 py-10 text-center">
+                <div className="text-xs font-semibold uppercase tracking-[0.2em] text-stone-500">History</div>
+                <h3 className="mt-2 text-lg font-semibold text-stone-900">No AI-team runs yet</h3>
+                <p className="mt-2 text-sm text-stone-600">
+                  Start from the launch panel and the most recent runs across your projects will appear here.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {recentRuns.map((run) => {
+                  const isSelected = run.runId === currentRun?.id;
+                  return (
+                    <div
+                      key={run.runId}
+                      className={`rounded-3xl border px-4 py-4 transition-colors ${
+                        isSelected
+                          ? 'border-emerald-300 bg-emerald-50 shadow-sm'
+                          : 'border-stone-200 bg-stone-50 hover:border-stone-300 hover:bg-white'
+                      }`}
+                    >
+                      <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <div className="text-sm font-semibold text-stone-900">{run.projectTitle}</div>
+                          <div className="mt-1 text-xs text-stone-500">
+                            {run.mode === 'create_campaign' ? 'Create campaign' : 'Current project'} • Updated {formatRelativeTime(run.updatedAt)}
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide ${statusTone(run.status)}`}>
+                            {run.currentStage ?? run.status}
+                          </span>
+                          {run.editorRecommendation && (
+                            <span className="rounded-full bg-stone-900 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-white">
+                              Editor {run.editorScore ?? 'n/a'}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="mb-3 flex flex-wrap gap-2">
+                        {run.roles.map((role) => (
+                          <span
+                            key={role.id}
+                            className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${roleStatusTone(role.status)}`}
+                          >
+                            {role.role}: {role.status}
+                          </span>
+                        ))}
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-3 text-xs text-stone-500">
+                        <span>{run.artifactCount} artifact{run.artifactCount === 1 ? '' : 's'}</span>
+                        {run.githubPullRequestUrl ? (
+                          <a
+                            href={run.githubPullRequestUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="font-medium text-emerald-700 underline hover:text-emerald-900"
+                          >
+                            PR #{run.githubPullRequestNumber}
+                          </a>
+                        ) : (
+                          <span>No engineering PR yet</span>
+                        )}
+                        {run.failureReason && <span className="text-red-600">{run.failureReason}</span>}
+                      </div>
+                      <button
+                        onClick={() => setSearchParams({ projectId: run.projectId, runId: run.runId })}
+                        className="mt-3 rounded-full border border-stone-300 bg-white px-3 py-1.5 text-xs font-medium text-stone-700 hover:bg-stone-100"
+                      >
+                        {isSelected ? 'Viewing run' : 'View run'}
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </section>
         </div>
+
+        <section className="mt-6 rounded-3xl border border-stone-200 bg-white p-6 shadow-sm">
+          {currentRun ? (
+            <ImprovementLoopPanel
+              title="Selected AI Team Run"
+              projectTitle={selectedRunProjectTitle ?? undefined}
+              previousRun={previousRunForProject}
+              onSelectRun={(run) => setSearchParams({ projectId: run.projectId, runId: run.runId })}
+            />
+          ) : (
+            <div className="rounded-3xl border border-dashed border-stone-200 bg-stone-50 px-5 py-12 text-center">
+              <div className="text-xs font-semibold uppercase tracking-[0.2em] text-stone-500">Run Detail</div>
+              <h2 className="mt-2 text-xl font-semibold text-stone-900">Select a recent run to compare outputs</h2>
+              <p className="mt-2 text-sm text-stone-600">
+                The selected run view keeps role lineage, editor rating, artifacts, and engineering follow-through together for quick comparison.
+              </p>
+            </div>
+          )}
+        </section>
       </main>
     </div>
   );

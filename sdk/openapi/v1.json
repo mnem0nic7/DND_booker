@@ -15091,6 +15091,293 @@
         }
       }
     },
+    "/api/v1/improvement-loops/recent": {
+      "get": {
+        "operationId": "listRecentImprovementLoops",
+        "summary": "List recent improvement loops across all projects for the current user.",
+        "tags": [
+          "improvementLoops"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "runId": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "projectId": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "projectTitle": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "mode": {
+                        "type": "string",
+                        "enum": [
+                          "current_project",
+                          "create_campaign"
+                        ]
+                      },
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "queued",
+                          "bootstrapping_project",
+                          "creator",
+                          "designer",
+                          "editor",
+                          "engineering",
+                          "completed",
+                          "failed",
+                          "paused",
+                          "cancelled"
+                        ]
+                      },
+                      "currentStage": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "progressPercent": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 100
+                      },
+                      "roles": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "runId": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "projectId": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "userId": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "role": {
+                              "type": "string",
+                              "enum": [
+                                "creator",
+                                "designer",
+                                "editor",
+                                "engineer"
+                              ]
+                            },
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "queued",
+                                "running",
+                                "completed",
+                                "failed",
+                                "skipped"
+                              ]
+                            },
+                            "objective": {
+                              "type": "string"
+                            },
+                            "input": {
+                              "type": "object",
+                              "additionalProperties": {},
+                              "nullable": true
+                            },
+                            "linkedGenerationRunId": {
+                              "type": "string",
+                              "format": "uuid",
+                              "nullable": true
+                            },
+                            "linkedAgentRunId": {
+                              "type": "string",
+                              "format": "uuid",
+                              "nullable": true
+                            },
+                            "outputArtifactIds": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "format": "uuid"
+                              }
+                            },
+                            "summary": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "failureReason": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "createdAt": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "updatedAt": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "startedAt": {
+                              "type": "string",
+                              "format": "date-time",
+                              "nullable": true
+                            },
+                            "completedAt": {
+                              "type": "string",
+                              "format": "date-time",
+                              "nullable": true
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "runId",
+                            "projectId",
+                            "userId",
+                            "role",
+                            "status",
+                            "objective",
+                            "input",
+                            "linkedGenerationRunId",
+                            "linkedAgentRunId",
+                            "outputArtifactIds",
+                            "summary",
+                            "failureReason",
+                            "createdAt",
+                            "updatedAt",
+                            "startedAt",
+                            "completedAt"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "linkedGenerationRunId": {
+                        "type": "string",
+                        "format": "uuid",
+                        "nullable": true
+                      },
+                      "linkedAgentRunId": {
+                        "type": "string",
+                        "format": "uuid",
+                        "nullable": true
+                      },
+                      "editorRecommendation": {
+                        "type": "string",
+                        "enum": [
+                          "ready",
+                          "needs_revision",
+                          "blocked"
+                        ],
+                        "nullable": true
+                      },
+                      "editorScore": {
+                        "type": "number",
+                        "nullable": true
+                      },
+                      "githubPullRequestNumber": {
+                        "type": "integer",
+                        "nullable": true
+                      },
+                      "githubPullRequestUrl": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "artifactCount": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "failureReason": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "createdAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "updatedAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      }
+                    },
+                    "required": [
+                      "runId",
+                      "projectId",
+                      "projectTitle",
+                      "mode",
+                      "status",
+                      "currentStage",
+                      "progressPercent",
+                      "roles",
+                      "linkedGenerationRunId",
+                      "linkedAgentRunId",
+                      "editorRecommendation",
+                      "editorScore",
+                      "githubPullRequestNumber",
+                      "githubPullRequestUrl",
+                      "artifactCount",
+                      "failureReason",
+                      "createdAt",
+                      "updatedAt"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer"
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "instance": {
+                      "type": "string"
+                    },
+                    "errors": {
+                      "type": "object",
+                      "additionalProperties": {}
+                    }
+                  },
+                  "required": [
+                    "title",
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/improvement-loops": {
       "post": {
         "operationId": "createImprovementLoopAndProject",

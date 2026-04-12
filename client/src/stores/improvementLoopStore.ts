@@ -7,6 +7,7 @@ import type {
   ImprovementLoopArtifact,
   ImprovementLoopRun,
   ImprovementLoopRunStatus,
+  ImprovementLoopWorkspaceRunSummary,
   ProjectGitHubRepoBinding,
   ProjectGitHubRepoBindingInput,
   ProjectGitHubRepoBindingValidation,
@@ -23,10 +24,14 @@ const ACTIVE_STATUSES: ImprovementLoopRunStatus[] = [
 
 interface ImprovementLoopState {
   currentRun: ImprovementLoopRun | null;
+  recentRuns: ImprovementLoopWorkspaceRunSummary[];
   isStarting: boolean;
+  isLoadingRecentRuns: boolean;
   error: string | null;
   progressPercent: number;
   currentStage: string | null;
+  selectedRunProjectId: string | null;
+  selectedRunId: string | null;
   artifacts: ImprovementLoopArtifact[];
   isLoadingArtifacts: boolean;
   binding: ProjectGitHubRepoBinding | null;
@@ -39,8 +44,10 @@ interface ImprovementLoopState {
 
   startRun: (projectId: string, body: CreateImprovementLoopRequest) => Promise<ImprovementLoopRun | null>;
   startRunWithProject: (body: CreateImprovementLoopAndProjectRequest) => Promise<ImprovementLoopRun | null>;
-  fetchRun: (projectId: string, runId: string) => Promise<void>;
+  fetchRun: (projectId: string, runId: string) => Promise<ImprovementLoopRun | null>;
   fetchLatestRun: (projectId: string) => Promise<void>;
+  fetchRecentRuns: () => Promise<ImprovementLoopWorkspaceRunSummary[]>;
+  selectRun: (projectId: string, runId: string) => Promise<void>;
   fetchArtifacts: (projectId: string, runId: string) => Promise<void>;
   subscribeToRun: (projectId: string, runId: string) => void;
   unsubscribe: () => void;
@@ -60,12 +67,44 @@ function toErrorMessage(err: unknown, fallback: string): string {
     : fallback;
 }
 
+function isTerminalStatus(status: ImprovementLoopRunStatus) {
+  return status === 'completed' || status === 'failed' || status === 'cancelled';
+}
+
+function mergeRecentRunDetail(
+  recentRuns: ImprovementLoopWorkspaceRunSummary[],
+  run: ImprovementLoopRun,
+) {
+  return recentRuns.map((summary) => {
+    if (summary.runId !== run.id) return summary;
+    return {
+      ...summary,
+      status: run.status,
+      currentStage: run.currentStage,
+      progressPercent: run.progressPercent ?? summary.progressPercent,
+      roles: run.roles,
+      linkedGenerationRunId: run.linkedGenerationRunId,
+      linkedAgentRunId: run.linkedAgentRunId,
+      editorRecommendation: run.editorFinalReport?.recommendation ?? summary.editorRecommendation,
+      editorScore: run.editorFinalReport?.overallScore ?? summary.editorScore,
+      githubPullRequestNumber: run.githubPullRequestNumber,
+      githubPullRequestUrl: run.githubPullRequestUrl,
+      failureReason: run.failureReason,
+      updatedAt: run.updatedAt,
+    };
+  });
+}
+
 export const useImprovementLoopStore = create<ImprovementLoopState>((set, get) => ({
   currentRun: null,
+  recentRuns: [],
   isStarting: false,
+  isLoadingRecentRuns: false,
   error: null,
   progressPercent: 0,
   currentStage: null,
+  selectedRunProjectId: null,
+  selectedRunId: null,
   artifacts: [],
   isLoadingArtifacts: false,
   binding: null,
@@ -88,10 +127,13 @@ export const useImprovementLoopStore = create<ImprovementLoopState>((set, get) =
       const data = await v1Client.improvementLoops.createImprovementLoop({ projectId }, body);
       set({
         currentRun: data,
+        selectedRunProjectId: projectId,
+        selectedRunId: data.id,
         isStarting: false,
         progressPercent: data.progressPercent ?? 0,
         currentStage: data.currentStage,
       });
+      void get().fetchRecentRuns();
       get().subscribeToRun(projectId, data.id);
       return data;
     } catch (err: unknown) {
@@ -112,10 +154,13 @@ export const useImprovementLoopStore = create<ImprovementLoopState>((set, get) =
       const data = await v1Client.improvementLoops.createImprovementLoopAndProject(body);
       set({
         currentRun: data,
+        selectedRunProjectId: data.projectId,
+        selectedRunId: data.id,
         isStarting: false,
         progressPercent: data.progressPercent ?? 0,
         currentStage: data.currentStage,
       });
+      void get().fetchRecentRuns();
       get().subscribeToRun(data.projectId, data.id);
       return data;
     } catch (err: unknown) {
@@ -127,14 +172,19 @@ export const useImprovementLoopStore = create<ImprovementLoopState>((set, get) =
   fetchRun: async (projectId, runId) => {
     try {
       const data = await v1Client.improvementLoops.getImprovementLoop({ projectId, runId });
-      const isTerminal = ['completed', 'failed', 'cancelled'].includes(data.status);
+      const isTerminal = isTerminalStatus(data.status);
       set({
         currentRun: data,
+        selectedRunProjectId: projectId,
+        selectedRunId: runId,
         progressPercent: isTerminal && data.status === 'completed' ? 100 : data.progressPercent ?? 0,
         currentStage: isTerminal ? null : data.currentStage,
+        recentRuns: mergeRecentRunDetail(get().recentRuns, data),
       });
+      return data;
     } catch (err: unknown) {
       set({ error: toErrorMessage(err, 'Failed to fetch improvement loop') });
+      return null;
     }
   },
 
@@ -147,9 +197,11 @@ export const useImprovementLoopStore = create<ImprovementLoopState>((set, get) =
         if (ACTIVE_STATUSES.includes(latest.status)) {
           get().subscribeToRun(projectId, latest.id);
         } else {
+          get().unsubscribe();
           await get().fetchArtifacts(projectId, latest.id);
         }
       } else {
+        get().unsubscribe();
         set({
           currentRun: null,
           artifacts: [],
@@ -159,6 +211,36 @@ export const useImprovementLoopStore = create<ImprovementLoopState>((set, get) =
       }
     } catch {
       // No loop yet is normal.
+    }
+  },
+
+  fetchRecentRuns: async () => {
+    set({ isLoadingRecentRuns: true });
+    try {
+      const data = await v1Client.improvementLoops.listRecentImprovementLoops();
+      set({
+        recentRuns: data,
+        isLoadingRecentRuns: false,
+      });
+      return data;
+    } catch (err: unknown) {
+      set({
+        isLoadingRecentRuns: false,
+        error: toErrorMessage(err, 'Failed to load recent AI team runs'),
+      });
+      return [];
+    }
+  },
+
+  selectRun: async (projectId, runId) => {
+    const run = await get().fetchRun(projectId, runId);
+    if (!run) return;
+
+    await get().fetchArtifacts(projectId, runId);
+    if (ACTIVE_STATUSES.includes(run.status)) {
+      get().subscribeToRun(projectId, runId);
+    } else {
+      get().unsubscribe();
     }
   },
 
@@ -178,12 +260,17 @@ export const useImprovementLoopStore = create<ImprovementLoopState>((set, get) =
   subscribeToRun: (projectId, runId) => {
     get().unsubscribe();
     const controller = new AbortController();
-    set({ _eventSource: controller });
+    set({
+      _eventSource: controller,
+      selectedRunProjectId: projectId,
+      selectedRunId: runId,
+    });
 
     const reconcile = async () => {
       if (controller.signal.aborted) return;
       await get().fetchRun(projectId, runId);
       await get().fetchArtifacts(projectId, runId);
+      await get().fetchRecentRuns();
     };
 
     const token = getAccessToken();
@@ -225,6 +312,16 @@ export const useImprovementLoopStore = create<ImprovementLoopState>((set, get) =
                 set((state) => ({
                   progressPercent: event.progressPercent ?? state.progressPercent,
                   currentStage: event.stage ?? state.currentStage,
+                  recentRuns: state.recentRuns.map((summary) => (
+                    summary.runId === runId
+                      ? {
+                        ...summary,
+                        status: event.status ?? summary.status,
+                        currentStage: event.stage ?? summary.currentStage,
+                        progressPercent: event.progressPercent ?? summary.progressPercent,
+                      }
+                      : summary
+                  )),
                   currentRun: state.currentRun
                     ? {
                       ...state.currentRun,
@@ -238,6 +335,7 @@ export const useImprovementLoopStore = create<ImprovementLoopState>((set, get) =
 
               if (event.type === 'artifact_created' || event.type === 'engineering_applied') {
                 void get().fetchArtifacts(projectId, runId);
+                void get().fetchRecentRuns();
               }
 
               if (event.type === 'run_completed' || event.type === 'run_failed') {
@@ -268,7 +366,14 @@ export const useImprovementLoopStore = create<ImprovementLoopState>((set, get) =
   pauseRun: async (projectId, runId) => {
     try {
       const data = await v1Client.improvementLoops.pauseImprovementLoop({ projectId, runId });
-      set({ currentRun: data });
+      set({
+        currentRun: data,
+        progressPercent: data.progressPercent ?? 0,
+        currentStage: data.currentStage,
+        recentRuns: mergeRecentRunDetail(get().recentRuns, data),
+      });
+      get().unsubscribe();
+      void get().fetchRecentRuns();
     } catch (err: unknown) {
       set({ error: toErrorMessage(err, 'Failed to pause improvement loop') });
     }
@@ -277,7 +382,13 @@ export const useImprovementLoopStore = create<ImprovementLoopState>((set, get) =
   resumeRun: async (projectId, runId) => {
     try {
       const data = await v1Client.improvementLoops.resumeImprovementLoop({ projectId, runId });
-      set({ currentRun: data });
+      set({
+        currentRun: data,
+        progressPercent: data.progressPercent ?? 0,
+        currentStage: data.currentStage,
+        recentRuns: mergeRecentRunDetail(get().recentRuns, data),
+      });
+      void get().fetchRecentRuns();
       get().subscribeToRun(projectId, runId);
     } catch (err: unknown) {
       set({ error: toErrorMessage(err, 'Failed to resume improvement loop') });
@@ -287,14 +398,21 @@ export const useImprovementLoopStore = create<ImprovementLoopState>((set, get) =
   cancelRun: async (projectId, runId) => {
     try {
       const data = await v1Client.improvementLoops.cancelImprovementLoop({ projectId, runId });
-      set({ currentRun: data });
+      set({
+        currentRun: data,
+        progressPercent: data.progressPercent ?? 0,
+        currentStage: data.currentStage,
+        recentRuns: mergeRecentRunDetail(get().recentRuns, data),
+      });
       get().unsubscribe();
+      void get().fetchRecentRuns();
     } catch (err: unknown) {
       set({ error: toErrorMessage(err, 'Failed to cancel improvement loop') });
     }
   },
 
   fetchBinding: async (projectId) => {
+    set({ binding: null, validation: null });
     try {
       const binding = await v1Client.projects.getProjectGitHubRepoBinding({ projectId });
       set({ binding });
@@ -350,10 +468,14 @@ export const useImprovementLoopStore = create<ImprovementLoopState>((set, get) =
     get().unsubscribe();
     set({
       currentRun: null,
+      recentRuns: [],
       isStarting: false,
+      isLoadingRecentRuns: false,
       error: null,
       progressPercent: 0,
       currentStage: null,
+      selectedRunProjectId: null,
+      selectedRunId: null,
       artifacts: [],
       isLoadingArtifacts: false,
       binding: null,

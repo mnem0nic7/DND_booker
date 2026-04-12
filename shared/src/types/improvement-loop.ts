@@ -228,6 +228,27 @@ export interface ImprovementLoopRunSummary {
   updatedAt: string;
 }
 
+export interface ImprovementLoopWorkspaceRunSummary {
+  runId: string;
+  projectId: string;
+  projectTitle: string;
+  mode: ImprovementLoopRunMode;
+  status: ImprovementLoopRunStatus;
+  currentStage: string | null;
+  progressPercent: number;
+  roles: ImprovementLoopRoleRun[];
+  linkedGenerationRunId: string | null;
+  linkedAgentRunId: string | null;
+  editorRecommendation: EditorFinalReport['recommendation'] | null;
+  editorScore: number | null;
+  githubPullRequestNumber: number | null;
+  githubPullRequestUrl: string | null;
+  artifactCount: number;
+  failureReason: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface CreateImprovementLoopRequest {
   prompt?: string;
   objective?: string;

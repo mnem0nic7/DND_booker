@@ -298,6 +298,7 @@ After deploy, verify:
 - load `"$URL/"`
 - confirm the authenticated `api/v1` smoke test passed, or run `npm run smoke:cloudrun:v1` manually if you skipped it during deploy
 - if improvement-loop runtime or GitHub integration changed, run `npm run smoke:cloudrun:improvement-loop` with the env vars above and confirm the loop reaches `completed`, produces creator/designer/editor/engineering artifacts, and records an engineering apply result
+- the improvement-loop smoke now also checks `/api/v1/improvement-loops/recent` before cleanup so the deployed AI-team dashboard history feed is covered on the live path
 - note that the smoke now creates a temporary project, drives a generation run to the publication-review interrupt, approves and resumes it, creates an export job, downloads the resulting PDF, validates the `%PDF-` header, and then deletes the temp project
 - the improvement-loop smoke creates a temporary campaign project through `/api/v1/improvement-loops`, waits for the full creator/designer/editor/engineering pipeline to finish, verifies the loop-owned artifacts, checks the engineering apply result, and then deletes the temp project
 - project aggregate content saves, document layout saves, chat history loads, asset uploads/browses, and template loads all flow through `api/v1` now, so production editor regressions are more likely to show up in the same typed transport path the SDK uses
@@ -320,6 +321,7 @@ Use this exact checklist when the improvement-loop runtime, GitHub repo binding 
    - `"status": "completed"`
    - an `editorRecommendation`
    - an `engineeringStatus` that is not `failed`
+   - a `recentRunProjectTitle`
 6. If `SMOKE_IMPROVEMENT_LOOP_EXPECT_APPLY=true`, confirm the output includes `githubPullRequestUrl`.
 7. Check Cloud Run logs if the loop stalls or fails:
    - web service for route/binding failures

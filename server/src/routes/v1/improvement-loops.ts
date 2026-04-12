@@ -7,6 +7,7 @@ import {
   ImprovementLoopRunDetailSchema,
   ImprovementLoopRunSchema,
   ImprovementLoopRunSummarySchema,
+  ImprovementLoopWorkspaceRunSummarySchema,
   ProjectGitHubRepoBindingInputSchema,
   ProjectGitHubRepoBindingSchema,
   ProjectGitHubRepoBindingValidationSchema,
@@ -29,6 +30,7 @@ import {
   createImprovementLoopRun,
   getImprovementLoopRun,
   listImprovementLoopRuns,
+  listRecentImprovementLoopRuns,
   transitionImprovementLoopStatus,
 } from '../../services/improvement-loop/run.service.js';
 import {
@@ -52,6 +54,16 @@ v1ImprovementLoopRoutes.get(
   asyncHandler(async (_req, res) => {
     const target = getDefaultImprovementLoopEngineeringTarget();
     res.json(ImprovementLoopDefaultEngineeringTargetSchema.parse(toTransportJson(target)));
+  }),
+);
+
+v1ImprovementLoopRoutes.get(
+  '/improvement-loops/recent',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const authReq = req as AuthRequest;
+    const runs = await listRecentImprovementLoopRuns(authReq.userId!);
+    res.json(ImprovementLoopWorkspaceRunSummarySchema.array().parse(toTransportJson(runs)));
   }),
 );
 

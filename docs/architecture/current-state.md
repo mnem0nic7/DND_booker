@@ -27,7 +27,7 @@ Client -> Server -> PostgreSQL
 
 ### `client/`
 
-- Routing is minimal: login, register, dashboard, and editor.
+- Routing is minimal: login, register, dashboard, editor, and the dashboard-first `/ai-team` control surface.
 - The editor page loads both project-level data and per-document data.
 - The generated SDK client is wired in `client/src/lib/api.ts`.
 - Most runtime state lives in Zustand stores:
@@ -37,6 +37,7 @@ Client -> Server -> PostgreSQL
   - `aiStore` for settings, chat, wizard, planning, and image generation
   - `generationStore` for generation runs and related detail panes
   - `agentStore` for autonomous agent runs and restore flow
+  - `improvementLoopStore` for AI-team recent history, selected-run detail, SSE updates, artifacts, and repo binding state
 - `client/src/components/editor/EditorLayout.tsx` is the main editing shell. The paginated TipTap surface is the live editor, not a throwaway preview.
 
 ### `server/`
@@ -105,6 +106,11 @@ The biggest architectural shift in the current codebase is that `ProjectDocument
 - `GenerationRun`
   - durable worker-driven generation job state
   - includes `graphStateJson`, `graphThreadId`, `graphCheckpointKey`, `resumeToken`
+- `ImprovementLoopRun`
+  - top-level creator/designer/editor/engineer orchestration state
+  - stores child-run lineage, editor and engineering reports, GitHub branch/PR metadata, and persisted graph state
+- `ImprovementLoopRoleRun`
+  - one durable row per AI-team role execution
 - `GenerationTask`
   - task-level generation tracking
 - `GeneratedArtifact`
@@ -117,6 +123,8 @@ The biggest architectural shift in the current codebase is that `ProjectDocument
   - run-generated canon entities surfaced in the UI
 - `AgentRun`
   - persistent autonomous editor/background producer state
+- `ImprovementLoopArtifact`
+  - loop-owned creator/designer/editor/engineer report artifacts used by the dashboard UI and engineering check-in flow
 - `AgentCheckpoint`
   - restorable checkpoints for agent runs
 - `AgentAction`
@@ -297,6 +305,28 @@ Current rendering split:
 - HTML + Playwright still matter for measurement/preflight/review.
 - Typst is the final PDF renderer.
 
+### 9. AI Team Dashboard And Workspace History
+
+Relevant files:
+
+- `client/src/pages/AiTeamPage.tsx`
+- `client/src/components/ai/ImprovementLoopPanel.tsx`
+- `client/src/stores/improvementLoopStore.ts`
+- `server/src/routes/v1/improvement-loops.ts`
+- `server/src/services/improvement-loop/run.service.ts`
+
+Flow:
+
+1. `/ai-team` loads the default engineering target plus workspace-wide recent runs from `GET /api/v1/improvement-loops/recent`.
+2. The dashboard launches current-project and create-and-run loops without entering the editor.
+3. Selecting a recent run loads detail and artifacts through the existing project-scoped routes.
+4. If the selected run is active, the client opens one SSE subscription for that run and reconciles both detail and recent-history state.
+5. The detail panel surfaces role lineage, editor recommendation/score, engineering PR follow-through, grouped artifacts, and previous-run context for the same project.
+
+Key invariant:
+
+- Workspace-wide AI-team history is additive and summary-oriented. Keep the project-scoped detail and artifact routes authoritative, and keep `/api/v1/improvement-loops/recent` cheap enough to render the dashboard without extra per-run fetches.
+
 ## Edit Here If You Need X
 
 - Add or change HTTP transport types:
@@ -333,6 +363,12 @@ Current rendering split:
   - `deploy/cloudrun/README.md`
   - `docs/runbooks/cloudrun-web-worker.md`
   - `scripts/redeploy-cloudrun.sh`
+- Change AI-team dashboard behavior:
+  - `client/src/pages/AiTeamPage.tsx`
+  - `client/src/components/ai/ImprovementLoopPanel.tsx`
+  - `client/src/stores/improvementLoopStore.ts`
+  - `server/src/routes/v1/improvement-loops.ts`
+  - `server/src/services/improvement-loop/*`
 
 ## Standing Invariants
 

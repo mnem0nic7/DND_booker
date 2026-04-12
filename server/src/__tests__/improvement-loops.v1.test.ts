@@ -12,10 +12,12 @@ import * as improvementLoopQueueService from '../services/improvement-loop/queue
 const JWT_SECRET = process.env.JWT_SECRET || 'test-secret';
 const uniqueSuffix = Date.now();
 const TEST_EMAIL = `improvement-loops-v1-${uniqueSuffix}@example.com`;
+const SECONDARY_EMAIL = `improvement-loops-v1-secondary-${uniqueSuffix}@example.com`;
 
 let accessToken: string;
 let userId: string;
 let projectId: string;
+let secondaryUserId: string | null = null;
 
 describe('Improvement loop API v1', () => {
   beforeAll(async () => {
@@ -46,8 +48,9 @@ describe('Improvement loop API v1', () => {
   });
 
   afterAll(async () => {
-    await prisma.project.deleteMany({ where: { userId } });
-    await prisma.user.deleteMany({ where: { id: userId } });
+    const userIds = [userId, secondaryUserId].filter((value): value is string => Boolean(value));
+    await prisma.project.deleteMany({ where: { userId: { in: userIds } } });
+    await prisma.user.deleteMany({ where: { id: { in: userIds } } });
     await prisma.$disconnect();
   });
 
@@ -244,5 +247,145 @@ describe('Improvement loop API v1', () => {
     expect(artifactDetailRes.body.id).toBe(artifact.id);
     expect(typeof artifactDetailRes.body.createdAt).toBe('string');
     expect(typeof artifactDetailRes.body.updatedAt).toBe('string');
+  });
+
+  it('lists recent runs across all projects for the current user', async () => {
+    const secondaryProject = await prisma.project.create({
+      data: {
+        title: 'Improvement Loop Secondary Project',
+        type: 'campaign',
+        userId,
+      },
+    });
+
+    const olderRun = await createImprovementLoopRun({
+      projectId,
+      userId,
+      mode: 'current_project',
+      request: {
+        prompt: 'Older AI team run',
+        objective: 'Compare runs across projects.',
+        generationMode: 'campaign',
+        generationQuality: 'polished',
+      },
+    });
+
+    const newerRun = await createImprovementLoopRun({
+      projectId: secondaryProject.id,
+      userId,
+      mode: 'create_campaign',
+      request: {
+        prompt: 'Newer AI team run',
+        objective: 'Compare runs across projects.',
+        generationMode: 'campaign',
+        generationQuality: 'quick',
+        projectTitle: 'Recent Run Campaign',
+      },
+    });
+
+    if (!olderRun || !newerRun) {
+      throw new Error('Failed to create recent-run fixtures.');
+    }
+
+    await prisma.improvementLoopRun.update({
+      where: { id: olderRun.id },
+      data: {
+        editorFinalReportJson: {
+          overallScore: 71,
+          recommendation: 'needs_revision',
+          summary: 'Needs another pass.',
+          strengths: [],
+          issues: [],
+          latestScorecard: null,
+          critiqueBacklog: [],
+        },
+      },
+    });
+
+    await prisma.improvementLoopRun.update({
+      where: { id: newerRun.id },
+      data: {
+        githubPullRequestNumber: 44,
+        githubPullRequestUrl: 'https://github.com/mnem0nic7/DND_booker/pull/44',
+        editorFinalReportJson: {
+          overallScore: 88,
+          recommendation: 'ready',
+          summary: 'Ready to ship.',
+          strengths: [],
+          issues: [],
+          latestScorecard: null,
+          critiqueBacklog: [],
+        },
+      },
+    });
+
+    await createImprovementLoopArtifact({
+      runId: olderRun.id,
+      projectId,
+      artifactType: 'creator_report',
+      artifactKey: 'older-creator',
+      title: 'Older Creator Report',
+      summary: 'Older run artifact',
+    });
+
+    await createImprovementLoopArtifact({
+      runId: newerRun.id,
+      projectId: secondaryProject.id,
+      artifactType: 'engineering_report',
+      artifactKey: 'newer-engineering',
+      title: 'Newer Engineering Report',
+      summary: 'Newer run artifact',
+    });
+
+    const secondaryPasswordHash = await bcrypt.hash('StrongP@ss1', 4);
+    const secondaryUser = await prisma.user.create({
+      data: {
+        email: SECONDARY_EMAIL,
+        passwordHash: secondaryPasswordHash,
+        displayName: 'Other Improvement Loop User',
+      },
+    });
+    secondaryUserId = secondaryUser.id;
+
+    const secondaryProjectForOtherUser = await prisma.project.create({
+      data: {
+        title: 'Other User Project',
+        type: 'campaign',
+        userId: secondaryUser.id,
+      },
+    });
+
+    await createImprovementLoopRun({
+      projectId: secondaryProjectForOtherUser.id,
+      userId: secondaryUser.id,
+      mode: 'current_project',
+      request: {
+        prompt: 'Other user run',
+        objective: 'Should not leak into recent runs.',
+      },
+    });
+
+    const res = await request(app)
+      .get('/api/v1/improvement-loops/recent')
+      .set('Authorization', `Bearer ${accessToken}`);
+
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body)).toBe(true);
+    expect(res.body.length).toBeGreaterThanOrEqual(2);
+    expect(res.body[0].runId).toBe(newerRun.id);
+    expect(res.body[0].projectTitle).toBe('Improvement Loop Secondary Project');
+    expect(res.body[0].editorRecommendation).toBe('ready');
+    expect(res.body[0].editorScore).toBe(88);
+    expect(res.body[0].artifactCount).toBe(1);
+    expect(res.body[0].githubPullRequestNumber).toBe(44);
+    expect(typeof res.body[0].updatedAt).toBe('string');
+
+    const listedOlderRun = res.body.find((candidate: { runId: string }) => candidate.runId === olderRun.id);
+    expect(listedOlderRun).toBeTruthy();
+    expect(listedOlderRun.projectTitle).toBe('Improvement Loop Project');
+    expect(listedOlderRun.editorRecommendation).toBe('needs_revision');
+    expect(listedOlderRun.artifactCount).toBe(1);
+
+    expect(res.body.some((candidate: { projectTitle: string }) => candidate.projectTitle === 'Other User Project')).toBe(false);
   });
 });

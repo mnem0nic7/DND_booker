@@ -31,8 +31,10 @@ Client (:3000) -> Server (:4000) -> PostgreSQL
 - Live paginated editor: the visible TipTap surface is the real editor, hydrated from saved `standard_pdf` layout snapshots and kept in parity with export pagination.
 - Publication documents: projects are materialized into ordered `ProjectDocument` rows for front matter, chapters, appendices, and back matter.
 - AI assistant: per-project chat, working memory, long-term memory, task planning, block generation, autofill, wizard flows, and image generation.
+- AI team dashboard: `/ai-team` is the dashboard-first control surface for creator/designer/editor/engineer runs, recent all-project history, linked child-run lineage, and engineering PR follow-through.
 - Generation runs: durable worker-driven runs expose tasks, artifacts, canon entities, evaluations, assembly manifests, and approval interrupts.
 - Agent runs: persistent editor/background producer runs expose checkpoints, action logs, restore points, and approval interrupts.
+- Improvement loops: project-scoped and create-and-run AI-team loops persist creator/designer/editor/engineer artifacts plus GitHub-backed engineering apply results.
 - Export: PDF, print-ready PDF, and ePub job APIs backed by Playwright preflight/review plus Typst final PDF rendering.
 - Storage: uploads and export artifacts use local disk in dev and Google Cloud Storage when `GCS_BUCKET` is configured.
 
@@ -93,6 +95,7 @@ Product traffic should use `/api/v1/*`. Legacy product `/api/*` compatibility ro
 - Generation and agent runs: `/api/v1/projects/:projectId/generation-runs/*`, `/api/v1/projects/:projectId/agent-runs/*`, and interrupt endpoints under the same project scope
 - AI settings and generation helpers: `/api/v1/ai/*`
 - Project-scoped AI chat, memory, planning, and wizard flows: `/api/v1/projects/:projectId/ai/*`
+- AI-team loops and workspace history: `/api/v1/improvement-loops/default-engineering-target`, `/api/v1/improvement-loops/recent`, `/api/v1/projects/:projectId/improvement-loops/*`
 - Assets/templates: `/api/v1/projects/:projectId/assets`, `/api/v1/assets/:id`, `/api/v1/templates`
 - Export jobs: `/api/v1/projects/:projectId/export-jobs`, `/api/v1/export-jobs/:jobId*`
 
@@ -140,7 +143,8 @@ npm run deploy:cloudrun
 
 - Cloud Run is split into a public web service and a worker service.
 - `npm run deploy:cloudrun` builds once, deploys web first, injects the resolved web URL into worker `SERVER_BASE_URL`, checks health/readiness, and runs the authenticated smoke when `SMOKE_TEST_EMAIL` and `SMOKE_TEST_PASSWORD` are set.
-- Set `SMOKE_IMPROVEMENT_LOOP_REPOSITORY_FULL_NAME` and `SMOKE_IMPROVEMENT_LOOP_INSTALLATION_ID` to run the dedicated improvement-loop smoke after deploy. Use a disposable or smoke-only GitHub repo binding if you do not want each smoke to open a draft PR against a long-lived repo.
+- Set `SMOKE_IMPROVEMENT_LOOP_REPOSITORY_FULL_NAME` and `SMOKE_IMPROVEMENT_LOOP_INSTALLATION_ID` to run the dedicated improvement-loop smoke after deploy. If those are omitted, the smoke now falls back to the live default engineering target published by `/api/v1/improvement-loops/default-engineering-target`.
+- The improvement-loop smoke now also verifies `/api/v1/improvement-loops/recent` so the dashboard history feed is covered on the live Cloud Run path, not just local builds.
 - For Redis or queue-durability changes, run `npm run ops:redis:check` before or during deploy triage.
 
 More deployment detail lives in:

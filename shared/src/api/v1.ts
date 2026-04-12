@@ -797,6 +797,27 @@ export const ImprovementLoopRunSummarySchema = z.object({
   updatedAt: z.string().datetime(),
 });
 
+export const ImprovementLoopWorkspaceRunSummarySchema = z.object({
+  runId: z.string().uuid(),
+  projectId: z.string().uuid(),
+  projectTitle: z.string().min(1),
+  mode: ImprovementLoopRunModeSchema,
+  status: ImprovementLoopRunStatusSchema,
+  currentStage: z.string().nullable(),
+  progressPercent: z.number().int().min(0).max(100),
+  roles: z.array(ImprovementLoopRoleRunSchema),
+  linkedGenerationRunId: z.string().uuid().nullable(),
+  linkedAgentRunId: z.string().uuid().nullable(),
+  editorRecommendation: z.enum(['ready', 'needs_revision', 'blocked']).nullable(),
+  editorScore: z.number().nullable(),
+  githubPullRequestNumber: z.number().int().nullable(),
+  githubPullRequestUrl: z.string().nullable(),
+  artifactCount: z.number().int().min(0),
+  failureReason: z.string().nullable(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+});
+
 export const ImprovementLoopRunDetailSchema = ImprovementLoopRunSchema.extend({
   artifactCount: z.number().int(),
 });
@@ -805,6 +826,7 @@ export type CreateImprovementLoopRequest = z.infer<typeof CreateImprovementLoopR
 export type CreateImprovementLoopAndProjectRequest = z.infer<typeof CreateImprovementLoopAndProjectRequestSchema>;
 export type ImprovementLoopRun = z.infer<typeof ImprovementLoopRunSchema>;
 export type ImprovementLoopRunSummary = z.infer<typeof ImprovementLoopRunSummarySchema>;
+export type ImprovementLoopWorkspaceRunSummary = z.infer<typeof ImprovementLoopWorkspaceRunSummarySchema>;
 export type ImprovementLoopRunDetail = z.infer<typeof ImprovementLoopRunDetailSchema>;
 export type ImprovementLoopArtifact = z.infer<typeof ImprovementLoopArtifactSchema>;
 export type ImprovementLoopRole = z.infer<typeof ImprovementLoopRoleSchema>;
@@ -1633,6 +1655,15 @@ export const V1_ROUTE_CONTRACTS: ApiV1RouteContract[] = [
     summary: 'Get the default engineering target for AI team runs.',
     responseSchema: ImprovementLoopDefaultEngineeringTargetSchema,
     responseTypeName: 'ImprovementLoopDefaultEngineeringTarget',
+  },
+  {
+    tag: 'improvementLoops',
+    operationId: 'listRecentImprovementLoops',
+    method: 'get',
+    path: '/api/v1/improvement-loops/recent',
+    summary: 'List recent improvement loops across all projects for the current user.',
+    responseSchema: ImprovementLoopWorkspaceRunSummarySchema.array(),
+    responseTypeName: 'ImprovementLoopWorkspaceRunSummary[]',
   },
   {
     tag: 'improvementLoops',

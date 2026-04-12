@@ -31,6 +31,7 @@ npm run smoke:cloudrun:improvement-loop
 ```
 
 If production already has the default AI-team engineering target configured, the smoke can now resolve the repo/install/default-branch/allowlist automatically from `/api/v1/improvement-loops/default-engineering-target` after login.
+It also validates that the completed loop appears in `/api/v1/improvement-loops/recent`, so the deployed all-projects AI-team dashboard feed is covered in production triage.
 
 Set these only when you need to override the Cloud Run defaults:
 

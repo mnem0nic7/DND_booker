@@ -78,7 +78,7 @@ npm run invites --workspace=server -- revoke invited@example.com
 - `aiStore` owns AI settings, chat streaming, wizard state, planning state, and image generation.
 - `generationStore` owns generation run state, SSE subscription, artifacts, canon, evaluations, assembly, and interrupt resolution.
 - `agentStore` owns agent run state, SSE subscription, checkpoints, actions, restore, and interrupt resolution.
-- `improvementLoopStore` owns improvement-loop run state, SSE subscription, loop artifacts, and project GitHub repo binding state.
+- `improvementLoopStore` owns workspace-wide AI-team recent history, selected-run detail, SSE subscription for the selected active run, loop artifacts, and project GitHub repo binding state.
 
 ### Publication Documents Are The Source Of Truth
 
@@ -158,6 +158,7 @@ npm run invites --workspace=server -- revoke invited@example.com
 ### Improvement Loop Runtime
 
 - Improvement loops are a separate top-level runtime layered above generation and agent runs.
+- `/ai-team` is the supported dashboard-first control surface. It can launch runs, monitor all-project recent history, inspect selected-run artifacts, and compare against the previous run for the same project without entering `/projects/:id`.
 - The loop stages are:
   - `bootstrapping_project`
   - `creator`
@@ -168,6 +169,7 @@ npm run invites --workspace=server -- revoke invited@example.com
 - The current v1 engineering stage is GitHub-only and cloud-safe: it reads and writes through the GitHub API, never by mutating the app server filesystem.
 - Safe auto-apply in v1 is limited to the bound repo allowlist. The default repo-visible apply is a checked-in engineering report under `docs/improvement-loops/<runId>.md` on a dedicated `improvement-loop/<runId>` branch plus a draft PR.
 - Improvement-loop routes and repo-binding routes live in `server/src/routes/v1/improvement-loops.ts`.
+- The additive workspace history route is `GET /api/v1/improvement-loops/recent`; keep it project-title aware and newest-first so the dashboard can render without extra per-run fetches.
 - Worker orchestration lives in `worker/src/jobs/improvement-loop-orchestrator.job.ts`.
 - Loop report builders and artifact storage live under `server/src/services/improvement-loop/`.
 
@@ -210,7 +212,7 @@ Unless the user explicitly asks for something else, treat this as the normal com
 4. Update standing memory and the closest user/operator docs when behavior, workflow, deployment, or architecture changed.
 5. Review `git status`, commit the intended paths, and push.
 6. Redeploy with `npm run deploy:cloudrun` unless the user asked to skip deploys.
-7. If improvement-loop or GitHub binding behavior changed and smoke credentials are available, run `npm run smoke:cloudrun:improvement-loop` after the base Cloud Run smoke.
+7. If improvement-loop or GitHub binding behavior changed and smoke credentials are available, run `npm run smoke:cloudrun:improvement-loop` after the base Cloud Run smoke. That live smoke should now cover both the full creator/designer/editor/engineering pipeline and the workspace-history feed exposed by `/api/v1/improvement-loops/recent`.
 
 If local services or the Cloud SQL proxy-backed integration harness are unavailable, record the exact blocker instead of silently skipping verification.
 
