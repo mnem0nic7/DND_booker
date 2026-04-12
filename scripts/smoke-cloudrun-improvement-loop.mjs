@@ -22,6 +22,7 @@ const generationQuality = process.env.SMOKE_IMPROVEMENT_LOOP_GENERATION_QUALITY?
 const pollIntervalMs = Number.parseInt(process.env.SMOKE_IMPROVEMENT_LOOP_POLL_INTERVAL_MS ?? '', 10) || 10_000;
 const timeoutMs = Number.parseInt(process.env.SMOKE_IMPROVEMENT_LOOP_TIMEOUT_MS ?? '', 10) || 60 * 60 * 1000;
 const expectApply = /^(1|true|yes)$/i.test(process.env.SMOKE_IMPROVEMENT_LOOP_EXPECT_APPLY ?? '');
+const keepProject = /^(1|true|yes)$/i.test(process.env.SMOKE_KEEP_PROJECT ?? '');
 
 const REQUIRED_ARTIFACT_TYPES = [
   'creator_report',
@@ -156,6 +157,8 @@ function assertArtifactCoverage(artifacts) {
 async function main() {
   let projectId = null;
   let runId = null;
+  let successSummary = null;
+  let cleanupStatus = keepProject ? 'retained' : 'not_requested';
 
   await login();
 
@@ -285,7 +288,7 @@ async function main() {
       throw new Error(`recent improvement loop summary reported editor score ${recentRun.editorScore}, expected ${completedRun.editorFinalReport.overallScore}`);
     }
 
-    console.log(JSON.stringify({
+    successSummary = {
       ok: true,
       projectId,
       runId,
@@ -297,24 +300,41 @@ async function main() {
       githubPullRequestUrl: completedRun.githubPullRequestUrl,
       recentRunProjectTitle: recentRun.projectTitle,
       artifactTypes: artifacts.map((artifact) => artifact.artifactType),
-    }));
+      projectRetained: keepProject,
+      inspectHint: keepProject
+        ? 'Retained AI-team smoke project for later inspection. Review the run from /ai-team and delete the project manually when finished.'
+        : undefined,
+    };
   } finally {
     if (projectId) {
-      try {
-        await fetchWithAuth(
-          `/api/v1/projects/${projectId}`,
-          { method: 'DELETE' },
-          `cleanup temp improvement-loop project ${projectId}`,
-          true,
-          true,
-        );
-      } catch (error) {
-        console.error(
-          `[smoke-cloudrun-improvement-loop] cleanup error for project ${projectId}:`,
-          error instanceof Error ? error.message : error,
-        );
+      if (keepProject) {
+        cleanupStatus = 'retained';
+      } else {
+        try {
+          await fetchWithAuth(
+            `/api/v1/projects/${projectId}`,
+            { method: 'DELETE' },
+            `cleanup temp improvement-loop project ${projectId}`,
+            true,
+            true,
+          );
+          cleanupStatus = 'deleted';
+        } catch (error) {
+          cleanupStatus = 'delete_failed';
+          console.error(
+            `[smoke-cloudrun-improvement-loop] cleanup error for project ${projectId}:`,
+            error instanceof Error ? error.message : error,
+          );
+        }
       }
     }
+  }
+
+  if (successSummary) {
+    console.log(JSON.stringify({
+      ...successSummary,
+      cleanupStatus,
+    }));
   }
 }
 

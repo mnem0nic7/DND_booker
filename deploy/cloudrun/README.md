@@ -231,6 +231,14 @@ npm run deploy:cloudrun
 
 The wrapper deploys the web service first, resolves the web URL, deploys the worker service with that web URL injected into `SERVER_BASE_URL`, checks web health, checks worker readiness, and then runs the authenticated acceptance smoke.
 
+By default both smoke scripts delete their temporary project during cleanup. To retain the smoke-created project for manual inspection afterward, set:
+
+```bash
+export SMOKE_KEEP_PROJECT="1"
+```
+
+That flag is pass-through only; `npm run deploy:cloudrun`, `npm run smoke:cloudrun:v1`, and `npm run smoke:cloudrun:improvement-loop` all honor it automatically. Retained AI-team smoke runs remain visible in `/ai-team` until you delete the project manually.
+
 Then fetch the public web URL:
 
 ```bash
@@ -276,6 +284,7 @@ If you set these before deploy, the wrapper also runs an authenticated `api/v1` 
 export SMOKE_TEST_EMAIL="you@example.com"
 export SMOKE_TEST_PASSWORD="your-password"
 export SMOKE_TEST_GENERATION_PROMPT="optional smoke prompt override"
+export SMOKE_KEEP_PROJECT="1" # optional; retain the smoke-created project for manual inspection
 ```
 
 To run the live improvement-loop smoke after the base v1 smoke, also set:
@@ -286,6 +295,7 @@ export SMOKE_IMPROVEMENT_LOOP_INSTALLATION_ID="123456"          # optional if Cl
 export SMOKE_IMPROVEMENT_LOOP_DEFAULT_BRANCH="main"             # optional
 export SMOKE_IMPROVEMENT_LOOP_ALLOWLIST="docs/,README.md,CLAUDE.md" # optional
 export SMOKE_IMPROVEMENT_LOOP_EXPECT_APPLY="false"
+export SMOKE_KEEP_PROJECT="1" # optional; retain the smoke-created project for later review in /ai-team
 ```
 
 If those repo/install env vars are omitted, the smoke now loads the default AI-team engineering target from `/api/v1/improvement-loops/default-engineering-target` after login and uses that configuration automatically.
@@ -299,8 +309,9 @@ After deploy, verify:
 - confirm the authenticated `api/v1` smoke test passed, or run `npm run smoke:cloudrun:v1` manually if you skipped it during deploy
 - if improvement-loop runtime or GitHub integration changed, run `npm run smoke:cloudrun:improvement-loop` with the env vars above and confirm the loop reaches `completed`, produces creator/designer/editor/engineering artifacts, and records an engineering apply result
 - the improvement-loop smoke now also checks `/api/v1/improvement-loops/recent` before cleanup so the deployed AI-team dashboard history feed is covered on the live path
-- note that the smoke now creates a temporary project, drives a generation run to the publication-review interrupt, approves and resumes it, creates an export job, downloads the resulting PDF, validates the `%PDF-` header, and then deletes the temp project
-- the improvement-loop smoke creates a temporary campaign project through `/api/v1/improvement-loops`, waits for the full creator/designer/editor/engineering pipeline to finish, verifies the loop-owned artifacts, checks the engineering apply result, and then deletes the temp project
+- note that the smoke now creates a temporary project, drives a generation run to the publication-review interrupt, approves and resumes it, creates an export job, downloads the resulting PDF, validates the `%PDF-` header, and then deletes the temp project unless `SMOKE_KEEP_PROJECT=1`
+- the improvement-loop smoke creates a temporary campaign project through `/api/v1/improvement-loops`, waits for the full creator/designer/editor/engineering pipeline to finish, verifies the loop-owned artifacts, checks the engineering apply result, and then deletes the temp project unless `SMOKE_KEEP_PROJECT=1`
+- set `SMOKE_KEEP_PROJECT=1` when you want either smoke to skip deletion and leave the temp project available for manual inspection; retained AI-team smoke runs stay visible under `/ai-team`
 - project aggregate content saves, document layout saves, chat history loads, asset uploads/browses, and template loads all flow through `api/v1` now, so production editor regressions are more likely to show up in the same typed transport path the SDK uses
 
 ## Improvement Loop Smoke Checklist

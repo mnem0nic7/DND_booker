@@ -145,6 +145,7 @@ npm run deploy:cloudrun
 - `npm run deploy:cloudrun` builds once, deploys web first, injects the resolved web URL into worker `SERVER_BASE_URL`, checks health/readiness, and runs the authenticated smoke when `SMOKE_TEST_EMAIL` and `SMOKE_TEST_PASSWORD` are set.
 - Set `SMOKE_IMPROVEMENT_LOOP_REPOSITORY_FULL_NAME` and `SMOKE_IMPROVEMENT_LOOP_INSTALLATION_ID` to run the dedicated improvement-loop smoke after deploy. If those are omitted, the smoke now falls back to the live default engineering target published by `/api/v1/improvement-loops/default-engineering-target`.
 - The improvement-loop smoke now also verifies `/api/v1/improvement-loops/recent` so the dashboard history feed is covered on the live Cloud Run path, not just local builds.
+- Set `SMOKE_KEEP_PROJECT=1` to retain the smoke-created project instead of deleting it during script cleanup. Retained improvement-loop smokes can be reviewed afterward from `/ai-team`.
 - For Redis or queue-durability changes, run `npm run ops:redis:check` before or during deploy triage.
 
 More deployment detail lives in:

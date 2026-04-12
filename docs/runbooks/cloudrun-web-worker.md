@@ -21,6 +21,7 @@ SMOKE_TEST_EMAIL=... SMOKE_TEST_PASSWORD=... npm run smoke:cloudrun:v1
 ```
 
 That smoke exercises the live `api/v1` path end to end: temp project creation, generation through publication review, resume, export, PDF download validation, and cleanup.
+Set `SMOKE_KEEP_PROJECT=1` if you want to keep the smoke-created project for manual inspection instead of deleting it during cleanup.
 
 If the deploy touched improvement-loop orchestration or GitHub repo binding behavior, follow with:
 
@@ -32,6 +33,7 @@ npm run smoke:cloudrun:improvement-loop
 
 If production already has the default AI-team engineering target configured, the smoke can now resolve the repo/install/default-branch/allowlist automatically from `/api/v1/improvement-loops/default-engineering-target` after login.
 It also validates that the completed loop appears in `/api/v1/improvement-loops/recent`, so the deployed all-projects AI-team dashboard feed is covered in production triage.
+Set `SMOKE_KEEP_PROJECT=1` here as well if you want the completed run to remain visible in `/ai-team` after the script exits.
 
 Set these only when you need to override the Cloud Run defaults:
 

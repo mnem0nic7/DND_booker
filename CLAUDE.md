@@ -201,6 +201,7 @@ npm run invites --workspace=server -- revoke invited@example.com
 - Production assets and export artifacts use GCS when `GCS_BUCKET` is configured.
 - The worker runs a runtime audit for stale queued runs, stale queued exports, stale BullMQ backlog, and stale pending interrupts. Violations log as `OPS_AUDIT_VIOLATION`.
 - BullMQ requires Redis `maxmemory-policy=noeviction`. Use `npm run ops:redis:check` after infra changes or during queue triage.
+- Cloud Run smoke scripts self-clean by default. Set `SMOKE_KEEP_PROJECT=1` to retain the temp project for manual inspection; retained improvement-loop smokes remain visible in `/ai-team` until someone deletes the project.
 
 ## Default Finish Flow
 
@@ -213,6 +214,7 @@ Unless the user explicitly asks for something else, treat this as the normal com
 5. Review `git status`, commit the intended paths, and push.
 6. Redeploy with `npm run deploy:cloudrun` unless the user asked to skip deploys.
 7. If improvement-loop or GitHub binding behavior changed and smoke credentials are available, run `npm run smoke:cloudrun:improvement-loop` after the base Cloud Run smoke. That live smoke should now cover both the full creator/designer/editor/engineering pipeline and the workspace-history feed exposed by `/api/v1/improvement-loops/recent`.
+8. When the user wants to inspect the exact smoke-created project afterward, rerun the relevant smoke with `SMOKE_KEEP_PROJECT=1` instead of doing an ad hoc manual setup.
 
 If local services or the Cloud SQL proxy-backed integration harness are unavailable, record the exact blocker instead of silently skipping verification.
 
