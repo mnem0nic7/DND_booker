@@ -20,6 +20,34 @@ Readiness only tells you whether the revision is serving. It does not prove that
 SMOKE_TEST_EMAIL=... SMOKE_TEST_PASSWORD=... npm run smoke:cloudrun:v1
 ```
 
+That smoke exercises the live `api/v1` path end to end: temp project creation, generation through publication review, resume, export, PDF download validation, and cleanup.
+Set `SMOKE_KEEP_PROJECT=1` if you want to keep the smoke-created project for manual inspection instead of deleting it during cleanup.
+
+If the deploy touched improvement-loop orchestration or GitHub repo binding behavior, follow with:
+
+```bash
+SMOKE_TEST_EMAIL=... \
+SMOKE_TEST_PASSWORD=... \
+npm run smoke:cloudrun:improvement-loop
+```
+
+If production already has the default AI-team engineering target configured, the smoke can now resolve the repo/install/default-branch/allowlist automatically from `/api/v1/improvement-loops/default-engineering-target` after login.
+It also validates that the completed loop appears in `/api/v1/improvement-loops/recent`, so the deployed all-projects AI-team dashboard feed is covered in production triage.
+Set `SMOKE_KEEP_PROJECT=1` here as well if you want the completed run to remain visible in `/ai-team` after the script exits.
+
+Set these only when you need to override the Cloud Run defaults:
+
+```bash
+SMOKE_IMPROVEMENT_LOOP_REPOSITORY_FULL_NAME=owner/repo \
+SMOKE_IMPROVEMENT_LOOP_INSTALLATION_ID=123456 \
+SMOKE_IMPROVEMENT_LOOP_DEFAULT_BRANCH=main \
+SMOKE_IMPROVEMENT_LOOP_ALLOWLIST='docs/,README.md,CLAUDE.md' \
+SMOKE_IMPROVEMENT_LOOP_EXPECT_APPLY=true \
+npm run smoke:cloudrun:improvement-loop
+```
+
+Use a disposable or smoke-only repo binding unless you explicitly want the smoke to open a draft PR against a long-lived repository.
+
 ## Alerts
 
 - `dnd-booker web HTTP 5xx`
@@ -94,7 +122,7 @@ SMOKE_TEST_EMAIL=... SMOKE_TEST_PASSWORD=... npm run smoke:cloudrun:v1
    ```
 3. Re-run the acceptance smoke:
    ```bash
-   BASE_URL=https://dnd-booker-npbu4x44pq-wn.a.run.app \
+   BASE_URL="$(gcloud run services describe dnd-booker --region us-west4 --format='value(status.url)')" \
    SMOKE_TEST_EMAIL=... \
    SMOKE_TEST_PASSWORD=... \
    npm run smoke:cloudrun:v1
@@ -131,7 +159,7 @@ SMOKE_TEST_EMAIL=... SMOKE_TEST_PASSWORD=... npm run smoke:cloudrun:v1
 
 1. Confirm web is still healthy:
    ```bash
-   curl -fsS https://dnd-booker-npbu4x44pq-wn.a.run.app/api/v1/health
+   curl -fsS "$(gcloud run services describe dnd-booker --region us-west4 --format='value(status.url)')/api/v1/health"
    ```
 2. Run the full acceptance smoke, even for a worker-only deploy:
    ```bash

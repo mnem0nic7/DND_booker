@@ -15,6 +15,8 @@ import type {
   AuthRegisterRequest,
   AuthSessionResponse,
   CanonEntity,
+  CreateImprovementLoopAndProjectRequest,
+  CreateImprovementLoopRequest,
   DocumentIdParams,
   DocumentLayout,
   ExportJob,
@@ -30,9 +32,19 @@ import type {
   GraphInterrupt,
   GraphInterruptIdParams,
   GraphInterruptResolutionRequestBody,
+  ImprovementLoopArtifact,
+  ImprovementLoopDefaultEngineeringTarget,
+  ImprovementLoopRun,
+  ImprovementLoopRunDetail,
+  ImprovementLoopRunIdParams,
+  ImprovementLoopRunSummary,
+  ImprovementLoopWorkspaceRunSummary,
   Problem,
   ProjectCreateRequest,
   ProjectDetail,
+  ProjectGitHubRepoBinding,
+  ProjectGitHubRepoBindingInput,
+  ProjectGitHubRepoBindingValidation,
   ProjectIdParams,
   ProjectSummary,
   ProjectUpdateRequest,
@@ -59,6 +71,9 @@ export interface V1Client {
     listProjects(config?: AxiosRequestConfig): Promise<ProjectSummary[]>;
     createProject(body: ProjectCreateRequest, config?: AxiosRequestConfig): Promise<ProjectSummary>;
     getProject(params: ProjectIdParams, config?: AxiosRequestConfig): Promise<ProjectDetail>;
+    getProjectGitHubRepoBinding(params: ProjectIdParams, config?: AxiosRequestConfig): Promise<ProjectGitHubRepoBinding>;
+    upsertProjectGitHubRepoBinding(params: ProjectIdParams, body: ProjectGitHubRepoBindingInput, config?: AxiosRequestConfig): Promise<ProjectGitHubRepoBinding>;
+    validateProjectGitHubRepoBinding(params: ProjectIdParams, config?: AxiosRequestConfig): Promise<ProjectGitHubRepoBindingValidation>;
     updateProject(params: ProjectIdParams, body: ProjectUpdateRequest, config?: AxiosRequestConfig): Promise<ProjectDetail>;
     deleteProject(params: ProjectIdParams, config?: AxiosRequestConfig): Promise<void>;
   };
@@ -103,6 +118,19 @@ export interface V1Client {
     restoreAgentCheckpoint(params: AgentCheckpointIdParams, config?: AxiosRequestConfig): Promise<AgentCheckpoint>;
     listAgentActions(params: AgentRunIdParams, config?: AxiosRequestConfig): Promise<AgentAction[]>;
   };
+  improvementLoops: {
+    getDefaultImprovementLoopEngineeringTarget(config?: AxiosRequestConfig): Promise<ImprovementLoopDefaultEngineeringTarget>;
+    listRecentImprovementLoops(config?: AxiosRequestConfig): Promise<ImprovementLoopWorkspaceRunSummary[]>;
+    createImprovementLoopAndProject(body: CreateImprovementLoopAndProjectRequest, config?: AxiosRequestConfig): Promise<ImprovementLoopRun>;
+    createImprovementLoop(params: ProjectIdParams, body: CreateImprovementLoopRequest, config?: AxiosRequestConfig): Promise<ImprovementLoopRun>;
+    listImprovementLoops(params: ProjectIdParams, config?: AxiosRequestConfig): Promise<ImprovementLoopRunSummary[]>;
+    getImprovementLoop(params: ImprovementLoopRunIdParams, config?: AxiosRequestConfig): Promise<ImprovementLoopRunDetail>;
+    pauseImprovementLoop(params: ImprovementLoopRunIdParams, config?: AxiosRequestConfig): Promise<ImprovementLoopRun>;
+    resumeImprovementLoop(params: ImprovementLoopRunIdParams, config?: AxiosRequestConfig): Promise<ImprovementLoopRun>;
+    cancelImprovementLoop(params: ImprovementLoopRunIdParams, config?: AxiosRequestConfig): Promise<ImprovementLoopRun>;
+    listImprovementLoopArtifacts(params: ImprovementLoopRunIdParams, config?: AxiosRequestConfig): Promise<ImprovementLoopArtifact[]>;
+    getImprovementLoopArtifact(params: ImprovementLoopRunIdParams & { artifactId: string }, config?: AxiosRequestConfig): Promise<ImprovementLoopArtifact>;
+  };
   exports: {
     createExportJob(params: ProjectIdParams, body: ExportRequest, config?: AxiosRequestConfig): Promise<ExportJob>;
     listExportJobs(params: ProjectIdParams, config?: AxiosRequestConfig): Promise<ExportJob[]>;
@@ -143,6 +171,18 @@ export function createV1Client(axios: AxiosInstance): V1Client {
       },
       async getProject(params: ProjectIdParams, config?: AxiosRequestConfig) {
         const { data } = await axios.get<ProjectDetail>(buildPath('/v1/projects/{projectId}', params as Record<string, string | number | undefined>), config);
+        return data;
+      },
+      async getProjectGitHubRepoBinding(params: ProjectIdParams, config?: AxiosRequestConfig) {
+        const { data } = await axios.get<ProjectGitHubRepoBinding>(buildPath('/v1/projects/{projectId}/github-repo-binding', params as Record<string, string | number | undefined>), config);
+        return data;
+      },
+      async upsertProjectGitHubRepoBinding(params: ProjectIdParams, body: ProjectGitHubRepoBindingInput, config?: AxiosRequestConfig) {
+        const { data } = await axios.post<ProjectGitHubRepoBinding>(buildPath('/v1/projects/{projectId}/github-repo-binding', params as Record<string, string | number | undefined>), body, config);
+        return data;
+      },
+      async validateProjectGitHubRepoBinding(params: ProjectIdParams, config?: AxiosRequestConfig) {
+        const { data } = await axios.post<ProjectGitHubRepoBindingValidation>(buildPath('/v1/projects/{projectId}/github-repo-binding/validate', params as Record<string, string | number | undefined>), undefined, config);
         return data;
       },
       async updateProject(params: ProjectIdParams, body: ProjectUpdateRequest, config?: AxiosRequestConfig) {
@@ -291,6 +331,52 @@ export function createV1Client(axios: AxiosInstance): V1Client {
       },
       async listAgentActions(params: AgentRunIdParams, config?: AxiosRequestConfig) {
         const { data } = await axios.get<AgentAction[]>(buildPath('/v1/projects/{projectId}/agent-runs/{runId}/actions', params as Record<string, string | number | undefined>), config);
+        return data;
+      },
+    },
+    improvementLoops: {
+      async getDefaultImprovementLoopEngineeringTarget(config?: AxiosRequestConfig) {
+        const { data } = await axios.get<ImprovementLoopDefaultEngineeringTarget>('/v1/improvement-loops/default-engineering-target', config);
+        return data;
+      },
+      async listRecentImprovementLoops(config?: AxiosRequestConfig) {
+        const { data } = await axios.get<ImprovementLoopWorkspaceRunSummary[]>('/v1/improvement-loops/recent', config);
+        return data;
+      },
+      async createImprovementLoopAndProject(body: CreateImprovementLoopAndProjectRequest, config?: AxiosRequestConfig) {
+        const { data } = await axios.post<ImprovementLoopRun>('/v1/improvement-loops', body, config);
+        return data;
+      },
+      async createImprovementLoop(params: ProjectIdParams, body: CreateImprovementLoopRequest, config?: AxiosRequestConfig) {
+        const { data } = await axios.post<ImprovementLoopRun>(buildPath('/v1/projects/{projectId}/improvement-loops', params as Record<string, string | number | undefined>), body, config);
+        return data;
+      },
+      async listImprovementLoops(params: ProjectIdParams, config?: AxiosRequestConfig) {
+        const { data } = await axios.get<ImprovementLoopRunSummary[]>(buildPath('/v1/projects/{projectId}/improvement-loops', params as Record<string, string | number | undefined>), config);
+        return data;
+      },
+      async getImprovementLoop(params: ImprovementLoopRunIdParams, config?: AxiosRequestConfig) {
+        const { data } = await axios.get<ImprovementLoopRunDetail>(buildPath('/v1/projects/{projectId}/improvement-loops/{runId}', params as Record<string, string | number | undefined>), config);
+        return data;
+      },
+      async pauseImprovementLoop(params: ImprovementLoopRunIdParams, config?: AxiosRequestConfig) {
+        const { data } = await axios.post<ImprovementLoopRun>(buildPath('/v1/projects/{projectId}/improvement-loops/{runId}/pause', params as Record<string, string | number | undefined>), undefined, config);
+        return data;
+      },
+      async resumeImprovementLoop(params: ImprovementLoopRunIdParams, config?: AxiosRequestConfig) {
+        const { data } = await axios.post<ImprovementLoopRun>(buildPath('/v1/projects/{projectId}/improvement-loops/{runId}/resume', params as Record<string, string | number | undefined>), undefined, config);
+        return data;
+      },
+      async cancelImprovementLoop(params: ImprovementLoopRunIdParams, config?: AxiosRequestConfig) {
+        const { data } = await axios.post<ImprovementLoopRun>(buildPath('/v1/projects/{projectId}/improvement-loops/{runId}/cancel', params as Record<string, string | number | undefined>), undefined, config);
+        return data;
+      },
+      async listImprovementLoopArtifacts(params: ImprovementLoopRunIdParams, config?: AxiosRequestConfig) {
+        const { data } = await axios.get<ImprovementLoopArtifact[]>(buildPath('/v1/projects/{projectId}/improvement-loops/{runId}/artifacts', params as Record<string, string | number | undefined>), config);
+        return data;
+      },
+      async getImprovementLoopArtifact(params: ImprovementLoopRunIdParams & { artifactId: string }, config?: AxiosRequestConfig) {
+        const { data } = await axios.get<ImprovementLoopArtifact>(buildPath('/v1/projects/{projectId}/improvement-loops/{runId}/artifacts/{artifactId}', params as Record<string, string | number | undefined>), config);
         return data;
       },
     },

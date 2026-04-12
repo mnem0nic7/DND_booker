@@ -1,6 +1,6 @@
 # Agent Catalog
 
-This directory documents the product-facing agents that already exist in the DND Booker runtime, plus one proposed agent that should be added next.
+This directory documents the product-facing agents that exist in the DND Booker runtime.
 
 Use these docs when you are:
 
@@ -9,6 +9,8 @@ Use these docs when you are:
 - debugging a run that edits content or layout
 - deciding whether a behavior belongs in the top-level controller or in a specialist
 
+If you need the broader package and persistence map first, start with `docs/architecture/current-state.md`.
+
 Important distinctions:
 
 - `persistent_editor` and `background_producer` are run modes for the same top-level controller, not separate specialist agents
@@ -16,7 +18,7 @@ Important distinctions:
 - specialists should own narrow mutation surfaces and be safe to checkpoint and roll back
 - the top-level controller now executes as a persisted node graph; retries should resume from `AgentRun.graphStateJson.runtime.currentNode`, not from cycle 0
 
-Current and proposed agents:
+Current agents:
 
 - [Autonomous Creative Director](./autonomous-creative-director.md)
 - [Layout Refresh Specialist](./layout-refresh-specialist.md)

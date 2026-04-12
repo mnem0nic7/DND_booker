@@ -61,6 +61,39 @@ enum AgentRunStatus {
   cancelled
 }
 
+enum ImprovementLoopRunMode {
+  current_project
+  create_campaign
+}
+
+enum ImprovementLoopRunStatus {
+  queued
+  bootstrapping_project
+  creator
+  designer
+  editor
+  engineering
+  completed
+  failed
+  paused
+  cancelled
+}
+
+enum ImprovementLoopRole {
+  creator
+  designer
+  editor
+  engineer
+}
+
+enum ImprovementLoopRoleRunStatus {
+  queued
+  running
+  completed
+  failed
+  skipped
+}
+
 enum AgentActionStatus {
   queued
   running
@@ -118,6 +151,8 @@ model User {
   taskPlans       AiTaskPlan[]
   generationRuns  GenerationRun[]
   agentRuns       AgentRun[]
+  improvementLoopRuns ImprovementLoopRun[]
+  improvementLoopRoleRuns ImprovementLoopRoleRun[]
 
   @@map("users")
 }
@@ -172,11 +207,15 @@ model Project {
   contentChunks    ContentChunk[]
   generationRuns   GenerationRun[]
   agentRuns        AgentRun[]
+  improvementLoopRuns ImprovementLoopRun[]
+  improvementLoopRoleRuns ImprovementLoopRoleRun[]
   agentCheckpoints AgentCheckpoint[]
   campaignBibles   CampaignBible[]
   canonEntities    CanonEntity[]
   artifacts        GeneratedArtifact[]
   documents        ProjectDocument[]
+  githubRepoBinding ProjectGitHubRepoBinding?
+  improvementLoopArtifacts ImprovementLoopArtifact[]
 
   @@index([userId])
   @@map("projects")
@@ -422,6 +461,8 @@ model GenerationRun {
   canonEntities   CanonEntity[]
   manifests       AssemblyManifest[]
   linkedAgentRuns AgentRun[]          @relation("LinkedGenerationRun")
+  linkedImprovementLoopRuns ImprovementLoopRun[] @relation("LinkedImprovementGenerationRun")
+  linkedImprovementLoopRoleRuns ImprovementLoopRoleRun[] @relation("LinkedImprovementRoleGenerationRun")
 
   @@index([projectId])
   @@index([userId])
@@ -468,6 +509,8 @@ model AgentRun {
   actions             AgentAction[]
   observations        AgentObservation[]
   decisions           AgentDecision[]
+  linkedImprovementLoopRuns ImprovementLoopRun[] @relation("LinkedImprovementAgentRun")
+  linkedImprovementLoopRoleRuns ImprovementLoopRoleRun[] @relation("LinkedImprovementRoleAgentRun")
 
   @@index([projectId])
   @@index([userId])
@@ -552,6 +595,132 @@ model AgentDecision {
   @@index([runId])
   @@index([runId, cycleIndex])
   @@map("agent_decisions")
+}
+
+model ProjectGitHubRepoBinding {
+  id                           String   @id @default(uuid())
+  projectId                    String   @unique @map("project_id")
+  repositoryFullName           String   @map("repository_full_name")
+  installationId               Int      @map("installation_id")
+  defaultBranch                String   @map("default_branch")
+  pathAllowlistJson            Json     @default("[]") @map("path_allowlist_json")
+  engineeringAutomationEnabled Boolean  @default(true) @map("engineering_automation_enabled")
+  lastValidatedAt              DateTime? @map("last_validated_at")
+  lastValidationStatus         String   @default("unconfigured") @map("last_validation_status")
+  lastValidationMessage        String?  @map("last_validation_message")
+  createdAt                    DateTime @default(now()) @map("created_at")
+  updatedAt                    DateTime @updatedAt @map("updated_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([repositoryFullName])
+  @@map("project_github_repo_bindings")
+}
+
+model ImprovementLoopRun {
+  id                         String                   @id @default(uuid())
+  projectId                  String                   @map("project_id")
+  userId                     String                   @map("user_id")
+  mode                       ImprovementLoopRunMode
+  status                     ImprovementLoopRunStatus @default(queued)
+  currentStage               String?                  @map("current_stage")
+  graphThreadId              String?                  @map("graph_thread_id")
+  graphCheckpointKey         String?                  @map("graph_checkpoint_key")
+  graphStateJson             Json?                    @map("graph_state_json")
+  resumeToken                String?                  @map("resume_token")
+  progressPercent            Int                      @default(0) @map("progress_percent")
+  inputJson                  Json                     @map("input_json")
+  linkedGenerationRunId      String?                  @map("linked_generation_run_id")
+  linkedAgentRunId           String?                  @map("linked_agent_run_id")
+  creatorReportJson          Json?                    @map("creator_report_json")
+  designerUxNotesJson        Json?                    @map("designer_ux_notes_json")
+  editorFinalReportJson      Json?                    @map("editor_final_report_json")
+  engineeringReportJson      Json?                    @map("engineering_report_json")
+  engineeringApplyResultJson Json?                    @map("engineering_apply_result_json")
+  githubBranchName           String?                  @map("github_branch_name")
+  githubBaseBranch           String?                  @map("github_base_branch")
+  githubHeadSha              String?                  @map("github_head_sha")
+  githubPullRequestNumber    Int?                     @map("github_pull_request_number")
+  githubPullRequestUrl       String?                  @map("github_pull_request_url")
+  failureReason              String?                  @map("failure_reason")
+  createdAt                  DateTime                 @default(now()) @map("created_at")
+  updatedAt                  DateTime                 @updatedAt @map("updated_at")
+  startedAt                  DateTime?                @map("started_at")
+  completedAt                DateTime?                @map("completed_at")
+
+  project              Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user                 User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  linkedGenerationRun  GenerationRun?         @relation("LinkedImprovementGenerationRun", fields: [linkedGenerationRunId], references: [id], onDelete: SetNull)
+  linkedAgentRun       AgentRun?              @relation("LinkedImprovementAgentRun", fields: [linkedAgentRunId], references: [id], onDelete: SetNull)
+  artifacts            ImprovementLoopArtifact[]
+  roleRuns             ImprovementLoopRoleRun[]
+
+  @@index([projectId])
+  @@index([userId])
+  @@index([status])
+  @@index([graphThreadId])
+  @@index([graphCheckpointKey])
+  @@map("improvement_loop_runs")
+}
+
+model ImprovementLoopRoleRun {
+  id                   String                   @id @default(uuid())
+  runId                String                   @map("run_id")
+  projectId            String                   @map("project_id")
+  userId               String                   @map("user_id")
+  role                 ImprovementLoopRole
+  status               ImprovementLoopRoleRunStatus @default(queued)
+  objective            String
+  inputJson            Json?                    @map("input_json")
+  linkedGenerationRunId String?                 @map("linked_generation_run_id")
+  linkedAgentRunId     String?                  @map("linked_agent_run_id")
+  outputArtifactIdsJson Json                    @default("[]") @map("output_artifact_ids_json")
+  summary              String?
+  failureReason        String?                  @map("failure_reason")
+  createdAt            DateTime                 @default(now()) @map("created_at")
+  updatedAt            DateTime                 @updatedAt @map("updated_at")
+  startedAt            DateTime?                @map("started_at")
+  completedAt          DateTime?                @map("completed_at")
+
+  run                 ImprovementLoopRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  project             Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user                User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  linkedGenerationRun GenerationRun?     @relation("LinkedImprovementRoleGenerationRun", fields: [linkedGenerationRunId], references: [id], onDelete: SetNull)
+  linkedAgentRun      AgentRun?          @relation("LinkedImprovementRoleAgentRun", fields: [linkedAgentRunId], references: [id], onDelete: SetNull)
+
+  @@unique([runId, role])
+  @@index([runId])
+  @@index([projectId])
+  @@index([userId])
+  @@index([role])
+  @@index([status])
+  @@map("improvement_loop_role_runs")
+}
+
+model ImprovementLoopArtifact {
+  id              String   @id @default(uuid())
+  runId           String   @map("run_id")
+  projectId       String   @map("project_id")
+  artifactType    String   @map("artifact_type")
+  artifactKey     String   @map("artifact_key")
+  status          String   @default("generated")
+  version         Int      @default(1)
+  title           String
+  summary         String?
+  jsonContent     Json?    @map("json_content")
+  markdownContent String?  @map("markdown_content")
+  metadata        Json?
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  run     ImprovementLoopRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  project Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([runId, artifactType, artifactKey, version])
+  @@index([runId])
+  @@index([projectId])
+  @@index([artifactType])
+  @@map("improvement_loop_artifacts")
 }
 
 model GenerationTask {

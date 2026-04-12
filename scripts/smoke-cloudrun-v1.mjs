@@ -8,6 +8,7 @@ const generationPrompt = process.env.SMOKE_TEST_GENERATION_PROMPT?.trim()
 const generationTimeoutMs = Number.parseInt(process.env.SMOKE_GENERATION_TIMEOUT_MS ?? '', 10) || 25 * 60 * 1000;
 const exportTimeoutMs = Number.parseInt(process.env.SMOKE_EXPORT_TIMEOUT_MS ?? '', 10) || 15 * 60 * 1000;
 const pollIntervalMs = Number.parseInt(process.env.SMOKE_POLL_INTERVAL_MS ?? '', 10) || 5_000;
+const keepProject = /^(1|true|yes)$/i.test(process.env.SMOKE_KEEP_PROJECT ?? '');
 let currentAccessToken = null;
 
 if (!baseUrl) {
@@ -126,6 +127,8 @@ async function main() {
   let projectId = null;
   let generationRunId = null;
   let exportJobId = null;
+  let successSummary = null;
+  let cleanupStatus = keepProject ? 'retained' : 'not_requested';
 
   const loginData = await login();
 
@@ -259,7 +262,7 @@ async function main() {
       throw new Error('downloaded export did not look like a PDF');
     }
 
-    console.log(JSON.stringify({
+    successSummary = {
       ok: true,
       projectId,
       generationRunId,
@@ -267,21 +270,38 @@ async function main() {
       exportJobId,
       exportJobStatus: completedExport.status,
       pdfBytes: pdfBuffer.length,
-    }));
+      projectRetained: keepProject,
+      inspectHint: keepProject
+        ? 'Retained smoke project for later inspection in the live app. Delete it manually when finished.'
+        : undefined,
+    };
   } finally {
     if (projectId) {
-      try {
-        const response = await fetchWithAuth(
-          `/api/v1/projects/${projectId}`,
-          { method: 'DELETE' },
-          `cleanup temp project ${projectId}`,
-          true,
-          true,
-        );
-      } catch (error) {
-        console.error(`[smoke-cloudrun-v1] cleanup error for project ${projectId}:`, error instanceof Error ? error.message : error);
+      if (keepProject) {
+        cleanupStatus = 'retained';
+      } else {
+        try {
+          await fetchWithAuth(
+            `/api/v1/projects/${projectId}`,
+            { method: 'DELETE' },
+            `cleanup temp project ${projectId}`,
+            true,
+            true,
+          );
+          cleanupStatus = 'deleted';
+        } catch (error) {
+          cleanupStatus = 'delete_failed';
+          console.error(`[smoke-cloudrun-v1] cleanup error for project ${projectId}:`, error instanceof Error ? error.message : error);
+        }
       }
     }
+  }
+
+  if (successSummary) {
+    console.log(JSON.stringify({
+      ...successSummary,
+      cleanupStatus,
+    }));
   }
 }
 
