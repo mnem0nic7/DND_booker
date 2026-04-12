@@ -104,3 +104,14 @@ if [[ -n "${SMOKE_TEST_EMAIL:-}" && -n "${SMOKE_TEST_PASSWORD:-}" ]]; then
 else
   echo "Skipping authenticated api/v1 smoke test; set SMOKE_TEST_EMAIL and SMOKE_TEST_PASSWORD to enable it."
 fi
+
+if [[ -n "${SMOKE_IMPROVEMENT_LOOP_REPOSITORY_FULL_NAME:-}" && -n "${SMOKE_IMPROVEMENT_LOOP_INSTALLATION_ID:-}" ]]; then
+  if [[ -n "${SMOKE_TEST_EMAIL:-}" && -n "${SMOKE_TEST_PASSWORD:-}" ]]; then
+    echo "Running improvement-loop acceptance smoke..."
+    BASE_URL="${WEB_SERVICE_URL}" node ./scripts/smoke-cloudrun-improvement-loop.mjs
+  else
+    echo "Skipping improvement-loop smoke; it also requires SMOKE_TEST_EMAIL and SMOKE_TEST_PASSWORD."
+  fi
+else
+  echo "Skipping improvement-loop smoke; set SMOKE_IMPROVEMENT_LOOP_REPOSITORY_FULL_NAME and SMOKE_IMPROVEMENT_LOOP_INSTALLATION_ID to enable it."
+fi

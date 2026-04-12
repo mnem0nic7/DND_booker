@@ -9,6 +9,8 @@ These are not end-user features. They are execution guides for making safe chang
 - the Pretext text-layout rollout
 - document mutation and layout re-resolution
 
+If you need a current codebase map before applying a skill, start with `docs/architecture/current-state.md`.
+
 Current skills:
 
 - [Change Completion Workflow](./change-completion-workflow.md)

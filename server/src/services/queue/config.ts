@@ -29,7 +29,7 @@ interface QueueDefaults {
   removeOnFailAgeSeconds: number;
 }
 
-const QUEUE_DEFAULTS: Record<'generation' | 'agent' | 'export', QueueDefaults> = {
+const QUEUE_DEFAULTS: Record<'generation' | 'agent' | 'export' | 'improvement-loop', QueueDefaults> = {
   generation: {
     attempts: 3,
     priority: 20,
@@ -40,6 +40,13 @@ const QUEUE_DEFAULTS: Record<'generation' | 'agent' | 'export', QueueDefaults> =
   agent: {
     attempts: 3,
     priority: 30,
+    backoffDelayMs: 2500,
+    removeOnCompleteAgeSeconds: 86_400,
+    removeOnFailAgeSeconds: 604_800,
+  },
+  'improvement-loop': {
+    attempts: 3,
+    priority: 25,
     backoffDelayMs: 2500,
     removeOnCompleteAgeSeconds: 86_400,
     removeOnFailAgeSeconds: 604_800,
@@ -60,7 +67,7 @@ function parsePositiveInt(value: string | undefined, fallback: number): number {
 }
 
 export function resolveQueueDispatchOptions(
-  queueName: 'generation' | 'agent' | 'export',
+  queueName: 'generation' | 'agent' | 'export' | 'improvement-loop',
   overrides: QueueDispatchOverrides = {},
 ): ResolvedQueueDispatchOptions {
   const defaults = QUEUE_DEFAULTS[queueName];

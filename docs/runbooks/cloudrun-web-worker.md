@@ -20,6 +20,20 @@ Readiness only tells you whether the revision is serving. It does not prove that
 SMOKE_TEST_EMAIL=... SMOKE_TEST_PASSWORD=... npm run smoke:cloudrun:v1
 ```
 
+That smoke exercises the live `api/v1` path end to end: temp project creation, generation through publication review, resume, export, PDF download validation, and cleanup.
+
+If the deploy touched improvement-loop orchestration or GitHub repo binding behavior, follow with:
+
+```bash
+SMOKE_TEST_EMAIL=... \
+SMOKE_TEST_PASSWORD=... \
+SMOKE_IMPROVEMENT_LOOP_REPOSITORY_FULL_NAME=owner/repo \
+SMOKE_IMPROVEMENT_LOOP_INSTALLATION_ID=123456 \
+npm run smoke:cloudrun:improvement-loop
+```
+
+Use a disposable or smoke-only repo binding unless you explicitly want the smoke to open a draft PR against a long-lived repository.
+
 ## Alerts
 
 - `dnd-booker web HTTP 5xx`
@@ -94,7 +108,7 @@ SMOKE_TEST_EMAIL=... SMOKE_TEST_PASSWORD=... npm run smoke:cloudrun:v1
    ```
 3. Re-run the acceptance smoke:
    ```bash
-   BASE_URL=https://dnd-booker-npbu4x44pq-wn.a.run.app \
+   BASE_URL="$(gcloud run services describe dnd-booker --region us-west4 --format='value(status.url)')" \
    SMOKE_TEST_EMAIL=... \
    SMOKE_TEST_PASSWORD=... \
    npm run smoke:cloudrun:v1
@@ -131,7 +145,7 @@ SMOKE_TEST_EMAIL=... SMOKE_TEST_PASSWORD=... npm run smoke:cloudrun:v1
 
 1. Confirm web is still healthy:
    ```bash
-   curl -fsS https://dnd-booker-npbu4x44pq-wn.a.run.app/api/v1/health
+   curl -fsS "$(gcloud run services describe dnd-booker --region us-west4 --format='value(status.url)')/api/v1/health"
    ```
 2. Run the full acceptance smoke, even for a worker-only deploy:
    ```bash

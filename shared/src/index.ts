@@ -24,6 +24,8 @@ export * from './types/project-document.js';
 export * from './types/generation-events.js';
 export * from './types/agent-run.js';
 export * from './types/agent-events.js';
+export * from './types/improvement-loop.js';
+export * from './types/improvement-loop-events.js';
 export * from './types/chapter-outline.js';
 export * from './types/chapter-plan.js';
 export * from './types/reference-artifacts.js';
@@ -58,10 +60,25 @@ export {
   AgentRunDetailSchema,
   AgentCheckpointSchema,
   AgentActionSchema,
+  ProjectGitHubRepoBindingSchema,
+  ProjectGitHubRepoBindingInputSchema,
+  ProjectGitHubRepoBindingValidationSchema,
+  ImprovementLoopRunSchema,
+  ImprovementLoopRunSummarySchema,
+  ImprovementLoopRunDetailSchema,
+  ImprovementLoopArtifactSchema,
+  CreateImprovementLoopRequestSchema,
+  CreateImprovementLoopAndProjectRequestSchema,
+  CreatorReportSchema,
+  DesignerUxNotesSchema,
+  EditorFinalReportSchema,
+  EngineeringReportSchema,
+  EngineeringApplyResultSchema,
   ProjectIdParamsSchema,
   DocumentIdParamsSchema,
   GenerationRunIdParamsSchema,
   AgentRunIdParamsSchema,
+  ImprovementLoopRunIdParamsSchema,
   AgentCheckpointIdParamsSchema,
   GraphInterruptIdParamsSchema,
   GenerationArtifactIdParamsSchema,
@@ -70,6 +87,7 @@ export {
   type DocumentIdParams,
   type GenerationRunIdParams,
   type AgentRunIdParams,
+  type ImprovementLoopRunIdParams,
   type AgentCheckpointIdParams,
   type GraphInterruptIdParams,
   type GenerationArtifactIdParams,
@@ -85,6 +103,20 @@ export {
   type GenerationRunDetail,
   type AgentRunCreateRequest,
   type AgentRunDetail,
+  type ProjectGitHubRepoBinding,
+  type ProjectGitHubRepoBindingInput,
+  type ProjectGitHubRepoBindingValidation,
+  type CreateImprovementLoopRequest,
+  type CreateImprovementLoopAndProjectRequest,
+  type ImprovementLoopRun,
+  type ImprovementLoopRunSummary,
+  type ImprovementLoopRunDetail,
+  type ImprovementLoopArtifact,
+  type CreatorReport,
+  type DesignerUxNotes,
+  type EditorFinalReport,
+  type EngineeringReport,
+  type EngineeringApplyResult,
   GraphInterruptSchema,
   GraphInterruptStatusSchema,
   GraphInterruptResolutionActionSchema,

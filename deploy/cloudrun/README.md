@@ -13,7 +13,7 @@ This repo is deployed to Google Cloud Run as two services:
   - Cloud Run injects the worker `PORT`; do not set it manually in the standalone worker manifest
   - the worker runs a periodic runtime audit that logs `OPS_AUDIT_VIOLATION` when queued work, BullMQ queue backlog, or pending approvals go stale
 
-Use [`service.yaml`](/home/gallison/workspace/DND_booker/deploy/cloudrun/service.yaml) for the web service, [`worker-service.yaml`](/home/gallison/workspace/DND_booker/deploy/cloudrun/worker-service.yaml) for the worker service, and the matching `*.example` files as templates.
+Use [service.yaml](./service.yaml) for the web service, [worker-service.yaml](./worker-service.yaml) for the worker service, and the matching `*.example` files as templates.
 
 ## What You Need
 
@@ -65,6 +65,7 @@ Manual page breaks in the live paginated editor should fill the rest of the curr
 Generation orchestration also routes model selection per stage through the checked-in agent model presets. That prevents a user's experimental chat model from becoming the structured-output model for outline, canon, chapter draft, or evaluation nodes during the deploy smoke or live generation runs. Quick-mode Google generations intentionally use the Flash lane for the heavier structured stages so deploy smoke and invite-only one-shot generation do not depend on `gemini-2.5-pro` capacity being available in that moment.
 The worker also enforces a hard timeout on the core generation nodes. If a provider call hangs inside intake, bible, outline, canon expansion, chapter planning, or chapter drafting, the node now errors and retries from the last persisted checkpoint instead of leaving the run stuck indefinitely.
 Legacy product `/api/*` compatibility routes have been removed. Keep health and infra probes on `/api/health`, and use `/api/v1/*` for app traffic, smoke tests, and operator tooling.
+The typed `api/v1` transport contract is exposed at `/api/v1/openapi.json`, and the frontend consumes the generated SDK built from that contract.
 
 ## Invite-Only Registration
 
@@ -109,7 +110,7 @@ npm run monitor:cloudrun:validate
 
 That writes a synthetic `OPS_AUDIT_VIOLATION` log entry against the current worker revision so the `dnd-booker ops audit violations` policy can be confirmed end to end.
 
-Operational triage lives in [docs/runbooks/cloudrun-web-worker.md](/home/gallison/workspace/DND_booker/docs/runbooks/cloudrun-web-worker.md).
+Operational triage lives in [docs/runbooks/cloudrun-web-worker.md](../../docs/runbooks/cloudrun-web-worker.md).
 
 ## Run Resume Semantics
 
@@ -182,7 +183,7 @@ For this service, keep `run.googleapis.com/vpc-access-egress: private-ranges-onl
 ## Deploy
 
 1. Build and push images with Cloud Build.
-2. Update the image tags in [`service.yaml`](/home/gallison/workspace/DND_booker/deploy/cloudrun/service.yaml) and [`worker-service.yaml`](/home/gallison/workspace/DND_booker/deploy/cloudrun/worker-service.yaml) if you are not deploying `latest`.
+2. Update the image tags in [service.yaml](./service.yaml) and [worker-service.yaml](./worker-service.yaml) if you are not deploying `latest`.
 3. Confirm these values in the manifests:
    - Cloud SQL instance connection name
    - Redis host
@@ -245,13 +246,50 @@ export SMOKE_TEST_PASSWORD="your-password"
 export SMOKE_TEST_GENERATION_PROMPT="optional smoke prompt override"
 ```
 
+To run the live improvement-loop smoke after the base v1 smoke, also set:
+
+```bash
+export SMOKE_IMPROVEMENT_LOOP_REPOSITORY_FULL_NAME="owner/repo"
+export SMOKE_IMPROVEMENT_LOOP_INSTALLATION_ID="123456"
+export SMOKE_IMPROVEMENT_LOOP_DEFAULT_BRANCH="main"
+export SMOKE_IMPROVEMENT_LOOP_ALLOWLIST="docs/,README.md,CLAUDE.md"
+export SMOKE_IMPROVEMENT_LOOP_EXPECT_APPLY="false"
+```
+
+`SMOKE_IMPROVEMENT_LOOP_EXPECT_APPLY=true` requires the engineering stage to create a branch and draft PR. Keep it `false` if you are validating the full loop against a binding that intentionally skips auto-apply outside the allowlist.
+
 After deploy, verify:
 
 - `curl -fsS "$URL/api/v1/health"`
 - load `"$URL/"`
 - confirm the authenticated `api/v1` smoke test passed, or run `npm run smoke:cloudrun:v1` manually if you skipped it during deploy
+- if improvement-loop runtime or GitHub integration changed, run `npm run smoke:cloudrun:improvement-loop` with the env vars above and confirm the loop reaches `completed`, produces creator/designer/editor/engineering artifacts, and records an engineering apply result
 - note that the smoke now creates a temporary project, drives a generation run to the publication-review interrupt, approves and resumes it, creates an export job, downloads the resulting PDF, validates the `%PDF-` header, and then deletes the temp project
+- the improvement-loop smoke creates a temporary campaign project through `/api/v1/improvement-loops`, waits for the full creator/designer/editor/engineering pipeline to finish, verifies the loop-owned artifacts, checks the engineering apply result, and then deletes the temp project
 - project aggregate content saves, document layout saves, chat history loads, asset uploads/browses, and template loads all flow through `api/v1` now, so production editor regressions are more likely to show up in the same typed transport path the SDK uses
+
+## Improvement Loop Smoke Checklist
+
+Use this exact checklist when the improvement-loop runtime, GitHub repo binding flow, persisted graph resumption, or engineering stage changes:
+
+1. Deploy with `npm run deploy:cloudrun`.
+2. Confirm the base smoke passed: `npm run smoke:cloudrun:v1`.
+3. Export the improvement-loop smoke env vars:
+   - `SMOKE_IMPROVEMENT_LOOP_REPOSITORY_FULL_NAME`
+   - `SMOKE_IMPROVEMENT_LOOP_INSTALLATION_ID`
+   - `SMOKE_IMPROVEMENT_LOOP_DEFAULT_BRANCH`
+   - `SMOKE_IMPROVEMENT_LOOP_ALLOWLIST`
+   - `SMOKE_IMPROVEMENT_LOOP_EXPECT_APPLY`
+4. Run `npm run smoke:cloudrun:improvement-loop`.
+5. Confirm the smoke JSON shows:
+   - `"ok": true`
+   - `"status": "completed"`
+   - an `editorRecommendation`
+   - an `engineeringStatus` that is not `failed`
+6. If `SMOKE_IMPROVEMENT_LOOP_EXPECT_APPLY=true`, confirm the output includes `githubPullRequestUrl`.
+7. Check Cloud Run logs if the loop stalls or fails:
+   - web service for route/binding failures
+   - worker service for creator/designer/editor/engineering stage failures
 
 Local ship verification should also cover the `api/v1` project and run surfaces before deploy. `npm run verify:ship` now includes the worker `layout-visual-parity.test.ts` regression plus auth, AI, assets, templates, documents, projects, runs, agent restore, and generation route coverage through the Cloud SQL Proxy + local Redis harness so transport, orchestration, and preview/export layout drift regressions are caught before production.
 

@@ -171,6 +171,41 @@ export type ProjectCreateRequest = z.infer<typeof ProjectCreateRequestSchema>;
 export type ProjectUpdateRequest = z.infer<typeof ProjectUpdateRequestSchema>;
 export type DocumentLayout = z.infer<typeof LayoutPlanSchema>;
 
+export const ProjectGitHubRepoBindingSchema = z.object({
+  id: z.string().uuid(),
+  projectId: z.string().uuid(),
+  repositoryFullName: z.string().min(1),
+  installationId: z.number().int().positive(),
+  defaultBranch: z.string().min(1),
+  pathAllowlist: z.array(z.string().min(1)),
+  engineeringAutomationEnabled: z.boolean(),
+  lastValidatedAt: z.string().datetime().nullable(),
+  lastValidationStatus: z.enum(['unconfigured', 'invalid', 'valid']),
+  lastValidationMessage: z.string().nullable(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+});
+
+export const ProjectGitHubRepoBindingInputSchema = z.object({
+  repositoryFullName: z.string().min(1),
+  installationId: z.number().int().positive(),
+  defaultBranch: z.string().min(1),
+  pathAllowlist: z.array(z.string().min(1)).max(64).optional(),
+  engineeringAutomationEnabled: z.boolean().optional(),
+});
+
+export const ProjectGitHubRepoBindingValidationSchema = z.object({
+  status: z.enum(['unconfigured', 'invalid', 'valid']),
+  message: z.string(),
+  repositoryFullName: z.string().nullable(),
+  defaultBranch: z.string().nullable(),
+  checkedAt: z.string().datetime(),
+});
+
+export type ProjectGitHubRepoBinding = z.infer<typeof ProjectGitHubRepoBindingSchema>;
+export type ProjectGitHubRepoBindingInput = z.infer<typeof ProjectGitHubRepoBindingInputSchema>;
+export type ProjectGitHubRepoBindingValidation = z.infer<typeof ProjectGitHubRepoBindingValidationSchema>;
+
 export const GenerationModeSchema = z.enum(['one_shot', 'module', 'campaign', 'sourcebook']);
 export const GenerationQualitySchema = z.enum(['quick', 'polished']);
 export const RunStatusSchema = z.enum([
@@ -552,6 +587,195 @@ export type V1AgentRunDetail = z.infer<typeof V1AgentRunDetailSchema>;
 export type AgentCheckpoint = z.infer<typeof AgentCheckpointSchema>;
 export type AgentAction = z.infer<typeof AgentActionSchema>;
 
+export const ImprovementLoopRunModeSchema = z.enum(['current_project', 'create_campaign']);
+export const ImprovementLoopRunStatusSchema = z.enum([
+  'queued',
+  'bootstrapping_project',
+  'creator',
+  'designer',
+  'editor',
+  'engineering',
+  'completed',
+  'failed',
+  'paused',
+  'cancelled',
+]);
+
+export const ImprovementLoopInputSchema = z.object({
+  mode: ImprovementLoopRunModeSchema,
+  prompt: z.string().nullable(),
+  objective: z.string(),
+  projectTitle: z.string().nullable(),
+  generationMode: GenerationModeSchema,
+  generationQuality: GenerationQualitySchema,
+  agentMode: AgentRunModeSchema,
+});
+
+export const CreatorReportSchema = z.object({
+  mode: z.enum(['generated_campaign', 'synthesized_existing_project']),
+  summary: z.string(),
+  prompt: z.string().nullable(),
+  substantialContentDetected: z.boolean(),
+  linkedGenerationRunId: z.string().uuid().nullable(),
+  notes: z.array(z.string()),
+});
+
+export const DesignerUxNotesSchema = z.object({
+  summary: z.string(),
+  observations: z.array(z.string()),
+  frictionPoints: z.array(z.string()),
+  recommendations: z.array(z.string()),
+});
+
+export const EditorFinalReportSchema = z.object({
+  overallScore: z.number(),
+  recommendation: z.enum(['ready', 'needs_revision', 'blocked']),
+  summary: z.string(),
+  strengths: z.array(z.string()),
+  issues: z.array(z.string()),
+  latestScorecard: AgentScorecardSchema.nullable(),
+  critiqueBacklog: z.array(CritiqueBacklogItemSchema),
+});
+
+export const EngineeringImprovementSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  priority: z.enum(['high', 'medium', 'low']),
+  rationale: z.string(),
+  affectedPaths: z.array(z.string()),
+  proposedChanges: z.array(z.string()),
+  autoApplyEligible: z.boolean(),
+  deferredReason: z.string().nullable(),
+});
+
+export const EngineeringReportSchema = z.object({
+  summary: z.string(),
+  repoObservations: z.array(z.string()),
+  improvements: z.array(EngineeringImprovementSchema),
+  appliedCount: z.number().int(),
+  deferredCount: z.number().int(),
+});
+
+export const EngineeringApplyResultSchema = z.object({
+  status: z.enum(['applied', 'partial', 'skipped', 'failed']),
+  message: z.string(),
+  branchName: z.string().nullable(),
+  baseBranch: z.string().nullable(),
+  headSha: z.string().nullable(),
+  pullRequestNumber: z.number().int().nullable(),
+  pullRequestUrl: z.string().nullable(),
+  appliedPaths: z.array(z.string()),
+  deferredPaths: z.array(z.string()),
+});
+
+export const ImprovementLoopArtifactTypeSchema = z.enum([
+  'creator_report',
+  'designer_ux_notes',
+  'editor_final_report',
+  'engineering_report',
+  'engineering_apply_result',
+]);
+
+export const ImprovementLoopArtifactStatusSchema = z.enum(['generated', 'accepted', 'failed']);
+
+export const ImprovementLoopArtifactSchema = z.object({
+  id: z.string().uuid(),
+  runId: z.string().uuid(),
+  projectId: z.string().uuid(),
+  artifactType: ImprovementLoopArtifactTypeSchema,
+  artifactKey: z.string(),
+  status: ImprovementLoopArtifactStatusSchema,
+  version: z.number().int(),
+  title: z.string(),
+  summary: z.string().nullable(),
+  jsonContent: z.unknown().nullable(),
+  markdownContent: z.string().nullable(),
+  metadata: z.unknown().nullable(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+});
+
+export const CreateImprovementLoopRequestSchema = z.object({
+  prompt: z.string().min(1).max(5000).optional(),
+  objective: z.string().min(1).max(5000).optional(),
+  generationMode: GenerationModeSchema.optional(),
+  generationQuality: GenerationQualitySchema.optional(),
+});
+
+export const CreateImprovementLoopAndProjectRequestSchema = CreateImprovementLoopRequestSchema.extend({
+  projectTitle: z.string().min(1).max(200),
+  repoBinding: ProjectGitHubRepoBindingInputSchema,
+});
+
+export const ImprovementLoopRunSchema = z.object({
+  id: z.string().uuid(),
+  projectId: z.string().uuid(),
+  userId: z.string().uuid(),
+  mode: ImprovementLoopRunModeSchema,
+  status: ImprovementLoopRunStatusSchema,
+  currentStage: z.string().nullable(),
+  progressPercent: z.number().int().min(0).max(100),
+  input: ImprovementLoopInputSchema,
+  linkedGenerationRunId: z.string().uuid().nullable(),
+  linkedAgentRunId: z.string().uuid().nullable(),
+  creatorReport: CreatorReportSchema.nullable(),
+  designerUxNotes: DesignerUxNotesSchema.nullable(),
+  editorFinalReport: EditorFinalReportSchema.nullable(),
+  engineeringReport: EngineeringReportSchema.nullable(),
+  engineeringApplyResult: EngineeringApplyResultSchema.nullable(),
+  githubBranchName: z.string().nullable(),
+  githubBaseBranch: z.string().nullable(),
+  githubHeadSha: z.string().nullable(),
+  githubPullRequestNumber: z.number().int().nullable(),
+  githubPullRequestUrl: z.string().nullable(),
+  failureReason: z.string().nullable(),
+  graphThreadId: z.string().nullable().optional(),
+  graphCheckpointKey: z.string().nullable().optional(),
+  graphStateJson: GraphStateSchema.nullable().optional(),
+  resumeToken: z.string().nullable().optional(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+  startedAt: z.string().datetime().nullable(),
+  completedAt: z.string().datetime().nullable(),
+});
+
+export const ImprovementLoopRunSummarySchema = z.object({
+  id: z.string().uuid(),
+  projectId: z.string().uuid(),
+  mode: ImprovementLoopRunModeSchema,
+  status: ImprovementLoopRunStatusSchema,
+  currentStage: z.string().nullable(),
+  progressPercent: z.number().int().min(0).max(100),
+  linkedGenerationRunId: z.string().uuid().nullable(),
+  linkedAgentRunId: z.string().uuid().nullable(),
+  githubPullRequestNumber: z.number().int().nullable(),
+  githubPullRequestUrl: z.string().nullable(),
+  failureReason: z.string().nullable(),
+  graphThreadId: z.string().nullable().optional(),
+  graphCheckpointKey: z.string().nullable().optional(),
+  graphStateJson: GraphStateSchema.nullable().optional(),
+  resumeToken: z.string().nullable().optional(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+});
+
+export const ImprovementLoopRunDetailSchema = ImprovementLoopRunSchema.extend({
+  artifactCount: z.number().int(),
+});
+
+export type CreateImprovementLoopRequest = z.infer<typeof CreateImprovementLoopRequestSchema>;
+export type CreateImprovementLoopAndProjectRequest = z.infer<typeof CreateImprovementLoopAndProjectRequestSchema>;
+export type ImprovementLoopRun = z.infer<typeof ImprovementLoopRunSchema>;
+export type ImprovementLoopRunSummary = z.infer<typeof ImprovementLoopRunSummarySchema>;
+export type ImprovementLoopRunDetail = z.infer<typeof ImprovementLoopRunDetailSchema>;
+export type ImprovementLoopArtifact = z.infer<typeof ImprovementLoopArtifactSchema>;
+export type CreatorReport = z.infer<typeof CreatorReportSchema>;
+export type DesignerUxNotes = z.infer<typeof DesignerUxNotesSchema>;
+export type EditorFinalReport = z.infer<typeof EditorFinalReportSchema>;
+export type EngineeringImprovement = z.infer<typeof EngineeringImprovementSchema>;
+export type EngineeringReport = z.infer<typeof EngineeringReportSchema>;
+export type EngineeringApplyResult = z.infer<typeof EngineeringApplyResultSchema>;
+
 export const GraphInterruptSchema = z.object({
   id: z.string().uuid(),
   runType: GraphInterruptRunTypeSchema,
@@ -793,6 +1017,10 @@ export const AgentRunIdParamsSchema = ProjectIdParamsSchema.extend({
   runId: z.string().uuid(),
 });
 
+export const ImprovementLoopRunIdParamsSchema = ProjectIdParamsSchema.extend({
+  runId: z.string().uuid(),
+});
+
 export const AgentCheckpointIdParamsSchema = AgentRunIdParamsSchema.extend({
   checkpointId: z.string().uuid(),
 });
@@ -811,6 +1039,7 @@ export type ProjectIdParams = z.infer<typeof ProjectIdParamsSchema>;
 export type DocumentIdParams = z.infer<typeof DocumentIdParamsSchema>;
 export type GenerationRunIdParams = z.infer<typeof GenerationRunIdParamsSchema>;
 export type AgentRunIdParams = z.infer<typeof AgentRunIdParamsSchema>;
+export type ImprovementLoopRunIdParams = z.infer<typeof ImprovementLoopRunIdParamsSchema>;
 export type AgentCheckpointIdParams = z.infer<typeof AgentCheckpointIdParamsSchema>;
 export type GraphInterruptIdParams = z.infer<typeof GraphInterruptIdParamsSchema>;
 export type GenerationArtifactIdParams = z.infer<typeof GenerationArtifactIdParamsSchema>;
@@ -834,7 +1063,7 @@ export type AgentRunDetail = V1AgentRunDetail;
 export type GraphInterruptResolutionRequestBody = z.infer<typeof GraphInterruptResolutionRequestSchema>;
 
 export interface ApiV1RouteContract {
-  tag: 'auth' | 'projects' | 'documents' | 'generationRuns' | 'agentRuns' | 'graphInterrupts' | 'exports';
+  tag: 'auth' | 'projects' | 'documents' | 'generationRuns' | 'agentRuns' | 'graphInterrupts' | 'exports' | 'improvementLoops';
   operationId: string;
   method: 'get' | 'post' | 'patch' | 'delete';
   path: string;
@@ -921,6 +1150,41 @@ export const V1_ROUTE_CONTRACTS: ApiV1RouteContract[] = [
     responseSchema: ProjectDetailSchema,
     paramsTypeName: 'ProjectIdParams',
     responseTypeName: 'ProjectDetail',
+  },
+  {
+    tag: 'projects',
+    operationId: 'getProjectGitHubRepoBinding',
+    method: 'get',
+    path: '/api/v1/projects/{projectId}/github-repo-binding',
+    summary: 'Get the GitHub repo binding for a project.',
+    paramsSchema: ProjectIdParamsSchema,
+    responseSchema: ProjectGitHubRepoBindingSchema,
+    paramsTypeName: 'ProjectIdParams',
+    responseTypeName: 'ProjectGitHubRepoBinding',
+  },
+  {
+    tag: 'projects',
+    operationId: 'upsertProjectGitHubRepoBinding',
+    method: 'post',
+    path: '/api/v1/projects/{projectId}/github-repo-binding',
+    summary: 'Create or update the GitHub repo binding for a project.',
+    paramsSchema: ProjectIdParamsSchema,
+    requestBodySchema: ProjectGitHubRepoBindingInputSchema,
+    responseSchema: ProjectGitHubRepoBindingSchema,
+    paramsTypeName: 'ProjectIdParams',
+    requestTypeName: 'ProjectGitHubRepoBindingInput',
+    responseTypeName: 'ProjectGitHubRepoBinding',
+  },
+  {
+    tag: 'projects',
+    operationId: 'validateProjectGitHubRepoBinding',
+    method: 'post',
+    path: '/api/v1/projects/{projectId}/github-repo-binding/validate',
+    summary: 'Validate the configured GitHub repo binding for a project.',
+    paramsSchema: ProjectIdParamsSchema,
+    responseSchema: ProjectGitHubRepoBindingValidationSchema,
+    paramsTypeName: 'ProjectIdParams',
+    responseTypeName: 'ProjectGitHubRepoBindingValidation',
   },
   {
     tag: 'projects',
@@ -1319,6 +1583,111 @@ export const V1_ROUTE_CONTRACTS: ApiV1RouteContract[] = [
     responseSchema: z.array(AgentActionSchema),
     paramsTypeName: 'AgentRunIdParams',
     responseTypeName: 'AgentAction[]',
+  },
+  {
+    tag: 'improvementLoops',
+    operationId: 'createImprovementLoopAndProject',
+    method: 'post',
+    path: '/api/v1/improvement-loops',
+    summary: 'Create a campaign project and start an improvement loop.',
+    requestBodySchema: CreateImprovementLoopAndProjectRequestSchema,
+    responseSchema: ImprovementLoopRunSchema,
+    successStatusCode: 201,
+    requestTypeName: 'CreateImprovementLoopAndProjectRequest',
+    responseTypeName: 'ImprovementLoopRun',
+  },
+  {
+    tag: 'improvementLoops',
+    operationId: 'createImprovementLoop',
+    method: 'post',
+    path: '/api/v1/projects/{projectId}/improvement-loops',
+    summary: 'Start an improvement loop for an existing project.',
+    paramsSchema: ProjectIdParamsSchema,
+    requestBodySchema: CreateImprovementLoopRequestSchema,
+    responseSchema: ImprovementLoopRunSchema,
+    successStatusCode: 201,
+    paramsTypeName: 'ProjectIdParams',
+    requestTypeName: 'CreateImprovementLoopRequest',
+    responseTypeName: 'ImprovementLoopRun',
+  },
+  {
+    tag: 'improvementLoops',
+    operationId: 'listImprovementLoops',
+    method: 'get',
+    path: '/api/v1/projects/{projectId}/improvement-loops',
+    summary: 'List improvement loops for a project.',
+    paramsSchema: ProjectIdParamsSchema,
+    responseSchema: ImprovementLoopRunSummarySchema.array(),
+    paramsTypeName: 'ProjectIdParams',
+    responseTypeName: 'ImprovementLoopRunSummary[]',
+  },
+  {
+    tag: 'improvementLoops',
+    operationId: 'getImprovementLoop',
+    method: 'get',
+    path: '/api/v1/projects/{projectId}/improvement-loops/{runId}',
+    summary: 'Get an improvement loop run.',
+    paramsSchema: ImprovementLoopRunIdParamsSchema,
+    responseSchema: ImprovementLoopRunDetailSchema,
+    paramsTypeName: 'ImprovementLoopRunIdParams',
+    responseTypeName: 'ImprovementLoopRunDetail',
+  },
+  {
+    tag: 'improvementLoops',
+    operationId: 'pauseImprovementLoop',
+    method: 'post',
+    path: '/api/v1/projects/{projectId}/improvement-loops/{runId}/pause',
+    summary: 'Pause an improvement loop.',
+    paramsSchema: ImprovementLoopRunIdParamsSchema,
+    responseSchema: ImprovementLoopRunSchema,
+    paramsTypeName: 'ImprovementLoopRunIdParams',
+    responseTypeName: 'ImprovementLoopRun',
+  },
+  {
+    tag: 'improvementLoops',
+    operationId: 'resumeImprovementLoop',
+    method: 'post',
+    path: '/api/v1/projects/{projectId}/improvement-loops/{runId}/resume',
+    summary: 'Resume a paused improvement loop.',
+    paramsSchema: ImprovementLoopRunIdParamsSchema,
+    responseSchema: ImprovementLoopRunSchema,
+    paramsTypeName: 'ImprovementLoopRunIdParams',
+    responseTypeName: 'ImprovementLoopRun',
+  },
+  {
+    tag: 'improvementLoops',
+    operationId: 'cancelImprovementLoop',
+    method: 'post',
+    path: '/api/v1/projects/{projectId}/improvement-loops/{runId}/cancel',
+    summary: 'Cancel an improvement loop.',
+    paramsSchema: ImprovementLoopRunIdParamsSchema,
+    responseSchema: ImprovementLoopRunSchema,
+    paramsTypeName: 'ImprovementLoopRunIdParams',
+    responseTypeName: 'ImprovementLoopRun',
+  },
+  {
+    tag: 'improvementLoops',
+    operationId: 'listImprovementLoopArtifacts',
+    method: 'get',
+    path: '/api/v1/projects/{projectId}/improvement-loops/{runId}/artifacts',
+    summary: 'List loop-owned artifacts for an improvement loop.',
+    paramsSchema: ImprovementLoopRunIdParamsSchema,
+    responseSchema: ImprovementLoopArtifactSchema.array(),
+    paramsTypeName: 'ImprovementLoopRunIdParams',
+    responseTypeName: 'ImprovementLoopArtifact[]',
+  },
+  {
+    tag: 'improvementLoops',
+    operationId: 'getImprovementLoopArtifact',
+    method: 'get',
+    path: '/api/v1/projects/{projectId}/improvement-loops/{runId}/artifacts/{artifactId}',
+    summary: 'Get a loop-owned artifact for an improvement loop.',
+    paramsSchema: ImprovementLoopRunIdParamsSchema.extend({
+      artifactId: z.string().uuid(),
+    }),
+    responseSchema: ImprovementLoopArtifactSchema,
+    paramsTypeName: 'ImprovementLoopRunIdParams & { artifactId: string }',
+    responseTypeName: 'ImprovementLoopArtifact',
   },
   {
     tag: 'exports',

@@ -11,6 +11,7 @@ import v1DocumentRoutes from './routes/v1/documents.js';
 import v1ExportRoutes from './routes/v1/exports.js';
 import v1RunRoutes from './routes/v1/runs.js';
 import v1SpecRoutes from './routes/v1/spec.js';
+import v1ImprovementLoopRoutes from './routes/v1/improvement-loops.js';
 import { publicRateLimit } from './middleware/ai-rate-limit.js';
 import { requireAuth, requireAuthOrRefreshCookie, type AuthRequest } from './middleware/auth.js';
 import { buildProjectAssetUrl } from './services/asset-paths.service.js';
@@ -80,6 +81,7 @@ app.get(['/api/health', '/api/v1/health'], publicRateLimit, (_req, res) => {
 app.use('/api/v1/auth', v1AuthRoutes);
 app.use('/api/v1', v1SpecRoutes);
 app.use('/api/v1', v1ProjectRoutes);
+app.use('/api/v1', v1ImprovementLoopRoutes);
 app.use('/api/v1', v1ExportRoutes);
 app.use('/api/v1/ai', aiSettingsRoutes);
 app.use('/api/v1/ai', aiGenerateRoutes);

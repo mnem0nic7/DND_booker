@@ -24,6 +24,7 @@ import { AiSettingsModal } from '../ai/AiSettingsModal';
 import { AiChatPanel } from '../ai/AiChatPanel';
 import { AutonomousGenerationDialog } from '../ai/AutonomousGenerationDialog';
 import { AutonomousAgentDialog } from '../ai/AutonomousAgentDialog';
+import { ImprovementLoopDialog } from '../ai/ImprovementLoopDialog';
 
 type PageSize = 'letter' | 'a4' | 'a5';
 
@@ -85,6 +86,7 @@ export function EditorLayout({
   const [showAiChat, setShowAiChat] = useState(false);
   const [showGenerationDialog, setShowGenerationDialog] = useState(false);
   const [showAgentDialog, setShowAgentDialog] = useState(false);
+  const [showImprovementLoopDialog, setShowImprovementLoopDialog] = useState(false);
   const [showAssetGallery, setShowAssetGallery] = useState(false);
   const currentTheme = useThemeStore((s) => s.currentTheme);
   const openExportDialog = useExportStore((s) => s.openDialog);
@@ -379,6 +381,18 @@ export function EditorLayout({
             Creative Director
           </button>
           <button
+            onClick={() => setShowImprovementLoopDialog(true)}
+            title="Run creator, designer, editor, and engineering loop"
+            aria-label="Run creator, designer, editor, and engineering loop"
+            className="px-3 py-1.5 text-sm text-gray-600 hover:text-emerald-700 hover:bg-emerald-50 transition-colors rounded mr-1 flex items-center gap-1"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12a7.5 7.5 0 0113.36-4.64M19.5 12a7.5 7.5 0 01-13.36 4.64" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 4.5h1.5v1.5M7.5 19.5H6v-1.5" />
+            </svg>
+            Improvement Loop
+          </button>
+          <button
             onClick={() => setShowAiChat((v) => !v)}
             title={showAiChat ? 'Hide AI assistant' : 'Show AI assistant'}
             aria-label={showAiChat ? 'Hide AI assistant' : 'Show AI assistant'}
@@ -523,6 +537,11 @@ export function EditorLayout({
         projectId={projectId}
         isOpen={showAgentDialog}
         onClose={() => setShowAgentDialog(false)}
+      />
+      <ImprovementLoopDialog
+        projectId={projectId}
+        isOpen={showImprovementLoopDialog}
+        onClose={() => setShowImprovementLoopDialog(false)}
       />
       <AiSettingsModal />
     </div>

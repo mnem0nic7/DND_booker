@@ -1,10 +1,26 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { zodToJsonSchema } from 'zod-to-json-schema';
-import * as V1 from '../../shared/src/api/v1.ts';
+const V1 = await import('../../shared/src/api/v1.ts');
 
-type ApiV1RouteContract = V1.ApiV1RouteContract;
-const { ProblemSchema, V1_ROUTE_CONTRACTS } = V1;
+type ApiV1RouteContract = typeof V1 extends { V1_ROUTE_CONTRACTS: infer T }
+  ? T extends Array<infer U>
+    ? U
+    : never
+  : never;
+
+const ProblemSchema = V1.ProblemSchema;
+const routeContractsCandidate = Array.isArray((V1 as { V1_ROUTE_CONTRACTS?: unknown }).V1_ROUTE_CONTRACTS)
+  ? (V1 as { V1_ROUTE_CONTRACTS: ApiV1RouteContract[] }).V1_ROUTE_CONTRACTS
+  : Array.isArray((V1 as { default?: { V1_ROUTE_CONTRACTS?: unknown } }).default?.V1_ROUTE_CONTRACTS)
+    ? (V1 as { default: { V1_ROUTE_CONTRACTS: ApiV1RouteContract[] } }).default.V1_ROUTE_CONTRACTS
+    : null;
+
+if (!routeContractsCandidate) {
+  throw new TypeError('V1_ROUTE_CONTRACTS must be an array.');
+}
+
+const ROUTES = routeContractsCandidate;
 
 function toOpenApiSchema(schema: ApiV1RouteContract['responseSchema']) {
   if (!schema) return undefined;
@@ -53,7 +69,7 @@ function getObjectShape(schema: ApiV1RouteContract['paramsSchema']) {
 function buildOpenApiDocument() {
   const paths: Record<string, Record<string, unknown>> = {};
 
-  for (const route of V1_ROUTE_CONTRACTS) {
+  for (const route of ROUTES) {
     const pathItem = paths[route.path] ?? {};
     const parameters = Object.entries(getObjectShape(route.paramsSchema)).map(([name, paramSchema]) => ({
       name,
@@ -111,7 +127,7 @@ function buildOpenApiDocument() {
 function getTypeImports() {
   const names = new Set<string>(['Problem']);
   const globalTypes = new Set(['Blob']);
-  for (const route of V1_ROUTE_CONTRACTS) {
+  for (const route of ROUTES) {
     for (const source of [route.paramsTypeName, route.requestTypeName, route.responseTypeName]) {
       if (!source) continue;
       for (const match of source.matchAll(/\b[A-Z][A-Za-z0-9_]*\b/g)) {
@@ -128,7 +144,7 @@ function buildClientSource() {
   const imports = getTypeImports().join(',\n  ');
   const routesByTag = new Map<string, ApiV1RouteContract[]>();
 
-  for (const route of V1_ROUTE_CONTRACTS) {
+  for (const route of ROUTES) {
     const bucket = routesByTag.get(route.tag) ?? [];
     bucket.push(route);
     routesByTag.set(route.tag, bucket);

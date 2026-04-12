@@ -9,6 +9,7 @@ import { WizardChatProgress } from './WizardChatProgress';
 import { ImageGenProgress } from './ImageGenProgress';
 import { GenerationRunPanel } from './GenerationRunPanel';
 import { AgentRunPanel } from './AgentRunPanel';
+import { ImprovementLoopPanel } from './ImprovementLoopPanel';
 import type { WizardOutline, DocumentEditOperation, ImageGenerationRequest, ImageTargetInsert, ImageGenJobProgress, PageMetricsSnapshot } from '@dnd-booker/shared';
 
 /**
@@ -618,6 +619,7 @@ export function AiChatPanel({ projectId, editor, pageMetrics = null }: AiChatPan
       )}
 
       <div className="px-3 pt-3">
+        <ImprovementLoopPanel projectId={projectId} />
         <AgentRunPanel projectId={projectId} />
         <GenerationRunPanel projectId={projectId} />
       </div>

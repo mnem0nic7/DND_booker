@@ -4,6 +4,8 @@
 
 Use this workflow whenever an accepted code change should be carried through to a shippable state.
 
+Read `docs/architecture/current-state.md` first when the touched area spans multiple packages or when ownership is unclear.
+
 ## Default Flow
 
 1. inspect the touched code paths and confirm the runtime impact
@@ -22,12 +24,13 @@ Do not stop after code edits unless the user explicitly says not to ship.
 - default to `npm run verify:ship`
 - `npm run verify:ship` means:
   - `npm run verify`
-  - `npm run test --workspace=worker -- layout-visual-parity.test.ts`
+  - `npm run test --workspace=worker -- layout-visual-parity.test.ts generation-orchestrator.test.ts`
   - `npm run test:unit --workspace=client`
-  - `npm run test:server:local -- auth.test.ts ai-routes.test.ts ai-wizard.test.ts assets.test.ts templates.test.ts documents.v1.test.ts projects.v1.test.ts runs.v1.test.ts agent-runs.test.ts src/__tests__/exports.v1.test.ts src/__tests__/legacy-routes.test.ts src/__tests__/generation/canon.test.ts src/__tests__/generation/routes.test.ts`
+  - `npm run test:server:local -- auth.test.ts agent-model-routing.test.ts ai-routes.test.ts ai-wizard.test.ts assets.test.ts templates.test.ts documents.v1.test.ts projects.v1.test.ts runs.v1.test.ts agent-runs.test.ts src/__tests__/exports.v1.test.ts src/__tests__/legacy-routes.test.ts src/__tests__/generation/canon.test.ts src/__tests__/generation/routes.test.ts`
 - when `api/v1` routes validate responses against schemas with ISO timestamps, normalize transport DTOs before schema parsing instead of feeding raw Prisma rows directly into the validator
 - keep list endpoints on summary schemas and detail endpoints on detail schemas; summary payloads should never be parsed with full-detail contracts
 - when project lifecycle work changes, use `/api/v1/projects` plus the generated SDK; do not reintroduce runtime `/api/*` product routes
+- treat `/api/v1/openapi.json` plus the generated SDK as the transport source of truth for app-facing routes
 - active runtime AI/chat/wizard flows should use `/api/v1/ai/*` and `/api/v1/projects/:projectId/ai/*`
 - active runtime template and asset flows should use `/api/v1/templates`, `/api/v1/projects/:projectId/assets`, and `/api/v1/assets/:id`
 - keep aggregate project content saves on `PATCH /api/v1/projects/:projectId` and manual layout saves on `PATCH /api/v1/projects/:projectId/documents/:docId/layout`; do not reintroduce runtime writes against the old project/document content endpoints

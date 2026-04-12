@@ -6,6 +6,7 @@
     "generate:sdk": "npm run generate --workspace=sdk",
     "test:server:local": "bash ./scripts/run-server-vitest-with-local-services.sh",
     "smoke:cloudrun:v1": "node ./scripts/smoke-cloudrun-v1.mjs",
+    "smoke:cloudrun:improvement-loop": "node ./scripts/smoke-cloudrun-improvement-loop.mjs",
     "verify": "npm run generate --workspace=sdk && npm run build --workspace=shared && npm run build --workspace=sdk && npm run build --workspace=server && npm run build --workspace=worker && npm run build --workspace=client",
     "verify:ship": "npm run verify && npm run test --workspace=worker -- layout-visual-parity.test.ts generation-orchestrator.test.ts && npm run test:unit --workspace=client && npm run test:server:local -- auth.test.ts agent-model-routing.test.ts ai-routes.test.ts ai-wizard.test.ts assets.test.ts templates.test.ts documents.v1.test.ts projects.v1.test.ts runs.v1.test.ts agent-runs.test.ts src/__tests__/exports.v1.test.ts src/__tests__/legacy-routes.test.ts src/__tests__/generation/canon.test.ts src/__tests__/generation/routes.test.ts",
     "monitor:cloudrun:install": "bash ./scripts/install-cloudrun-monitoring.sh",

@@ -5,6 +5,7 @@ import { processExportJob } from './jobs/export.job.js';
 import { cleanupExportFiles } from './jobs/cleanup.job.js';
 import { processGenerationJob } from './jobs/generation-orchestrator.job.js';
 import { processAgentRun } from './jobs/agent-orchestrator.job.js';
+import { processImprovementLoop } from './jobs/improvement-loop-orchestrator.job.js';
 import { resolveWorkerConcurrency, resolveWorkerTiming } from './runtime-config.js';
 import { createQueueBacklogInspector, startRuntimeAuditLoop } from './runtime-audit.js';
 
@@ -35,6 +36,7 @@ const EXPORT_WORKER_CONCURRENCY = resolveWorkerConcurrency('export', BASE_WORKER
 const CLEANUP_WORKER_CONCURRENCY = resolveWorkerConcurrency('cleanup', BASE_WORKER_CONCURRENCY);
 const GENERATION_WORKER_CONCURRENCY = resolveWorkerConcurrency('generation', BASE_WORKER_CONCURRENCY);
 const AGENT_WORKER_CONCURRENCY = resolveWorkerConcurrency('agent', BASE_WORKER_CONCURRENCY);
+const IMPROVEMENT_LOOP_WORKER_CONCURRENCY = resolveWorkerConcurrency('agent', BASE_WORKER_CONCURRENCY);
 
 const worker = new Worker('export', processExportJob, {
   connection: connection as unknown as ConnectionOptions,
@@ -71,6 +73,17 @@ const agentWorker = new Worker('agent', processAgentRun, {
   maxStalledCount: 2,
 });
 const agentQueue = new Queue('agent', {
+  connection: connection as unknown as ConnectionOptions,
+});
+
+const improvementLoopWorker = new Worker('improvement-loop', processImprovementLoop, {
+  connection: connection as unknown as ConnectionOptions,
+  concurrency: IMPROVEMENT_LOOP_WORKER_CONCURRENCY,
+  lockDuration: LONG_RUNNING_JOB_LOCK_MS,
+  stalledInterval: STALLED_CHECK_INTERVAL_MS,
+  maxStalledCount: 2,
+});
+const improvementLoopQueue = new Queue('improvement-loop', {
   connection: connection as unknown as ConnectionOptions,
 });
 
@@ -113,6 +126,9 @@ generationWorker.on('error', (err) => console.error('[Generation Worker] Error:'
 agentWorker.on('completed', (job) => console.log(`Agent job ${job.id} completed`));
 agentWorker.on('failed', (job, err) => console.error(`[worker.agent] job ${job?.id} failed:`, formatWorkerErrorMessage(err, 'Agent worker job failed.')));
 agentWorker.on('error', (err) => console.error('[Agent Worker] Error:', formatWorkerErrorMessage(err, 'Agent worker error.')));
+improvementLoopWorker.on('completed', (job) => console.log(`Improvement loop job ${job.id} completed`));
+improvementLoopWorker.on('failed', (job, err) => console.error(`[worker.improvement-loop] job ${job?.id} failed:`, formatWorkerErrorMessage(err, 'Improvement loop worker job failed.')));
+improvementLoopWorker.on('error', (err) => console.error('[Improvement Loop Worker] Error:', formatWorkerErrorMessage(err, 'Improvement loop worker error.')));
 
 const stopRuntimeAudit = startRuntimeAuditLoop(
   undefined,
@@ -147,10 +163,12 @@ async function shutdown() {
       });
     });
     await agentWorker.close();
+    await improvementLoopWorker.close();
     await generationWorker.close();
     await worker.close();
     await cleanupWorker.close();
     await agentQueue.close();
+    await improvementLoopQueue.close();
     await generationQueue.close();
     await exportQueue.close();
     await cleanupQueue.close();
@@ -170,4 +188,4 @@ if (healthServer) {
   });
 }
 
-console.log('Workers running (export + generation + agent)...');
+console.log('Workers running (export + generation + agent + improvement-loop)...');

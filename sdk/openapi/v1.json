@@ -1703,6 +1703,429 @@
         ]
       }
     },
+    "/api/v1/projects/{projectId}/github-repo-binding": {
+      "get": {
+        "operationId": "getProjectGitHubRepoBinding",
+        "summary": "Get the GitHub repo binding for a project.",
+        "tags": [
+          "projects"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "projectId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "repositoryFullName": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "installationId": {
+                      "type": "integer",
+                      "exclusiveMinimum": true,
+                      "minimum": 0
+                    },
+                    "defaultBranch": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "pathAllowlist": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "engineeringAutomationEnabled": {
+                      "type": "boolean"
+                    },
+                    "lastValidatedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "nullable": true
+                    },
+                    "lastValidationStatus": {
+                      "type": "string",
+                      "enum": [
+                        "unconfigured",
+                        "invalid",
+                        "valid"
+                      ]
+                    },
+                    "lastValidationMessage": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "projectId",
+                    "repositoryFullName",
+                    "installationId",
+                    "defaultBranch",
+                    "pathAllowlist",
+                    "engineeringAutomationEnabled",
+                    "lastValidatedAt",
+                    "lastValidationStatus",
+                    "lastValidationMessage",
+                    "createdAt",
+                    "updatedAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer"
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "instance": {
+                      "type": "string"
+                    },
+                    "errors": {
+                      "type": "object",
+                      "additionalProperties": {}
+                    }
+                  },
+                  "required": [
+                    "title",
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      },
+      "post": {
+        "operationId": "upsertProjectGitHubRepoBinding",
+        "summary": "Create or update the GitHub repo binding for a project.",
+        "tags": [
+          "projects"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "projectId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "repositoryFullName": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "installationId": {
+                      "type": "integer",
+                      "exclusiveMinimum": true,
+                      "minimum": 0
+                    },
+                    "defaultBranch": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "pathAllowlist": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "engineeringAutomationEnabled": {
+                      "type": "boolean"
+                    },
+                    "lastValidatedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "nullable": true
+                    },
+                    "lastValidationStatus": {
+                      "type": "string",
+                      "enum": [
+                        "unconfigured",
+                        "invalid",
+                        "valid"
+                      ]
+                    },
+                    "lastValidationMessage": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "projectId",
+                    "repositoryFullName",
+                    "installationId",
+                    "defaultBranch",
+                    "pathAllowlist",
+                    "engineeringAutomationEnabled",
+                    "lastValidatedAt",
+                    "lastValidationStatus",
+                    "lastValidationMessage",
+                    "createdAt",
+                    "updatedAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer"
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "instance": {
+                      "type": "string"
+                    },
+                    "errors": {
+                      "type": "object",
+                      "additionalProperties": {}
+                    }
+                  },
+                  "required": [
+                    "title",
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "repositoryFullName": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "installationId": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "minimum": 0
+                  },
+                  "defaultBranch": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "pathAllowlist": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "maxItems": 64
+                  },
+                  "engineeringAutomationEnabled": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "repositoryFullName",
+                  "installationId",
+                  "defaultBranch"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{projectId}/github-repo-binding/validate": {
+      "post": {
+        "operationId": "validateProjectGitHubRepoBinding",
+        "summary": "Validate the configured GitHub repo binding for a project.",
+        "tags": [
+          "projects"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "unconfigured",
+                        "invalid",
+                        "valid"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "repositoryFullName": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "defaultBranch": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "checkedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "message",
+                    "repositoryFullName",
+                    "defaultBranch",
+                    "checkedAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer"
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "instance": {
+                      "type": "string"
+                    },
+                    "errors": {
+                      "type": "object",
+                      "additionalProperties": {}
+                    }
+                  },
+                  "required": [
+                    "title",
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
     "/api/v1/projects/{projectId}/documents": {
       "get": {
         "operationId": "listDocuments",
@@ -14552,6 +14975,4510 @@
           },
           {
             "name": "runId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/improvement-loops": {
+      "post": {
+        "operationId": "createImprovementLoopAndProject",
+        "summary": "Create a campaign project and start an improvement loop.",
+        "tags": [
+          "improvementLoops"
+        ],
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "projectId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "userId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "mode": {
+                      "type": "string",
+                      "enum": [
+                        "current_project",
+                        "create_campaign"
+                      ]
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "queued",
+                        "bootstrapping_project",
+                        "creator",
+                        "designer",
+                        "editor",
+                        "engineering",
+                        "completed",
+                        "failed",
+                        "paused",
+                        "cancelled"
+                      ]
+                    },
+                    "currentStage": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "progressPercent": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 100
+                    },
+                    "input": {
+                      "type": "object",
+                      "properties": {
+                        "mode": {
+                          "type": "string",
+                          "enum": [
+                            "current_project",
+                            "create_campaign"
+                          ]
+                        },
+                        "prompt": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "objective": {
+                          "type": "string"
+                        },
+                        "projectTitle": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "generationMode": {
+                          "type": "string",
+                          "enum": [
+                            "one_shot",
+                            "module",
+                            "campaign",
+                            "sourcebook"
+                          ]
+                        },
+                        "generationQuality": {
+                          "type": "string",
+                          "enum": [
+                            "quick",
+                            "polished"
+                          ]
+                        },
+                        "agentMode": {
+                          "type": "string",
+                          "enum": [
+                            "background_producer",
+                            "persistent_editor"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "mode",
+                        "prompt",
+                        "objective",
+                        "projectTitle",
+                        "generationMode",
+                        "generationQuality",
+                        "agentMode"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "linkedGenerationRunId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "nullable": true
+                    },
+                    "linkedAgentRunId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "nullable": true
+                    },
+                    "creatorReport": {
+                      "type": "object",
+                      "properties": {
+                        "mode": {
+                          "type": "string",
+                          "enum": [
+                            "generated_campaign",
+                            "synthesized_existing_project"
+                          ]
+                        },
+                        "summary": {
+                          "type": "string"
+                        },
+                        "prompt": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "substantialContentDetected": {
+                          "type": "boolean"
+                        },
+                        "linkedGenerationRunId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "nullable": true
+                        },
+                        "notes": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "mode",
+                        "summary",
+                        "prompt",
+                        "substantialContentDetected",
+                        "linkedGenerationRunId",
+                        "notes"
+                      ],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "designerUxNotes": {
+                      "type": "object",
+                      "properties": {
+                        "summary": {
+                          "type": "string"
+                        },
+                        "observations": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "frictionPoints": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "recommendations": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "summary",
+                        "observations",
+                        "frictionPoints",
+                        "recommendations"
+                      ],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "editorFinalReport": {
+                      "type": "object",
+                      "properties": {
+                        "overallScore": {
+                          "type": "number"
+                        },
+                        "recommendation": {
+                          "type": "string",
+                          "enum": [
+                            "ready",
+                            "needs_revision",
+                            "blocked"
+                          ]
+                        },
+                        "summary": {
+                          "type": "string"
+                        },
+                        "strengths": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "issues": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "latestScorecard": {
+                          "type": "object",
+                          "properties": {
+                            "overallScore": {
+                              "type": "number"
+                            },
+                            "exportScore": {
+                              "type": "number",
+                              "nullable": true
+                            },
+                            "blockingFindingCount": {
+                              "type": "integer"
+                            },
+                            "warningFindingCount": {
+                              "type": "integer"
+                            },
+                            "utilityDensityAverage": {
+                              "type": "number",
+                              "nullable": true
+                            },
+                            "sparsePageCount": {
+                              "type": "integer"
+                            },
+                            "thinRandomTableCount": {
+                              "type": "integer"
+                            },
+                            "lowUtilityDensityCount": {
+                              "type": "integer"
+                            },
+                            "suspiciousStatBlockCount": {
+                              "type": "integer"
+                            },
+                            "generatedAt": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "summary": {
+                              "type": "string"
+                            },
+                            "latestExportJobId": {
+                              "type": "string",
+                              "format": "uuid",
+                              "nullable": true
+                            }
+                          },
+                          "required": [
+                            "overallScore",
+                            "exportScore",
+                            "blockingFindingCount",
+                            "warningFindingCount",
+                            "utilityDensityAverage",
+                            "sparsePageCount",
+                            "thinRandomTableCount",
+                            "lowUtilityDensityCount",
+                            "suspiciousStatBlockCount",
+                            "generatedAt",
+                            "summary",
+                            "latestExportJobId"
+                          ],
+                          "additionalProperties": false,
+                          "nullable": true
+                        },
+                        "critiqueBacklog": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "code": {
+                                "type": "string"
+                              },
+                              "title": {
+                                "type": "string"
+                              },
+                              "detail": {
+                                "type": "string"
+                              },
+                              "severity": {
+                                "type": "string",
+                                "enum": [
+                                  "info",
+                                  "warning",
+                                  "error"
+                                ]
+                              },
+                              "priority": {
+                                "type": "number"
+                              },
+                              "targetTitle": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "page": {
+                                "type": "integer",
+                                "nullable": true
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "code",
+                              "title",
+                              "detail",
+                              "severity",
+                              "priority",
+                              "targetTitle",
+                              "page"
+                            ],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": [
+                        "overallScore",
+                        "recommendation",
+                        "summary",
+                        "strengths",
+                        "issues",
+                        "latestScorecard",
+                        "critiqueBacklog"
+                      ],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "engineeringReport": {
+                      "type": "object",
+                      "properties": {
+                        "summary": {
+                          "type": "string"
+                        },
+                        "repoObservations": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "improvements": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "title": {
+                                "type": "string"
+                              },
+                              "priority": {
+                                "type": "string",
+                                "enum": [
+                                  "high",
+                                  "medium",
+                                  "low"
+                                ]
+                              },
+                              "rationale": {
+                                "type": "string"
+                              },
+                              "affectedPaths": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "proposedChanges": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "autoApplyEligible": {
+                                "type": "boolean"
+                              },
+                              "deferredReason": {
+                                "type": "string",
+                                "nullable": true
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "title",
+                              "priority",
+                              "rationale",
+                              "affectedPaths",
+                              "proposedChanges",
+                              "autoApplyEligible",
+                              "deferredReason"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "appliedCount": {
+                          "type": "integer"
+                        },
+                        "deferredCount": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "summary",
+                        "repoObservations",
+                        "improvements",
+                        "appliedCount",
+                        "deferredCount"
+                      ],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "engineeringApplyResult": {
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "applied",
+                            "partial",
+                            "skipped",
+                            "failed"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "branchName": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "baseBranch": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "headSha": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "pullRequestNumber": {
+                          "type": "integer",
+                          "nullable": true
+                        },
+                        "pullRequestUrl": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "appliedPaths": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "deferredPaths": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "status",
+                        "message",
+                        "branchName",
+                        "baseBranch",
+                        "headSha",
+                        "pullRequestNumber",
+                        "pullRequestUrl",
+                        "appliedPaths",
+                        "deferredPaths"
+                      ],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "githubBranchName": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "githubBaseBranch": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "githubHeadSha": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "githubPullRequestNumber": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "githubPullRequestUrl": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "failureReason": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "graphThreadId": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "graphCheckpointKey": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "graphStateJson": {
+                      "type": "object",
+                      "additionalProperties": {},
+                      "nullable": true
+                    },
+                    "resumeToken": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "startedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "nullable": true
+                    },
+                    "completedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "projectId",
+                    "userId",
+                    "mode",
+                    "status",
+                    "currentStage",
+                    "progressPercent",
+                    "input",
+                    "linkedGenerationRunId",
+                    "linkedAgentRunId",
+                    "creatorReport",
+                    "designerUxNotes",
+                    "editorFinalReport",
+                    "engineeringReport",
+                    "engineeringApplyResult",
+                    "githubBranchName",
+                    "githubBaseBranch",
+                    "githubHeadSha",
+                    "githubPullRequestNumber",
+                    "githubPullRequestUrl",
+                    "failureReason",
+                    "createdAt",
+                    "updatedAt",
+                    "startedAt",
+                    "completedAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer"
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "instance": {
+                      "type": "string"
+                    },
+                    "errors": {
+                      "type": "object",
+                      "additionalProperties": {}
+                    }
+                  },
+                  "required": [
+                    "title",
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "prompt": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 5000
+                  },
+                  "objective": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 5000
+                  },
+                  "generationMode": {
+                    "type": "string",
+                    "enum": [
+                      "one_shot",
+                      "module",
+                      "campaign",
+                      "sourcebook"
+                    ]
+                  },
+                  "generationQuality": {
+                    "type": "string",
+                    "enum": [
+                      "quick",
+                      "polished"
+                    ]
+                  },
+                  "projectTitle": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "repoBinding": {
+                    "type": "object",
+                    "properties": {
+                      "repositoryFullName": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "installationId": {
+                        "type": "integer",
+                        "exclusiveMinimum": true,
+                        "minimum": 0
+                      },
+                      "defaultBranch": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "pathAllowlist": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "maxItems": 64
+                      },
+                      "engineeringAutomationEnabled": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "repositoryFullName",
+                      "installationId",
+                      "defaultBranch"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "projectTitle",
+                  "repoBinding"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{projectId}/improvement-loops": {
+      "post": {
+        "operationId": "createImprovementLoop",
+        "summary": "Start an improvement loop for an existing project.",
+        "tags": [
+          "improvementLoops"
+        ],
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "projectId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "userId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "mode": {
+                      "type": "string",
+                      "enum": [
+                        "current_project",
+                        "create_campaign"
+                      ]
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "queued",
+                        "bootstrapping_project",
+                        "creator",
+                        "designer",
+                        "editor",
+                        "engineering",
+                        "completed",
+                        "failed",
+                        "paused",
+                        "cancelled"
+                      ]
+                    },
+                    "currentStage": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "progressPercent": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 100
+                    },
+                    "input": {
+                      "type": "object",
+                      "properties": {
+                        "mode": {
+                          "type": "string",
+                          "enum": [
+                            "current_project",
+                            "create_campaign"
+                          ]
+                        },
+                        "prompt": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "objective": {
+                          "type": "string"
+                        },
+                        "projectTitle": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "generationMode": {
+                          "type": "string",
+                          "enum": [
+                            "one_shot",
+                            "module",
+                            "campaign",
+                            "sourcebook"
+                          ]
+                        },
+                        "generationQuality": {
+                          "type": "string",
+                          "enum": [
+                            "quick",
+                            "polished"
+                          ]
+                        },
+                        "agentMode": {
+                          "type": "string",
+                          "enum": [
+                            "background_producer",
+                            "persistent_editor"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "mode",
+                        "prompt",
+                        "objective",
+                        "projectTitle",
+                        "generationMode",
+                        "generationQuality",
+                        "agentMode"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "linkedGenerationRunId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "nullable": true
+                    },
+                    "linkedAgentRunId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "nullable": true
+                    },
+                    "creatorReport": {
+                      "type": "object",
+                      "properties": {
+                        "mode": {
+                          "type": "string",
+                          "enum": [
+                            "generated_campaign",
+                            "synthesized_existing_project"
+                          ]
+                        },
+                        "summary": {
+                          "type": "string"
+                        },
+                        "prompt": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "substantialContentDetected": {
+                          "type": "boolean"
+                        },
+                        "linkedGenerationRunId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "nullable": true
+                        },
+                        "notes": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "mode",
+                        "summary",
+                        "prompt",
+                        "substantialContentDetected",
+                        "linkedGenerationRunId",
+                        "notes"
+                      ],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "designerUxNotes": {
+                      "type": "object",
+                      "properties": {
+                        "summary": {
+                          "type": "string"
+                        },
+                        "observations": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "frictionPoints": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "recommendations": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "summary",
+                        "observations",
+                        "frictionPoints",
+                        "recommendations"
+                      ],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "editorFinalReport": {
+                      "type": "object",
+                      "properties": {
+                        "overallScore": {
+                          "type": "number"
+                        },
+                        "recommendation": {
+                          "type": "string",
+                          "enum": [
+                            "ready",
+                            "needs_revision",
+                            "blocked"
+                          ]
+                        },
+                        "summary": {
+                          "type": "string"
+                        },
+                        "strengths": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "issues": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "latestScorecard": {
+                          "type": "object",
+                          "properties": {
+                            "overallScore": {
+                              "type": "number"
+                            },
+                            "exportScore": {
+                              "type": "number",
+                              "nullable": true
+                            },
+                            "blockingFindingCount": {
+                              "type": "integer"
+                            },
+                            "warningFindingCount": {
+                              "type": "integer"
+                            },
+                            "utilityDensityAverage": {
+                              "type": "number",
+                              "nullable": true
+                            },
+                            "sparsePageCount": {
+                              "type": "integer"
+                            },
+                            "thinRandomTableCount": {
+                              "type": "integer"
+                            },
+                            "lowUtilityDensityCount": {
+                              "type": "integer"
+                            },
+                            "suspiciousStatBlockCount": {
+                              "type": "integer"
+                            },
+                            "generatedAt": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "summary": {
+                              "type": "string"
+                            },
+                            "latestExportJobId": {
+                              "type": "string",
+                              "format": "uuid",
+                              "nullable": true
+                            }
+                          },
+                          "required": [
+                            "overallScore",
+                            "exportScore",
+                            "blockingFindingCount",
+                            "warningFindingCount",
+                            "utilityDensityAverage",
+                            "sparsePageCount",
+                            "thinRandomTableCount",
+                            "lowUtilityDensityCount",
+                            "suspiciousStatBlockCount",
+                            "generatedAt",
+                            "summary",
+                            "latestExportJobId"
+                          ],
+                          "additionalProperties": false,
+                          "nullable": true
+                        },
+                        "critiqueBacklog": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "code": {
+                                "type": "string"
+                              },
+                              "title": {
+                                "type": "string"
+                              },
+                              "detail": {
+                                "type": "string"
+                              },
+                              "severity": {
+                                "type": "string",
+                                "enum": [
+                                  "info",
+                                  "warning",
+                                  "error"
+                                ]
+                              },
+                              "priority": {
+                                "type": "number"
+                              },
+                              "targetTitle": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "page": {
+                                "type": "integer",
+                                "nullable": true
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "code",
+                              "title",
+                              "detail",
+                              "severity",
+                              "priority",
+                              "targetTitle",
+                              "page"
+                            ],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": [
+                        "overallScore",
+                        "recommendation",
+                        "summary",
+                        "strengths",
+                        "issues",
+                        "latestScorecard",
+                        "critiqueBacklog"
+                      ],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "engineeringReport": {
+                      "type": "object",
+                      "properties": {
+                        "summary": {
+                          "type": "string"
+                        },
+                        "repoObservations": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "improvements": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "title": {
+                                "type": "string"
+                              },
+                              "priority": {
+                                "type": "string",
+                                "enum": [
+                                  "high",
+                                  "medium",
+                                  "low"
+                                ]
+                              },
+                              "rationale": {
+                                "type": "string"
+                              },
+                              "affectedPaths": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "proposedChanges": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "autoApplyEligible": {
+                                "type": "boolean"
+                              },
+                              "deferredReason": {
+                                "type": "string",
+                                "nullable": true
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "title",
+                              "priority",
+                              "rationale",
+                              "affectedPaths",
+                              "proposedChanges",
+                              "autoApplyEligible",
+                              "deferredReason"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "appliedCount": {
+                          "type": "integer"
+                        },
+                        "deferredCount": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "summary",
+                        "repoObservations",
+                        "improvements",
+                        "appliedCount",
+                        "deferredCount"
+                      ],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "engineeringApplyResult": {
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "applied",
+                            "partial",
+                            "skipped",
+                            "failed"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "branchName": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "baseBranch": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "headSha": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "pullRequestNumber": {
+                          "type": "integer",
+                          "nullable": true
+                        },
+                        "pullRequestUrl": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "appliedPaths": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "deferredPaths": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "status",
+                        "message",
+                        "branchName",
+                        "baseBranch",
+                        "headSha",
+                        "pullRequestNumber",
+                        "pullRequestUrl",
+                        "appliedPaths",
+                        "deferredPaths"
+                      ],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "githubBranchName": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "githubBaseBranch": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "githubHeadSha": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "githubPullRequestNumber": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "githubPullRequestUrl": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "failureReason": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "graphThreadId": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "graphCheckpointKey": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "graphStateJson": {
+                      "type": "object",
+                      "additionalProperties": {},
+                      "nullable": true
+                    },
+                    "resumeToken": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "startedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "nullable": true
+                    },
+                    "completedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "projectId",
+                    "userId",
+                    "mode",
+                    "status",
+                    "currentStage",
+                    "progressPercent",
+                    "input",
+                    "linkedGenerationRunId",
+                    "linkedAgentRunId",
+                    "creatorReport",
+                    "designerUxNotes",
+                    "editorFinalReport",
+                    "engineeringReport",
+                    "engineeringApplyResult",
+                    "githubBranchName",
+                    "githubBaseBranch",
+                    "githubHeadSha",
+                    "githubPullRequestNumber",
+                    "githubPullRequestUrl",
+                    "failureReason",
+                    "createdAt",
+                    "updatedAt",
+                    "startedAt",
+                    "completedAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer"
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "instance": {
+                      "type": "string"
+                    },
+                    "errors": {
+                      "type": "object",
+                      "additionalProperties": {}
+                    }
+                  },
+                  "required": [
+                    "title",
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "prompt": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 5000
+                  },
+                  "objective": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 5000
+                  },
+                  "generationMode": {
+                    "type": "string",
+                    "enum": [
+                      "one_shot",
+                      "module",
+                      "campaign",
+                      "sourcebook"
+                    ]
+                  },
+                  "generationQuality": {
+                    "type": "string",
+                    "enum": [
+                      "quick",
+                      "polished"
+                    ]
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "operationId": "listImprovementLoops",
+        "summary": "List improvement loops for a project.",
+        "tags": [
+          "improvementLoops"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "projectId": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "mode": {
+                        "type": "string",
+                        "enum": [
+                          "current_project",
+                          "create_campaign"
+                        ]
+                      },
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "queued",
+                          "bootstrapping_project",
+                          "creator",
+                          "designer",
+                          "editor",
+                          "engineering",
+                          "completed",
+                          "failed",
+                          "paused",
+                          "cancelled"
+                        ]
+                      },
+                      "currentStage": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "progressPercent": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 100
+                      },
+                      "linkedGenerationRunId": {
+                        "type": "string",
+                        "format": "uuid",
+                        "nullable": true
+                      },
+                      "linkedAgentRunId": {
+                        "type": "string",
+                        "format": "uuid",
+                        "nullable": true
+                      },
+                      "githubPullRequestNumber": {
+                        "type": "integer",
+                        "nullable": true
+                      },
+                      "githubPullRequestUrl": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "failureReason": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "graphThreadId": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "graphCheckpointKey": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "graphStateJson": {
+                        "type": "object",
+                        "additionalProperties": {},
+                        "nullable": true
+                      },
+                      "resumeToken": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "createdAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "updatedAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "projectId",
+                      "mode",
+                      "status",
+                      "currentStage",
+                      "progressPercent",
+                      "linkedGenerationRunId",
+                      "linkedAgentRunId",
+                      "githubPullRequestNumber",
+                      "githubPullRequestUrl",
+                      "failureReason",
+                      "createdAt",
+                      "updatedAt"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer"
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "instance": {
+                      "type": "string"
+                    },
+                    "errors": {
+                      "type": "object",
+                      "additionalProperties": {}
+                    }
+                  },
+                  "required": [
+                    "title",
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/projects/{projectId}/improvement-loops/{runId}": {
+      "get": {
+        "operationId": "getImprovementLoop",
+        "summary": "Get an improvement loop run.",
+        "tags": [
+          "improvementLoops"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "projectId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "userId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "mode": {
+                      "type": "string",
+                      "enum": [
+                        "current_project",
+                        "create_campaign"
+                      ]
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "queued",
+                        "bootstrapping_project",
+                        "creator",
+                        "designer",
+                        "editor",
+                        "engineering",
+                        "completed",
+                        "failed",
+                        "paused",
+                        "cancelled"
+                      ]
+                    },
+                    "currentStage": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "progressPercent": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 100
+                    },
+                    "input": {
+                      "type": "object",
+                      "properties": {
+                        "mode": {
+                          "type": "string",
+                          "enum": [
+                            "current_project",
+                            "create_campaign"
+                          ]
+                        },
+                        "prompt": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "objective": {
+                          "type": "string"
+                        },
+                        "projectTitle": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "generationMode": {
+                          "type": "string",
+                          "enum": [
+                            "one_shot",
+                            "module",
+                            "campaign",
+                            "sourcebook"
+                          ]
+                        },
+                        "generationQuality": {
+                          "type": "string",
+                          "enum": [
+                            "quick",
+                            "polished"
+                          ]
+                        },
+                        "agentMode": {
+                          "type": "string",
+                          "enum": [
+                            "background_producer",
+                            "persistent_editor"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "mode",
+                        "prompt",
+                        "objective",
+                        "projectTitle",
+                        "generationMode",
+                        "generationQuality",
+                        "agentMode"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "linkedGenerationRunId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "nullable": true
+                    },
+                    "linkedAgentRunId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "nullable": true
+                    },
+                    "creatorReport": {
+                      "type": "object",
+                      "properties": {
+                        "mode": {
+                          "type": "string",
+                          "enum": [
+                            "generated_campaign",
+                            "synthesized_existing_project"
+                          ]
+                        },
+                        "summary": {
+                          "type": "string"
+                        },
+                        "prompt": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "substantialContentDetected": {
+                          "type": "boolean"
+                        },
+                        "linkedGenerationRunId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "nullable": true
+                        },
+                        "notes": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "mode",
+                        "summary",
+                        "prompt",
+                        "substantialContentDetected",
+                        "linkedGenerationRunId",
+                        "notes"
+                      ],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "designerUxNotes": {
+                      "type": "object",
+                      "properties": {
+                        "summary": {
+                          "type": "string"
+                        },
+                        "observations": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "frictionPoints": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "recommendations": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "summary",
+                        "observations",
+                        "frictionPoints",
+                        "recommendations"
+                      ],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "editorFinalReport": {
+                      "type": "object",
+                      "properties": {
+                        "overallScore": {
+                          "type": "number"
+                        },
+                        "recommendation": {
+                          "type": "string",
+                          "enum": [
+                            "ready",
+                            "needs_revision",
+                            "blocked"
+                          ]
+                        },
+                        "summary": {
+                          "type": "string"
+                        },
+                        "strengths": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "issues": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "latestScorecard": {
+                          "type": "object",
+                          "properties": {
+                            "overallScore": {
+                              "type": "number"
+                            },
+                            "exportScore": {
+                              "type": "number",
+                              "nullable": true
+                            },
+                            "blockingFindingCount": {
+                              "type": "integer"
+                            },
+                            "warningFindingCount": {
+                              "type": "integer"
+                            },
+                            "utilityDensityAverage": {
+                              "type": "number",
+                              "nullable": true
+                            },
+                            "sparsePageCount": {
+                              "type": "integer"
+                            },
+                            "thinRandomTableCount": {
+                              "type": "integer"
+                            },
+                            "lowUtilityDensityCount": {
+                              "type": "integer"
+                            },
+                            "suspiciousStatBlockCount": {
+                              "type": "integer"
+                            },
+                            "generatedAt": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "summary": {
+                              "type": "string"
+                            },
+                            "latestExportJobId": {
+                              "type": "string",
+                              "format": "uuid",
+                              "nullable": true
+                            }
+                          },
+                          "required": [
+                            "overallScore",
+                            "exportScore",
+                            "blockingFindingCount",
+                            "warningFindingCount",
+                            "utilityDensityAverage",
+                            "sparsePageCount",
+                            "thinRandomTableCount",
+                            "lowUtilityDensityCount",
+                            "suspiciousStatBlockCount",
+                            "generatedAt",
+                            "summary",
+                            "latestExportJobId"
+                          ],
+                          "additionalProperties": false,
+                          "nullable": true
+                        },
+                        "critiqueBacklog": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "code": {
+                                "type": "string"
+                              },
+                              "title": {
+                                "type": "string"
+                              },
+                              "detail": {
+                                "type": "string"
+                              },
+                              "severity": {
+                                "type": "string",
+                                "enum": [
+                                  "info",
+                                  "warning",
+                                  "error"
+                                ]
+                              },
+                              "priority": {
+                                "type": "number"
+                              },
+                              "targetTitle": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "page": {
+                                "type": "integer",
+                                "nullable": true
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "code",
+                              "title",
+                              "detail",
+                              "severity",
+                              "priority",
+                              "targetTitle",
+                              "page"
+                            ],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": [
+                        "overallScore",
+                        "recommendation",
+                        "summary",
+                        "strengths",
+                        "issues",
+                        "latestScorecard",
+                        "critiqueBacklog"
+                      ],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "engineeringReport": {
+                      "type": "object",
+                      "properties": {
+                        "summary": {
+                          "type": "string"
+                        },
+                        "repoObservations": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "improvements": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "title": {
+                                "type": "string"
+                              },
+                              "priority": {
+                                "type": "string",
+                                "enum": [
+                                  "high",
+                                  "medium",
+                                  "low"
+                                ]
+                              },
+                              "rationale": {
+                                "type": "string"
+                              },
+                              "affectedPaths": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "proposedChanges": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "autoApplyEligible": {
+                                "type": "boolean"
+                              },
+                              "deferredReason": {
+                                "type": "string",
+                                "nullable": true
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "title",
+                              "priority",
+                              "rationale",
+                              "affectedPaths",
+                              "proposedChanges",
+                              "autoApplyEligible",
+                              "deferredReason"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "appliedCount": {
+                          "type": "integer"
+                        },
+                        "deferredCount": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "summary",
+                        "repoObservations",
+                        "improvements",
+                        "appliedCount",
+                        "deferredCount"
+                      ],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "engineeringApplyResult": {
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "applied",
+                            "partial",
+                            "skipped",
+                            "failed"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "branchName": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "baseBranch": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "headSha": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "pullRequestNumber": {
+                          "type": "integer",
+                          "nullable": true
+                        },
+                        "pullRequestUrl": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "appliedPaths": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "deferredPaths": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "status",
+                        "message",
+                        "branchName",
+                        "baseBranch",
+                        "headSha",
+                        "pullRequestNumber",
+                        "pullRequestUrl",
+                        "appliedPaths",
+                        "deferredPaths"
+                      ],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "githubBranchName": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "githubBaseBranch": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "githubHeadSha": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "githubPullRequestNumber": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "githubPullRequestUrl": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "failureReason": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "graphThreadId": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "graphCheckpointKey": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "graphStateJson": {
+                      "type": "object",
+                      "additionalProperties": {},
+                      "nullable": true
+                    },
+                    "resumeToken": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "startedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "nullable": true
+                    },
+                    "completedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "nullable": true
+                    },
+                    "artifactCount": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "projectId",
+                    "userId",
+                    "mode",
+                    "status",
+                    "currentStage",
+                    "progressPercent",
+                    "input",
+                    "linkedGenerationRunId",
+                    "linkedAgentRunId",
+                    "creatorReport",
+                    "designerUxNotes",
+                    "editorFinalReport",
+                    "engineeringReport",
+                    "engineeringApplyResult",
+                    "githubBranchName",
+                    "githubBaseBranch",
+                    "githubHeadSha",
+                    "githubPullRequestNumber",
+                    "githubPullRequestUrl",
+                    "failureReason",
+                    "createdAt",
+                    "updatedAt",
+                    "startedAt",
+                    "completedAt",
+                    "artifactCount"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer"
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "instance": {
+                      "type": "string"
+                    },
+                    "errors": {
+                      "type": "object",
+                      "additionalProperties": {}
+                    }
+                  },
+                  "required": [
+                    "title",
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "runId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/projects/{projectId}/improvement-loops/{runId}/pause": {
+      "post": {
+        "operationId": "pauseImprovementLoop",
+        "summary": "Pause an improvement loop.",
+        "tags": [
+          "improvementLoops"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "projectId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "userId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "mode": {
+                      "type": "string",
+                      "enum": [
+                        "current_project",
+                        "create_campaign"
+                      ]
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "queued",
+                        "bootstrapping_project",
+                        "creator",
+                        "designer",
+                        "editor",
+                        "engineering",
+                        "completed",
+                        "failed",
+                        "paused",
+                        "cancelled"
+                      ]
+                    },
+                    "currentStage": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "progressPercent": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 100
+                    },
+                    "input": {
+                      "type": "object",
+                      "properties": {
+                        "mode": {
+                          "type": "string",
+                          "enum": [
+                            "current_project",
+                            "create_campaign"
+                          ]
+                        },
+                        "prompt": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "objective": {
+                          "type": "string"
+                        },
+                        "projectTitle": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "generationMode": {
+                          "type": "string",
+                          "enum": [
+                            "one_shot",
+                            "module",
+                            "campaign",
+                            "sourcebook"
+                          ]
+                        },
+                        "generationQuality": {
+                          "type": "string",
+                          "enum": [
+                            "quick",
+                            "polished"
+                          ]
+                        },
+                        "agentMode": {
+                          "type": "string",
+                          "enum": [
+                            "background_producer",
+                            "persistent_editor"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "mode",
+                        "prompt",
+                        "objective",
+                        "projectTitle",
+                        "generationMode",
+                        "generationQuality",
+                        "agentMode"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "linkedGenerationRunId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "nullable": true
+                    },
+                    "linkedAgentRunId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "nullable": true
+                    },
+                    "creatorReport": {
+                      "type": "object",
+                      "properties": {
+                        "mode": {
+                          "type": "string",
+                          "enum": [
+                            "generated_campaign",
+                            "synthesized_existing_project"
+                          ]
+                        },
+                        "summary": {
+                          "type": "string"
+                        },
+                        "prompt": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "substantialContentDetected": {
+                          "type": "boolean"
+                        },
+                        "linkedGenerationRunId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "nullable": true
+                        },
+                        "notes": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "mode",
+                        "summary",
+                        "prompt",
+                        "substantialContentDetected",
+                        "linkedGenerationRunId",
+                        "notes"
+                      ],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "designerUxNotes": {
+                      "type": "object",
+                      "properties": {
+                        "summary": {
+                          "type": "string"
+                        },
+                        "observations": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "frictionPoints": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "recommendations": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "summary",
+                        "observations",
+                        "frictionPoints",
+                        "recommendations"
+                      ],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "editorFinalReport": {
+                      "type": "object",
+                      "properties": {
+                        "overallScore": {
+                          "type": "number"
+                        },
+                        "recommendation": {
+                          "type": "string",
+                          "enum": [
+                            "ready",
+                            "needs_revision",
+                            "blocked"
+                          ]
+                        },
+                        "summary": {
+                          "type": "string"
+                        },
+                        "strengths": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "issues": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "latestScorecard": {
+                          "type": "object",
+                          "properties": {
+                            "overallScore": {
+                              "type": "number"
+                            },
+                            "exportScore": {
+                              "type": "number",
+                              "nullable": true
+                            },
+                            "blockingFindingCount": {
+                              "type": "integer"
+                            },
+                            "warningFindingCount": {
+                              "type": "integer"
+                            },
+                            "utilityDensityAverage": {
+                              "type": "number",
+                              "nullable": true
+                            },
+                            "sparsePageCount": {
+                              "type": "integer"
+                            },
+                            "thinRandomTableCount": {
+                              "type": "integer"
+                            },
+                            "lowUtilityDensityCount": {
+                              "type": "integer"
+                            },
+                            "suspiciousStatBlockCount": {
+                              "type": "integer"
+                            },
+                            "generatedAt": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "summary": {
+                              "type": "string"
+                            },
+                            "latestExportJobId": {
+                              "type": "string",
+                              "format": "uuid",
+                              "nullable": true
+                            }
+                          },
+                          "required": [
+                            "overallScore",
+                            "exportScore",
+                            "blockingFindingCount",
+                            "warningFindingCount",
+                            "utilityDensityAverage",
+                            "sparsePageCount",
+                            "thinRandomTableCount",
+                            "lowUtilityDensityCount",
+                            "suspiciousStatBlockCount",
+                            "generatedAt",
+                            "summary",
+                            "latestExportJobId"
+                          ],
+                          "additionalProperties": false,
+                          "nullable": true
+                        },
+                        "critiqueBacklog": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "code": {
+                                "type": "string"
+                              },
+                              "title": {
+                                "type": "string"
+                              },
+                              "detail": {
+                                "type": "string"
+                              },
+                              "severity": {
+                                "type": "string",
+                                "enum": [
+                                  "info",
+                                  "warning",
+                                  "error"
+                                ]
+                              },
+                              "priority": {
+                                "type": "number"
+                              },
+                              "targetTitle": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "page": {
+                                "type": "integer",
+                                "nullable": true
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "code",
+                              "title",
+                              "detail",
+                              "severity",
+                              "priority",
+                              "targetTitle",
+                              "page"
+                            ],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": [
+                        "overallScore",
+                        "recommendation",
+                        "summary",
+                        "strengths",
+                        "issues",
+                        "latestScorecard",
+                        "critiqueBacklog"
+                      ],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "engineeringReport": {
+                      "type": "object",
+                      "properties": {
+                        "summary": {
+                          "type": "string"
+                        },
+                        "repoObservations": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "improvements": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "title": {
+                                "type": "string"
+                              },
+                              "priority": {
+                                "type": "string",
+                                "enum": [
+                                  "high",
+                                  "medium",
+                                  "low"
+                                ]
+                              },
+                              "rationale": {
+                                "type": "string"
+                              },
+                              "affectedPaths": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "proposedChanges": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "autoApplyEligible": {
+                                "type": "boolean"
+                              },
+                              "deferredReason": {
+                                "type": "string",
+                                "nullable": true
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "title",
+                              "priority",
+                              "rationale",
+                              "affectedPaths",
+                              "proposedChanges",
+                              "autoApplyEligible",
+                              "deferredReason"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "appliedCount": {
+                          "type": "integer"
+                        },
+                        "deferredCount": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "summary",
+                        "repoObservations",
+                        "improvements",
+                        "appliedCount",
+                        "deferredCount"
+                      ],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "engineeringApplyResult": {
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "applied",
+                            "partial",
+                            "skipped",
+                            "failed"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "branchName": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "baseBranch": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "headSha": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "pullRequestNumber": {
+                          "type": "integer",
+                          "nullable": true
+                        },
+                        "pullRequestUrl": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "appliedPaths": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "deferredPaths": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "status",
+                        "message",
+                        "branchName",
+                        "baseBranch",
+                        "headSha",
+                        "pullRequestNumber",
+                        "pullRequestUrl",
+                        "appliedPaths",
+                        "deferredPaths"
+                      ],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "githubBranchName": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "githubBaseBranch": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "githubHeadSha": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "githubPullRequestNumber": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "githubPullRequestUrl": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "failureReason": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "graphThreadId": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "graphCheckpointKey": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "graphStateJson": {
+                      "type": "object",
+                      "additionalProperties": {},
+                      "nullable": true
+                    },
+                    "resumeToken": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "startedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "nullable": true
+                    },
+                    "completedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "projectId",
+                    "userId",
+                    "mode",
+                    "status",
+                    "currentStage",
+                    "progressPercent",
+                    "input",
+                    "linkedGenerationRunId",
+                    "linkedAgentRunId",
+                    "creatorReport",
+                    "designerUxNotes",
+                    "editorFinalReport",
+                    "engineeringReport",
+                    "engineeringApplyResult",
+                    "githubBranchName",
+                    "githubBaseBranch",
+                    "githubHeadSha",
+                    "githubPullRequestNumber",
+                    "githubPullRequestUrl",
+                    "failureReason",
+                    "createdAt",
+                    "updatedAt",
+                    "startedAt",
+                    "completedAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer"
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "instance": {
+                      "type": "string"
+                    },
+                    "errors": {
+                      "type": "object",
+                      "additionalProperties": {}
+                    }
+                  },
+                  "required": [
+                    "title",
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "runId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/projects/{projectId}/improvement-loops/{runId}/resume": {
+      "post": {
+        "operationId": "resumeImprovementLoop",
+        "summary": "Resume a paused improvement loop.",
+        "tags": [
+          "improvementLoops"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "projectId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "userId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "mode": {
+                      "type": "string",
+                      "enum": [
+                        "current_project",
+                        "create_campaign"
+                      ]
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "queued",
+                        "bootstrapping_project",
+                        "creator",
+                        "designer",
+                        "editor",
+                        "engineering",
+                        "completed",
+                        "failed",
+                        "paused",
+                        "cancelled"
+                      ]
+                    },
+                    "currentStage": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "progressPercent": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 100
+                    },
+                    "input": {
+                      "type": "object",
+                      "properties": {
+                        "mode": {
+                          "type": "string",
+                          "enum": [
+                            "current_project",
+                            "create_campaign"
+                          ]
+                        },
+                        "prompt": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "objective": {
+                          "type": "string"
+                        },
+                        "projectTitle": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "generationMode": {
+                          "type": "string",
+                          "enum": [
+                            "one_shot",
+                            "module",
+                            "campaign",
+                            "sourcebook"
+                          ]
+                        },
+                        "generationQuality": {
+                          "type": "string",
+                          "enum": [
+                            "quick",
+                            "polished"
+                          ]
+                        },
+                        "agentMode": {
+                          "type": "string",
+                          "enum": [
+                            "background_producer",
+                            "persistent_editor"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "mode",
+                        "prompt",
+                        "objective",
+                        "projectTitle",
+                        "generationMode",
+                        "generationQuality",
+                        "agentMode"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "linkedGenerationRunId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "nullable": true
+                    },
+                    "linkedAgentRunId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "nullable": true
+                    },
+                    "creatorReport": {
+                      "type": "object",
+                      "properties": {
+                        "mode": {
+                          "type": "string",
+                          "enum": [
+                            "generated_campaign",
+                            "synthesized_existing_project"
+                          ]
+                        },
+                        "summary": {
+                          "type": "string"
+                        },
+                        "prompt": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "substantialContentDetected": {
+                          "type": "boolean"
+                        },
+                        "linkedGenerationRunId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "nullable": true
+                        },
+                        "notes": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "mode",
+                        "summary",
+                        "prompt",
+                        "substantialContentDetected",
+                        "linkedGenerationRunId",
+                        "notes"
+                      ],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "designerUxNotes": {
+                      "type": "object",
+                      "properties": {
+                        "summary": {
+                          "type": "string"
+                        },
+                        "observations": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "frictionPoints": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "recommendations": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "summary",
+                        "observations",
+                        "frictionPoints",
+                        "recommendations"
+                      ],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "editorFinalReport": {
+                      "type": "object",
+                      "properties": {
+                        "overallScore": {
+                          "type": "number"
+                        },
+                        "recommendation": {
+                          "type": "string",
+                          "enum": [
+                            "ready",
+                            "needs_revision",
+                            "blocked"
+                          ]
+                        },
+                        "summary": {
+                          "type": "string"
+                        },
+                        "strengths": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "issues": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "latestScorecard": {
+                          "type": "object",
+                          "properties": {
+                            "overallScore": {
+                              "type": "number"
+                            },
+                            "exportScore": {
+                              "type": "number",
+                              "nullable": true
+                            },
+                            "blockingFindingCount": {
+                              "type": "integer"
+                            },
+                            "warningFindingCount": {
+                              "type": "integer"
+                            },
+                            "utilityDensityAverage": {
+                              "type": "number",
+                              "nullable": true
+                            },
+                            "sparsePageCount": {
+                              "type": "integer"
+                            },
+                            "thinRandomTableCount": {
+                              "type": "integer"
+                            },
+                            "lowUtilityDensityCount": {
+                              "type": "integer"
+                            },
+                            "suspiciousStatBlockCount": {
+                              "type": "integer"
+                            },
+                            "generatedAt": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "summary": {
+                              "type": "string"
+                            },
+                            "latestExportJobId": {
+                              "type": "string",
+                              "format": "uuid",
+                              "nullable": true
+                            }
+                          },
+                          "required": [
+                            "overallScore",
+                            "exportScore",
+                            "blockingFindingCount",
+                            "warningFindingCount",
+                            "utilityDensityAverage",
+                            "sparsePageCount",
+                            "thinRandomTableCount",
+                            "lowUtilityDensityCount",
+                            "suspiciousStatBlockCount",
+                            "generatedAt",
+                            "summary",
+                            "latestExportJobId"
+                          ],
+                          "additionalProperties": false,
+                          "nullable": true
+                        },
+                        "critiqueBacklog": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "code": {
+                                "type": "string"
+                              },
+                              "title": {
+                                "type": "string"
+                              },
+                              "detail": {
+                                "type": "string"
+                              },
+                              "severity": {
+                                "type": "string",
+                                "enum": [
+                                  "info",
+                                  "warning",
+                                  "error"
+                                ]
+                              },
+                              "priority": {
+                                "type": "number"
+                              },
+                              "targetTitle": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "page": {
+                                "type": "integer",
+                                "nullable": true
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "code",
+                              "title",
+                              "detail",
+                              "severity",
+                              "priority",
+                              "targetTitle",
+                              "page"
+                            ],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": [
+                        "overallScore",
+                        "recommendation",
+                        "summary",
+                        "strengths",
+                        "issues",
+                        "latestScorecard",
+                        "critiqueBacklog"
+                      ],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "engineeringReport": {
+                      "type": "object",
+                      "properties": {
+                        "summary": {
+                          "type": "string"
+                        },
+                        "repoObservations": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "improvements": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "title": {
+                                "type": "string"
+                              },
+                              "priority": {
+                                "type": "string",
+                                "enum": [
+                                  "high",
+                                  "medium",
+                                  "low"
+                                ]
+                              },
+                              "rationale": {
+                                "type": "string"
+                              },
+                              "affectedPaths": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "proposedChanges": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "autoApplyEligible": {
+                                "type": "boolean"
+                              },
+                              "deferredReason": {
+                                "type": "string",
+                                "nullable": true
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "title",
+                              "priority",
+                              "rationale",
+                              "affectedPaths",
+                              "proposedChanges",
+                              "autoApplyEligible",
+                              "deferredReason"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "appliedCount": {
+                          "type": "integer"
+                        },
+                        "deferredCount": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "summary",
+                        "repoObservations",
+                        "improvements",
+                        "appliedCount",
+                        "deferredCount"
+                      ],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "engineeringApplyResult": {
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "applied",
+                            "partial",
+                            "skipped",
+                            "failed"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "branchName": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "baseBranch": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "headSha": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "pullRequestNumber": {
+                          "type": "integer",
+                          "nullable": true
+                        },
+                        "pullRequestUrl": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "appliedPaths": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "deferredPaths": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "status",
+                        "message",
+                        "branchName",
+                        "baseBranch",
+                        "headSha",
+                        "pullRequestNumber",
+                        "pullRequestUrl",
+                        "appliedPaths",
+                        "deferredPaths"
+                      ],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "githubBranchName": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "githubBaseBranch": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "githubHeadSha": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "githubPullRequestNumber": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "githubPullRequestUrl": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "failureReason": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "graphThreadId": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "graphCheckpointKey": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "graphStateJson": {
+                      "type": "object",
+                      "additionalProperties": {},
+                      "nullable": true
+                    },
+                    "resumeToken": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "startedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "nullable": true
+                    },
+                    "completedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "projectId",
+                    "userId",
+                    "mode",
+                    "status",
+                    "currentStage",
+                    "progressPercent",
+                    "input",
+                    "linkedGenerationRunId",
+                    "linkedAgentRunId",
+                    "creatorReport",
+                    "designerUxNotes",
+                    "editorFinalReport",
+                    "engineeringReport",
+                    "engineeringApplyResult",
+                    "githubBranchName",
+                    "githubBaseBranch",
+                    "githubHeadSha",
+                    "githubPullRequestNumber",
+                    "githubPullRequestUrl",
+                    "failureReason",
+                    "createdAt",
+                    "updatedAt",
+                    "startedAt",
+                    "completedAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer"
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "instance": {
+                      "type": "string"
+                    },
+                    "errors": {
+                      "type": "object",
+                      "additionalProperties": {}
+                    }
+                  },
+                  "required": [
+                    "title",
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "runId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/projects/{projectId}/improvement-loops/{runId}/cancel": {
+      "post": {
+        "operationId": "cancelImprovementLoop",
+        "summary": "Cancel an improvement loop.",
+        "tags": [
+          "improvementLoops"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "projectId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "userId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "mode": {
+                      "type": "string",
+                      "enum": [
+                        "current_project",
+                        "create_campaign"
+                      ]
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "queued",
+                        "bootstrapping_project",
+                        "creator",
+                        "designer",
+                        "editor",
+                        "engineering",
+                        "completed",
+                        "failed",
+                        "paused",
+                        "cancelled"
+                      ]
+                    },
+                    "currentStage": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "progressPercent": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 100
+                    },
+                    "input": {
+                      "type": "object",
+                      "properties": {
+                        "mode": {
+                          "type": "string",
+                          "enum": [
+                            "current_project",
+                            "create_campaign"
+                          ]
+                        },
+                        "prompt": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "objective": {
+                          "type": "string"
+                        },
+                        "projectTitle": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "generationMode": {
+                          "type": "string",
+                          "enum": [
+                            "one_shot",
+                            "module",
+                            "campaign",
+                            "sourcebook"
+                          ]
+                        },
+                        "generationQuality": {
+                          "type": "string",
+                          "enum": [
+                            "quick",
+                            "polished"
+                          ]
+                        },
+                        "agentMode": {
+                          "type": "string",
+                          "enum": [
+                            "background_producer",
+                            "persistent_editor"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "mode",
+                        "prompt",
+                        "objective",
+                        "projectTitle",
+                        "generationMode",
+                        "generationQuality",
+                        "agentMode"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "linkedGenerationRunId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "nullable": true
+                    },
+                    "linkedAgentRunId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "nullable": true
+                    },
+                    "creatorReport": {
+                      "type": "object",
+                      "properties": {
+                        "mode": {
+                          "type": "string",
+                          "enum": [
+                            "generated_campaign",
+                            "synthesized_existing_project"
+                          ]
+                        },
+                        "summary": {
+                          "type": "string"
+                        },
+                        "prompt": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "substantialContentDetected": {
+                          "type": "boolean"
+                        },
+                        "linkedGenerationRunId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "nullable": true
+                        },
+                        "notes": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "mode",
+                        "summary",
+                        "prompt",
+                        "substantialContentDetected",
+                        "linkedGenerationRunId",
+                        "notes"
+                      ],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "designerUxNotes": {
+                      "type": "object",
+                      "properties": {
+                        "summary": {
+                          "type": "string"
+                        },
+                        "observations": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "frictionPoints": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "recommendations": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "summary",
+                        "observations",
+                        "frictionPoints",
+                        "recommendations"
+                      ],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "editorFinalReport": {
+                      "type": "object",
+                      "properties": {
+                        "overallScore": {
+                          "type": "number"
+                        },
+                        "recommendation": {
+                          "type": "string",
+                          "enum": [
+                            "ready",
+                            "needs_revision",
+                            "blocked"
+                          ]
+                        },
+                        "summary": {
+                          "type": "string"
+                        },
+                        "strengths": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "issues": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "latestScorecard": {
+                          "type": "object",
+                          "properties": {
+                            "overallScore": {
+                              "type": "number"
+                            },
+                            "exportScore": {
+                              "type": "number",
+                              "nullable": true
+                            },
+                            "blockingFindingCount": {
+                              "type": "integer"
+                            },
+                            "warningFindingCount": {
+                              "type": "integer"
+                            },
+                            "utilityDensityAverage": {
+                              "type": "number",
+                              "nullable": true
+                            },
+                            "sparsePageCount": {
+                              "type": "integer"
+                            },
+                            "thinRandomTableCount": {
+                              "type": "integer"
+                            },
+                            "lowUtilityDensityCount": {
+                              "type": "integer"
+                            },
+                            "suspiciousStatBlockCount": {
+                              "type": "integer"
+                            },
+                            "generatedAt": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "summary": {
+                              "type": "string"
+                            },
+                            "latestExportJobId": {
+                              "type": "string",
+                              "format": "uuid",
+                              "nullable": true
+                            }
+                          },
+                          "required": [
+                            "overallScore",
+                            "exportScore",
+                            "blockingFindingCount",
+                            "warningFindingCount",
+                            "utilityDensityAverage",
+                            "sparsePageCount",
+                            "thinRandomTableCount",
+                            "lowUtilityDensityCount",
+                            "suspiciousStatBlockCount",
+                            "generatedAt",
+                            "summary",
+                            "latestExportJobId"
+                          ],
+                          "additionalProperties": false,
+                          "nullable": true
+                        },
+                        "critiqueBacklog": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "code": {
+                                "type": "string"
+                              },
+                              "title": {
+                                "type": "string"
+                              },
+                              "detail": {
+                                "type": "string"
+                              },
+                              "severity": {
+                                "type": "string",
+                                "enum": [
+                                  "info",
+                                  "warning",
+                                  "error"
+                                ]
+                              },
+                              "priority": {
+                                "type": "number"
+                              },
+                              "targetTitle": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "page": {
+                                "type": "integer",
+                                "nullable": true
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "code",
+                              "title",
+                              "detail",
+                              "severity",
+                              "priority",
+                              "targetTitle",
+                              "page"
+                            ],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": [
+                        "overallScore",
+                        "recommendation",
+                        "summary",
+                        "strengths",
+                        "issues",
+                        "latestScorecard",
+                        "critiqueBacklog"
+                      ],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "engineeringReport": {
+                      "type": "object",
+                      "properties": {
+                        "summary": {
+                          "type": "string"
+                        },
+                        "repoObservations": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "improvements": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "title": {
+                                "type": "string"
+                              },
+                              "priority": {
+                                "type": "string",
+                                "enum": [
+                                  "high",
+                                  "medium",
+                                  "low"
+                                ]
+                              },
+                              "rationale": {
+                                "type": "string"
+                              },
+                              "affectedPaths": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "proposedChanges": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "autoApplyEligible": {
+                                "type": "boolean"
+                              },
+                              "deferredReason": {
+                                "type": "string",
+                                "nullable": true
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "title",
+                              "priority",
+                              "rationale",
+                              "affectedPaths",
+                              "proposedChanges",
+                              "autoApplyEligible",
+                              "deferredReason"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "appliedCount": {
+                          "type": "integer"
+                        },
+                        "deferredCount": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "summary",
+                        "repoObservations",
+                        "improvements",
+                        "appliedCount",
+                        "deferredCount"
+                      ],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "engineeringApplyResult": {
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "applied",
+                            "partial",
+                            "skipped",
+                            "failed"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "branchName": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "baseBranch": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "headSha": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "pullRequestNumber": {
+                          "type": "integer",
+                          "nullable": true
+                        },
+                        "pullRequestUrl": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "appliedPaths": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "deferredPaths": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "status",
+                        "message",
+                        "branchName",
+                        "baseBranch",
+                        "headSha",
+                        "pullRequestNumber",
+                        "pullRequestUrl",
+                        "appliedPaths",
+                        "deferredPaths"
+                      ],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "githubBranchName": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "githubBaseBranch": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "githubHeadSha": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "githubPullRequestNumber": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "githubPullRequestUrl": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "failureReason": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "graphThreadId": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "graphCheckpointKey": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "graphStateJson": {
+                      "type": "object",
+                      "additionalProperties": {},
+                      "nullable": true
+                    },
+                    "resumeToken": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "startedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "nullable": true
+                    },
+                    "completedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "projectId",
+                    "userId",
+                    "mode",
+                    "status",
+                    "currentStage",
+                    "progressPercent",
+                    "input",
+                    "linkedGenerationRunId",
+                    "linkedAgentRunId",
+                    "creatorReport",
+                    "designerUxNotes",
+                    "editorFinalReport",
+                    "engineeringReport",
+                    "engineeringApplyResult",
+                    "githubBranchName",
+                    "githubBaseBranch",
+                    "githubHeadSha",
+                    "githubPullRequestNumber",
+                    "githubPullRequestUrl",
+                    "failureReason",
+                    "createdAt",
+                    "updatedAt",
+                    "startedAt",
+                    "completedAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer"
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "instance": {
+                      "type": "string"
+                    },
+                    "errors": {
+                      "type": "object",
+                      "additionalProperties": {}
+                    }
+                  },
+                  "required": [
+                    "title",
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "runId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/projects/{projectId}/improvement-loops/{runId}/artifacts": {
+      "get": {
+        "operationId": "listImprovementLoopArtifacts",
+        "summary": "List loop-owned artifacts for an improvement loop.",
+        "tags": [
+          "improvementLoops"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "runId": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "projectId": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "artifactType": {
+                        "type": "string",
+                        "enum": [
+                          "creator_report",
+                          "designer_ux_notes",
+                          "editor_final_report",
+                          "engineering_report",
+                          "engineering_apply_result"
+                        ]
+                      },
+                      "artifactKey": {
+                        "type": "string"
+                      },
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "generated",
+                          "accepted",
+                          "failed"
+                        ]
+                      },
+                      "version": {
+                        "type": "integer"
+                      },
+                      "title": {
+                        "type": "string"
+                      },
+                      "summary": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "jsonContent": {
+                        "nullable": true
+                      },
+                      "markdownContent": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "metadata": {
+                        "nullable": true
+                      },
+                      "createdAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "updatedAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "runId",
+                      "projectId",
+                      "artifactType",
+                      "artifactKey",
+                      "status",
+                      "version",
+                      "title",
+                      "summary",
+                      "markdownContent",
+                      "createdAt",
+                      "updatedAt"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer"
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "instance": {
+                      "type": "string"
+                    },
+                    "errors": {
+                      "type": "object",
+                      "additionalProperties": {}
+                    }
+                  },
+                  "required": [
+                    "title",
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "runId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/projects/{projectId}/improvement-loops/{runId}/artifacts/{artifactId}": {
+      "get": {
+        "operationId": "getImprovementLoopArtifact",
+        "summary": "Get a loop-owned artifact for an improvement loop.",
+        "tags": [
+          "improvementLoops"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "runId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "projectId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "artifactType": {
+                      "type": "string",
+                      "enum": [
+                        "creator_report",
+                        "designer_ux_notes",
+                        "editor_final_report",
+                        "engineering_report",
+                        "engineering_apply_result"
+                      ]
+                    },
+                    "artifactKey": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "generated",
+                        "accepted",
+                        "failed"
+                      ]
+                    },
+                    "version": {
+                      "type": "integer"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "summary": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "jsonContent": {
+                      "nullable": true
+                    },
+                    "markdownContent": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "metadata": {
+                      "nullable": true
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "runId",
+                    "projectId",
+                    "artifactType",
+                    "artifactKey",
+                    "status",
+                    "version",
+                    "title",
+                    "summary",
+                    "markdownContent",
+                    "createdAt",
+                    "updatedAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer"
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "instance": {
+                      "type": "string"
+                    },
+                    "errors": {
+                      "type": "object",
+                      "additionalProperties": {}
+                    }
+                  },
+                  "required": [
+                    "title",
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "runId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "artifactId",
             "in": "path",
             "required": true,
             "schema": {
