@@ -4,7 +4,7 @@ import type {
   ProjectGitHubRepoBindingInput,
   ProjectGitHubRepoBindingValidation,
 } from '@dnd-booker/shared';
-import { getGitHubRepoInfo, isGitHubAppConfigured } from './github-app.service.js';
+import { getGitHubRepoInfo, getPublicGitHubRepoInfo, isGitHubAppConfigured } from './github-app.service.js';
 
 function serializeBinding(binding: any): ProjectGitHubRepoBinding {
   return {
@@ -106,52 +106,40 @@ export async function validateProjectGitHubRepoBinding(
     };
   }
 
-  if (!isGitHubAppConfigured()) {
-    await prisma.projectGitHubRepoBinding.update({
-      where: { projectId },
-      data: {
-        lastValidationStatus: 'invalid',
-        lastValidationMessage: 'GitHub App integration is not configured on the server.',
-        lastValidatedAt: new Date(),
-      },
-    });
-
-    return {
-      status: 'invalid',
-      message: 'GitHub App integration is not configured on the server.',
-      repositoryFullName: binding.repositoryFullName,
-      defaultBranch: binding.defaultBranch,
-      checkedAt,
-    };
-  }
-
   try {
-    const repoInfo = await getGitHubRepoInfo({
-      repositoryFullName: binding.repositoryFullName,
-      installationId: binding.installationId,
-      defaultBranch: binding.defaultBranch,
-    });
+    const repoInfo = !isGitHubAppConfigured() && !binding.engineeringAutomationEnabled
+      ? await getPublicGitHubRepoInfo(binding.repositoryFullName)
+      : await getGitHubRepoInfo({
+        repositoryFullName: binding.repositoryFullName,
+        installationId: binding.installationId,
+        defaultBranch: binding.defaultBranch,
+      });
 
     const normalizedDefaultBranch = binding.defaultBranch.trim() || repoInfo.defaultBranch;
+    const message = !isGitHubAppConfigured() && !binding.engineeringAutomationEnabled
+      ? `Validated GitHub repo binding against public repo ${binding.repositoryFullName} with engineering automation disabled.`
+      : `Validated GitHub repo binding against ${binding.repositoryFullName}.`;
     await prisma.projectGitHubRepoBinding.update({
       where: { projectId },
       data: {
         defaultBranch: normalizedDefaultBranch,
         lastValidationStatus: 'valid',
-        lastValidationMessage: `Validated GitHub repo binding against ${binding.repositoryFullName}.`,
+        lastValidationMessage: message,
         lastValidatedAt: new Date(),
       },
     });
 
     return {
       status: 'valid',
-      message: `Validated GitHub repo binding against ${binding.repositoryFullName}.`,
+      message,
       repositoryFullName: binding.repositoryFullName,
       defaultBranch: normalizedDefaultBranch,
       checkedAt,
     };
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'GitHub validation failed.';
+    const message = !isGitHubAppConfigured() && binding.engineeringAutomationEnabled
+      ? 'GitHub App integration is not configured on the server.'
+      : (error instanceof Error ? error.message : 'GitHub validation failed.');
     await prisma.projectGitHubRepoBinding.update({
       where: { projectId },
       data: {

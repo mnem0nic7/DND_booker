@@ -21,6 +21,7 @@ import {
 } from '../../services/project-github-repo-binding.service.js';
 import {
   getGitHubRepoInfo,
+  getPublicGitHubRepoInfo,
   isGitHubAppConfigured,
 } from '../../services/github-app.service.js';
 import {
@@ -107,19 +108,24 @@ v1ImprovementLoopRoutes.post(
       return;
     }
 
-    if (!isGitHubAppConfigured()) {
+    if (!isGitHubAppConfigured() && parsed.data.repoBinding.engineeringAutomationEnabled) {
       res.status(409).json({ error: 'GitHub App integration is not configured on the server.' });
       return;
     }
 
     try {
-      await getGitHubRepoInfo({
-        repositoryFullName: parsed.data.repoBinding.repositoryFullName,
-        installationId: parsed.data.repoBinding.installationId,
-        defaultBranch: parsed.data.repoBinding.defaultBranch,
-      });
+      if (!isGitHubAppConfigured() && !parsed.data.repoBinding.engineeringAutomationEnabled) {
+        await getPublicGitHubRepoInfo(parsed.data.repoBinding.repositoryFullName);
+      } else {
+        await getGitHubRepoInfo({
+          repositoryFullName: parsed.data.repoBinding.repositoryFullName,
+          installationId: parsed.data.repoBinding.installationId,
+          defaultBranch: parsed.data.repoBinding.defaultBranch,
+        });
+      }
     } catch (error) {
-      res.status(400).json({ error: error instanceof Error ? error.message : 'GitHub repo validation failed.' });
+      const message = error instanceof Error ? error.message : 'GitHub repo validation failed.';
+      res.status(400).json({ error: message });
       return;
     }
 

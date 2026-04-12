@@ -4,7 +4,13 @@ const baseUrl = (process.env.BASE_URL ?? process.env.SERVICE_URL ?? '').trim().r
 const email = process.env.SMOKE_TEST_EMAIL?.trim();
 const password = process.env.SMOKE_TEST_PASSWORD;
 const repositoryFullName = process.env.SMOKE_IMPROVEMENT_LOOP_REPOSITORY_FULL_NAME?.trim();
-const installationId = Number.parseInt(process.env.SMOKE_IMPROVEMENT_LOOP_INSTALLATION_ID ?? '', 10);
+const engineeringAutomationEnabled = !/^(0|false|no)$/i.test(
+  process.env.SMOKE_IMPROVEMENT_LOOP_ENGINEERING_AUTOMATION_ENABLED ?? 'true',
+);
+const installationId = Number.parseInt(
+  process.env.SMOKE_IMPROVEMENT_LOOP_INSTALLATION_ID ?? (engineeringAutomationEnabled ? '' : '1'),
+  10,
+);
 const defaultBranch = process.env.SMOKE_IMPROVEMENT_LOOP_DEFAULT_BRANCH?.trim() || 'main';
 const allowlist = (process.env.SMOKE_IMPROVEMENT_LOOP_ALLOWLIST?.trim() || 'docs/,README.md,CLAUDE.md')
   .split(',')
@@ -177,7 +183,7 @@ async function main() {
           installationId,
           defaultBranch,
           pathAllowlist: allowlist,
-          engineeringAutomationEnabled: true,
+          engineeringAutomationEnabled,
         },
       },
     }, 'create improvement loop and project');

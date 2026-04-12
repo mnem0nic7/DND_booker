@@ -268,7 +268,7 @@ export async function processImprovementLoop(job: Job<ImprovementLoopJobData>): 
         bootstrapping_project: async () => {
           await setStatus('bootstrapping_project', 5);
           const binding = await dependencies.getProjectGitHubRepoBinding(projectId, userId);
-          if (!binding || !binding.engineeringAutomationEnabled || binding.lastValidationStatus !== 'valid') {
+          if (!binding || binding.lastValidationStatus !== 'valid') {
             throw new Error('A valid GitHub repo binding is required before the improvement loop can start.');
           }
           return { nextNode: 'creator' };
@@ -512,7 +512,19 @@ export async function processImprovementLoop(job: Job<ImprovementLoopJobData>): 
 
           let engineeringApplyResult: EngineeringApplyResult | null = null;
           try {
-            if (applyPathEligible) {
+            if (!binding.engineeringAutomationEnabled) {
+              engineeringApplyResult = {
+                status: 'skipped',
+                message: 'Engineering auto-apply skipped because GitHub automation is disabled for this project binding.',
+                branchName: null,
+                baseBranch: binding.defaultBranch,
+                headSha: null,
+                pullRequestNumber: null,
+                pullRequestUrl: null,
+                appliedPaths: [],
+                deferredPaths: [reportFilePath],
+              };
+            } else if (applyPathEligible) {
               const branchName = `improvement-loop/${runId}`;
               await dependencies.ensureGitHubBranch({
                 repositoryFullName: binding.repositoryFullName,

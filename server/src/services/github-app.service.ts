@@ -74,6 +74,14 @@ function buildHeaders(token: string) {
   };
 }
 
+function buildPublicHeaders() {
+  return {
+    Accept: 'application/vnd.github+json',
+    'User-Agent': 'dnd-booker-improvement-loop',
+    'X-GitHub-Api-Version': GITHUB_API_VERSION,
+  };
+}
+
 function splitRepoFullName(repositoryFullName: string) {
   const [owner, repo] = repositoryFullName.split('/');
   if (!owner || !repo) {
@@ -141,6 +149,22 @@ export async function getGitHubRepoInfo(input: GitHubRepoRef): Promise<GitHubRep
     default_branch: string;
     html_url: string;
   }>(input.installationId, `/repos/${owner}/${repo}`);
+
+  return {
+    defaultBranch: data.default_branch,
+    htmlUrl: data.html_url,
+  };
+}
+
+export async function getPublicGitHubRepoInfo(repositoryFullName: string): Promise<GitHubRepoInfo> {
+  const { owner, repo } = splitRepoFullName(repositoryFullName);
+  const response = await fetch(`${GITHUB_API_BASE}/repos/${owner}/${repo}`, {
+    headers: buildPublicHeaders(),
+  });
+  const data = await parseResponse<{
+    default_branch: string;
+    html_url: string;
+  }>(response);
 
   return {
     defaultBranch: data.default_branch,

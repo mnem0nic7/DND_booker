@@ -7,6 +7,7 @@ import { prisma } from '../config/database.js';
 import { createImprovementLoopRun } from '../services/improvement-loop/run.service.js';
 import { createImprovementLoopArtifact } from '../services/improvement-loop/artifact.service.js';
 import * as githubAppService from '../services/github-app.service.js';
+import * as improvementLoopQueueService from '../services/improvement-loop/queue.service.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'test-secret';
 const uniqueSuffix = Date.now();
@@ -115,6 +116,44 @@ describe('Improvement loop API v1', () => {
       expect(res.status).toBe(409);
       expect(res.body.error).toContain('GitHub App integration');
     } finally {
+      configuredSpy.mockRestore();
+    }
+  });
+
+  it('allows create-and-run in report-only mode when the server GitHub App integration is unavailable', async () => {
+    const configuredSpy = vi.spyOn(githubAppService, 'isGitHubAppConfigured').mockReturnValue(false);
+    const publicRepoSpy = vi.spyOn(githubAppService, 'getPublicGitHubRepoInfo').mockResolvedValue({
+      defaultBranch: 'main',
+      htmlUrl: 'https://github.com/openai/dnd-booker',
+    });
+    const enqueueSpy = vi.spyOn(improvementLoopQueueService, 'enqueueImprovementLoopRun').mockResolvedValue(undefined);
+
+    try {
+      const res = await request(app)
+        .post('/api/v1/improvement-loops')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({
+          projectTitle: 'Fresh Loop Campaign Report Only',
+          prompt: 'Create a campaign and run the loop in report-only mode.',
+          objective: 'Run the four-stage improvement loop.',
+          generationMode: 'campaign',
+          generationQuality: 'polished',
+          repoBinding: {
+            repositoryFullName: 'openai/dnd-booker',
+            installationId: 1,
+            defaultBranch: 'main',
+            pathAllowlist: ['docs/'],
+            engineeringAutomationEnabled: false,
+          },
+        });
+
+      expect(res.status).toBe(201);
+      expect(res.body.mode).toBe('create_campaign');
+      expect(publicRepoSpy).toHaveBeenCalled();
+      expect(enqueueSpy).toHaveBeenCalledWith(res.body.id, userId, res.body.projectId);
+    } finally {
+      enqueueSpy.mockRestore();
+      publicRepoSpy.mockRestore();
       configuredSpy.mockRestore();
     }
   });
