@@ -51,7 +51,23 @@ inject_optional_cloudrun_envs() {
 
   OPTIONAL_GITHUB_APP_ENV="${optional_github_app_env}" \
   OPTIONAL_DEFAULT_ENGINEERING_INSTALLATION_ENV="${optional_default_installation_env}" \
-    perl -0pi -e 's/\n\s*# __OPTIONAL_GITHUB_APP_ENV__/$ENV{OPTIONAL_GITHUB_APP_ENV}/g; s/\n\s*# __OPTIONAL_DEFAULT_ENGINEERING_INSTALLATION_ID__/$ENV{OPTIONAL_DEFAULT_ENGINEERING_INSTALLATION_ENV}/g' "${target_file}"
+    python3 - "${target_file}" <<'PY'
+import os
+import sys
+from pathlib import Path
+
+target = Path(sys.argv[1])
+text = target.read_text()
+
+for placeholder, env_key in [
+    ("            # __OPTIONAL_GITHUB_APP_ENV__", "OPTIONAL_GITHUB_APP_ENV"),
+    ("            # __OPTIONAL_DEFAULT_ENGINEERING_INSTALLATION_ID__", "OPTIONAL_DEFAULT_ENGINEERING_INSTALLATION_ENV"),
+]:
+    value = os.environ.get(env_key, "")
+    text = text.replace(placeholder, value if value else "")
+
+target.write_text(text)
+PY
 }
 
 cleanup() {
