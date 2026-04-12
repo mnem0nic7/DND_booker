@@ -11,6 +11,49 @@ DEPLOY_TARGET="${DEPLOY_TARGET:-all}"
 TEMP_WEB_SERVICE_YAML="$(mktemp)"
 TEMP_WORKER_SERVICE_YAML="$(mktemp)"
 
+render_optional_github_app_env() {
+  if [[ -z "${CLOUDRUN_GITHUB_APP_ID_SECRET:-}" || -z "${CLOUDRUN_GITHUB_APP_PRIVATE_KEY_SECRET:-}" ]]; then
+    return 0
+  fi
+
+  cat <<EOF
+            - name: GITHUB_APP_ID
+              valueFrom:
+                secretKeyRef:
+                  name: ${CLOUDRUN_GITHUB_APP_ID_SECRET}
+                  key: latest
+            - name: GITHUB_APP_PRIVATE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: ${CLOUDRUN_GITHUB_APP_PRIVATE_KEY_SECRET}
+                  key: latest
+EOF
+}
+
+render_optional_default_installation_env() {
+  if [[ -z "${DEFAULT_ENGINEERING_INSTALLATION_ID:-}" ]]; then
+    return 0
+  fi
+
+  cat <<EOF
+            - name: DEFAULT_ENGINEERING_INSTALLATION_ID
+              value: "${DEFAULT_ENGINEERING_INSTALLATION_ID}"
+EOF
+}
+
+inject_optional_cloudrun_envs() {
+  local target_file="$1"
+  local optional_github_app_env
+  local optional_default_installation_env
+
+  optional_github_app_env="$(render_optional_github_app_env)"
+  optional_default_installation_env="$(render_optional_default_installation_env)"
+
+  OPTIONAL_GITHUB_APP_ENV="${optional_github_app_env}" \
+  OPTIONAL_DEFAULT_ENGINEERING_INSTALLATION_ENV="${optional_default_installation_env}" \
+    perl -0pi -e 's/\n\s*# __OPTIONAL_GITHUB_APP_ENV__/$ENV{OPTIONAL_GITHUB_APP_ENV}/g; s/\n\s*# __OPTIONAL_DEFAULT_ENGINEERING_INSTALLATION_ID__/$ENV{OPTIONAL_DEFAULT_ENGINEERING_INSTALLATION_ENV}/g' "${target_file}"
+}
+
 cleanup() {
   rm -f "${TEMP_WEB_SERVICE_YAML}" "${TEMP_WORKER_SERVICE_YAML}"
 }
@@ -41,6 +84,7 @@ if [[ "${DEPLOY_TARGET}" == "all" || "${DEPLOY_TARGET}" == "web" ]]; then
     -e "s|dnd-booker-client:latest|dnd-booker-client:${TAG}|g" \
     -e "s|dnd-booker-server:latest|dnd-booker-server:${TAG}|g" \
     deploy/cloudrun/service.yaml > "${TEMP_WEB_SERVICE_YAML}"
+  inject_optional_cloudrun_envs "${TEMP_WEB_SERVICE_YAML}"
 
   gcloud run services replace "${TEMP_WEB_SERVICE_YAML}" \
     --project "${PROJECT_ID}" \
@@ -59,6 +103,7 @@ if [[ "${DEPLOY_TARGET}" == "all" || "${DEPLOY_TARGET}" == "worker" ]]; then
     -e "s|dnd-booker-worker:latest|dnd-booker-worker:${TAG}|g" \
     -e "s|__WEB_SERVICE_URL__|${WEB_SERVICE_URL}|g" \
     deploy/cloudrun/worker-service.yaml > "${TEMP_WORKER_SERVICE_YAML}"
+  inject_optional_cloudrun_envs "${TEMP_WORKER_SERVICE_YAML}"
 
   gcloud run services replace "${TEMP_WORKER_SERVICE_YAML}" \
     --project "${PROJECT_ID}" \

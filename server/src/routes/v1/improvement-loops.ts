@@ -2,6 +2,7 @@ import { Router } from 'express';
 import {
   CreateImprovementLoopAndProjectRequestSchema,
   CreateImprovementLoopRequestSchema,
+  ImprovementLoopDefaultEngineeringTargetSchema,
   ImprovementLoopArtifactSchema,
   ImprovementLoopRunDetailSchema,
   ImprovementLoopRunSchema,
@@ -36,6 +37,7 @@ import {
 } from '../../services/improvement-loop/artifact.service.js';
 import { enqueueImprovementLoopRun } from '../../services/improvement-loop/queue.service.js';
 import { subscribeToImprovementLoopRun } from '../../services/improvement-loop/pubsub.service.js';
+import { getDefaultImprovementLoopEngineeringTarget } from '../../services/improvement-loop/default-engineering-target.service.js';
 import { prisma } from '../../config/database.js';
 
 const v1ImprovementLoopRoutes = Router();
@@ -43,6 +45,15 @@ const v1ImprovementLoopRoutes = Router();
 function toTransportJson<T>(value: T): unknown {
   return JSON.parse(JSON.stringify(value));
 }
+
+v1ImprovementLoopRoutes.get(
+  '/improvement-loops/default-engineering-target',
+  requireAuth,
+  asyncHandler(async (_req, res) => {
+    const target = getDefaultImprovementLoopEngineeringTarget();
+    res.json(ImprovementLoopDefaultEngineeringTargetSchema.parse(toTransportJson(target)));
+  }),
+);
 
 v1ImprovementLoopRoutes.get(
   '/projects/:projectId/github-repo-binding',

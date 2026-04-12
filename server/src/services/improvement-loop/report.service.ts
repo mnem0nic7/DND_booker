@@ -158,17 +158,18 @@ export function buildEngineeringReport(input: {
   if (input.critiqueBacklog.some((item) => item.code.startsWith('EXPORT_TEXT_LAYOUT'))) {
     improvements.push({
       id: 'layout-parity-audit',
-      title: 'Tighten text-layout parity diagnostics',
+      title: 'Surface layout parity drift through the AI team dashboard',
       priority: 'high',
-      rationale: 'The loop kept encountering export/layout drift signals, which means preview, saved snapshot, and export parity still need stronger tooling.',
+      rationale: 'The loop kept encountering export/layout drift signals, so the AI team surface should make preview/export parity problems easier to diagnose without dropping into editor-specific tooling.',
       affectedPaths: [
-        'client/src/components/editor/EditorLayout.tsx',
+        'client/src/pages/AiTeamPage.tsx',
+        'client/src/components/ai/ImprovementLoopPanel.tsx',
         'worker/src/jobs/export.job.ts',
         'shared/src/layout-runtime-v2.ts',
       ],
       proposedChanges: [
-        'Promote parity drift counts into the run UI before export.',
-        'Persist stronger scope-level parity metadata for repair suggestions.',
+        'Promote parity drift counts into the AI team run UI before export.',
+        'Persist stronger scope-level parity metadata so the engineer role can rank fixes without relying on editor context.',
       ],
       autoApplyEligible: false,
       deferredReason: 'Requires coordinated runtime changes beyond the safe report-file auto-apply boundary.',
@@ -195,16 +196,17 @@ export function buildEngineeringReport(input: {
   }
 
   improvements.push({
-    id: 'loop-reporting-surface',
-    title: 'Consolidate loop-stage reporting into one product surface',
+    id: 'ai-team-dashboard-surface',
+    title: 'Consolidate AI team reporting into a dashboard-first surface',
     priority: 'medium',
-    rationale: 'The improvement loop produces creator, designer, editor, and engineering signals that should be easier to compare side by side.',
+    rationale: 'The AI team produces creator, designer, editor, and engineer signals that should be easier to compare side by side without centering the WYSIWYG editor.',
     affectedPaths: [
-      'client/src/components/ai',
+      'client/src/pages/AiTeamPage.tsx',
+      'client/src/stores/improvementLoopStore.ts',
       'shared/src/api/v1.ts',
     ],
     proposedChanges: [
-      'Keep child-run lineage, final rating, and engineering follow-ups visible in the same panel.',
+      'Keep role lineage, final rating, and engineering follow-ups visible in the same dashboard.',
       'Retain report artifacts for later comparison across runs.',
     ],
     autoApplyEligible: false,

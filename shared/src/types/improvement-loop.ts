@@ -25,6 +25,8 @@ export type ImprovementLoopArtifactType =
 export type ImprovementLoopArtifactStatus = 'generated' | 'accepted' | 'failed';
 
 export type RepoBindingValidationStatus = 'unconfigured' | 'invalid' | 'valid';
+export type ImprovementLoopRole = 'creator' | 'designer' | 'editor' | 'engineer';
+export type ImprovementLoopRoleRunStatus = 'queued' | 'running' | 'completed' | 'failed' | 'skipped';
 
 export interface ProjectGitHubRepoBinding {
   id: string;
@@ -55,6 +57,17 @@ export interface ProjectGitHubRepoBindingValidation {
   repositoryFullName: string | null;
   defaultBranch: string | null;
   checkedAt: string;
+}
+
+export interface ImprovementLoopDefaultEngineeringTarget {
+  repositoryFullName: string;
+  installationId: number;
+  defaultBranch: string;
+  pathAllowlist: string[];
+  engineeringAutomationEnabled: boolean;
+  engineeringAutomationAvailable: boolean;
+  source: 'env' | 'fallback';
+  message: string;
 }
 
 export interface ImprovementLoopInput {
@@ -124,6 +137,26 @@ export interface EngineeringApplyResult {
   deferredPaths: string[];
 }
 
+export interface ImprovementLoopRoleRun {
+  id: string;
+  runId: string;
+  projectId: string;
+  userId: string;
+  role: ImprovementLoopRole;
+  status: ImprovementLoopRoleRunStatus;
+  objective: string;
+  input: Record<string, unknown> | null;
+  linkedGenerationRunId: string | null;
+  linkedAgentRunId: string | null;
+  outputArtifactIds: string[];
+  summary: string | null;
+  failureReason: string | null;
+  createdAt: string;
+  updatedAt: string;
+  startedAt: string | null;
+  completedAt: string | null;
+}
+
 export interface ImprovementLoopArtifact {
   id: string;
   runId: string;
@@ -150,6 +183,7 @@ export interface ImprovementLoopRun {
   currentStage: string | null;
   progressPercent: number;
   input: ImprovementLoopInput;
+  roles: ImprovementLoopRoleRun[];
   linkedGenerationRunId: string | null;
   linkedAgentRunId: string | null;
   creatorReport: CreatorReport | null;
@@ -180,6 +214,7 @@ export interface ImprovementLoopRunSummary {
   status: ImprovementLoopRunStatus;
   currentStage: string | null;
   progressPercent: number;
+  roles: ImprovementLoopRoleRun[];
   linkedGenerationRunId: string | null;
   linkedAgentRunId: string | null;
   githubPullRequestNumber: number | null;

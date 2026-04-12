@@ -91,6 +91,18 @@ describe('Improvement loop API v1', () => {
     expect(typeof getRes.body.updatedAt).toBe('string');
   });
 
+  it('returns the default AI team engineering target', async () => {
+    const res = await request(app)
+      .get('/api/v1/improvement-loops/default-engineering-target')
+      .set('Authorization', `Bearer ${accessToken}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.repositoryFullName).toBe('mnem0nic7/DND_booker');
+    expect(res.body.defaultBranch).toBe('main');
+    expect(Array.isArray(res.body.pathAllowlist)).toBe(true);
+    expect(typeof res.body.engineeringAutomationAvailable).toBe('boolean');
+  });
+
   it('rejects create-and-run when the server GitHub App integration is unavailable', async () => {
     const configuredSpy = vi.spyOn(githubAppService, 'isGitHubAppConfigured').mockReturnValue(false);
 
@@ -204,6 +216,13 @@ describe('Improvement loop API v1', () => {
     expect(detailRes.status).toBe(200);
     expect(detailRes.body.id).toBe(run.id);
     expect(detailRes.body.artifactCount).toBe(1);
+    expect(detailRes.body.roles).toHaveLength(4);
+    expect(detailRes.body.roles.map((role: { role: string }) => role.role)).toEqual([
+      'creator',
+      'designer',
+      'editor',
+      'engineer',
+    ]);
     expect(typeof detailRes.body.createdAt).toBe('string');
     expect(typeof detailRes.body.updatedAt).toBe('string');
 

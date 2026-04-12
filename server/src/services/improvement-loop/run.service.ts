@@ -6,15 +6,26 @@ import type {
   EngineeringApplyResult,
   EngineeringReport,
   ImprovementLoopInput,
+  ImprovementLoopRole,
+  ImprovementLoopRoleRun,
+  ImprovementLoopRoleRunStatus,
   ImprovementLoopRun,
   ImprovementLoopRunMode,
   ImprovementLoopRunStatus,
   ImprovementLoopRunSummary,
 } from '@dnd-booker/shared';
 import { IMPROVEMENT_LOOP_STATUS_TRANSITIONS } from '@dnd-booker/shared';
-import type { Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 import { prisma } from '../../config/database.js';
+
+const RUN_WITH_ROLES_INCLUDE = {
+  roleRuns: {
+    orderBy: { createdAt: 'asc' },
+  },
+} satisfies Prisma.ImprovementLoopRunInclude;
+
+const ROLE_ORDER: ImprovementLoopRole[] = ['creator', 'designer', 'editor', 'engineer'];
 
 function createGraphMetadata(kind: 'improvement_loop') {
   const graphThreadId = `${kind}:${randomUUID()}`;
@@ -48,6 +59,40 @@ function mergeGraphState(existing: unknown, patch: Record<string, unknown>): Pri
   } as Prisma.InputJsonValue;
 }
 
+function toJsonValue(value: unknown): Prisma.InputJsonValue {
+  return value as Prisma.InputJsonValue;
+}
+
+function toNullableJsonValue(value: unknown | null): Prisma.InputJsonValue | typeof Prisma.JsonNull {
+  return value === null ? Prisma.JsonNull : toJsonValue(value);
+}
+
+function serializeRoleRun(roleRun: any): ImprovementLoopRoleRun {
+  return {
+    id: roleRun.id,
+    runId: roleRun.runId,
+    projectId: roleRun.projectId,
+    userId: roleRun.userId,
+    role: roleRun.role,
+    status: roleRun.status,
+    objective: roleRun.objective,
+    input: (roleRun.inputJson as Record<string, unknown> | null) ?? null,
+    linkedGenerationRunId: roleRun.linkedGenerationRunId ?? null,
+    linkedAgentRunId: roleRun.linkedAgentRunId ?? null,
+    outputArtifactIds: Array.isArray(roleRun.outputArtifactIdsJson) ? roleRun.outputArtifactIdsJson as string[] : [],
+    summary: roleRun.summary ?? null,
+    failureReason: roleRun.failureReason ?? null,
+    createdAt: roleRun.createdAt.toISOString(),
+    updatedAt: roleRun.updatedAt.toISOString(),
+    startedAt: roleRun.startedAt?.toISOString() ?? null,
+    completedAt: roleRun.completedAt?.toISOString() ?? null,
+  };
+}
+
+function sortRoleRuns(roleRuns: any[] | undefined) {
+  return [...(roleRuns ?? [])].sort((a, b) => ROLE_ORDER.indexOf(a.role) - ROLE_ORDER.indexOf(b.role));
+}
+
 function serializeRun(run: any): ImprovementLoopRun {
   return {
     id: run.id,
@@ -58,6 +103,7 @@ function serializeRun(run: any): ImprovementLoopRun {
     currentStage: run.currentStage ?? null,
     progressPercent: run.progressPercent ?? 0,
     input: run.inputJson as ImprovementLoopInput,
+    roles: sortRoleRuns(run.roleRuns).map(serializeRoleRun),
     linkedGenerationRunId: run.linkedGenerationRunId ?? null,
     linkedAgentRunId: run.linkedAgentRunId ?? null,
     creatorReport: (run.creatorReportJson as CreatorReport | null) ?? null,
@@ -90,6 +136,7 @@ function serializeSummary(run: any): ImprovementLoopRunSummary {
     status: run.status,
     currentStage: run.currentStage ?? null,
     progressPercent: run.progressPercent ?? 0,
+    roles: sortRoleRuns(run.roleRuns).map(serializeRoleRun),
     linkedGenerationRunId: run.linkedGenerationRunId ?? null,
     linkedAgentRunId: run.linkedAgentRunId ?? null,
     githubPullRequestNumber: run.githubPullRequestNumber ?? null,
@@ -117,6 +164,61 @@ function buildInput(mode: ImprovementLoopRunMode, request: CreateImprovementLoop
   };
 }
 
+function buildInitialRoleSeeds(input: {
+  projectId: string;
+  userId: string;
+  loopInput: ImprovementLoopInput;
+}) {
+  const { projectId, userId, loopInput } = input;
+  const repoTarget = process.env.DEFAULT_ENGINEERING_REPOSITORY_FULL_NAME?.trim() || 'mnem0nic7/DND_booker';
+
+  return [
+    {
+      projectId,
+      userId,
+      role: 'creator' as const,
+      objective: loopInput.mode === 'create_campaign'
+        ? 'Create the initial campaign package and hand it off to the rest of the AI team.'
+        : 'Synthesize the current project into a creator-ready campaign plan without overwriting substantial authored content.',
+      inputJson: {
+        prompt: loopInput.prompt,
+        generationMode: loopInput.generationMode,
+        generationQuality: loopInput.generationQuality,
+      } as Prisma.InputJsonValue,
+    },
+    {
+      projectId,
+      userId,
+      role: 'designer' as const,
+      objective: 'Improve the campaign package for DM utility, presentation quality, layout quality, and publication readiness.',
+      inputJson: {
+        objective: loopInput.objective,
+        stage: 'designer',
+        executionMode: 'autonomous_agent',
+      } as Prisma.InputJsonValue,
+    },
+    {
+      projectId,
+      userId,
+      role: 'editor' as const,
+      objective: 'Independently score the final package and issue a release recommendation.',
+      inputJson: {
+        rubric: 'campaign_release_review',
+      } as Prisma.InputJsonValue,
+    },
+    {
+      projectId,
+      userId,
+      role: 'engineer' as const,
+      objective: 'Translate loop findings into safe DND Booker system improvements and a draft GitHub PR when auto-apply is available.',
+      inputJson: {
+        targetRepository: repoTarget,
+        safeAutoApply: true,
+      } as Prisma.InputJsonValue,
+    },
+  ];
+}
+
 export async function createImprovementLoopRun(input: {
   projectId: string;
   userId: string;
@@ -129,14 +231,23 @@ export async function createImprovementLoopRun(input: {
   });
   if (!project) return null;
 
+  const loopInput = buildInput(input.mode, input.request);
   const run = await prisma.improvementLoopRun.create({
     data: {
       projectId: input.projectId,
       userId: input.userId,
       mode: input.mode,
       ...createGraphMetadata('improvement_loop'),
-      inputJson: buildInput(input.mode, input.request) as any,
+      inputJson: loopInput as unknown as Prisma.InputJsonValue,
+      roleRuns: {
+        create: buildInitialRoleSeeds({
+          projectId: input.projectId,
+          userId: input.userId,
+          loopInput,
+        }),
+      },
     },
+    include: RUN_WITH_ROLES_INCLUDE,
   });
 
   return serializeRun(run);
@@ -145,6 +256,7 @@ export async function createImprovementLoopRun(input: {
 export async function getImprovementLoopRun(runId: string, userId: string): Promise<ImprovementLoopRun | null> {
   const run = await prisma.improvementLoopRun.findFirst({
     where: { id: runId, userId },
+    include: RUN_WITH_ROLES_INCLUDE,
   });
   return run ? serializeRun(run) : null;
 }
@@ -158,6 +270,7 @@ export async function listImprovementLoopRuns(projectId: string, userId: string)
 
   const runs = await prisma.improvementLoopRun.findMany({
     where: { projectId, userId },
+    include: RUN_WITH_ROLES_INCLUDE,
     orderBy: { createdAt: 'desc' },
   });
   return runs.map(serializeSummary);
@@ -169,7 +282,10 @@ export async function transitionImprovementLoopStatus(
   newStatus: ImprovementLoopRunStatus,
   failureReason?: string,
 ): Promise<ImprovementLoopRun | null> {
-  const run = await prisma.improvementLoopRun.findFirst({ where: { id: runId, userId } });
+  const run = await prisma.improvementLoopRun.findFirst({
+    where: { id: runId, userId },
+    include: RUN_WITH_ROLES_INCLUDE,
+  });
   if (!run) return null;
 
   const allowed = IMPROVEMENT_LOOP_STATUS_TRANSITIONS[run.status as ImprovementLoopRunStatus];
@@ -221,6 +337,7 @@ export async function transitionImprovementLoopStatus(
   const updated = await prisma.improvementLoopRun.update({
     where: { id: runId },
     data,
+    include: RUN_WITH_ROLES_INCLUDE,
   });
 
   return serializeRun(updated);
@@ -252,6 +369,7 @@ export async function updateImprovementLoopProgress(
         updatedAt: new Date().toISOString(),
       }),
     },
+    include: RUN_WITH_ROLES_INCLUDE,
   });
 
   return serializeRun(updated);
@@ -279,6 +397,7 @@ export async function updateImprovementLoopGraphState(input: {
       ...(typeof input.patch['graphThreadId'] === 'string' ? { graphThreadId: input.patch['graphThreadId'] } : {}),
       ...(typeof input.patch['graphCheckpointKey'] === 'string' ? { graphCheckpointKey: input.patch['graphCheckpointKey'] } : {}),
     },
+    include: RUN_WITH_ROLES_INCLUDE,
   });
 
   return serializeRun(updated);
@@ -305,38 +424,138 @@ export async function updateImprovementLoopState(input: {
   });
   if (!current) return null;
 
-  const updated = await prisma.improvementLoopRun.update({
-    where: { id: input.runId },
-    data: {
+  const data: Prisma.ImprovementLoopRunUncheckedUpdateInput = {
+    graphStateJson: mergeGraphState(current.graphStateJson, {
       ...(input.linkedGenerationRunId !== undefined ? { linkedGenerationRunId: input.linkedGenerationRunId } : {}),
       ...(input.linkedAgentRunId !== undefined ? { linkedAgentRunId: input.linkedAgentRunId } : {}),
-      ...(input.creatorReport !== undefined ? { creatorReportJson: input.creatorReport as any } : {}),
-      ...(input.designerUxNotes !== undefined ? { designerUxNotesJson: input.designerUxNotes as any } : {}),
-      ...(input.editorFinalReport !== undefined ? { editorFinalReportJson: input.editorFinalReport as any } : {}),
-      ...(input.engineeringReport !== undefined ? { engineeringReportJson: input.engineeringReport as any } : {}),
-      ...(input.engineeringApplyResult !== undefined ? { engineeringApplyResultJson: input.engineeringApplyResult as any } : {}),
+      ...(input.creatorReport !== undefined ? { creatorReport: input.creatorReport } : {}),
+      ...(input.designerUxNotes !== undefined ? { designerUxNotes: input.designerUxNotes } : {}),
+      ...(input.editorFinalReport !== undefined ? { editorFinalReport: input.editorFinalReport } : {}),
+      ...(input.engineeringReport !== undefined ? { engineeringReport: input.engineeringReport } : {}),
+      ...(input.engineeringApplyResult !== undefined ? { engineeringApplyResult: input.engineeringApplyResult } : {}),
       ...(input.githubBranchName !== undefined ? { githubBranchName: input.githubBranchName } : {}),
       ...(input.githubBaseBranch !== undefined ? { githubBaseBranch: input.githubBaseBranch } : {}),
       ...(input.githubHeadSha !== undefined ? { githubHeadSha: input.githubHeadSha } : {}),
       ...(input.githubPullRequestNumber !== undefined ? { githubPullRequestNumber: input.githubPullRequestNumber } : {}),
       ...(input.githubPullRequestUrl !== undefined ? { githubPullRequestUrl: input.githubPullRequestUrl } : {}),
-      graphStateJson: mergeGraphState(current.graphStateJson, {
-        ...(input.linkedGenerationRunId !== undefined ? { linkedGenerationRunId: input.linkedGenerationRunId } : {}),
-        ...(input.linkedAgentRunId !== undefined ? { linkedAgentRunId: input.linkedAgentRunId } : {}),
-        ...(input.creatorReport !== undefined ? { creatorReport: input.creatorReport } : {}),
-        ...(input.designerUxNotes !== undefined ? { designerUxNotes: input.designerUxNotes } : {}),
-        ...(input.editorFinalReport !== undefined ? { editorFinalReport: input.editorFinalReport } : {}),
-        ...(input.engineeringReport !== undefined ? { engineeringReport: input.engineeringReport } : {}),
-        ...(input.engineeringApplyResult !== undefined ? { engineeringApplyResult: input.engineeringApplyResult } : {}),
-        ...(input.githubBranchName !== undefined ? { githubBranchName: input.githubBranchName } : {}),
-        ...(input.githubBaseBranch !== undefined ? { githubBaseBranch: input.githubBaseBranch } : {}),
-        ...(input.githubHeadSha !== undefined ? { githubHeadSha: input.githubHeadSha } : {}),
-        ...(input.githubPullRequestNumber !== undefined ? { githubPullRequestNumber: input.githubPullRequestNumber } : {}),
-        ...(input.githubPullRequestUrl !== undefined ? { githubPullRequestUrl: input.githubPullRequestUrl } : {}),
-        updatedAt: new Date().toISOString(),
-      }),
-    },
+      updatedAt: new Date().toISOString(),
+    }),
+  };
+  if (input.linkedGenerationRunId !== undefined) data.linkedGenerationRunId = input.linkedGenerationRunId;
+  if (input.linkedAgentRunId !== undefined) data.linkedAgentRunId = input.linkedAgentRunId;
+  if (input.creatorReport !== undefined) data.creatorReportJson = toNullableJsonValue(input.creatorReport);
+  if (input.designerUxNotes !== undefined) data.designerUxNotesJson = toNullableJsonValue(input.designerUxNotes);
+  if (input.editorFinalReport !== undefined) data.editorFinalReportJson = toNullableJsonValue(input.editorFinalReport);
+  if (input.engineeringReport !== undefined) data.engineeringReportJson = toNullableJsonValue(input.engineeringReport);
+  if (input.engineeringApplyResult !== undefined) data.engineeringApplyResultJson = toNullableJsonValue(input.engineeringApplyResult);
+  if (input.githubBranchName !== undefined) data.githubBranchName = input.githubBranchName;
+  if (input.githubBaseBranch !== undefined) data.githubBaseBranch = input.githubBaseBranch;
+  if (input.githubHeadSha !== undefined) data.githubHeadSha = input.githubHeadSha;
+  if (input.githubPullRequestNumber !== undefined) data.githubPullRequestNumber = input.githubPullRequestNumber;
+  if (input.githubPullRequestUrl !== undefined) data.githubPullRequestUrl = input.githubPullRequestUrl;
+
+  const updated = await prisma.improvementLoopRun.update({
+    where: { id: input.runId },
+    data,
+    include: RUN_WITH_ROLES_INCLUDE,
   });
 
   return serializeRun(updated);
+}
+
+export async function ensureImprovementLoopRoleRun(input: {
+  runId: string;
+  projectId: string;
+  userId: string;
+  role: ImprovementLoopRole;
+  objective: string;
+  stageInput?: Record<string, unknown> | null;
+}): Promise<ImprovementLoopRoleRun> {
+  const roleRun = await prisma.improvementLoopRoleRun.upsert({
+    where: {
+      runId_role: {
+        runId: input.runId,
+        role: input.role,
+      },
+    },
+    create: {
+      runId: input.runId,
+      projectId: input.projectId,
+      userId: input.userId,
+      role: input.role,
+      objective: input.objective,
+      ...(input.stageInput !== undefined ? { inputJson: toNullableJsonValue(input.stageInput) } : {}),
+    },
+    update: (() => {
+      const data: Prisma.ImprovementLoopRoleRunUncheckedUpdateInput = {
+        objective: input.objective,
+      };
+      if (input.stageInput !== undefined) {
+        data.inputJson = toNullableJsonValue(input.stageInput);
+      }
+      return data;
+    })(),
+  });
+
+  return serializeRoleRun(roleRun);
+}
+
+export async function updateImprovementLoopRoleRun(input: {
+  runId: string;
+  role: ImprovementLoopRole;
+  status?: ImprovementLoopRoleRunStatus;
+  objective?: string;
+  stageInput?: Record<string, unknown> | null;
+  linkedGenerationRunId?: string | null;
+  linkedAgentRunId?: string | null;
+  outputArtifactId?: string;
+  summary?: string | null;
+  failureReason?: string | null;
+}): Promise<ImprovementLoopRoleRun | null> {
+  const current = await prisma.improvementLoopRoleRun.findUnique({
+    where: {
+      runId_role: {
+        runId: input.runId,
+        role: input.role,
+      },
+    },
+  });
+  if (!current) return null;
+
+  const now = new Date();
+  const outputArtifactIds = Array.isArray(current.outputArtifactIdsJson)
+    ? [...current.outputArtifactIdsJson as string[]]
+    : [];
+  if (input.outputArtifactId && !outputArtifactIds.includes(input.outputArtifactId)) {
+    outputArtifactIds.push(input.outputArtifactId);
+  }
+
+  const nextStatus = input.status ?? current.status;
+  const isTerminalStatus = nextStatus === 'completed' || nextStatus === 'failed' || nextStatus === 'skipped';
+  const data: Prisma.ImprovementLoopRoleRunUncheckedUpdateInput = {};
+
+  if (input.status !== undefined) data.status = input.status;
+  if (input.objective !== undefined) data.objective = input.objective;
+  if (input.stageInput !== undefined) data.inputJson = toNullableJsonValue(input.stageInput);
+  if (input.linkedGenerationRunId !== undefined) data.linkedGenerationRunId = input.linkedGenerationRunId;
+  if (input.linkedAgentRunId !== undefined) data.linkedAgentRunId = input.linkedAgentRunId;
+  if (input.outputArtifactId) data.outputArtifactIdsJson = outputArtifactIds as Prisma.InputJsonValue;
+  if (input.summary !== undefined) data.summary = input.summary;
+  if (input.failureReason !== undefined) data.failureReason = input.failureReason;
+  if (nextStatus === 'running' && !current.startedAt) data.startedAt = now;
+  if (isTerminalStatus) data.completedAt = current.completedAt ?? now;
+  if (input.status === 'running') {
+    data.completedAt = null;
+    data.failureReason = null;
+  }
+  if (input.status === 'completed' || input.status === 'skipped') {
+    data.failureReason = input.failureReason ?? null;
+  }
+
+  const updated = await prisma.improvementLoopRoleRun.update({
+    where: { id: current.id },
+    data,
+  });
+
+  return serializeRoleRun(updated);
 }

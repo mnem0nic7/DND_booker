@@ -24,10 +24,18 @@ const ACTIVE_STATUSES = new Set([
 ]);
 
 interface Props {
-  projectId: string;
+  projectId?: string;
+  title?: string;
 }
 
-export function ImprovementLoopPanel({ projectId }: Props) {
+const ROLE_LABELS = {
+  creator: 'Creator',
+  designer: 'Designer',
+  editor: 'Editor',
+  engineer: 'Engineer',
+} as const;
+
+export function ImprovementLoopPanel({ projectId, title = 'AI Team Run' }: Props) {
   const {
     currentRun,
     progressPercent,
@@ -43,11 +51,13 @@ export function ImprovementLoopPanel({ projectId }: Props) {
   const [expandedArtifactId, setExpandedArtifactId] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!projectId) return;
     fetchLatestRun(projectId);
   }, [projectId, fetchLatestRun]);
 
   if (!currentRun) return null;
 
+  const runProjectId = projectId ?? currentRun.projectId;
   const status = currentRun.status;
   const isActive = ACTIVE_STATUSES.has(status);
   const selectedArtifact = artifacts.find((artifact) => artifact.id === expandedArtifactId) ?? null;
@@ -61,7 +71,7 @@ export function ImprovementLoopPanel({ projectId }: Props) {
           {status === 'failed' && <span className="w-2 h-2 rounded-full bg-red-500" />}
           {status === 'paused' && <span className="w-2 h-2 rounded-full bg-yellow-500" />}
           <span className="text-sm font-medium text-gray-800">
-            Improvement Loop: {STAGE_LABELS[status] ?? currentStage ?? status}
+            {title}: {STAGE_LABELS[status] ?? currentStage ?? status}
           </span>
         </div>
         <span className="text-xs text-gray-500">
@@ -106,6 +116,36 @@ export function ImprovementLoopPanel({ projectId }: Props) {
         )}
       </div>
 
+      {currentRun.roles.length > 0 && (
+        <div className="mb-3 grid gap-2 md:grid-cols-2">
+          {currentRun.roles.map((roleRun) => (
+            <div key={roleRun.id} className="rounded border border-emerald-200 bg-white px-3 py-2">
+              <div className="mb-1 flex items-center justify-between">
+                <div className="text-[11px] font-semibold uppercase tracking-wide text-emerald-700">
+                  {ROLE_LABELS[roleRun.role]}
+                </div>
+                <div className="text-[11px] text-gray-500">{roleRun.status}</div>
+              </div>
+              <div className="text-xs text-gray-700">{roleRun.summary ?? roleRun.objective}</div>
+              {roleRun.linkedGenerationRunId && (
+                <div className="mt-1 text-[11px] text-gray-500">Generation: {roleRun.linkedGenerationRunId}</div>
+              )}
+              {roleRun.linkedAgentRunId && (
+                <div className="mt-1 text-[11px] text-gray-500">Agent: {roleRun.linkedAgentRunId}</div>
+              )}
+              {roleRun.outputArtifactIds.length > 0 && (
+                <div className="mt-1 text-[11px] text-gray-500">
+                  Outputs: {roleRun.outputArtifactIds.length} artifact{roleRun.outputArtifactIds.length === 1 ? '' : 's'}
+                </div>
+              )}
+              {roleRun.failureReason && (
+                <div className="mt-1 text-[11px] text-red-600">{roleRun.failureReason}</div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
       {error && <p className="text-xs text-red-600 mb-2">{error}</p>}
 
       {currentRun.designerUxNotes && (
@@ -132,7 +172,7 @@ export function ImprovementLoopPanel({ projectId }: Props) {
       <div className="flex gap-2 mb-3">
         {isActive && (
           <button
-            onClick={() => void pauseRun(projectId, currentRun.id)}
+            onClick={() => void pauseRun(runProjectId, currentRun.id)}
             className="text-xs px-2 py-1 rounded bg-yellow-100 text-yellow-700 hover:bg-yellow-200 transition-colors"
           >
             Pause
@@ -140,7 +180,7 @@ export function ImprovementLoopPanel({ projectId }: Props) {
         )}
         {status === 'paused' && (
           <button
-            onClick={() => void resumeRun(projectId, currentRun.id)}
+            onClick={() => void resumeRun(runProjectId, currentRun.id)}
             className="text-xs px-2 py-1 rounded bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition-colors"
           >
             Resume
@@ -148,7 +188,7 @@ export function ImprovementLoopPanel({ projectId }: Props) {
         )}
         {(isActive || status === 'paused') && (
           <button
-            onClick={() => void cancelRun(projectId, currentRun.id)}
+            onClick={() => void cancelRun(runProjectId, currentRun.id)}
             className="text-xs px-2 py-1 rounded bg-red-100 text-red-700 hover:bg-red-200 transition-colors"
           >
             Cancel

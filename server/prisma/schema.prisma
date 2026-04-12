@@ -79,6 +79,21 @@ enum ImprovementLoopRunStatus {
   cancelled
 }
 
+enum ImprovementLoopRole {
+  creator
+  designer
+  editor
+  engineer
+}
+
+enum ImprovementLoopRoleRunStatus {
+  queued
+  running
+  completed
+  failed
+  skipped
+}
+
 enum AgentActionStatus {
   queued
   running
@@ -137,6 +152,7 @@ model User {
   generationRuns  GenerationRun[]
   agentRuns       AgentRun[]
   improvementLoopRuns ImprovementLoopRun[]
+  improvementLoopRoleRuns ImprovementLoopRoleRun[]
 
   @@map("users")
 }
@@ -192,6 +208,7 @@ model Project {
   generationRuns   GenerationRun[]
   agentRuns        AgentRun[]
   improvementLoopRuns ImprovementLoopRun[]
+  improvementLoopRoleRuns ImprovementLoopRoleRun[]
   agentCheckpoints AgentCheckpoint[]
   campaignBibles   CampaignBible[]
   canonEntities    CanonEntity[]
@@ -445,6 +462,7 @@ model GenerationRun {
   manifests       AssemblyManifest[]
   linkedAgentRuns AgentRun[]          @relation("LinkedGenerationRun")
   linkedImprovementLoopRuns ImprovementLoopRun[] @relation("LinkedImprovementGenerationRun")
+  linkedImprovementLoopRoleRuns ImprovementLoopRoleRun[] @relation("LinkedImprovementRoleGenerationRun")
 
   @@index([projectId])
   @@index([userId])
@@ -492,6 +510,7 @@ model AgentRun {
   observations        AgentObservation[]
   decisions           AgentDecision[]
   linkedImprovementLoopRuns ImprovementLoopRun[] @relation("LinkedImprovementAgentRun")
+  linkedImprovementLoopRoleRuns ImprovementLoopRoleRun[] @relation("LinkedImprovementRoleAgentRun")
 
   @@index([projectId])
   @@index([userId])
@@ -634,6 +653,7 @@ model ImprovementLoopRun {
   linkedGenerationRun  GenerationRun?         @relation("LinkedImprovementGenerationRun", fields: [linkedGenerationRunId], references: [id], onDelete: SetNull)
   linkedAgentRun       AgentRun?              @relation("LinkedImprovementAgentRun", fields: [linkedAgentRunId], references: [id], onDelete: SetNull)
   artifacts            ImprovementLoopArtifact[]
+  roleRuns             ImprovementLoopRoleRun[]
 
   @@index([projectId])
   @@index([userId])
@@ -641,6 +661,40 @@ model ImprovementLoopRun {
   @@index([graphThreadId])
   @@index([graphCheckpointKey])
   @@map("improvement_loop_runs")
+}
+
+model ImprovementLoopRoleRun {
+  id                   String                   @id @default(uuid())
+  runId                String                   @map("run_id")
+  projectId            String                   @map("project_id")
+  userId               String                   @map("user_id")
+  role                 ImprovementLoopRole
+  status               ImprovementLoopRoleRunStatus @default(queued)
+  objective            String
+  inputJson            Json?                    @map("input_json")
+  linkedGenerationRunId String?                 @map("linked_generation_run_id")
+  linkedAgentRunId     String?                  @map("linked_agent_run_id")
+  outputArtifactIdsJson Json                    @default("[]") @map("output_artifact_ids_json")
+  summary              String?
+  failureReason        String?                  @map("failure_reason")
+  createdAt            DateTime                 @default(now()) @map("created_at")
+  updatedAt            DateTime                 @updatedAt @map("updated_at")
+  startedAt            DateTime?                @map("started_at")
+  completedAt          DateTime?                @map("completed_at")
+
+  run                 ImprovementLoopRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  project             Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user                User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  linkedGenerationRun GenerationRun?     @relation("LinkedImprovementRoleGenerationRun", fields: [linkedGenerationRunId], references: [id], onDelete: SetNull)
+  linkedAgentRun      AgentRun?          @relation("LinkedImprovementRoleAgentRun", fields: [linkedAgentRunId], references: [id], onDelete: SetNull)
+
+  @@unique([runId, role])
+  @@index([runId])
+  @@index([projectId])
+  @@index([userId])
+  @@index([role])
+  @@index([status])
+  @@map("improvement_loop_role_runs")
 }
 
 model ImprovementLoopArtifact {

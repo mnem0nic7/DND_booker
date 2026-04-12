@@ -77,6 +77,14 @@ spec:
               value: uploads
             - name: GCS_EXPORT_PREFIX
               value: output
+            # __OPTIONAL_GITHUB_APP_ENV__
+            # __OPTIONAL_DEFAULT_ENGINEERING_INSTALLATION_ID__
+            - name: DEFAULT_ENGINEERING_REPOSITORY_FULL_NAME
+              value: mnem0nic7/DND_booker
+            - name: DEFAULT_ENGINEERING_DEFAULT_BRANCH
+              value: main
+            - name: DEFAULT_ENGINEERING_PATH_ALLOWLIST
+              value: docs/,README.md,CLAUDE.md,client/src/components/ai/,client/src/pages/,server/src/services/improvement-loop/,shared/src/types/improvement-loop.ts,shared/src/api/v1.ts,deploy/cloudrun/,scripts/
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:

@@ -14985,6 +14985,112 @@
         ]
       }
     },
+    "/api/v1/improvement-loops/default-engineering-target": {
+      "get": {
+        "operationId": "getDefaultImprovementLoopEngineeringTarget",
+        "summary": "Get the default engineering target for AI team runs.",
+        "tags": [
+          "improvementLoops"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "repositoryFullName": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "installationId": {
+                      "type": "integer",
+                      "exclusiveMinimum": true,
+                      "minimum": 0
+                    },
+                    "defaultBranch": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "pathAllowlist": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "engineeringAutomationEnabled": {
+                      "type": "boolean"
+                    },
+                    "engineeringAutomationAvailable": {
+                      "type": "boolean"
+                    },
+                    "source": {
+                      "type": "string",
+                      "enum": [
+                        "env",
+                        "fallback"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "repositoryFullName",
+                    "installationId",
+                    "defaultBranch",
+                    "pathAllowlist",
+                    "engineeringAutomationEnabled",
+                    "engineeringAutomationAvailable",
+                    "source",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer"
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "instance": {
+                      "type": "string"
+                    },
+                    "errors": {
+                      "type": "object",
+                      "additionalProperties": {}
+                    }
+                  },
+                  "required": [
+                    "title",
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/improvement-loops": {
       "post": {
         "operationId": "createImprovementLoopAndProject",
@@ -15098,6 +15204,120 @@
                         "agentMode"
                       ],
                       "additionalProperties": false
+                    },
+                    "roles": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "runId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "projectId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "userId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "role": {
+                            "type": "string",
+                            "enum": [
+                              "creator",
+                              "designer",
+                              "editor",
+                              "engineer"
+                            ]
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "queued",
+                              "running",
+                              "completed",
+                              "failed",
+                              "skipped"
+                            ]
+                          },
+                          "objective": {
+                            "type": "string"
+                          },
+                          "input": {
+                            "type": "object",
+                            "additionalProperties": {},
+                            "nullable": true
+                          },
+                          "linkedGenerationRunId": {
+                            "type": "string",
+                            "format": "uuid",
+                            "nullable": true
+                          },
+                          "linkedAgentRunId": {
+                            "type": "string",
+                            "format": "uuid",
+                            "nullable": true
+                          },
+                          "outputArtifactIds": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "format": "uuid"
+                            }
+                          },
+                          "summary": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "failureReason": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "updatedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "startedAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "nullable": true
+                          },
+                          "completedAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "nullable": true
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "runId",
+                          "projectId",
+                          "userId",
+                          "role",
+                          "status",
+                          "objective",
+                          "input",
+                          "linkedGenerationRunId",
+                          "linkedAgentRunId",
+                          "outputArtifactIds",
+                          "summary",
+                          "failureReason",
+                          "createdAt",
+                          "updatedAt",
+                          "startedAt",
+                          "completedAt"
+                        ],
+                        "additionalProperties": false
+                      }
                     },
                     "linkedGenerationRunId": {
                       "type": "string",
@@ -15555,6 +15775,7 @@
                     "currentStage",
                     "progressPercent",
                     "input",
+                    "roles",
                     "linkedGenerationRunId",
                     "linkedAgentRunId",
                     "creatorReport",
@@ -15814,6 +16035,120 @@
                       ],
                       "additionalProperties": false
                     },
+                    "roles": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "runId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "projectId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "userId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "role": {
+                            "type": "string",
+                            "enum": [
+                              "creator",
+                              "designer",
+                              "editor",
+                              "engineer"
+                            ]
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "queued",
+                              "running",
+                              "completed",
+                              "failed",
+                              "skipped"
+                            ]
+                          },
+                          "objective": {
+                            "type": "string"
+                          },
+                          "input": {
+                            "type": "object",
+                            "additionalProperties": {},
+                            "nullable": true
+                          },
+                          "linkedGenerationRunId": {
+                            "type": "string",
+                            "format": "uuid",
+                            "nullable": true
+                          },
+                          "linkedAgentRunId": {
+                            "type": "string",
+                            "format": "uuid",
+                            "nullable": true
+                          },
+                          "outputArtifactIds": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "format": "uuid"
+                            }
+                          },
+                          "summary": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "failureReason": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "updatedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "startedAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "nullable": true
+                          },
+                          "completedAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "nullable": true
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "runId",
+                          "projectId",
+                          "userId",
+                          "role",
+                          "status",
+                          "objective",
+                          "input",
+                          "linkedGenerationRunId",
+                          "linkedAgentRunId",
+                          "outputArtifactIds",
+                          "summary",
+                          "failureReason",
+                          "createdAt",
+                          "updatedAt",
+                          "startedAt",
+                          "completedAt"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
                     "linkedGenerationRunId": {
                       "type": "string",
                       "format": "uuid",
@@ -16270,6 +16605,7 @@
                     "currentStage",
                     "progressPercent",
                     "input",
+                    "roles",
                     "linkedGenerationRunId",
                     "linkedAgentRunId",
                     "creatorReport",
@@ -16436,6 +16772,120 @@
                         "minimum": 0,
                         "maximum": 100
                       },
+                      "roles": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "runId": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "projectId": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "userId": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "role": {
+                              "type": "string",
+                              "enum": [
+                                "creator",
+                                "designer",
+                                "editor",
+                                "engineer"
+                              ]
+                            },
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "queued",
+                                "running",
+                                "completed",
+                                "failed",
+                                "skipped"
+                              ]
+                            },
+                            "objective": {
+                              "type": "string"
+                            },
+                            "input": {
+                              "type": "object",
+                              "additionalProperties": {},
+                              "nullable": true
+                            },
+                            "linkedGenerationRunId": {
+                              "type": "string",
+                              "format": "uuid",
+                              "nullable": true
+                            },
+                            "linkedAgentRunId": {
+                              "type": "string",
+                              "format": "uuid",
+                              "nullable": true
+                            },
+                            "outputArtifactIds": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "format": "uuid"
+                              }
+                            },
+                            "summary": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "failureReason": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "createdAt": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "updatedAt": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "startedAt": {
+                              "type": "string",
+                              "format": "date-time",
+                              "nullable": true
+                            },
+                            "completedAt": {
+                              "type": "string",
+                              "format": "date-time",
+                              "nullable": true
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "runId",
+                            "projectId",
+                            "userId",
+                            "role",
+                            "status",
+                            "objective",
+                            "input",
+                            "linkedGenerationRunId",
+                            "linkedAgentRunId",
+                            "outputArtifactIds",
+                            "summary",
+                            "failureReason",
+                            "createdAt",
+                            "updatedAt",
+                            "startedAt",
+                            "completedAt"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
                       "linkedGenerationRunId": {
                         "type": "string",
                         "format": "uuid",
@@ -16491,6 +16941,7 @@
                       "status",
                       "currentStage",
                       "progressPercent",
+                      "roles",
                       "linkedGenerationRunId",
                       "linkedAgentRunId",
                       "githubPullRequestNumber",
@@ -16668,6 +17119,120 @@
                         "agentMode"
                       ],
                       "additionalProperties": false
+                    },
+                    "roles": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "runId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "projectId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "userId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "role": {
+                            "type": "string",
+                            "enum": [
+                              "creator",
+                              "designer",
+                              "editor",
+                              "engineer"
+                            ]
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "queued",
+                              "running",
+                              "completed",
+                              "failed",
+                              "skipped"
+                            ]
+                          },
+                          "objective": {
+                            "type": "string"
+                          },
+                          "input": {
+                            "type": "object",
+                            "additionalProperties": {},
+                            "nullable": true
+                          },
+                          "linkedGenerationRunId": {
+                            "type": "string",
+                            "format": "uuid",
+                            "nullable": true
+                          },
+                          "linkedAgentRunId": {
+                            "type": "string",
+                            "format": "uuid",
+                            "nullable": true
+                          },
+                          "outputArtifactIds": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "format": "uuid"
+                            }
+                          },
+                          "summary": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "failureReason": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "updatedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "startedAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "nullable": true
+                          },
+                          "completedAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "nullable": true
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "runId",
+                          "projectId",
+                          "userId",
+                          "role",
+                          "status",
+                          "objective",
+                          "input",
+                          "linkedGenerationRunId",
+                          "linkedAgentRunId",
+                          "outputArtifactIds",
+                          "summary",
+                          "failureReason",
+                          "createdAt",
+                          "updatedAt",
+                          "startedAt",
+                          "completedAt"
+                        ],
+                        "additionalProperties": false
+                      }
                     },
                     "linkedGenerationRunId": {
                       "type": "string",
@@ -17128,6 +17693,7 @@
                     "currentStage",
                     "progressPercent",
                     "input",
+                    "roles",
                     "linkedGenerationRunId",
                     "linkedAgentRunId",
                     "creatorReport",
@@ -17325,6 +17891,120 @@
                       ],
                       "additionalProperties": false
                     },
+                    "roles": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "runId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "projectId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "userId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "role": {
+                            "type": "string",
+                            "enum": [
+                              "creator",
+                              "designer",
+                              "editor",
+                              "engineer"
+                            ]
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "queued",
+                              "running",
+                              "completed",
+                              "failed",
+                              "skipped"
+                            ]
+                          },
+                          "objective": {
+                            "type": "string"
+                          },
+                          "input": {
+                            "type": "object",
+                            "additionalProperties": {},
+                            "nullable": true
+                          },
+                          "linkedGenerationRunId": {
+                            "type": "string",
+                            "format": "uuid",
+                            "nullable": true
+                          },
+                          "linkedAgentRunId": {
+                            "type": "string",
+                            "format": "uuid",
+                            "nullable": true
+                          },
+                          "outputArtifactIds": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "format": "uuid"
+                            }
+                          },
+                          "summary": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "failureReason": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "updatedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "startedAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "nullable": true
+                          },
+                          "completedAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "nullable": true
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "runId",
+                          "projectId",
+                          "userId",
+                          "role",
+                          "status",
+                          "objective",
+                          "input",
+                          "linkedGenerationRunId",
+                          "linkedAgentRunId",
+                          "outputArtifactIds",
+                          "summary",
+                          "failureReason",
+                          "createdAt",
+                          "updatedAt",
+                          "startedAt",
+                          "completedAt"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
                     "linkedGenerationRunId": {
                       "type": "string",
                       "format": "uuid",
@@ -17781,6 +18461,7 @@
                     "currentStage",
                     "progressPercent",
                     "input",
+                    "roles",
                     "linkedGenerationRunId",
                     "linkedAgentRunId",
                     "creatorReport",
@@ -17977,6 +18658,120 @@
                       ],
                       "additionalProperties": false
                     },
+                    "roles": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "runId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "projectId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "userId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "role": {
+                            "type": "string",
+                            "enum": [
+                              "creator",
+                              "designer",
+                              "editor",
+                              "engineer"
+                            ]
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "queued",
+                              "running",
+                              "completed",
+                              "failed",
+                              "skipped"
+                            ]
+                          },
+                          "objective": {
+                            "type": "string"
+                          },
+                          "input": {
+                            "type": "object",
+                            "additionalProperties": {},
+                            "nullable": true
+                          },
+                          "linkedGenerationRunId": {
+                            "type": "string",
+                            "format": "uuid",
+                            "nullable": true
+                          },
+                          "linkedAgentRunId": {
+                            "type": "string",
+                            "format": "uuid",
+                            "nullable": true
+                          },
+                          "outputArtifactIds": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "format": "uuid"
+                            }
+                          },
+                          "summary": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "failureReason": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "updatedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "startedAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "nullable": true
+                          },
+                          "completedAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "nullable": true
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "runId",
+                          "projectId",
+                          "userId",
+                          "role",
+                          "status",
+                          "objective",
+                          "input",
+                          "linkedGenerationRunId",
+                          "linkedAgentRunId",
+                          "outputArtifactIds",
+                          "summary",
+                          "failureReason",
+                          "createdAt",
+                          "updatedAt",
+                          "startedAt",
+                          "completedAt"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
                     "linkedGenerationRunId": {
                       "type": "string",
                       "format": "uuid",
@@ -18433,6 +19228,7 @@
                     "currentStage",
                     "progressPercent",
                     "input",
+                    "roles",
                     "linkedGenerationRunId",
                     "linkedAgentRunId",
                     "creatorReport",
@@ -18629,6 +19425,120 @@
                       ],
                       "additionalProperties": false
                     },
+                    "roles": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "runId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "projectId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "userId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "role": {
+                            "type": "string",
+                            "enum": [
+                              "creator",
+                              "designer",
+                              "editor",
+                              "engineer"
+                            ]
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "queued",
+                              "running",
+                              "completed",
+                              "failed",
+                              "skipped"
+                            ]
+                          },
+                          "objective": {
+                            "type": "string"
+                          },
+                          "input": {
+                            "type": "object",
+                            "additionalProperties": {},
+                            "nullable": true
+                          },
+                          "linkedGenerationRunId": {
+                            "type": "string",
+                            "format": "uuid",
+                            "nullable": true
+                          },
+                          "linkedAgentRunId": {
+                            "type": "string",
+                            "format": "uuid",
+                            "nullable": true
+                          },
+                          "outputArtifactIds": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "format": "uuid"
+                            }
+                          },
+                          "summary": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "failureReason": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "updatedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "startedAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "nullable": true
+                          },
+                          "completedAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "nullable": true
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "runId",
+                          "projectId",
+                          "userId",
+                          "role",
+                          "status",
+                          "objective",
+                          "input",
+                          "linkedGenerationRunId",
+                          "linkedAgentRunId",
+                          "outputArtifactIds",
+                          "summary",
+                          "failureReason",
+                          "createdAt",
+                          "updatedAt",
+                          "startedAt",
+                          "completedAt"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
                     "linkedGenerationRunId": {
                       "type": "string",
                       "format": "uuid",
@@ -19085,6 +19995,7 @@
                     "currentStage",
                     "progressPercent",
                     "input",
+                    "roles",
                     "linkedGenerationRunId",
                     "linkedAgentRunId",
                     "creatorReport",

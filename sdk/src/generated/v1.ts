@@ -33,6 +33,7 @@ import type {
   GraphInterruptIdParams,
   GraphInterruptResolutionRequestBody,
   ImprovementLoopArtifact,
+  ImprovementLoopDefaultEngineeringTarget,
   ImprovementLoopRun,
   ImprovementLoopRunDetail,
   ImprovementLoopRunIdParams,
@@ -117,6 +118,7 @@ export interface V1Client {
     listAgentActions(params: AgentRunIdParams, config?: AxiosRequestConfig): Promise<AgentAction[]>;
   };
   improvementLoops: {
+    getDefaultImprovementLoopEngineeringTarget(config?: AxiosRequestConfig): Promise<ImprovementLoopDefaultEngineeringTarget>;
     createImprovementLoopAndProject(body: CreateImprovementLoopAndProjectRequest, config?: AxiosRequestConfig): Promise<ImprovementLoopRun>;
     createImprovementLoop(params: ProjectIdParams, body: CreateImprovementLoopRequest, config?: AxiosRequestConfig): Promise<ImprovementLoopRun>;
     listImprovementLoops(params: ProjectIdParams, config?: AxiosRequestConfig): Promise<ImprovementLoopRunSummary[]>;
@@ -331,6 +333,10 @@ export function createV1Client(axios: AxiosInstance): V1Client {
       },
     },
     improvementLoops: {
+      async getDefaultImprovementLoopEngineeringTarget(config?: AxiosRequestConfig) {
+        const { data } = await axios.get<ImprovementLoopDefaultEngineeringTarget>('/v1/improvement-loops/default-engineering-target', config);
+        return data;
+      },
       async createImprovementLoopAndProject(body: CreateImprovementLoopAndProjectRequest, config?: AxiosRequestConfig) {
         const { data } = await axios.post<ImprovementLoopRun>('/v1/improvement-loops', body, config);
         return data;

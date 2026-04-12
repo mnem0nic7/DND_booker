@@ -81,6 +81,38 @@ npm run invites --workspace=server -- revoke invited@example.com
 
 Existing users can still log in normally. New registrations require an active invite row.
 
+## GitHub App Auto-Apply
+
+AI-team engineering auto-apply is GitHub App-backed in production. Report-only mode still works when these values are missing, but branch creation and draft PR creation require the GitHub App secrets and a real installation id.
+
+Provision or update the Cloud Run secrets with:
+
+```bash
+GITHUB_APP_ID_VALUE=123456 \
+GITHUB_APP_PRIVATE_KEY_PATH=/path/to/github-app.private-key.pem \
+bash ./scripts/configure-cloudrun-github-app-secrets.sh
+```
+
+Then deploy with the GitHub App secret names and the installed repo id:
+
+```bash
+export CLOUDRUN_GITHUB_APP_ID_SECRET="dnd-booker-github-app-id"
+export CLOUDRUN_GITHUB_APP_PRIVATE_KEY_SECRET="dnd-booker-github-app-private-key"
+export DEFAULT_ENGINEERING_INSTALLATION_ID="123456"
+npm run deploy:cloudrun
+```
+
+The web and worker manifests now support:
+
+- `GITHUB_APP_ID`
+- `GITHUB_APP_PRIVATE_KEY`
+- `DEFAULT_ENGINEERING_REPOSITORY_FULL_NAME`
+- `DEFAULT_ENGINEERING_INSTALLATION_ID`
+- `DEFAULT_ENGINEERING_DEFAULT_BRANCH`
+- `DEFAULT_ENGINEERING_PATH_ALLOWLIST`
+
+The server publishes the dashboard default through `/api/v1/improvement-loops/default-engineering-target`. If the GitHub App credentials or installation id are missing, that route intentionally reports report-only mode instead of pretending auto-apply is available.
+
 ## Monitoring And Alerting
 
 Install the checked-in Cloud Monitoring policies after the web/worker services exist:
@@ -249,12 +281,14 @@ export SMOKE_TEST_GENERATION_PROMPT="optional smoke prompt override"
 To run the live improvement-loop smoke after the base v1 smoke, also set:
 
 ```bash
-export SMOKE_IMPROVEMENT_LOOP_REPOSITORY_FULL_NAME="owner/repo"
-export SMOKE_IMPROVEMENT_LOOP_INSTALLATION_ID="123456"
-export SMOKE_IMPROVEMENT_LOOP_DEFAULT_BRANCH="main"
-export SMOKE_IMPROVEMENT_LOOP_ALLOWLIST="docs/,README.md,CLAUDE.md"
+export SMOKE_IMPROVEMENT_LOOP_REPOSITORY_FULL_NAME="owner/repo" # optional if Cloud Run default target is configured
+export SMOKE_IMPROVEMENT_LOOP_INSTALLATION_ID="123456"          # optional if Cloud Run default target is configured
+export SMOKE_IMPROVEMENT_LOOP_DEFAULT_BRANCH="main"             # optional
+export SMOKE_IMPROVEMENT_LOOP_ALLOWLIST="docs/,README.md,CLAUDE.md" # optional
 export SMOKE_IMPROVEMENT_LOOP_EXPECT_APPLY="false"
 ```
+
+If those repo/install env vars are omitted, the smoke now loads the default AI-team engineering target from `/api/v1/improvement-loops/default-engineering-target` after login and uses that configuration automatically.
 
 `SMOKE_IMPROVEMENT_LOOP_EXPECT_APPLY=true` requires the engineering stage to create a branch and draft PR. Keep it `false` if you are validating the full loop against a binding that intentionally skips auto-apply outside the allowlist.
 

@@ -3,6 +3,7 @@ import { getAccessToken, v1Client } from '../lib/api';
 import type {
   CreateImprovementLoopAndProjectRequest,
   CreateImprovementLoopRequest,
+  ImprovementLoopDefaultEngineeringTarget,
   ImprovementLoopArtifact,
   ImprovementLoopRun,
   ImprovementLoopRunStatus,
@@ -30,6 +31,8 @@ interface ImprovementLoopState {
   isLoadingArtifacts: boolean;
   binding: ProjectGitHubRepoBinding | null;
   validation: ProjectGitHubRepoBindingValidation | null;
+  defaultEngineeringTarget: ImprovementLoopDefaultEngineeringTarget | null;
+  isLoadingDefaultEngineeringTarget: boolean;
   isSavingBinding: boolean;
   isValidatingBinding: boolean;
   _eventSource: AbortController | null;
@@ -45,6 +48,7 @@ interface ImprovementLoopState {
   resumeRun: (projectId: string, runId: string) => Promise<void>;
   cancelRun: (projectId: string, runId: string) => Promise<void>;
   fetchBinding: (projectId: string) => Promise<void>;
+  fetchDefaultEngineeringTarget: () => Promise<ImprovementLoopDefaultEngineeringTarget | null>;
   saveBinding: (projectId: string, body: ProjectGitHubRepoBindingInput) => Promise<ProjectGitHubRepoBinding | null>;
   validateBinding: (projectId: string) => Promise<ProjectGitHubRepoBindingValidation | null>;
   reset: () => void;
@@ -66,6 +70,8 @@ export const useImprovementLoopStore = create<ImprovementLoopState>((set, get) =
   isLoadingArtifacts: false,
   binding: null,
   validation: null,
+  defaultEngineeringTarget: null,
+  isLoadingDefaultEngineeringTarget: false,
   isSavingBinding: false,
   isValidatingBinding: false,
   _eventSource: null,
@@ -80,7 +86,12 @@ export const useImprovementLoopStore = create<ImprovementLoopState>((set, get) =
     });
     try {
       const data = await v1Client.improvementLoops.createImprovementLoop({ projectId }, body);
-      set({ currentRun: data, isStarting: false });
+      set({
+        currentRun: data,
+        isStarting: false,
+        progressPercent: data.progressPercent ?? 0,
+        currentStage: data.currentStage,
+      });
       get().subscribeToRun(projectId, data.id);
       return data;
     } catch (err: unknown) {
@@ -99,7 +110,13 @@ export const useImprovementLoopStore = create<ImprovementLoopState>((set, get) =
     });
     try {
       const data = await v1Client.improvementLoops.createImprovementLoopAndProject(body);
-      set({ currentRun: data, isStarting: false });
+      set({
+        currentRun: data,
+        isStarting: false,
+        progressPercent: data.progressPercent ?? 0,
+        currentStage: data.currentStage,
+      });
+      get().subscribeToRun(data.projectId, data.id);
       return data;
     } catch (err: unknown) {
       set({ isStarting: false, error: toErrorMessage(err, 'Failed to create project and start improvement loop') });
@@ -132,6 +149,13 @@ export const useImprovementLoopStore = create<ImprovementLoopState>((set, get) =
         } else {
           await get().fetchArtifacts(projectId, latest.id);
         }
+      } else {
+        set({
+          currentRun: null,
+          artifacts: [],
+          progressPercent: 0,
+          currentStage: null,
+        });
       }
     } catch {
       // No loop yet is normal.
@@ -279,6 +303,24 @@ export const useImprovementLoopStore = create<ImprovementLoopState>((set, get) =
     }
   },
 
+  fetchDefaultEngineeringTarget: async () => {
+    set({ isLoadingDefaultEngineeringTarget: true, error: null });
+    try {
+      const target = await v1Client.improvementLoops.getDefaultImprovementLoopEngineeringTarget();
+      set({
+        defaultEngineeringTarget: target,
+        isLoadingDefaultEngineeringTarget: false,
+      });
+      return target;
+    } catch (err: unknown) {
+      set({
+        isLoadingDefaultEngineeringTarget: false,
+        error: toErrorMessage(err, 'Failed to load the default engineering target'),
+      });
+      return null;
+    }
+  },
+
   saveBinding: async (projectId, body) => {
     set({ isSavingBinding: true, error: null });
     try {
@@ -316,6 +358,8 @@ export const useImprovementLoopStore = create<ImprovementLoopState>((set, get) =
       isLoadingArtifacts: false,
       binding: null,
       validation: null,
+      defaultEngineeringTarget: null,
+      isLoadingDefaultEngineeringTarget: false,
       isSavingBinding: false,
       isValidatingBinding: false,
     });

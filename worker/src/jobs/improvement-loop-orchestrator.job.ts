@@ -2,6 +2,7 @@ import type { Job } from 'bullmq';
 import type {
   AgentRun,
   EngineeringApplyResult,
+  ImprovementLoopRole,
   ImprovementLoopRunStatus,
 } from '@dnd-booker/shared';
 import { prisma } from '../config/database.js';
@@ -128,6 +129,13 @@ async function countGenerationEvaluations(runId: string) {
   });
 }
 
+const STAGE_TO_ROLE: Record<string, ImprovementLoopRole> = {
+  creator: 'creator',
+  designer: 'designer',
+  editor: 'editor',
+  engineering: 'engineer',
+};
+
 export async function processImprovementLoop(job: Job<ImprovementLoopJobData>): Promise<void> {
   const { runId, userId, projectId } = job.data;
   const dependencies = await loadImprovementLoopDependencies();
@@ -158,8 +166,19 @@ export async function processImprovementLoop(job: Job<ImprovementLoopJobData>): 
     });
   }
 
-  async function createArtifactAndPublish(input: Parameters<typeof dependencies.createImprovementLoopArtifact>[0]) {
+  async function createArtifactAndPublish(
+    input: Parameters<typeof dependencies.createImprovementLoopArtifact>[0],
+    role?: ImprovementLoopRole,
+  ) {
     const artifact = await dependencies.createImprovementLoopArtifact(input);
+    if (role) {
+      await dependencies.updateImprovementLoopRoleRun({
+        runId,
+        role,
+        outputArtifactId: artifact.id,
+        summary: input.summary ?? null,
+      });
+    }
     await dependencies.publishImprovementLoopEvent(runId, {
       type: 'artifact_created',
       runId,
@@ -169,6 +188,46 @@ export async function processImprovementLoop(job: Job<ImprovementLoopJobData>): 
       version: artifact.version,
     });
     return artifact;
+  }
+
+  async function ensureRole(role: ImprovementLoopRole, objective: string, stageInput?: Record<string, unknown> | null) {
+    await dependencies.ensureImprovementLoopRoleRun({
+      runId,
+      projectId,
+      userId,
+      role,
+      objective,
+      stageInput,
+    });
+  }
+
+  async function markRoleRunning(role: ImprovementLoopRole, summary?: string | null, stageInput?: Record<string, unknown> | null) {
+    await dependencies.updateImprovementLoopRoleRun({
+      runId,
+      role,
+      status: 'running',
+      summary: summary ?? null,
+      ...(stageInput !== undefined ? { stageInput } : {}),
+    });
+  }
+
+  async function markRoleCompleted(role: ImprovementLoopRole, summary?: string | null) {
+    await dependencies.updateImprovementLoopRoleRun({
+      runId,
+      role,
+      status: 'completed',
+      summary: summary ?? null,
+    });
+  }
+
+  async function markRoleFailed(role: ImprovementLoopRole, reason: string) {
+    await dependencies.updateImprovementLoopRoleRun({
+      runId,
+      role,
+      status: 'failed',
+      summary: reason,
+      failureReason: reason,
+    });
   }
 
   async function waitForGenerationRunCompletion(childRunId: string) {
@@ -289,6 +348,16 @@ export async function processImprovementLoop(job: Job<ImprovementLoopJobData>): 
 
           const substantialContentDetected = projectLooksSubstantial(documents.map((document) => document.content));
           const shouldGenerate = currentRun.mode === 'create_campaign' || !substantialContentDetected;
+          const creatorObjective = shouldGenerate
+            ? 'Create the initial campaign package and hand it off to the rest of the AI team.'
+            : 'Synthesize the current project into creator-ready planning context without overwriting authored content.';
+          await ensureRole('creator', creatorObjective, {
+            mode: currentRun.mode,
+            shouldGenerate,
+            substantialContentDetected,
+            prompt: currentRun.input.prompt,
+          });
+          await markRoleRunning('creator', shouldGenerate ? 'Creator is generating the initial campaign package.' : 'Creator is synthesizing the current project state.');
 
           let creatorChildRunId = data.creatorChildRunId;
           if (shouldGenerate) {
@@ -304,6 +373,11 @@ export async function processImprovementLoop(job: Job<ImprovementLoopJobData>): 
               creatorChildRunId = seedRun.id;
               await dependencies.updateImprovementLoopState({
                 runId,
+                linkedGenerationRunId: seedRun.id,
+              });
+              await dependencies.updateImprovementLoopRoleRun({
+                runId,
+                role: 'creator',
                 linkedGenerationRunId: seedRun.id,
               });
               await dependencies.enqueueGenerationRun(seedRun.id, userId, projectId, { priority: 10 });
@@ -347,7 +421,8 @@ export async function processImprovementLoop(job: Job<ImprovementLoopJobData>): 
               '',
               ...creatorReport.notes.map((note: string) => `- ${note}`),
             ].join('\n'),
-          });
+          }, 'creator');
+          await markRoleCompleted('creator', creatorReport.summary);
 
           return {
             nextNode: 'designer',
@@ -360,6 +435,13 @@ export async function processImprovementLoop(job: Job<ImprovementLoopJobData>): 
         designer: async ({ data, persistData }) => {
           await setStatus('designer', 48);
           const currentRun = await refreshRun();
+          const designerObjective = 'Improve the campaign package for DM utility, presentation quality, layout quality, and publication readiness.';
+          await ensureRole('designer', designerObjective, {
+            objective: currentRun.input.objective,
+            generationQuality: currentRun.input.generationQuality,
+            executionMode: 'autonomous_agent',
+          });
+          await markRoleRunning('designer', 'Designer is running the autonomous improvement pass.');
           let designerChildRunId = data.designerChildRunId;
 
           if (!designerChildRunId) {
@@ -378,6 +460,11 @@ export async function processImprovementLoop(job: Job<ImprovementLoopJobData>): 
             designerChildRunId = childRun.id;
             await dependencies.updateImprovementLoopState({
               runId,
+              linkedAgentRunId: childRun.id,
+            });
+            await dependencies.updateImprovementLoopRoleRun({
+              runId,
+              role: 'designer',
               linkedAgentRunId: childRun.id,
             });
             await dependencies.enqueueAgentRun(childRun.id, userId, projectId, { priority: 10 });
@@ -426,7 +513,8 @@ export async function processImprovementLoop(job: Job<ImprovementLoopJobData>): 
               '## Recommendations',
               ...designerUxNotes.recommendations.map((value: string) => `- ${value}`),
             ].join('\n'),
-          });
+          }, 'designer');
+          await markRoleCompleted('designer', designerUxNotes.summary);
 
           return {
             nextNode: 'editor',
@@ -439,6 +527,11 @@ export async function processImprovementLoop(job: Job<ImprovementLoopJobData>): 
         editor: async () => {
           await setStatus('editor', 72);
           const currentRun = await refreshRun();
+          const editorObjective = 'Independently score the resulting campaign package and issue a release recommendation.';
+          await ensureRole('editor', editorObjective, {
+            rubric: 'campaign_release_review',
+          });
+          await markRoleRunning('editor', 'Editor is scoring the latest campaign package.');
           const project = await prisma.project.findUniqueOrThrow({
             where: { id: projectId },
             select: { title: true },
@@ -479,7 +572,8 @@ export async function processImprovementLoop(job: Job<ImprovementLoopJobData>): 
               `Overall score: ${editorFinalReport.overallScore}`,
               `Recommendation: ${editorFinalReport.recommendation}`,
             ].join('\n'),
-          });
+          }, 'editor');
+          await markRoleCompleted('editor', editorFinalReport.summary);
 
           return { nextNode: 'engineering' };
         },
@@ -487,6 +581,12 @@ export async function processImprovementLoop(job: Job<ImprovementLoopJobData>): 
         engineering: async () => {
           await setStatus('engineering', 88);
           const currentRun = await refreshRun();
+          const engineerObjective = 'Translate loop findings into safe DND Booker system improvements and a draft GitHub PR when auto-apply is available.';
+          await ensureRole('engineer', engineerObjective, {
+            repository: 'mnem0nic7/DND_booker',
+            autoApplyRequested: true,
+          });
+          await markRoleRunning('engineer', 'Engineer is reviewing loop telemetry and preparing GitHub changes.');
           const binding = await dependencies.getProjectGitHubRepoBinding(projectId, userId);
           if (!binding) {
             throw new Error('GitHub repo binding disappeared before engineering could run.');
@@ -628,7 +728,7 @@ export async function processImprovementLoop(job: Job<ImprovementLoopJobData>): 
               designerUxNotes: currentRun.designerUxNotes,
               applyResult: engineeringApplyResult,
             }),
-          });
+          }, 'engineer');
           await createArtifactAndPublish({
             runId,
             projectId,
@@ -638,7 +738,12 @@ export async function processImprovementLoop(job: Job<ImprovementLoopJobData>): 
             summary: engineeringApplyResult.message,
             jsonContent: engineeringApplyResult,
             markdownContent: `# Engineering Apply Result\n\n${engineeringApplyResult.message}\n`,
-          });
+          }, 'engineer');
+          if (engineeringApplyResult.status === 'failed') {
+            await markRoleFailed('engineer', engineeringApplyResult.message);
+          } else {
+            await markRoleCompleted('engineer', engineeringApplyResult.message);
+          }
 
           await dependencies.publishImprovementLoopEvent(runId, {
             type: 'engineering_applied',
@@ -694,6 +799,11 @@ export async function processImprovementLoop(job: Job<ImprovementLoopJobData>): 
           severity: 'warning',
         });
       } else {
+        const failedRun = await dependencies.getImprovementLoopRun(runId, userId);
+        const failedRole = STAGE_TO_ROLE[failedRun?.currentStage ?? failedRun?.status ?? ''];
+        if (failedRole) {
+          await markRoleFailed(failedRole, reason);
+        }
         await dependencies.transitionImprovementLoopStatus(runId, userId, 'failed', reason);
         await dependencies.publishImprovementLoopEvent(runId, {
           type: 'run_failed',

@@ -206,6 +206,19 @@ export type ProjectGitHubRepoBinding = z.infer<typeof ProjectGitHubRepoBindingSc
 export type ProjectGitHubRepoBindingInput = z.infer<typeof ProjectGitHubRepoBindingInputSchema>;
 export type ProjectGitHubRepoBindingValidation = z.infer<typeof ProjectGitHubRepoBindingValidationSchema>;
 
+export const ImprovementLoopDefaultEngineeringTargetSchema = z.object({
+  repositoryFullName: z.string().min(1),
+  installationId: z.number().int().positive(),
+  defaultBranch: z.string().min(1),
+  pathAllowlist: z.array(z.string().min(1)),
+  engineeringAutomationEnabled: z.boolean(),
+  engineeringAutomationAvailable: z.boolean(),
+  source: z.enum(['env', 'fallback']),
+  message: z.string(),
+});
+
+export type ImprovementLoopDefaultEngineeringTarget = z.infer<typeof ImprovementLoopDefaultEngineeringTargetSchema>;
+
 export const GenerationModeSchema = z.enum(['one_shot', 'module', 'campaign', 'sourcebook']);
 export const GenerationQualitySchema = z.enum(['quick', 'polished']);
 export const RunStatusSchema = z.enum([
@@ -611,6 +624,9 @@ export const ImprovementLoopInputSchema = z.object({
   agentMode: AgentRunModeSchema,
 });
 
+export const ImprovementLoopRoleSchema = z.enum(['creator', 'designer', 'editor', 'engineer']);
+export const ImprovementLoopRoleRunStatusSchema = z.enum(['queued', 'running', 'completed', 'failed', 'skipped']);
+
 export const CreatorReportSchema = z.object({
   mode: z.enum(['generated_campaign', 'synthesized_existing_project']),
   summary: z.string(),
@@ -668,6 +684,26 @@ export const EngineeringApplyResultSchema = z.object({
   deferredPaths: z.array(z.string()),
 });
 
+export const ImprovementLoopRoleRunSchema = z.object({
+  id: z.string().uuid(),
+  runId: z.string().uuid(),
+  projectId: z.string().uuid(),
+  userId: z.string().uuid(),
+  role: ImprovementLoopRoleSchema,
+  status: ImprovementLoopRoleRunStatusSchema,
+  objective: z.string(),
+  input: GraphStateSchema.nullable(),
+  linkedGenerationRunId: z.string().uuid().nullable(),
+  linkedAgentRunId: z.string().uuid().nullable(),
+  outputArtifactIds: z.array(z.string().uuid()),
+  summary: z.string().nullable(),
+  failureReason: z.string().nullable(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+  startedAt: z.string().datetime().nullable(),
+  completedAt: z.string().datetime().nullable(),
+});
+
 export const ImprovementLoopArtifactTypeSchema = z.enum([
   'creator_report',
   'designer_ux_notes',
@@ -716,6 +752,7 @@ export const ImprovementLoopRunSchema = z.object({
   currentStage: z.string().nullable(),
   progressPercent: z.number().int().min(0).max(100),
   input: ImprovementLoopInputSchema,
+  roles: z.array(ImprovementLoopRoleRunSchema),
   linkedGenerationRunId: z.string().uuid().nullable(),
   linkedAgentRunId: z.string().uuid().nullable(),
   creatorReport: CreatorReportSchema.nullable(),
@@ -746,6 +783,7 @@ export const ImprovementLoopRunSummarySchema = z.object({
   status: ImprovementLoopRunStatusSchema,
   currentStage: z.string().nullable(),
   progressPercent: z.number().int().min(0).max(100),
+  roles: z.array(ImprovementLoopRoleRunSchema),
   linkedGenerationRunId: z.string().uuid().nullable(),
   linkedAgentRunId: z.string().uuid().nullable(),
   githubPullRequestNumber: z.number().int().nullable(),
@@ -769,6 +807,9 @@ export type ImprovementLoopRun = z.infer<typeof ImprovementLoopRunSchema>;
 export type ImprovementLoopRunSummary = z.infer<typeof ImprovementLoopRunSummarySchema>;
 export type ImprovementLoopRunDetail = z.infer<typeof ImprovementLoopRunDetailSchema>;
 export type ImprovementLoopArtifact = z.infer<typeof ImprovementLoopArtifactSchema>;
+export type ImprovementLoopRole = z.infer<typeof ImprovementLoopRoleSchema>;
+export type ImprovementLoopRoleRunStatus = z.infer<typeof ImprovementLoopRoleRunStatusSchema>;
+export type ImprovementLoopRoleRun = z.infer<typeof ImprovementLoopRoleRunSchema>;
 export type CreatorReport = z.infer<typeof CreatorReportSchema>;
 export type DesignerUxNotes = z.infer<typeof DesignerUxNotesSchema>;
 export type EditorFinalReport = z.infer<typeof EditorFinalReportSchema>;
@@ -1583,6 +1624,15 @@ export const V1_ROUTE_CONTRACTS: ApiV1RouteContract[] = [
     responseSchema: z.array(AgentActionSchema),
     paramsTypeName: 'AgentRunIdParams',
     responseTypeName: 'AgentAction[]',
+  },
+  {
+    tag: 'improvementLoops',
+    operationId: 'getDefaultImprovementLoopEngineeringTarget',
+    method: 'get',
+    path: '/api/v1/improvement-loops/default-engineering-target',
+    summary: 'Get the default engineering target for AI team runs.',
+    responseSchema: ImprovementLoopDefaultEngineeringTargetSchema,
+    responseTypeName: 'ImprovementLoopDefaultEngineeringTarget',
   },
   {
     tag: 'improvementLoops',

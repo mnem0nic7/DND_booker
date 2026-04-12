@@ -7,6 +7,7 @@ import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import DashboardPage from './pages/DashboardPage';
 import EditorPage from './pages/EditorPage';
+import AiTeamPage from './pages/AiTeamPage';
 
 export default function App() {
   useEffect(() => {
@@ -34,6 +35,16 @@ export default function App() {
             <ProtectedRoute>
               <ErrorBoundary fallbackMessage="The editor encountered an error. Your recent changes were auto-saved.">
                 <EditorPage />
+              </ErrorBoundary>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/ai-team"
+          element={
+            <ProtectedRoute>
+              <ErrorBoundary>
+                <AiTeamPage />
               </ErrorBoundary>
             </ProtectedRoute>
           }

@@ -27,8 +27,19 @@ If the deploy touched improvement-loop orchestration or GitHub repo binding beha
 ```bash
 SMOKE_TEST_EMAIL=... \
 SMOKE_TEST_PASSWORD=... \
+npm run smoke:cloudrun:improvement-loop
+```
+
+If production already has the default AI-team engineering target configured, the smoke can now resolve the repo/install/default-branch/allowlist automatically from `/api/v1/improvement-loops/default-engineering-target` after login.
+
+Set these only when you need to override the Cloud Run defaults:
+
+```bash
 SMOKE_IMPROVEMENT_LOOP_REPOSITORY_FULL_NAME=owner/repo \
 SMOKE_IMPROVEMENT_LOOP_INSTALLATION_ID=123456 \
+SMOKE_IMPROVEMENT_LOOP_DEFAULT_BRANCH=main \
+SMOKE_IMPROVEMENT_LOOP_ALLOWLIST='docs/,README.md,CLAUDE.md' \
+SMOKE_IMPROVEMENT_LOOP_EXPECT_APPLY=true \
 npm run smoke:cloudrun:improvement-loop
 ```
 

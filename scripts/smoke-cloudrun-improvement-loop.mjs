@@ -3,19 +3,14 @@
 const baseUrl = (process.env.BASE_URL ?? process.env.SERVICE_URL ?? '').trim().replace(/\/$/, '');
 const email = process.env.SMOKE_TEST_EMAIL?.trim();
 const password = process.env.SMOKE_TEST_PASSWORD;
-const repositoryFullName = process.env.SMOKE_IMPROVEMENT_LOOP_REPOSITORY_FULL_NAME?.trim();
-const engineeringAutomationEnabled = !/^(0|false|no)$/i.test(
+const requestedRepositoryFullName = process.env.SMOKE_IMPROVEMENT_LOOP_REPOSITORY_FULL_NAME?.trim();
+const requestedDefaultBranch = process.env.SMOKE_IMPROVEMENT_LOOP_DEFAULT_BRANCH?.trim();
+const requestedAllowlist = process.env.SMOKE_IMPROVEMENT_LOOP_ALLOWLIST?.trim();
+const hasEngineeringAutomationEnv = process.env.SMOKE_IMPROVEMENT_LOOP_ENGINEERING_AUTOMATION_ENABLED !== undefined;
+const hasInstallationIdEnv = process.env.SMOKE_IMPROVEMENT_LOOP_INSTALLATION_ID !== undefined;
+const requestedEngineeringAutomationEnabled = !/^(0|false|no)$/i.test(
   process.env.SMOKE_IMPROVEMENT_LOOP_ENGINEERING_AUTOMATION_ENABLED ?? 'true',
 );
-const installationId = Number.parseInt(
-  process.env.SMOKE_IMPROVEMENT_LOOP_INSTALLATION_ID ?? (engineeringAutomationEnabled ? '' : '1'),
-  10,
-);
-const defaultBranch = process.env.SMOKE_IMPROVEMENT_LOOP_DEFAULT_BRANCH?.trim() || 'main';
-const allowlist = (process.env.SMOKE_IMPROVEMENT_LOOP_ALLOWLIST?.trim() || 'docs/,README.md,CLAUDE.md')
-  .split(',')
-  .map((entry) => entry.trim())
-  .filter(Boolean);
 const projectTitle = process.env.SMOKE_IMPROVEMENT_LOOP_PROJECT_TITLE?.trim()
   || `Smoke Improvement Loop ${new Date().toISOString().replace(/[:.]/g, '-')}`;
 const prompt = process.env.SMOKE_IMPROVEMENT_LOOP_PROMPT?.trim()
@@ -45,11 +40,6 @@ if (!baseUrl) {
 
 if (!email || !password) {
   console.error('SMOKE_TEST_EMAIL and SMOKE_TEST_PASSWORD are required for the Cloud Run improvement-loop smoke test.');
-  process.exit(1);
-}
-
-if (!repositoryFullName || !Number.isInteger(installationId) || installationId <= 0) {
-  console.error('SMOKE_IMPROVEMENT_LOOP_REPOSITORY_FULL_NAME and a positive SMOKE_IMPROVEMENT_LOOP_INSTALLATION_ID are required.');
   process.exit(1);
 }
 
@@ -168,6 +158,36 @@ async function main() {
   let runId = null;
 
   await login();
+
+  let repositoryFullName = requestedRepositoryFullName ?? '';
+  let engineeringAutomationEnabled = requestedEngineeringAutomationEnabled;
+  let installationId = Number.parseInt(
+    process.env.SMOKE_IMPROVEMENT_LOOP_INSTALLATION_ID ?? (engineeringAutomationEnabled ? '' : '1'),
+    10,
+  );
+  let defaultBranch = requestedDefaultBranch || 'main';
+  let allowlist = (requestedAllowlist || '')
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+
+  if (!repositoryFullName || !Number.isInteger(installationId) || installationId <= 0 || allowlist.length === 0 || !requestedDefaultBranch || !hasEngineeringAutomationEnv) {
+    const defaultTarget = await apiJson(
+      '/api/v1/improvement-loops/default-engineering-target',
+      {},
+      'load default improvement-loop engineering target',
+    );
+
+    if (!repositoryFullName) repositoryFullName = defaultTarget.repositoryFullName;
+    if (!Number.isInteger(installationId) || installationId <= 0) installationId = defaultTarget.installationId;
+    if (!requestedDefaultBranch) defaultBranch = defaultTarget.defaultBranch;
+    if (allowlist.length === 0) allowlist = defaultTarget.pathAllowlist;
+    if (!hasEngineeringAutomationEnv) engineeringAutomationEnabled = defaultTarget.engineeringAutomationEnabled;
+  }
+
+  if (!repositoryFullName || !Number.isInteger(installationId) || installationId <= 0) {
+    throw new Error('A repository full name and a positive installation id are required for the Cloud Run improvement-loop smoke test.');
+  }
 
   try {
     const run = await apiJson('/api/v1/improvement-loops', {
