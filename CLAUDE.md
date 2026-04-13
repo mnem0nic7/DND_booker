@@ -164,6 +164,7 @@ Agentic artifact versioning must be retry-safe. `createVersionedArtifact(...)` s
 Critic/evaluator passes should also stay on schema-native structured output. Keep `evaluateArtifact(...)` on `generateObjectWithTimeout(...)` with `EvaluationResponseSchema` instead of text generation plus JSON repair so malformed provider text cannot stall or poison the critic loop.
 The same rule now applies to the remaining core writer-side JSON nodes: intake normalization, campaign bible generation, and chapter plan generation should stay on `generateObjectWithTimeout(...)` plus their normalization/final Zod parse layers. Do not reintroduce raw text JSON parsing in those stages.
 `generateObjectWithTimeout(...)` should retry transient structured-output parse/schema misses from the provider. Gemini occasionally returns a malformed object payload on the first pass; absorb that with bounded retries instead of failing the autonomous run immediately.
+Inside the autonomous rewrite loop, `layout_plan`, `art_direction_plan`, and `editor_report` artifacts must also use `createVersionedArtifact(...)`. Those stages can replay after critic-routed rewrites; a raw `generatedArtifact.create({ version: 1 })` will eventually trip a unique-version failure in production.
 
 ### Authentication
 JWT access token (15min) + refresh token (7d, httpOnly cookie). Token version incremented on logout. Client axios interceptor auto-refreshes on 401.

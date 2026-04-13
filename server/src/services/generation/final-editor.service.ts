@@ -4,6 +4,7 @@ import type { EditorialDecision } from '@dnd-booker/shared';
 import { prisma } from '../../config/database.js';
 import { generateObjectWithTimeout } from './model-timeouts.js';
 import { publishGenerationEvent } from './pubsub.service.js';
+import { createVersionedArtifact } from './agentic-artifacts.service.js';
 
 const EditorialDecisionSchema = z.object({
   approved: z.boolean(),
@@ -48,16 +49,6 @@ export async function executeFinalEditorReview(
   model: LanguageModel,
   maxOutputTokens: number,
 ) {
-  const existing = await prisma.generatedArtifact.findFirst({
-    where: {
-      runId: run.id,
-      artifactType: 'editor_report',
-      artifactKey: 'editor-report',
-    },
-    orderBy: [{ version: 'desc' }, { createdAt: 'desc' }],
-    select: { id: true, version: true },
-  });
-
   const { object, usage } = await generateObjectWithTimeout('Final editor review', {
     model,
     system: buildSystemPrompt(),
@@ -73,20 +64,16 @@ export async function executeFinalEditorReview(
   const decision = EditorialDecisionSchema.parse(object) as EditorialDecision;
   const totalTokens = (usage?.inputTokens ?? 0) + (usage?.outputTokens ?? 0);
 
-  const artifact = await prisma.generatedArtifact.create({
-    data: {
-      runId: run.id,
-      projectId: run.projectId,
-      artifactType: 'editor_report',
-      artifactKey: 'editor-report',
-      status: 'accepted',
-      version: (existing?.version ?? 0) + 1,
-      title: 'Final Editor Report',
-      summary: decision.summary,
-      jsonContent: decision as any,
-      tokenCount: totalTokens,
-      parentArtifactId: existing?.id ?? null,
-    },
+  const artifact = await createVersionedArtifact({
+    runId: run.id,
+    projectId: run.projectId,
+    artifactType: 'editor_report',
+    artifactKey: 'editor-report',
+    status: 'accepted',
+    title: 'Final Editor Report',
+    summary: decision.summary,
+    jsonContent: decision as any,
+    tokenCount: totalTokens,
   });
 
   await prisma.generationRun.update({

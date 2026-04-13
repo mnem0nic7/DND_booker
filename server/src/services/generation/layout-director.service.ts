@@ -9,6 +9,7 @@ import { prisma } from '../../config/database.js';
 import { materializeSparsePageArt } from '../layout-art.service.js';
 import { buildResolvedPublicationDocumentWriteData } from '../document-publication.service.js';
 import { rebuildProjectContentCache } from '../project-document-content.service.js';
+import { createVersionedArtifact } from './agentic-artifacts.service.js';
 
 interface LayoutDirectedDocumentSummary {
   documentId: string;
@@ -187,21 +188,18 @@ export async function executeLayoutDirectorPass(run: { id: string; projectId: st
     await rebuildProjectContentCache(run.projectId);
   }
 
-  const artifact = await prisma.generatedArtifact.create({
-    data: {
-      runId: run.id,
-      projectId: run.projectId,
-      artifactType: 'layout_plan',
-      artifactKey: 'layout-plan',
-      status: 'accepted',
-      version: 1,
-      title: 'Layout Plan',
-      summary: `Applied canonical layout plans to ${summaries.length} document${summaries.length === 1 ? '' : 's'}.`,
-      jsonContent: {
-        documentsUpdated,
-        documents: summaries,
-      } as any,
-    },
+  const artifact = await createVersionedArtifact({
+    runId: run.id,
+    projectId: run.projectId,
+    artifactType: 'layout_plan',
+    artifactKey: 'layout-plan',
+    status: 'accepted',
+    title: 'Layout Plan',
+    summary: `Applied canonical layout plans to ${summaries.length} document${summaries.length === 1 ? '' : 's'}.`,
+    jsonContent: {
+      documentsUpdated,
+      documents: summaries,
+    } as any,
   });
 
   return {

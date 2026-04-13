@@ -66,6 +66,7 @@ export async function createVersionedArtifact(input: {
   jsonContent: unknown;
   markdownContent?: string | null;
   metadata?: unknown;
+  tokenCount?: number | null;
   status?: 'accepted' | 'generated';
 }) {
   const nextJson = stableJson(input.jsonContent);
@@ -99,6 +100,7 @@ export async function createVersionedArtifact(input: {
           jsonContent: input.jsonContent as any,
           markdownContent: input.markdownContent ?? null,
           metadata: (input.metadata as any) ?? undefined,
+          tokenCount: input.tokenCount ?? null,
           parentArtifactId: existing?.id ?? null,
         },
       });

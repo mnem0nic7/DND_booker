@@ -10,6 +10,7 @@ import { createAsset } from '../asset.service.js';
 import { generateTextWithTimeout } from './model-timeouts.js';
 import { buildResolvedPublicationDocumentWriteData } from '../document-publication.service.js';
 import { rebuildProjectContentCache } from '../project-document-content.service.js';
+import { createVersionedArtifact } from './agentic-artifacts.service.js';
 
 type ImageCapableBlockType =
   | 'titlePage'
@@ -1234,38 +1235,35 @@ export async function executeArtDirectionPass(
 
   await rebuildProjectContentCache(run.projectId);
 
-  const artifact = await prisma.generatedArtifact.create({
-    data: {
-      runId: run.id,
-      projectId: run.projectId,
-      artifactType: 'art_direction_plan',
-      artifactKey: 'art-direction-plan',
-      status: 'accepted',
-      version: 1,
-      title: 'Art Direction Plan',
-      summary: plan.summary,
-      jsonContent: {
-        ...plan,
-        placements: applicablePlacements,
-        generatedImages: realized.successfulPlacements,
-        failedImagePlacements: realized.failedPlacements,
-        skippedImageGenerationReason: realized.skippedReason,
-      } as any,
-      markdownContent: buildMarkdown({
-        ...plan,
-        placements: applicablePlacements,
-      }),
-      tokenCount: totalTokens,
-      metadata: {
-        slotCount: slots.length,
-        selectedPlacementCount: selectedSlots.length,
-        appliedPlacementCount: applicablePlacements.length,
-        generatedImageCount: realized.successfulPlacements.length,
-        failedImageCount: realized.failedPlacements.length,
-        skippedImageGenerationReason: realized.skippedReason,
-        selectionMode: 'automatic',
-      } as any,
-    },
+  const artifact = await createVersionedArtifact({
+    runId: run.id,
+    projectId: run.projectId,
+    artifactType: 'art_direction_plan',
+    artifactKey: 'art-direction-plan',
+    status: 'accepted',
+    title: 'Art Direction Plan',
+    summary: plan.summary,
+    jsonContent: {
+      ...plan,
+      placements: applicablePlacements,
+      generatedImages: realized.successfulPlacements,
+      failedImagePlacements: realized.failedPlacements,
+      skippedImageGenerationReason: realized.skippedReason,
+    } as any,
+    markdownContent: buildMarkdown({
+      ...plan,
+      placements: applicablePlacements,
+    }),
+    tokenCount: totalTokens,
+    metadata: {
+      slotCount: slots.length,
+      selectedPlacementCount: selectedSlots.length,
+      appliedPlacementCount: applicablePlacements.length,
+      generatedImageCount: realized.successfulPlacements.length,
+      failedImageCount: realized.failedPlacements.length,
+      skippedImageGenerationReason: realized.skippedReason,
+      selectionMode: 'automatic',
+    } as any,
   });
 
   await prisma.generationRun.update({

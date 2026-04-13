@@ -74,6 +74,7 @@ Artifact evaluation in the critic loop now uses schema-native structured output.
 Critic-report and print-manifest artifact writes must remain retry-safe under BullMQ/job retries. The versioned artifact helper now scopes latest-record lookups by `(runId, artifactType, artifactKey)`, compares canonicalized JSON payloads, and retries on Prisma unique-constraint messages even if the error object omits `code: 'P2002'`.
 Intake normalization, campaign bible generation, and chapter plan generation are also on schema-native structured output now. Those three nodes sit directly on the autonomous writer path; if they regress back to text JSON parsing, expect intermittent writer-stage retries in production smoke and live runs.
 `generateObjectWithTimeout(...)` now retries transient object-parse/schema misses before surfacing a failure. Keep that retry behavior in place for the autonomous interview/writer/critic stages unless a provider-specific regression proves it harmful.
+The same replay-safety rule applies to `layout_plan`, `art_direction_plan`, and `editor_report`: those artifacts can be regenerated after critic-routed rewrites, so they must go through the shared versioned-artifact helper instead of inserting a fresh `version: 1` row on each pass.
 
 ## Invite-Only Registration
 
