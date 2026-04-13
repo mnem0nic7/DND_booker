@@ -156,6 +156,7 @@ Keep agent-stage state in `graphStateJson` (`agentStage`, `criticCycle`, `qualit
 Autonomous runs use system-managed model credentials from `config/agents.yaml`, not the user’s saved AI settings. For Google-backed autonomous stages, both web and worker Cloud Run services must have `SYSTEM_GOOGLE_API_KEY`.
 Prompt-only autonomous runs should still seed `qualityBudgetLane` from the run quality (`quick -> fast`, `polished -> high_quality`) so they follow the same routed presets as interview-driven runs.
 The `artist_requested` stage must resolve both provider credentials and prompt-planning model selection from `agent.artist`. Do not route that stage through `agent.layout_expert`.
+The autonomous critic loop can legitimately run much longer than a single write stage because it evaluates many artifacts in sequence. Keep critic stages on their longer dedicated timeout budget, and keep artist generation on its own longer timeout budget as well, rather than inflating the global core-stage timeout for every node.
 
 ### Authentication
 JWT access token (15min) + refresh token (7d, httpOnly cookie). Token version incremented on logout. Client axios interceptor auto-refreshes on 401.

@@ -67,6 +67,7 @@ Generation orchestration also routes model selection per stage through the check
 The worker also enforces a hard timeout on the core generation nodes. If a provider call hangs inside intake, bible, outline, canon expansion, chapter planning, or chapter drafting, the node now errors and retries from the last persisted checkpoint instead of leaving the run stuck indefinitely.
 Legacy product `/api/*` compatibility routes have been removed. Keep health and infra probes on `/api/health`, and use `/api/v1/*` for app traffic, smoke tests, and operator tooling.
 Autonomous generation uses a system-managed Gemini credential for the artist stage and any other system-routed Google model calls. Set `SYSTEM_GOOGLE_API_KEY` in both Cloud Run services with a Secret Manager secret named `dnd-booker-system-google-api-key`.
+Critic and artist stages now have longer dedicated timeout budgets than the default core stage timeout. If production runs need tuning, prefer `GENERATION_CRITIC_STAGE_TIMEOUT_MS` and `GENERATION_ARTIST_STAGE_TIMEOUT_MS` over raising the global `GENERATION_CORE_STAGE_TIMEOUT_MS`.
 
 ## Invite-Only Registration
 

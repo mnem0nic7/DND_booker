@@ -51,6 +51,8 @@ const MAX_CRITIC_CYCLES = 4;
 
 const DEFAULT_OPTIONAL_STAGE_TIMEOUT_MS = 4 * 60 * 1000;
 const DEFAULT_CORE_STAGE_TIMEOUT_MS = 6 * 60 * 1000;
+const DEFAULT_ARTIST_STAGE_TIMEOUT_MS = 12 * 60 * 1000;
+const DEFAULT_CRITIC_STAGE_TIMEOUT_MS = 15 * 60 * 1000;
 const REVISION_ELIGIBLE_CATEGORIES = new Set(['written']);
 const SUPPORTED_CANON_ENTITY_TYPES: Record<string, string> = {
   npc: 'npc_dossier',
@@ -93,9 +95,15 @@ function resolveCoreStageTimeoutMs(): number {
   return DEFAULT_CORE_STAGE_TIMEOUT_MS;
 }
 
-async function withOptionalStageTimeout<T>(label: string, task: Promise<T>): Promise<T> {
-  const timeoutMs = resolveOptionalStageTimeoutMs();
+function resolveConfiguredStageTimeoutMs(envName: string, fallbackMs: number): number {
+  const parsed = Number.parseInt(process.env[envName] ?? '', 10);
+  if (Number.isFinite(parsed) && parsed > 0) {
+    return parsed;
+  }
+  return fallbackMs;
+}
 
+async function withStageTimeout<T>(label: string, task: Promise<T>, timeoutMs: number): Promise<T> {
   return await new Promise<T>((resolve, reject) => {
     const timeoutHandle = setTimeout(() => {
       reject(new Error(`${label} timed out after ${Math.round(timeoutMs / 1000)}s`));
@@ -113,24 +121,28 @@ async function withOptionalStageTimeout<T>(label: string, task: Promise<T>): Pro
   });
 }
 
+async function withOptionalStageTimeout<T>(label: string, task: Promise<T>): Promise<T> {
+  return withStageTimeout(label, task, resolveOptionalStageTimeoutMs());
+}
+
 async function withCoreStageTimeout<T>(label: string, task: Promise<T>): Promise<T> {
-  const timeoutMs = resolveCoreStageTimeoutMs();
+  return withStageTimeout(label, task, resolveCoreStageTimeoutMs());
+}
 
-  return await new Promise<T>((resolve, reject) => {
-    const timeoutHandle = setTimeout(() => {
-      reject(new Error(`${label} timed out after ${Math.round(timeoutMs / 1000)}s`));
-    }, timeoutMs);
+async function withArtistStageTimeout<T>(label: string, task: Promise<T>): Promise<T> {
+  return withStageTimeout(
+    label,
+    task,
+    resolveConfiguredStageTimeoutMs('GENERATION_ARTIST_STAGE_TIMEOUT_MS', DEFAULT_ARTIST_STAGE_TIMEOUT_MS),
+  );
+}
 
-    task
-      .then((value) => {
-        clearTimeout(timeoutHandle);
-        resolve(value);
-      })
-      .catch((error) => {
-        clearTimeout(timeoutHandle);
-        reject(error);
-      });
-  });
+async function withCriticStageTimeout<T>(label: string, task: Promise<T>): Promise<T> {
+  return withStageTimeout(
+    label,
+    task,
+    resolveConfiguredStageTimeoutMs('GENERATION_CRITIC_STAGE_TIMEOUT_MS', DEFAULT_CRITIC_STAGE_TIMEOUT_MS),
+  );
 }
 
 function hasRetryRemaining(job: Job<GenerationJobData>) {
@@ -857,7 +869,7 @@ export async function processGenerationJob(job: Job<GenerationJobData>): Promise
           return { nextNode: 'critic_text_pass' };
         })()),
 
-        critic_text_pass: async ({ data }) => withCoreStageTimeout('Critic text pass node', (async () => {
+        critic_text_pass: async ({ data }) => withCriticStageTimeout('Critic text pass node', (async () => {
           const cycle = (data.criticCycle ?? 0) + 1;
           await setAgentStage('critic_text_pass', 'evaluating', 74, { criticCycle: cycle });
           await evaluateLatestArtifacts();
@@ -977,7 +989,7 @@ export async function processGenerationJob(job: Job<GenerationJobData>): Promise
           return { nextNode: 'critic_text_pass', data };
         })()),
 
-        artist_requested: async ({ data }) => withOptionalStageTimeout('Artist requested node', (async () => {
+        artist_requested: async ({ data }) => withArtistStageTimeout('Artist requested node', (async () => {
           await setAgentStage('artist_requested', 'assembling', 82, {
             imageGenerationStatus: 'processing',
           });
@@ -1018,7 +1030,7 @@ export async function processGenerationJob(job: Job<GenerationJobData>): Promise
           return { nextNode: 'critic_image_pass', data };
         },
 
-        critic_image_pass: async ({ data }) => withCoreStageTimeout('Critic image pass node', (async () => {
+        critic_image_pass: async ({ data }) => withCriticStageTimeout('Critic image pass node', (async () => {
           const cycle = (data.criticCycle ?? 0) + 1;
           await setAgentStage('critic_image_pass', 'evaluating', 88, {
             criticCycle: cycle,
