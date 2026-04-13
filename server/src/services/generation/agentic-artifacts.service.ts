@@ -14,6 +14,15 @@ function stableJson(value: unknown) {
   return JSON.stringify(value);
 }
 
+function isUniqueConstraintError(error: unknown) {
+  return Boolean(
+    error
+    && typeof error === 'object'
+    && 'code' in error
+    && (error as { code?: string }).code === 'P2002',
+  );
+}
+
 async function getLatestArtifact(runId: string, artifactKey: string) {
   return prisma.generatedArtifact.findFirst({
     where: { runId, artifactKey },
@@ -21,7 +30,7 @@ async function getLatestArtifact(runId: string, artifactKey: string) {
   });
 }
 
-async function createVersionedArtifact(input: {
+export async function createVersionedArtifact(input: {
   runId: string;
   projectId: string;
   artifactType: string;
@@ -33,34 +42,45 @@ async function createVersionedArtifact(input: {
   metadata?: unknown;
   status?: 'accepted' | 'generated';
 }) {
-  const existing = await getLatestArtifact(input.runId, input.artifactKey);
   const nextJson = stableJson(input.jsonContent);
 
-  if (
-    existing
-    && stableJson(existing.jsonContent) === nextJson
-    && (existing.summary ?? null) === (input.summary ?? null)
-    && (existing.markdownContent ?? null) === (input.markdownContent ?? null)
-  ) {
-    return existing;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const existing = await getLatestArtifact(input.runId, input.artifactKey);
+
+    if (
+      existing
+      && stableJson(existing.jsonContent) === nextJson
+      && (existing.summary ?? null) === (input.summary ?? null)
+      && (existing.markdownContent ?? null) === (input.markdownContent ?? null)
+    ) {
+      return existing;
+    }
+
+    try {
+      return await prisma.generatedArtifact.create({
+        data: {
+          runId: input.runId,
+          projectId: input.projectId,
+          artifactType: input.artifactType,
+          artifactKey: input.artifactKey,
+          status: input.status ?? 'accepted',
+          version: (existing?.version ?? 0) + 1,
+          title: input.title,
+          summary: input.summary,
+          jsonContent: input.jsonContent as any,
+          markdownContent: input.markdownContent ?? null,
+          metadata: (input.metadata as any) ?? undefined,
+          parentArtifactId: existing?.id ?? null,
+        },
+      });
+    } catch (error) {
+      if (!isUniqueConstraintError(error) || attempt === 2) {
+        throw error;
+      }
+    }
   }
 
-  return prisma.generatedArtifact.create({
-    data: {
-      runId: input.runId,
-      projectId: input.projectId,
-      artifactType: input.artifactType,
-      artifactKey: input.artifactKey,
-      status: input.status ?? 'accepted',
-      version: (existing?.version ?? 0) + 1,
-      title: input.title,
-      summary: input.summary,
-      jsonContent: input.jsonContent as any,
-      markdownContent: input.markdownContent ?? null,
-      metadata: (input.metadata as any) ?? undefined,
-      parentArtifactId: existing?.id ?? null,
-    },
-  });
+  throw new Error(`Failed to create versioned artifact ${input.artifactKey}.`);
 }
 
 function asObject(value: unknown): Record<string, unknown> | null {

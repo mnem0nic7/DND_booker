@@ -8,6 +8,7 @@ TAG="${TAG:-$(git rev-parse --short HEAD)}"
 WEB_SERVICE="${WEB_SERVICE:-dnd-booker}"
 WORKER_SERVICE="${WORKER_SERVICE:-dnd-booker-worker}"
 DEPLOY_TARGET="${DEPLOY_TARGET:-all}"
+WORKER_STABILIZATION_SECONDS="${WORKER_STABILIZATION_SECONDS:-90}"
 TEMP_WEB_SERVICE_YAML="$(mktemp)"
 TEMP_WORKER_SERVICE_YAML="$(mktemp)"
 
@@ -86,6 +87,11 @@ if [[ "${DEPLOY_TARGET}" == "all" || "${DEPLOY_TARGET}" == "worker" ]]; then
   if [[ "${WORKER_READY}" != "True" ]]; then
     echo "Worker service is not ready." >&2
     exit 1
+  fi
+
+  if [[ "${WORKER_STABILIZATION_SECONDS}" =~ ^[0-9]+$ ]] && [[ "${WORKER_STABILIZATION_SECONDS}" -gt 0 ]]; then
+    echo "Waiting ${WORKER_STABILIZATION_SECONDS}s for old worker revisions to drain before smoke..."
+    sleep "${WORKER_STABILIZATION_SECONDS}"
   fi
 fi
 
