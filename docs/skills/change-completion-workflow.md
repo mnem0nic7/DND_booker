@@ -34,6 +34,7 @@ Do not stop after code edits unless the user explicitly says not to ship.
 - prompt-only autonomous runs should still derive a concrete `qualityBudgetLane` from the requested run quality so `quick` runs stay on the fast routed lane
 - keep the art-direction stage on `agent.artist` for both provider credentials and prompt-planning model selection; layout routing should stop at the layout draft stage
 - keep agentic artifact versioning retry-safe; duplicate `(run, type, key, version)` collisions during critic/editor retries should be absorbed by re-reading the latest artifact, not by failing the run
+- when hardening versioned artifact writes, scope "latest artifact" reads by `(runId, artifactType, artifactKey)`, compare canonicalized JSON rather than raw object key order, and retry on Prisma unique-constraint message text even if `error.code` is absent
 - active runtime template and asset flows should use `/api/v1/templates`, `/api/v1/projects/:projectId/assets`, and `/api/v1/assets/:id`
 - keep aggregate project content saves on `PATCH /api/v1/projects/:projectId` and manual layout saves on `PATCH /api/v1/projects/:projectId/documents/:docId/layout`; do not reintroduce runtime writes against the old project/document content endpoints
 - if a server-side change mutates `ProjectDocument.content`, keep `canonicalDocJson`, `editorProjectionJson`, `typstSource`, `layoutSnapshotJson`, `layoutEngineVersion`, and `layoutSnapshotUpdatedAt` in sync in the same write; prefer `buildResolvedPublicationDocumentWriteData(...)` over ad hoc update payloads

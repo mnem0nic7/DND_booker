@@ -11,21 +11,47 @@ import { MODE_DEFAULTS } from '@dnd-booker/shared';
 import { prisma } from '../../config/database.js';
 
 function stableJson(value: unknown) {
-  return JSON.stringify(value);
+  return JSON.stringify(sortJsonValue(value));
+}
+
+function sortJsonValue(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map((entry) => sortJsonValue(entry));
+  }
+
+  if (value && typeof value === 'object') {
+    return Object.keys(value as Record<string, unknown>)
+      .sort((left, right) => left.localeCompare(right))
+      .reduce<Record<string, unknown>>((acc, key) => {
+        acc[key] = sortJsonValue((value as Record<string, unknown>)[key]);
+        return acc;
+      }, {});
+  }
+
+  return value;
 }
 
 function isUniqueConstraintError(error: unknown) {
+  const message = error instanceof Error
+    ? error.message
+    : typeof error === 'string'
+      ? error
+      : typeof error === 'object' && error && 'message' in error
+        ? String((error as { message?: unknown }).message ?? '')
+        : '';
+
   return Boolean(
-    error
-    && typeof error === 'object'
-    && 'code' in error
-    && (error as { code?: string }).code === 'P2002',
+    (error
+      && typeof error === 'object'
+      && 'code' in error
+      && (error as { code?: string }).code === 'P2002')
+    || message.includes('Unique constraint failed'),
   );
 }
 
-async function getLatestArtifact(runId: string, artifactKey: string) {
+async function getLatestArtifact(runId: string, artifactType: string, artifactKey: string) {
   return prisma.generatedArtifact.findFirst({
-    where: { runId, artifactKey },
+    where: { runId, artifactType, artifactKey },
     orderBy: [{ version: 'desc' }, { createdAt: 'desc' }],
   });
 }
@@ -43,15 +69,18 @@ export async function createVersionedArtifact(input: {
   status?: 'accepted' | 'generated';
 }) {
   const nextJson = stableJson(input.jsonContent);
+  const nextMetadata = input.metadata === undefined ? null : stableJson(input.metadata);
 
   for (let attempt = 0; attempt < 3; attempt += 1) {
-    const existing = await getLatestArtifact(input.runId, input.artifactKey);
+    const existing = await getLatestArtifact(input.runId, input.artifactType, input.artifactKey);
 
     if (
       existing
       && stableJson(existing.jsonContent) === nextJson
       && (existing.summary ?? null) === (input.summary ?? null)
       && (existing.markdownContent ?? null) === (input.markdownContent ?? null)
+      && (existing.title ?? null) === input.title
+      && ((existing.metadata ?? null) === null ? null : stableJson(existing.metadata)) === nextMetadata
     ) {
       return existing;
     }
@@ -156,9 +185,9 @@ export async function ensureWriterStoryPacketArtifact(run: {
   projectId: string;
 }) {
   const [profileArtifact, bibleArtifact, outlineArtifact, chapterDrafts] = await Promise.all([
-    getLatestArtifact(run.id, 'project-profile'),
-    getLatestArtifact(run.id, 'campaign-bible'),
-    getLatestArtifact(run.id, 'chapter-outline'),
+    getLatestArtifact(run.id, 'project_profile', 'project-profile'),
+    getLatestArtifact(run.id, 'campaign_bible', 'campaign-bible'),
+    getLatestArtifact(run.id, 'chapter_outline', 'chapter-outline'),
     prisma.generatedArtifact.findMany({
       where: {
         runId: run.id,
@@ -371,8 +400,8 @@ export async function ensureLayoutDraftArtifacts(run: {
         kind: true,
       },
     }),
-    getLatestArtifact(run.id, 'layout-plan'),
-    getLatestArtifact(run.id, 'art-direction-plan'),
+    getLatestArtifact(run.id, 'layout_plan', 'layout-plan'),
+    getLatestArtifact(run.id, 'art_direction_plan', 'art-direction-plan'),
   ]);
 
   const artJson = asObject(artArtifact?.jsonContent);

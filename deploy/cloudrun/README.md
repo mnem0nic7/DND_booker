@@ -70,6 +70,7 @@ Autonomous generation uses a system-managed Gemini credential for the artist sta
 Critic and artist stages now have longer dedicated timeout budgets than the default core stage timeout. If production runs need tuning, prefer `GENERATION_CRITIC_STAGE_TIMEOUT_MS` and `GENERATION_ARTIST_STAGE_TIMEOUT_MS` over raising the global `GENERATION_CORE_STAGE_TIMEOUT_MS`.
 `scripts/redeploy-cloudrun.sh` now waits for a short worker stabilization window before running the authenticated smoke. Tune that with `WORKER_STABILIZATION_SECONDS` if a rollout needs more or less time for old worker revisions to drain.
 Artifact evaluation in the critic loop now uses schema-native structured output. Keep evaluator responses on `generateObjectWithTimeout(...)` and `EvaluationResponseSchema`; do not fall back to text JSON repair for live critic passes.
+Critic-report and print-manifest artifact writes must remain retry-safe under BullMQ/job retries. The versioned artifact helper now scopes latest-record lookups by `(runId, artifactType, artifactKey)`, compares canonicalized JSON payloads, and retries on Prisma unique-constraint messages even if the error object omits `code: 'P2002'`.
 
 ## Invite-Only Registration
 
