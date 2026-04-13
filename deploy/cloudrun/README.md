@@ -69,6 +69,7 @@ Legacy product `/api/*` compatibility routes have been removed. Keep health and 
 Autonomous generation uses a system-managed Gemini credential for the artist stage and any other system-routed Google model calls. Set `SYSTEM_GOOGLE_API_KEY` in both Cloud Run services with a Secret Manager secret named `dnd-booker-system-google-api-key`.
 Critic and artist stages now have longer dedicated timeout budgets than the default core stage timeout. If production runs need tuning, prefer `GENERATION_CRITIC_STAGE_TIMEOUT_MS` and `GENERATION_ARTIST_STAGE_TIMEOUT_MS` over raising the global `GENERATION_CORE_STAGE_TIMEOUT_MS`.
 `scripts/redeploy-cloudrun.sh` now waits for a short worker stabilization window before running the authenticated smoke. Tune that with `WORKER_STABILIZATION_SECONDS` if a rollout needs more or less time for old worker revisions to drain.
+Artifact evaluation in the critic loop now uses schema-native structured output. Keep evaluator responses on `generateObjectWithTimeout(...)` and `EvaluationResponseSchema`; do not fall back to text JSON repair for live critic passes.
 
 ## Invite-Only Registration
 

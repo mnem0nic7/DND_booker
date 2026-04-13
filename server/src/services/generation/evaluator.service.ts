@@ -11,7 +11,6 @@ import {
 } from '@dnd-booker/shared';
 import { prisma } from '../../config/database.js';
 import { publishGenerationEvent } from './pubsub.service.js';
-import { parseJsonResponse } from './parse-json.js';
 import { analyzeEstimatedArtifactLayout } from './layout-estimate.service.js';
 import {
   applyDeterministicPublicationPenalty,
@@ -21,7 +20,7 @@ import {
   buildEvaluateArtifactSystemPrompt,
   buildEvaluateArtifactUserPrompt,
 } from './prompts/evaluate-artifact.prompt.js';
-import { generateTextWithTimeout } from './model-timeouts.js';
+import { generateObjectWithTimeout } from './model-timeouts.js';
 
 const FindingSchema = z.object({
   severity: z.enum(['critical', 'major', 'minor', 'informational']),
@@ -270,12 +269,14 @@ export async function evaluateArtifact(
     deterministicLayoutFindings,
   );
 
-  const { text, usage } = await generateTextWithTimeout(`Artifact evaluation for ${artifact.title}`, {
-    model, system, prompt, maxOutputTokens,
+  const { object, usage } = await generateObjectWithTimeout(`Artifact evaluation for ${artifact.title}`, {
+    model,
+    schema: EvaluationResponseSchema,
+    system,
+    prompt,
+    maxOutputTokens,
   });
-
-  const parsed = parseJsonResponse(text);
-  const evalResponse = EvaluationResponseSchema.parse(parsed);
+  const evalResponse = EvaluationResponseSchema.parse(object);
   const mergedFindings = mergeEvaluationFindings(
     evalResponse.findings as EvaluationFinding[],
     [...deterministicLayoutFindings, ...deterministicContentFindings],

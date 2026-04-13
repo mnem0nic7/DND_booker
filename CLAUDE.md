@@ -159,6 +159,7 @@ The `artist_requested` stage must resolve both provider credentials and prompt-p
 The autonomous critic loop can legitimately run much longer than a single write stage because it evaluates many artifacts in sequence. Keep critic stages on their longer dedicated timeout budget, and keep artist generation on its own longer timeout budget as well, rather than inflating the global core-stage timeout for every node.
 The Cloud Run redeploy smoke should wait for a short worker stabilization window before creating fresh generation jobs. Old worker revisions can still be draining BullMQ work during rollout; use `WORKER_STABILIZATION_SECONDS` in `scripts/redeploy-cloudrun.sh` instead of starting smoke immediately.
 Agentic artifact versioning must be retry-safe. `createVersionedArtifact(...)` should handle `P2002` collisions by re-reading the latest artifact and either reusing identical content or advancing the version, never failing the whole critic/editor/print loop on a duplicate version race.
+Critic/evaluator passes should also stay on schema-native structured output. Keep `evaluateArtifact(...)` on `generateObjectWithTimeout(...)` with `EvaluationResponseSchema` instead of text generation plus JSON repair so malformed provider text cannot stall or poison the critic loop.
 
 ### Authentication
 JWT access token (15min) + refresh token (7d, httpOnly cookie). Token version incremented on logout. Client axios interceptor auto-refreshes on 401.
@@ -198,7 +199,7 @@ Unless the user explicitly says not to, treat this as the default after every co
    - `npm run verify:ship` for the normal shippable path.
    - `npm run verify` is the lighter build-only pass when you explicitly do not need the full ship checks.
    - If cloud-backed server integration is unavailable, record the exact blocker instead of silently skipping it.
-   - `verify:ship` now includes the worker `layout-visual-parity.test.ts` regression before the client and server suites, plus auth, AI, wizard apply, asset, template, document, v1 export, legacy-compatibility header, agentic artifact versioning, canon expansion, project, run, interview, agent restore, and generation-route coverage through the local Cloud SQL Proxy + Redis harness; keep new `api/v1` route regressions in that path when they touch transport serialization or run orchestration APIs.
+   - `verify:ship` now includes the worker `layout-visual-parity.test.ts` regression before the client and server suites, plus auth, AI, wizard apply, asset, template, document, v1 export, legacy-compatibility header, agentic artifact versioning, canon expansion, evaluator, project, run, interview, agent restore, and generation-route coverage through the local Cloud SQL Proxy + Redis harness; keep new `api/v1` route regressions in that path when they touch transport serialization or run orchestration APIs.
    - For runtime or infra work that can affect queue durability, add `npm run ops:redis:check` to the ship pass or incident triage.
 3. Update repo memory and docs when behavior, workflow, deployment steps, or architecture changed.
    - Memory: this file and any other standing repo guidance.

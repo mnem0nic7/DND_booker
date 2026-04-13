@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeAll, afterAll, vi, beforeEach } from 'vitest';
-import { generateText } from 'ai';
 import type { BibleContent, EvaluationFinding } from '@dnd-booker/shared';
 import { EVALUATION_WEIGHTS, ACCEPTANCE_THRESHOLDS } from '@dnd-booker/shared';
 import { prisma } from '../../config/database.js';
+import { generateObjectWithTimeout } from '../../services/generation/model-timeouts.js';
 import {
   evaluateArtifact,
   calculateOverallScore,
@@ -11,11 +11,13 @@ import {
 } from '../../services/generation/evaluator.service.js';
 import { createRun } from '../../services/generation/run.service.js';
 
-vi.mock('ai', () => ({ generateText: vi.fn() }));
+vi.mock('../../services/generation/model-timeouts.js', () => ({
+  generateObjectWithTimeout: vi.fn(),
+}));
 vi.mock('../../services/generation/pubsub.service.js', () => ({
   publishGenerationEvent: vi.fn(),
 }));
-const mockGenerateText = vi.mocked(generateText);
+const mockGenerateObjectWithTimeout = vi.mocked(generateObjectWithTimeout);
 
 let testUser: { id: string };
 let testProject: { id: string };
@@ -171,8 +173,8 @@ describe('Evaluator — pure functions', () => {
 
 describe('Evaluator — evaluateArtifact', () => {
   it('should create a passing ArtifactEvaluation', async () => {
-    mockGenerateText.mockResolvedValueOnce({
-      text: JSON.stringify(PASSING_EVAL_RESPONSE),
+    mockGenerateObjectWithTimeout.mockResolvedValueOnce({
+      object: PASSING_EVAL_RESPONSE,
       usage: { inputTokens: 1000, outputTokens: 500 },
     } as any);
 
@@ -211,8 +213,8 @@ describe('Evaluator — evaluateArtifact', () => {
   });
 
   it('should create a failing ArtifactEvaluation with critical findings', async () => {
-    mockGenerateText.mockResolvedValueOnce({
-      text: JSON.stringify(FAILING_EVAL_RESPONSE),
+    mockGenerateObjectWithTimeout.mockResolvedValueOnce({
+      object: FAILING_EVAL_RESPONSE,
       usage: { inputTokens: 1000, outputTokens: 500 },
     } as any);
 
@@ -246,8 +248,8 @@ describe('Evaluator — evaluateArtifact', () => {
   });
 
   it('should update run token count', async () => {
-    mockGenerateText.mockResolvedValueOnce({
-      text: JSON.stringify(PASSING_EVAL_RESPONSE),
+    mockGenerateObjectWithTimeout.mockResolvedValueOnce({
+      object: PASSING_EVAL_RESPONSE,
       usage: { inputTokens: 1000, outputTokens: 500 },
     } as any);
 
@@ -277,8 +279,8 @@ describe('Evaluator — evaluateArtifact', () => {
   });
 
   it('should tolerate null suggestedFix values from the evaluator response', async () => {
-    mockGenerateText.mockResolvedValueOnce({
-      text: JSON.stringify(NULL_SUGGESTED_FIX_RESPONSE),
+    mockGenerateObjectWithTimeout.mockResolvedValueOnce({
+      object: NULL_SUGGESTED_FIX_RESPONSE,
       usage: { inputTokens: 900, outputTokens: 300 },
     } as any);
 
@@ -307,9 +309,9 @@ describe('Evaluator — evaluateArtifact', () => {
     expect(result.findings[0].suggestedFix).toBeUndefined();
   });
 
-  it('should recover from evaluator responses that use JS-style object syntax', async () => {
-    mockGenerateText.mockResolvedValueOnce({
-      text: `{
+  it('accepts structured evaluator responses without text JSON repair', async () => {
+    mockGenerateObjectWithTimeout.mockResolvedValueOnce({
+      object: {
         structuralCompleteness: 84,
         continuityScore: 82,
         dndSanity: 85,
@@ -324,8 +326,8 @@ describe('Evaluator — evaluateArtifact', () => {
             suggestedFix: 'Tighten the opening hook and state the immediate threat.',
           },
         ],
-        recommendedActions: ['Clarify the opening stakes',],
-      }`,
+        recommendedActions: ['Clarify the opening stakes'],
+      },
       usage: { inputTokens: 1000, outputTokens: 500 },
     } as any);
 
@@ -356,8 +358,8 @@ describe('Evaluator — evaluateArtifact', () => {
   });
 
   it('fails chapter drafts that contain placeholder stat blocks even when the model score is high', async () => {
-    mockGenerateText.mockResolvedValueOnce({
-      text: JSON.stringify(PASSING_EVAL_RESPONSE),
+    mockGenerateObjectWithTimeout.mockResolvedValueOnce({
+      object: PASSING_EVAL_RESPONSE,
       usage: { inputTokens: 1000, outputTokens: 500 },
     } as any);
 
@@ -402,8 +404,8 @@ describe('Evaluator — evaluateArtifact', () => {
   });
 
   it('fails chapter drafts that contain encounter markers without a full runnable packet', async () => {
-    mockGenerateText.mockResolvedValueOnce({
-      text: JSON.stringify(PASSING_EVAL_RESPONSE),
+    mockGenerateObjectWithTimeout.mockResolvedValueOnce({
+      object: PASSING_EVAL_RESPONSE,
       usage: { inputTokens: 1000, outputTokens: 500 },
     } as any);
 
