@@ -102,6 +102,8 @@ Saved `LayoutRuntimeV2` snapshots are now the authoritative parity contract at p
 Clicks inside prose on the visible paginated surface must preserve normal caret placement. Do not force a top-level `NodeSelection` for content-editable blocks just to drive the inspector UI.
 `layoutSnapshotJson` remains the authoritative saved editor snapshot for `standard_pdf`. `print_pdf` exports may build a format-specific snapshot in memory, but they must not overwrite the persisted standard snapshot slot.
 Manual page breaks in the live parity editor must consume the full remaining page height. The old “compact near-blank page” separator behavior is legacy-only and should not run inside `.parity-live-editor-shell`.
+Current parity goal is exact page count, block order, page placement, and column placement between the visible paginated editor and export. Minor line-wrap drift is still acceptable, but page/column drift is a bug.
+When parity regresses, check these paths first: `client/src/hooks/usePageAlignment.ts`, `client/src/extensions/SnapshotPagination.ts`, `client/src/components/editor/RenderedDocumentCanvas.tsx`, `client/src/lib/useMeasuredLayoutDocument.ts`, and `worker/src/jobs/export.job.ts`.
 
 PDF export now keeps the HTML/Playwright measurement pass for preflight and review, but the final production PDF render is Typst-based. Typst workspaces must stage referenced `uploads/...` assets explicitly because production uploads live in GCS, not a shared local disk.
 Export job creation should materialize `ProjectDocument` rows before queueing work. The worker's monolithic `Project.content` fallback is defensive compatibility-only, not an active runtime source of truth.
