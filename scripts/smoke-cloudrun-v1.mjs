@@ -4,7 +4,7 @@ const baseUrl = (process.env.BASE_URL ?? process.env.SERVICE_URL ?? '').trim().r
 const email = process.env.SMOKE_TEST_EMAIL?.trim();
 const password = process.env.SMOKE_TEST_PASSWORD;
 const generationPrompt = process.env.SMOKE_TEST_GENERATION_PROMPT?.trim()
-  || '[smoke] Create a very short D&D one-shot titled Smoke Gate with one clear hook, one location, one encounter, and one table.';
+  || '[smoke] Create a very short D&D one-shot titled Smoke Gate. Theme: smoky planar gate mystery. Tone: tense but playable in one session. Levels 3-4 for a party of four. Scope: 4-6 pages. Complexity: straightforward. Budget lane: fast. Must have: one clear hook, one location, one encounter, one random table, one read-aloud box. Constraints: original/SRD-safe only, no maps required.';
 const generationTimeoutMs = Number.parseInt(process.env.SMOKE_GENERATION_TIMEOUT_MS ?? '', 10) || 25 * 60 * 1000;
 const exportTimeoutMs = Number.parseInt(process.env.SMOKE_EXPORT_TIMEOUT_MS ?? '', 10) || 15 * 60 * 1000;
 const pollIntervalMs = Number.parseInt(process.env.SMOKE_POLL_INTERVAL_MS ?? '', 10) || 5_000;
@@ -152,11 +152,30 @@ async function main() {
       throw new Error('temp project did not materialize any publication documents');
     }
 
+    const interviewSession = await apiJson(`/api/v1/projects/${projectId}/interview/sessions`, {
+      method: 'POST',
+      body: {
+        initialPrompt: generationPrompt,
+      },
+    }, 'create interview session');
+
+    const lockedInterview = await apiJson(
+      `/api/v1/projects/${projectId}/interview/sessions/${interviewSession.id}/lock`,
+      {
+        method: 'POST',
+        body: { force: true },
+      },
+      'lock interview session',
+    );
+
+    if (lockedInterview.status !== 'locked' || !lockedInterview.lockedBrief) {
+      throw new Error('interview session did not produce a locked brief');
+    }
+
     const createdRun = await apiJson(`/api/v1/projects/${projectId}/generation-runs`, {
       method: 'POST',
       body: {
-        prompt: generationPrompt,
-        mode: 'one_shot',
+        interviewSessionId: lockedInterview.id,
         quality: 'quick',
         pageTarget: 4,
       },

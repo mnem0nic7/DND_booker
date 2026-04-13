@@ -3,6 +3,8 @@ import type { ToolContext } from '../../services/ai-tools/types.js';
 
 const mockCreateRun = vi.hoisted(() => vi.fn());
 const mockEnqueue = vi.hoisted(() => vi.fn());
+const mockCreateInterviewSession = vi.hoisted(() => vi.fn());
+const mockLockInterviewSession = vi.hoisted(() => vi.fn());
 
 vi.mock('../../services/generation/run.service.js', () => ({
   createRun: mockCreateRun,
@@ -10,6 +12,11 @@ vi.mock('../../services/generation/run.service.js', () => ({
 
 vi.mock('../../services/generation/queue.service.js', () => ({
   enqueueGenerationRun: mockEnqueue,
+}));
+
+vi.mock('../../services/interview.service.js', () => ({
+  createInterviewSession: mockCreateInterviewSession,
+  lockInterviewSession: mockLockInterviewSession,
 }));
 
 import { startGenerationRun } from '../../services/ai-tools/content/start-generation-run.js';
@@ -22,6 +29,8 @@ beforeEach(() => {
 
 describe('startGenerationRun tool', () => {
   it('creates a run and enqueues it', async () => {
+    mockCreateInterviewSession.mockResolvedValue({ id: 'session-1' });
+    mockLockInterviewSession.mockResolvedValue({ id: 'session-1' });
     mockCreateRun.mockResolvedValue({
       id: 'run-abc',
       projectId: 'proj-1',
@@ -42,14 +51,15 @@ describe('startGenerationRun tool', () => {
     expect(mockCreateRun).toHaveBeenCalledWith(expect.objectContaining({
       projectId: 'proj-1',
       userId: 'user-1',
-      prompt: 'A dark forest adventure',
-      mode: 'one_shot',
+      interviewSessionId: 'session-1',
       quality: 'quick',
     }));
     expect(mockEnqueue).toHaveBeenCalledWith('run-abc', 'user-1', 'proj-1');
   });
 
   it('returns NOT_FOUND when project does not exist', async () => {
+    mockCreateInterviewSession.mockResolvedValue({ id: 'session-1' });
+    mockLockInterviewSession.mockResolvedValue({ id: 'session-1' });
     mockCreateRun.mockResolvedValue(null);
 
     const result = await startGenerationRun.execute(

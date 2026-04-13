@@ -5,6 +5,103 @@ import { useGenerationStore } from './generationStore';
 import { server } from '../test/msw/server';
 
 describe('generationStore.fetchLatestRun', () => {
+  it('starts autonomous generation from a locked interview session', async () => {
+    server.use(
+      http.post('/api/v1/projects/:projectId/interview/sessions', () => HttpResponse.json({
+        id: 'session-1',
+        projectId: 'project-1',
+        userId: 'user-1',
+        status: 'ready_to_lock',
+        turns: [],
+        briefDraft: null,
+        lockedBrief: null,
+        maxUserTurns: 8,
+        createdAt: '2026-04-01T16:00:00.000Z',
+        updatedAt: '2026-04-01T16:00:00.000Z',
+        lockedAt: null,
+      })),
+      http.post('/api/v1/projects/:projectId/interview/sessions/:sessionId/lock', () => HttpResponse.json({
+        id: 'session-1',
+        projectId: 'project-1',
+        userId: 'user-1',
+        status: 'locked',
+        turns: [],
+        briefDraft: {
+          title: 'Smoke Gate',
+          summary: 'Short one-shot.',
+          generationMode: 'one_shot',
+          concept: 'Smoke gate mystery',
+          theme: 'Planar smoke',
+          tone: 'tense',
+          levelRange: { min: 3, max: 4 },
+          scope: '4-6 pages',
+          partyAssumptions: 'party of four',
+          desiredComplexity: 'straightforward',
+          qualityBudgetLane: 'fast',
+          mustHaveElements: ['one encounter'],
+          specialConstraints: ['original only'],
+          settings: { includeHandouts: true, includeMaps: false, strict5e: true },
+        },
+        lockedBrief: {
+          title: 'Smoke Gate',
+          summary: 'Short one-shot.',
+          generationMode: 'one_shot',
+          concept: 'Smoke gate mystery',
+          theme: 'Planar smoke',
+          tone: 'tense',
+          levelRange: { min: 3, max: 4 },
+          scope: '4-6 pages',
+          partyAssumptions: 'party of four',
+          desiredComplexity: 'straightforward',
+          qualityBudgetLane: 'fast',
+          mustHaveElements: ['one encounter'],
+          specialConstraints: ['original only'],
+          settings: { includeHandouts: true, includeMaps: false, strict5e: true },
+        },
+        maxUserTurns: 8,
+        createdAt: '2026-04-01T16:00:00.000Z',
+        updatedAt: '2026-04-01T16:01:00.000Z',
+        lockedAt: '2026-04-01T16:01:00.000Z',
+      })),
+      http.post('/api/v1/projects/:projectId/generation-runs', async ({ request }) => {
+        const body = await request.json() as Record<string, unknown>;
+        expect(body).toMatchObject({
+          interviewSessionId: 'session-1',
+          quality: 'quick',
+          pageTarget: 8,
+        });
+
+        return HttpResponse.json({
+          id: 'run-2',
+          projectId: 'project-1',
+          userId: 'user-1',
+          mode: 'one_shot',
+          quality: 'quick',
+          status: 'queued',
+          currentStage: 'planning',
+          progressPercent: 0,
+          inputPrompt: 'Short one-shot.',
+          createdAt: '2026-04-01T16:01:00.000Z',
+          updatedAt: '2026-04-01T16:01:00.000Z',
+        }, { status: 201 });
+      }),
+      http.get('/api/v1/projects/:projectId/generation-runs/:runId/events', () => new HttpResponse('', {
+        status: 200,
+        headers: { 'Content-Type': 'text/event-stream' },
+      })),
+      http.get('/api/v1/projects/:projectId/generation-runs', () => HttpResponse.json([])),
+    );
+
+    await act(async () => {
+      await useGenerationStore.getState().startRun('project-1', 'Smoke gate mystery', 'one_shot', 'quick', 8);
+    });
+
+    const state = useGenerationStore.getState();
+    expect(state.currentRun?.id).toBe('run-2');
+    expect(state.error).toBeNull();
+    useGenerationStore.getState().unsubscribe();
+  });
+
   it('hydrates terminal runs from the detail endpoint so artifact counts stay current', async () => {
     server.use(
       http.get('/api/v1/projects/:projectId/generation-runs', () => HttpResponse.json([

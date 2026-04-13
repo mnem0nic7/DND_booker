@@ -2,6 +2,7 @@ import { generateObject, generateText } from 'ai';
 
 const DEFAULT_GENERATION_TEXT_TIMEOUT_MS = 240_000;
 const DEFAULT_GENERATION_TEXT_ATTEMPTS = 2;
+const DEFAULT_GENERATION_OBJECT_ATTEMPTS = 3;
 
 function resolveTimeoutMs(fallbackMs: number): number {
   const parsed = Number.parseInt(process.env.GENERATION_TEXT_TIMEOUT_MS ?? '', 10);
@@ -16,6 +17,18 @@ function isAbortLikeError(error: unknown): boolean {
   return error.name === 'AbortError'
     || error.name === 'TimeoutError'
     || /aborted|timeout/i.test(error.message);
+}
+
+function isRetriableGenerateObjectError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+
+  const message = error.message.toLowerCase();
+  return message.includes('no object generated')
+    || message.includes('could not parse the response')
+    || message.includes('response did not match')
+    || message.includes('did not match schema')
+    || message.includes('invalid json')
+    || message.includes('json parse');
 }
 
 function buildTextTimeoutError(label: string, timeoutMs: number): Error {
@@ -84,7 +97,7 @@ export async function generateObjectWithTimeout(
   const timeoutMs = resolveTimeoutMs(fallbackMs);
   let lastError: unknown = null;
 
-  for (let attempt = 1; attempt <= DEFAULT_GENERATION_TEXT_ATTEMPTS; attempt += 1) {
+  for (let attempt = 1; attempt <= DEFAULT_GENERATION_OBJECT_ATTEMPTS; attempt += 1) {
     try {
       return await withHardTextTimeout(label, timeoutMs, async (signal) => generateObject({
         ...options,
@@ -92,7 +105,8 @@ export async function generateObjectWithTimeout(
       }));
     } catch (error) {
       lastError = error;
-      if (!isAbortLikeError(error) || attempt >= DEFAULT_GENERATION_TEXT_ATTEMPTS) {
+      if ((!isAbortLikeError(error) && !isRetriableGenerateObjectError(error))
+        || attempt >= DEFAULT_GENERATION_OBJECT_ATTEMPTS) {
         throw error;
       }
     }

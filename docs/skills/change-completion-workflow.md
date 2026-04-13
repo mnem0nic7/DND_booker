@@ -30,6 +30,7 @@ Do not stop after code edits unless the user explicitly says not to ship.
 - when project lifecycle work changes, use `/api/v1/projects` plus the generated SDK; do not reintroduce runtime `/api/*` product routes
 - active runtime AI/chat/wizard flows should use `/api/v1/ai/*` and `/api/v1/projects/:projectId/ai/*`
 - autonomous generation should start from locked interview sessions on `/api/v1/projects/:projectId/interview/sessions/*`; keep the `interview_brief` contract as the only input to the background generation run
+- runtime callers should honor that same contract: client start flows, smoke/e2e helpers, and project-chat generation tools should create and lock an interview session before they enqueue a run
 - long-running autonomous generation should use system-managed presets from `config/agents.yaml` instead of the user’s saved chat/image settings
 - prompt-only autonomous runs should still derive a concrete `qualityBudgetLane` from the requested run quality so `quick` runs stay on the fast routed lane
 - keep the art-direction stage on `agent.artist` for both provider credentials and prompt-planning model selection; layout routing should stop at the layout draft stage
@@ -56,6 +57,7 @@ Do not stop after code edits unless the user explicitly says not to ship.
 - generation nodes that already have strong Zod schemas, like outline generation and canon expansion, should prefer schema-native `generateObject(...)` over `generateText(...)` plus post-parse repair
 - critic/evaluator passes are in the same bucket: keep `evaluateArtifact(...)` on schema-native `generateObjectWithTimeout(...)` and `EvaluationResponseSchema` so a malformed provider text blob cannot derail the autonomous critic loop
 - intake normalization, campaign bible generation, and chapter plan generation belong in that same structured-output bucket; keep them on `generateObjectWithTimeout(...)` with their candidate/final schema layers so the autonomous writer path does not regress back to text JSON parse failures
+- keep bounded retries on `generateObjectWithTimeout(...)` for transient provider parse/schema misses; that retry is part of the production hardening for Gemini-backed autonomous stages
 - generation and agent workers should resolve per-stage models through the routed agent presets instead of using the raw user chat model for every node; this is especially important when users save Google preview models that are acceptable for chat but unreliable for long-running structured orchestration
 - keep the quick-mode Google downgrade rule covered: `agent.bible`, `agent.outline`, `agent.canon`, `agent.chapter_draft`, and `agent.layout` should prefer the Flash lane in quick mode so deploy smoke and lightweight invite-only runs do not depend on live `gemini-2.5-pro` capacity
 - keep core generation node timeouts in place. Intake, bible, outline, canon expansion, chapter planning, and chapter drafting should fail and retry from a checkpoint if a provider call hangs, not sit indefinitely on a stale `currentNode`

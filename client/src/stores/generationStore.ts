@@ -80,6 +80,29 @@ interface GenerationState {
   ) => Promise<void>;
 }
 
+function buildInterviewSeedPrompt(
+  prompt: string,
+  mode: 'one_shot' | 'module' | 'campaign' | 'sourcebook',
+  quality: 'quick' | 'polished',
+  pageTarget?: number,
+) {
+  const parts = [
+    prompt.trim(),
+    `Requested mode: ${mode === 'module' ? 'module' : 'one_shot'}.`,
+    `Quality budget lane: ${quality === 'polished' ? 'high_quality' : 'fast'}.`,
+  ];
+
+  if (pageTarget) {
+    parts.push(`Requested page target: ${pageTarget} pages.`);
+  }
+
+  if (mode === 'campaign' || mode === 'sourcebook') {
+    parts.push('Compress this request into the closest supported short-module interpretation.');
+  }
+
+  return parts.join('\n\n');
+}
+
 export const useGenerationStore = create<GenerationState>((set, get) => ({
   currentRun: null,
   isStarting: false,
@@ -110,9 +133,19 @@ export const useGenerationStore = create<GenerationState>((set, get) => ({
       artifactCount: 0,
     });
     try {
+      const interviewSession = await v1Client.interviews.createInterviewSession(
+        { projectId },
+        {
+          initialPrompt: buildInterviewSeedPrompt(prompt, mode, quality, pageTarget),
+        },
+      );
+      const lockedInterview = await v1Client.interviews.lockInterviewSession(
+        { projectId, sessionId: interviewSession.id },
+        { force: true },
+      );
+
       const data = await v1Client.generationRuns.createGenerationRun({ projectId }, {
-        prompt,
-        mode,
+        interviewSessionId: lockedInterview.id,
         quality,
         pageTarget,
       });

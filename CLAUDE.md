@@ -65,6 +65,7 @@ Project aggregate content saves also go through `PATCH /api/v1/projects/:project
 `api/v1` document snapshots now carry `layoutPlan` alongside canonical/editor/Typst fields. Client document loads should consume that v1 snapshot rather than stitching layout data from legacy document routes.
 Active client AI/chat/wizard traffic should use `/api/v1/ai/*` and `/api/v1/projects/:projectId/ai/*`.
 Autonomous generation now starts from interview sessions under `/api/v1/projects/:projectId/interview/sessions`. The long-running generation worker should only start after the interview is locked and a structured `interview_brief` artifact exists.
+Runtime callers should follow that contract too: the client autonomous-generation flow, the project-chat `startGenerationRun` tool, and the Cloud Run acceptance smoke should all create and lock an interview session before they enqueue a generation run.
 Active template and asset traffic should use `/api/v1/templates`, `/api/v1/projects/:projectId/assets`, and `/api/v1/assets/:id`.
 Legacy runtime `/api/*` compatibility mounts have been removed. Keep `/api/health` for operational probes, but route all product traffic through `/api/v1/*`.
 
@@ -162,6 +163,7 @@ Agentic artifact versioning must be retry-safe. `createVersionedArtifact(...)` s
 `createVersionedArtifact(...)` should scope "latest artifact" lookups by `(runId, artifactType, artifactKey)`, compare canonicalized JSON instead of raw insertion order, and treat Prisma unique-constraint message text as retryable even when `error.code` is missing. The critic report path depends on that hardening during live BullMQ retries.
 Critic/evaluator passes should also stay on schema-native structured output. Keep `evaluateArtifact(...)` on `generateObjectWithTimeout(...)` with `EvaluationResponseSchema` instead of text generation plus JSON repair so malformed provider text cannot stall or poison the critic loop.
 The same rule now applies to the remaining core writer-side JSON nodes: intake normalization, campaign bible generation, and chapter plan generation should stay on `generateObjectWithTimeout(...)` plus their normalization/final Zod parse layers. Do not reintroduce raw text JSON parsing in those stages.
+`generateObjectWithTimeout(...)` should retry transient structured-output parse/schema misses from the provider. Gemini occasionally returns a malformed object payload on the first pass; absorb that with bounded retries instead of failing the autonomous run immediately.
 
 ### Authentication
 JWT access token (15min) + refresh token (7d, httpOnly cookie). Token version incremented on logout. Client axios interceptor auto-refreshes on 401.

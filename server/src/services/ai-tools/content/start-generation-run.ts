@@ -2,6 +2,30 @@ import { z } from 'zod';
 import type { ToolDefinition } from '../types.js';
 import { createRun } from '../../generation/run.service.js';
 import { enqueueGenerationRun } from '../../generation/queue.service.js';
+import { createInterviewSession, lockInterviewSession } from '../../interview.service.js';
+
+function buildInterviewSeedPrompt(
+  prompt: string,
+  mode: 'one_shot' | 'module' | 'campaign' | 'sourcebook',
+  quality: 'quick' | 'polished',
+  pageTarget?: number,
+) {
+  const parts = [
+    prompt.trim(),
+    `Requested mode: ${mode === 'module' ? 'module' : 'one_shot'}.`,
+    `Quality budget lane: ${quality === 'polished' ? 'high_quality' : 'fast'}.`,
+  ];
+
+  if (pageTarget) {
+    parts.push(`Requested page target: ${pageTarget} pages.`);
+  }
+
+  if (mode === 'campaign' || mode === 'sourcebook') {
+    parts.push('Compress this request into the closest supported short-module interpretation.');
+  }
+
+  return parts.join('\n\n');
+}
 
 export const startGenerationRun: ToolDefinition = {
   name: 'startGenerationRun',
@@ -21,11 +45,22 @@ export const startGenerationRun: ToolDefinition = {
       pageTarget?: number;
     };
 
+    const interviewSession = await createInterviewSession(
+      ctx.projectId,
+      ctx.userId,
+      buildInterviewSeedPrompt(prompt, mode, quality, pageTarget),
+    );
+    const lockedInterview = await lockInterviewSession(
+      ctx.projectId,
+      ctx.userId,
+      interviewSession.id,
+      true,
+    );
+
     const run = await createRun({
       projectId: ctx.projectId,
       userId: ctx.userId,
-      prompt,
-      mode,
+      interviewSessionId: lockedInterview?.id,
       quality,
       pageTarget,
     });
@@ -45,7 +80,7 @@ export const startGenerationRun: ToolDefinition = {
         runId: run.id,
         jobId,
         status: run.status,
-        message: `Generation run started. I'll generate a ${mode} based on your description. You can monitor progress in the generation panel.`,
+        message: `Generation run started. I locked an interview brief and started a ${mode === 'module' ? 'module' : 'one-shot'} generation. You can monitor progress in the generation panel.`,
       },
     };
   },
