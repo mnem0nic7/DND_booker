@@ -3,8 +3,7 @@ import { z } from 'zod';
 import type { NormalizedInput, BibleContent } from '@dnd-booker/shared';
 import { prisma } from '../../config/database.js';
 import { publishGenerationEvent } from './pubsub.service.js';
-import { parseJsonResponse } from './parse-json.js';
-import { generateTextWithTimeout } from './model-timeouts.js';
+import { generateObjectWithTimeout } from './model-timeouts.js';
 import {
   buildCampaignBibleSystemPrompt,
   buildCampaignBibleUserPrompt,
@@ -87,6 +86,20 @@ const BibleContentSchema = z.object({
   openThreads: z.array(z.string()).default([]),
   entities: z.array(BibleEntitySeedSchema).default([]),
 });
+
+const BibleContentCandidateSchema = z.object({
+  title: z.string().optional().default(''),
+  summary: z.string().optional().default(''),
+  premise: z.string().optional().default(''),
+  worldRules: z.record(z.unknown()).optional().default({}),
+  actStructure: z.array(z.record(z.unknown())).optional().default([]),
+  timeline: z.array(z.record(z.unknown())).optional().default([]),
+  levelProgression: z.record(z.unknown()).nullable().optional().default(null),
+  pageBudget: z.array(z.record(z.unknown())).optional().default([]),
+  styleGuide: z.record(z.unknown()).optional().default({}),
+  openThreads: z.array(z.string()).optional().default([]),
+  entities: z.array(z.record(z.unknown())).optional().default([]),
+}).passthrough();
 
 function buildFallbackEntities(normalizedInput: NormalizedInput): BibleContent['entities'] {
   const entities: BibleContent['entities'] = [];
@@ -253,16 +266,15 @@ export async function executeBibleGeneration(
   const system = buildCampaignBibleSystemPrompt();
   const prompt = buildCampaignBibleUserPrompt(normalizedInput);
 
-  const { text, usage } = await generateTextWithTimeout('Campaign bible generation', {
+  const { object, usage } = await generateObjectWithTimeout('Campaign bible generation', {
     model,
+    schema: BibleContentCandidateSchema,
     system,
     prompt,
     maxOutputTokens,
   });
 
-  // Parse and validate the AI response
-  const parsed = parseJsonResponse(text);
-  const bibleContent = normalizeBibleContent(parsed, normalizedInput);
+  const bibleContent = normalizeBibleContent(object, normalizedInput);
 
   const totalTokens = (usage?.inputTokens ?? 0) + (usage?.outputTokens ?? 0);
 

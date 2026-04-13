@@ -1,15 +1,17 @@
 import { describe, it, expect, beforeAll, afterAll, vi, beforeEach } from 'vitest';
-import { generateText } from 'ai';
 import type { BibleContent, ChapterOutlineEntry, ChapterPlan } from '@dnd-booker/shared';
 import { prisma } from '../../config/database.js';
+import { generateObjectWithTimeout } from '../../services/generation/model-timeouts.js';
 import { executeChapterPlanGeneration } from '../../services/generation/chapter-plan.service.js';
 import { createRun } from '../../services/generation/run.service.js';
 
-vi.mock('ai', () => ({ generateText: vi.fn() }));
+vi.mock('../../services/generation/model-timeouts.js', () => ({
+  generateObjectWithTimeout: vi.fn(),
+}));
 vi.mock('../../services/generation/pubsub.service.js', () => ({
   publishGenerationEvent: vi.fn(),
 }));
-const mockGenerateText = vi.mocked(generateText);
+const mockGenerateObjectWithTimeout = vi.mocked(generateObjectWithTimeout);
 
 let testUser: { id: string };
 let testProject: { id: string };
@@ -107,8 +109,8 @@ beforeEach(() => { vi.clearAllMocks(); });
 
 describe('Chapter Plan Service — executeChapterPlanGeneration', () => {
   it('should create a chapter_plan artifact from valid AI response', async () => {
-    mockGenerateText.mockResolvedValueOnce({
-      text: JSON.stringify(VALID_PLAN),
+    mockGenerateObjectWithTimeout.mockResolvedValueOnce({
+      object: VALID_PLAN,
       usage: { inputTokens: 1000, outputTokens: 1500 },
     } as any);
 
@@ -135,8 +137,8 @@ describe('Chapter Plan Service — executeChapterPlanGeneration', () => {
   });
 
   it('should include chapter and entity context in the prompt', async () => {
-    mockGenerateText.mockResolvedValueOnce({
-      text: JSON.stringify(VALID_PLAN),
+    mockGenerateObjectWithTimeout.mockResolvedValueOnce({
+      object: VALID_PLAN,
       usage: { inputTokens: 1000, outputTokens: 1500 },
     } as any);
 
@@ -150,15 +152,15 @@ describe('Chapter Plan Service — executeChapterPlanGeneration', () => {
       {} as any, 8192,
     );
 
-    const call = mockGenerateText.mock.calls[0][0];
+    const call = mockGenerateObjectWithTimeout.mock.calls[0][1];
     expect(call.prompt).toContain('ch-1');
     expect(call.prompt).toContain('chief-gnarltooth');
     expect(call.prompt).toContain('Arrival');
   });
 
   it('should update run token count', async () => {
-    mockGenerateText.mockResolvedValueOnce({
-      text: JSON.stringify(VALID_PLAN),
+    mockGenerateObjectWithTimeout.mockResolvedValueOnce({
+      object: VALID_PLAN,
       usage: { inputTokens: 1000, outputTokens: 1500 },
     } as any);
 
@@ -177,8 +179,8 @@ describe('Chapter Plan Service — executeChapterPlanGeneration', () => {
   });
 
   it('should normalize weak plans into table-usable chapter structure', async () => {
-    mockGenerateText.mockResolvedValueOnce({
-      text: JSON.stringify({
+    mockGenerateObjectWithTimeout.mockResolvedValueOnce({
+      object: {
         chapterSlug: 'ch-1',
         chapterTitle: 'Chapter 1: The Village',
         sections: [
@@ -208,7 +210,7 @@ describe('Chapter Plan Service — executeChapterPlanGeneration', () => {
         readAloudCount: 0,
         dmTipCount: 0,
         difficultyProgression: '',
-      }),
+      },
       usage: { inputTokens: 1000, outputTokens: 1500 },
     } as any);
 
@@ -244,8 +246,8 @@ describe('Chapter Plan Service — executeChapterPlanGeneration', () => {
   });
 
   it('adds deterministic utility fallbacks for exploration and social sections', async () => {
-    mockGenerateText.mockResolvedValueOnce({
-      text: JSON.stringify({
+    mockGenerateObjectWithTimeout.mockResolvedValueOnce({
+      object: {
         chapterSlug: 'ch-1',
         chapterTitle: 'Chapter 1: The Village',
         sections: [
@@ -275,7 +277,7 @@ describe('Chapter Plan Service — executeChapterPlanGeneration', () => {
         readAloudCount: 0,
         dmTipCount: 0,
         difficultyProgression: '',
-      }),
+      },
       usage: { inputTokens: 1000, outputTokens: 1500 },
     } as any);
 
@@ -298,8 +300,8 @@ describe('Chapter Plan Service — executeChapterPlanGeneration', () => {
   });
 
   it('backfills missing required section titles from the outline before validation', async () => {
-    mockGenerateText.mockResolvedValueOnce({
-      text: JSON.stringify({
+    mockGenerateObjectWithTimeout.mockResolvedValueOnce({
+      object: {
         chapterSlug: 'ch-1',
         chapterTitle: 'Chapter 1: The Village',
         sections: [
@@ -323,7 +325,7 @@ describe('Chapter Plan Service — executeChapterPlanGeneration', () => {
           },
         ],
         encounters: VALID_PLAN.encounters,
-      }),
+      },
       usage: { inputTokens: 1000, outputTokens: 1500 },
     } as any);
 
@@ -342,9 +344,7 @@ describe('Chapter Plan Service — executeChapterPlanGeneration', () => {
   });
 
   it('should throw on malformed AI response', async () => {
-    mockGenerateText.mockResolvedValueOnce({
-      text: 'not json', usage: { inputTokens: 100, outputTokens: 50 },
-    } as any);
+    mockGenerateObjectWithTimeout.mockRejectedValueOnce(new Error('Structured chapter plan generation failed'));
 
     const run = await createRun({
       projectId: testProject.id, userId: testUser.id, prompt: 'test',
@@ -358,8 +358,8 @@ describe('Chapter Plan Service — executeChapterPlanGeneration', () => {
   });
 
   it('should generate unique artifact keys per chapter', async () => {
-    mockGenerateText.mockResolvedValueOnce({
-      text: JSON.stringify({ ...VALID_PLAN, chapterSlug: 'ch-2', chapterTitle: 'Chapter 2' }),
+    mockGenerateObjectWithTimeout.mockResolvedValueOnce({
+      object: { ...VALID_PLAN, chapterSlug: 'ch-2', chapterTitle: 'Chapter 2' },
       usage: { inputTokens: 1000, outputTokens: 1500 },
     } as any);
 
@@ -379,8 +379,8 @@ describe('Chapter Plan Service — executeChapterPlanGeneration', () => {
   });
 
   it('should coerce sloppy pipe-delimited section contentType values from the model', async () => {
-    mockGenerateText.mockResolvedValueOnce({
-      text: JSON.stringify({
+    mockGenerateObjectWithTimeout.mockResolvedValueOnce({
+      object: {
         ...VALID_PLAN,
         sections: [
           {
@@ -392,7 +392,7 @@ describe('Chapter Plan Service — executeChapterPlanGeneration', () => {
             contentType: 'encounter / exploration',
           },
         ],
-      }),
+      },
       usage: { inputTokens: 1000, outputTokens: 1500 },
     } as any);
 
@@ -411,8 +411,8 @@ describe('Chapter Plan Service — executeChapterPlanGeneration', () => {
   });
 
   it('coerces numeric encounter CR values into strings', async () => {
-    mockGenerateText.mockResolvedValueOnce({
-      text: JSON.stringify({
+    mockGenerateObjectWithTimeout.mockResolvedValueOnce({
+      object: {
         ...VALID_PLAN,
         encounters: [
           {
@@ -420,7 +420,7 @@ describe('Chapter Plan Service — executeChapterPlanGeneration', () => {
             enemies: [{ name: 'Goblin', count: 6, cr: 0.25 }],
           },
         ],
-      }),
+      },
       usage: { inputTokens: 1000, outputTokens: 1500 },
     } as any);
 
@@ -438,8 +438,8 @@ describe('Chapter Plan Service — executeChapterPlanGeneration', () => {
   });
 
   it('defaults missing plan arrays instead of failing generation', async () => {
-    mockGenerateText.mockResolvedValueOnce({
-      text: JSON.stringify({
+    mockGenerateObjectWithTimeout.mockResolvedValueOnce({
+      object: {
         chapterSlug: 'ch-1',
         chapterTitle: 'Chapter 1: The Village',
         sections: [
@@ -453,7 +453,7 @@ describe('Chapter Plan Service — executeChapterPlanGeneration', () => {
             blocksNeeded: ['readAloud'],
           },
         ],
-      }),
+      },
       usage: { inputTokens: 1000, outputTokens: 1500 },
     } as any);
 
@@ -473,8 +473,8 @@ describe('Chapter Plan Service — executeChapterPlanGeneration', () => {
   });
 
   it('reuses the persisted chapter plan on replay', async () => {
-    mockGenerateText.mockResolvedValueOnce({
-      text: JSON.stringify(VALID_PLAN),
+    mockGenerateObjectWithTimeout.mockResolvedValueOnce({
+      object: VALID_PLAN,
       usage: { inputTokens: 1000, outputTokens: 1500 },
     } as any);
 
@@ -495,7 +495,7 @@ describe('Chapter Plan Service — executeChapterPlanGeneration', () => {
 
     expect(second.artifactId).toBe(first.artifactId);
     expect(second.plan.sections).toHaveLength(first.plan.sections.length);
-    expect(mockGenerateText).toHaveBeenCalledTimes(1);
+    expect(mockGenerateObjectWithTimeout).toHaveBeenCalledTimes(1);
 
     const artifacts = await prisma.generatedArtifact.findMany({
       where: { runId: run!.id, artifactType: 'chapter_plan' },

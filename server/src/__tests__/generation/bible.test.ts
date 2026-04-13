@@ -1,15 +1,17 @@
 import { describe, it, expect, beforeAll, afterAll, vi, beforeEach } from 'vitest';
-import { generateText } from 'ai';
 import type { NormalizedInput, BibleContent } from '@dnd-booker/shared';
 import { prisma } from '../../config/database.js';
+import { generateObjectWithTimeout } from '../../services/generation/model-timeouts.js';
 import { executeBibleGeneration } from '../../services/generation/bible.service.js';
 import { createRun } from '../../services/generation/run.service.js';
 
-vi.mock('ai', () => ({ generateText: vi.fn() }));
+vi.mock('../../services/generation/model-timeouts.js', () => ({
+  generateObjectWithTimeout: vi.fn(),
+}));
 vi.mock('../../services/generation/pubsub.service.js', () => ({
   publishGenerationEvent: vi.fn(),
 }));
-const mockGenerateText = vi.mocked(generateText);
+const mockGenerateObjectWithTimeout = vi.mocked(generateObjectWithTimeout);
 
 let testUser: { id: string };
 let testProject: { id: string };
@@ -144,8 +146,8 @@ beforeEach(() => {
 
 describe('Bible Service — executeBibleGeneration', () => {
   it('should create a CampaignBible record from valid AI response', async () => {
-    mockGenerateText.mockResolvedValueOnce({
-      text: JSON.stringify(VALID_BIBLE_RESPONSE),
+    mockGenerateObjectWithTimeout.mockResolvedValueOnce({
+      object: VALID_BIBLE_RESPONSE,
       usage: { inputTokens: 1000, outputTokens: 2000 },
     } as any);
 
@@ -167,8 +169,8 @@ describe('Bible Service — executeBibleGeneration', () => {
   });
 
   it('should create a campaign_bible artifact', async () => {
-    mockGenerateText.mockResolvedValueOnce({
-      text: JSON.stringify(VALID_BIBLE_RESPONSE),
+    mockGenerateObjectWithTimeout.mockResolvedValueOnce({
+      object: VALID_BIBLE_RESPONSE,
       usage: { inputTokens: 1000, outputTokens: 2000 },
     } as any);
 
@@ -190,8 +192,8 @@ describe('Bible Service — executeBibleGeneration', () => {
   });
 
   it('should create CanonEntity records for each entity in the bible', async () => {
-    mockGenerateText.mockResolvedValueOnce({
-      text: JSON.stringify(VALID_BIBLE_RESPONSE),
+    mockGenerateObjectWithTimeout.mockResolvedValueOnce({
+      object: VALID_BIBLE_RESPONSE,
       usage: { inputTokens: 1000, outputTokens: 2000 },
     } as any);
 
@@ -218,8 +220,8 @@ describe('Bible Service — executeBibleGeneration', () => {
   });
 
   it('should store structured JSON fields on the CampaignBible', async () => {
-    mockGenerateText.mockResolvedValueOnce({
-      text: JSON.stringify(VALID_BIBLE_RESPONSE),
+    mockGenerateObjectWithTimeout.mockResolvedValueOnce({
+      object: VALID_BIBLE_RESPONSE,
       usage: { inputTokens: 1000, outputTokens: 2000 },
     } as any);
 
@@ -242,10 +244,7 @@ describe('Bible Service — executeBibleGeneration', () => {
   });
 
   it('should throw on malformed AI response', async () => {
-    mockGenerateText.mockResolvedValueOnce({
-      text: 'Not valid JSON',
-      usage: { inputTokens: 500, outputTokens: 100 },
-    } as any);
+    mockGenerateObjectWithTimeout.mockRejectedValueOnce(new Error('Structured bible generation failed'));
 
     const run = await createRun({
       projectId: testProject.id,
@@ -259,8 +258,8 @@ describe('Bible Service — executeBibleGeneration', () => {
   });
 
   it('should update run token count', async () => {
-    mockGenerateText.mockResolvedValueOnce({
-      text: JSON.stringify(VALID_BIBLE_RESPONSE),
+    mockGenerateObjectWithTimeout.mockResolvedValueOnce({
+      object: VALID_BIBLE_RESPONSE,
       usage: { inputTokens: 1000, outputTokens: 2000 },
     } as any);
 
@@ -277,8 +276,8 @@ describe('Bible Service — executeBibleGeneration', () => {
   });
 
   it('should include NormalizedInput context in the AI prompt', async () => {
-    mockGenerateText.mockResolvedValueOnce({
-      text: JSON.stringify(VALID_BIBLE_RESPONSE),
+    mockGenerateObjectWithTimeout.mockResolvedValueOnce({
+      object: VALID_BIBLE_RESPONSE,
       usage: { inputTokens: 1000, outputTokens: 2000 },
     } as any);
 
@@ -290,7 +289,7 @@ describe('Bible Service — executeBibleGeneration', () => {
 
     await executeBibleGeneration(run!, SAMPLE_INPUT, {} as any, 8192);
 
-    const call = mockGenerateText.mock.calls[0][0];
+    const call = mockGenerateObjectWithTimeout.mock.calls[0][1];
     expect(call.prompt).toContain('The Goblin Caves of Duskhollow');
     expect(call.prompt).toContain('one_shot');
     expect(call.prompt).toContain('classic fantasy');
@@ -298,8 +297,8 @@ describe('Bible Service — executeBibleGeneration', () => {
 
   it('backfills missing entities from normalized input when the model omits them', async () => {
     const { entities: _ignored, ...responseWithoutEntities } = VALID_BIBLE_RESPONSE as any;
-    mockGenerateText.mockResolvedValueOnce({
-      text: JSON.stringify(responseWithoutEntities),
+    mockGenerateObjectWithTimeout.mockResolvedValueOnce({
+      object: responseWithoutEntities,
       usage: { inputTokens: 900, outputTokens: 1800 },
     } as any);
 
@@ -317,8 +316,8 @@ describe('Bible Service — executeBibleGeneration', () => {
   });
 
   it('reuses the persisted bible and canon entities on replay', async () => {
-    mockGenerateText.mockResolvedValueOnce({
-      text: JSON.stringify(VALID_BIBLE_RESPONSE),
+    mockGenerateObjectWithTimeout.mockResolvedValueOnce({
+      object: VALID_BIBLE_RESPONSE,
       usage: { inputTokens: 1000, outputTokens: 2000 },
     } as any);
 
@@ -334,7 +333,7 @@ describe('Bible Service — executeBibleGeneration', () => {
     expect(second.artifactId).toBe(first.artifactId);
     expect(second.bible.id).toBe(first.bible.id);
     expect(second.entities).toHaveLength(first.entities.length);
-    expect(mockGenerateText).toHaveBeenCalledTimes(1);
+    expect(mockGenerateObjectWithTimeout).toHaveBeenCalledTimes(1);
 
     const [artifacts, bibles, entities] = await Promise.all([
       prisma.generatedArtifact.findMany({

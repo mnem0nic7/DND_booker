@@ -1,16 +1,18 @@
 import { describe, it, expect, beforeAll, afterAll, vi, beforeEach } from 'vitest';
-import { generateText } from 'ai';
 import type { NormalizedInput, BibleContent } from '@dnd-booker/shared';
 import { prisma } from '../../config/database.js';
 import { createRun } from '../../services/generation/run.service.js';
+import { generateObjectWithTimeout } from '../../services/generation/model-timeouts.js';
 import { executeIntake } from '../../services/generation/intake.service.js';
 import { executeBibleGeneration } from '../../services/generation/bible.service.js';
 
-vi.mock('ai', () => ({ generateText: vi.fn() }));
+vi.mock('../../services/generation/model-timeouts.js', () => ({
+  generateObjectWithTimeout: vi.fn(),
+}));
 vi.mock('../../services/generation/pubsub.service.js', () => ({
   publishGenerationEvent: vi.fn(),
 }));
-const mockGenerateText = vi.mocked(generateText);
+const mockGenerateObjectWithTimeout = vi.mocked(generateObjectWithTimeout);
 
 let testUser: { id: string };
 let testProject: { id: string };
@@ -106,13 +108,13 @@ beforeEach(() => {
 describe('Intake → Bible Pipeline', () => {
   it('should chain intake output into bible generation', async () => {
     // Mock both AI calls in sequence
-    mockGenerateText
+    mockGenerateObjectWithTimeout
       .mockResolvedValueOnce({
-        text: JSON.stringify(INTAKE_RESPONSE),
+        object: INTAKE_RESPONSE,
         usage: { inputTokens: 500, outputTokens: 300 },
       } as any)
       .mockResolvedValueOnce({
-        text: JSON.stringify(BIBLE_RESPONSE),
+        object: BIBLE_RESPONSE,
         usage: { inputTokens: 1500, outputTokens: 3000 },
       } as any);
 
@@ -166,8 +168,8 @@ describe('Intake → Bible Pipeline', () => {
       keyElements: { npcs: [], locations: [], plotHooks: [], items: [] },
     };
 
-    mockGenerateText.mockResolvedValueOnce({
-      text: JSON.stringify(BIBLE_RESPONSE),
+    mockGenerateObjectWithTimeout.mockResolvedValueOnce({
+      object: BIBLE_RESPONSE,
       usage: { inputTokens: 1000, outputTokens: 2000 },
     } as any);
 

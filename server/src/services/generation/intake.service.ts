@@ -3,8 +3,7 @@ import { z } from 'zod';
 import { MODE_DEFAULTS, type NormalizedInput, type GenerationConstraints } from '@dnd-booker/shared';
 import { prisma } from '../../config/database.js';
 import { publishGenerationEvent } from './pubsub.service.js';
-import { parseJsonResponse } from './parse-json.js';
-import { generateTextWithTimeout } from './model-timeouts.js';
+import { generateObjectWithTimeout } from './model-timeouts.js';
 import {
   buildNormalizeInputSystemPrompt,
   buildNormalizeInputUserPrompt,
@@ -33,6 +32,38 @@ const NormalizedInputSchema = z.object({
     items: z.array(z.string()),
   }),
 });
+
+const NormalizedInputCandidateSchema = z.object({
+  title: z.string(),
+  summary: z.string(),
+  inferredMode: z.union([z.enum(['one_shot', 'module', 'campaign', 'sourcebook']), z.string()]),
+  tone: z.string(),
+  themes: z.union([z.array(z.string()), z.string()]).optional().default([]),
+  setting: z.string(),
+  premise: z.string(),
+  levelRange: z.union([
+    z.object({
+      min: z.union([z.number(), z.string()]).optional(),
+      max: z.union([z.number(), z.string()]).optional(),
+    }).passthrough(),
+    z.number(),
+    z.string(),
+    z.null(),
+  ]).optional().default(null),
+  pageTarget: z.union([z.number(), z.string()]).optional(),
+  chapterEstimate: z.union([z.number(), z.string()]).optional(),
+  constraints: z.object({
+    strict5e: z.union([z.boolean(), z.string()]).optional(),
+    includeHandouts: z.union([z.boolean(), z.string()]).optional(),
+    includeMaps: z.union([z.boolean(), z.string()]).optional(),
+  }).partial().optional().default({}),
+  keyElements: z.object({
+    npcs: z.union([z.array(z.string()), z.string()]).optional(),
+    locations: z.union([z.array(z.string()), z.string()]).optional(),
+    plotHooks: z.union([z.array(z.string()), z.string()]).optional(),
+    items: z.union([z.array(z.string()), z.string()]).optional(),
+  }).partial().optional().default({}),
+}).passthrough();
 
 function coerceStringArray(value: unknown): string[] {
   if (Array.isArray(value)) {
@@ -230,16 +261,15 @@ export async function executeIntake(
     run.inputParameters as GenerationConstraints | null,
   );
 
-  const { text, usage } = await generateTextWithTimeout('Input normalization', {
+  const { object, usage } = await generateObjectWithTimeout('Input normalization', {
     model,
+    schema: NormalizedInputCandidateSchema,
     system,
     prompt,
     maxOutputTokens,
   });
 
-  // Parse and validate the AI response
-  const parsed = parseJsonResponse(text);
-  const normalizedInput = NormalizedInputSchema.parse(normalizeParsedInput(parsed, {
+  const normalizedInput = NormalizedInputSchema.parse(normalizeParsedInput(object, {
     pageTargetHint: run.pageTargetHint ?? null,
   })) as NormalizedInput;
 

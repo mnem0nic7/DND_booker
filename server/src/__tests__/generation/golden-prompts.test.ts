@@ -14,10 +14,10 @@
  * (that requires live evaluation), only pipeline correctness.
  */
 import { describe, it, expect, beforeAll, afterAll, vi, beforeEach } from 'vitest';
-import { generateText } from 'ai';
 import type { NormalizedInput, BibleContent } from '@dnd-booker/shared';
 import { prisma } from '../../config/database.js';
 import { createRun } from '../../services/generation/run.service.js';
+import { generateObjectWithTimeout } from '../../services/generation/model-timeouts.js';
 import { executeIntake } from '../../services/generation/intake.service.js';
 import { executeBibleGeneration } from '../../services/generation/bible.service.js';
 
@@ -27,12 +27,14 @@ import * as horrorMiniCampaign from './golden-prompts/horror-mini-campaign.js';
 import * as urbanIntrigue from './golden-prompts/urban-intrigue.js';
 import * as wildernessHex from './golden-prompts/wilderness-hex.js';
 
-vi.mock('ai', () => ({ generateText: vi.fn() }));
+vi.mock('../../services/generation/model-timeouts.js', () => ({
+  generateObjectWithTimeout: vi.fn(),
+}));
 vi.mock('../../services/generation/pubsub.service.js', () => ({
   publishGenerationEvent: vi.fn(),
 }));
 
-const mockGenerateText = vi.mocked(generateText);
+const mockGenerateObjectWithTimeout = vi.mocked(generateObjectWithTimeout);
 
 let testUser: { id: string };
 let testProject: { id: string };
@@ -79,8 +81,8 @@ const GOLDEN_PROMPTS: { name: string; fixture: GoldenFixture }[] = [
 describe('Golden Prompt Regression Suite', () => {
   describe.each(GOLDEN_PROMPTS)('$name', ({ fixture }) => {
     it('should produce valid intake output', async () => {
-      mockGenerateText.mockResolvedValueOnce({
-        text: JSON.stringify(fixture.EXPECTED_INTAKE),
+      mockGenerateObjectWithTimeout.mockResolvedValueOnce({
+        object: fixture.EXPECTED_INTAKE,
         usage: { inputTokens: 500, outputTokens: 400 },
       } as any);
 
@@ -116,8 +118,8 @@ describe('Golden Prompt Regression Suite', () => {
     });
 
     it('should produce valid bible from intake output', async () => {
-      mockGenerateText.mockResolvedValueOnce({
-        text: JSON.stringify(fixture.EXPECTED_BIBLE),
+      mockGenerateObjectWithTimeout.mockResolvedValueOnce({
+        object: fixture.EXPECTED_BIBLE,
         usage: { inputTokens: 1500, outputTokens: 3000 },
       } as any);
 
@@ -183,13 +185,13 @@ describe('Golden Prompt Regression Suite', () => {
       const intakeTokens = { inputTokens: 500, outputTokens: 300 };
       const bibleTokens = { inputTokens: 1500, outputTokens: 3000 };
 
-      mockGenerateText
+      mockGenerateObjectWithTimeout
         .mockResolvedValueOnce({
-          text: JSON.stringify(fixture.EXPECTED_INTAKE),
+          object: fixture.EXPECTED_INTAKE,
           usage: intakeTokens,
         } as any)
         .mockResolvedValueOnce({
-          text: JSON.stringify(fixture.EXPECTED_BIBLE),
+          object: fixture.EXPECTED_BIBLE,
           usage: bibleTokens,
         } as any);
 

@@ -1,16 +1,18 @@
 import { describe, it, expect, beforeAll, afterAll, vi, beforeEach } from 'vitest';
-import { generateText } from 'ai';
 import type { NormalizedInput } from '@dnd-booker/shared';
 import { prisma } from '../../config/database.js';
+import { generateObjectWithTimeout } from '../../services/generation/model-timeouts.js';
 import { executeIntake } from '../../services/generation/intake.service.js';
 import { createRun } from '../../services/generation/run.service.js';
 
-vi.mock('ai', () => ({ generateText: vi.fn() }));
+vi.mock('../../services/generation/model-timeouts.js', () => ({
+  generateObjectWithTimeout: vi.fn(),
+}));
 vi.mock('../../services/generation/pubsub.service.js', () => ({
   publishGenerationEvent: vi.fn(),
 }));
 
-const mockGenerateText = vi.mocked(generateText);
+const mockGenerateObjectWithTimeout = vi.mocked(generateObjectWithTimeout);
 
 let testUser: { id: string };
 let testProject: { id: string };
@@ -63,8 +65,8 @@ const VALID_AI_RESPONSE: NormalizedInput = {
 
 describe('Intake Service — executeIntake', () => {
   it('should parse a valid AI response and create a project_profile artifact', async () => {
-    mockGenerateText.mockResolvedValueOnce({
-      text: JSON.stringify(VALID_AI_RESPONSE),
+    mockGenerateObjectWithTimeout.mockResolvedValueOnce({
+      object: VALID_AI_RESPONSE,
       usage: { inputTokens: 500, outputTokens: 300 },
     } as any);
 
@@ -93,8 +95,8 @@ describe('Intake Service — executeIntake', () => {
   });
 
   it('should update the run with inferred mode and page estimates', async () => {
-    mockGenerateText.mockResolvedValueOnce({
-      text: JSON.stringify(VALID_AI_RESPONSE),
+    mockGenerateObjectWithTimeout.mockResolvedValueOnce({
+      object: VALID_AI_RESPONSE,
       usage: { inputTokens: 500, outputTokens: 300 },
     } as any);
 
@@ -112,8 +114,8 @@ describe('Intake Service — executeIntake', () => {
   });
 
   it('should pass user constraints to the prompt', async () => {
-    mockGenerateText.mockResolvedValueOnce({
-      text: JSON.stringify(VALID_AI_RESPONSE),
+    mockGenerateObjectWithTimeout.mockResolvedValueOnce({
+      object: VALID_AI_RESPONSE,
       usage: { inputTokens: 500, outputTokens: 300 },
     } as any);
 
@@ -126,16 +128,13 @@ describe('Intake Service — executeIntake', () => {
 
     await executeIntake(run!, {} as any, 4096);
 
-    const call = mockGenerateText.mock.calls[0][0];
+    const call = mockGenerateObjectWithTimeout.mock.calls[0][1];
     expect(call.prompt).toContain('gothic horror');
     expect(call.prompt).toContain('3-10');
   });
 
   it('should throw on malformed AI response', async () => {
-    mockGenerateText.mockResolvedValueOnce({
-      text: 'This is not JSON at all',
-      usage: { inputTokens: 500, outputTokens: 100 },
-    } as any);
+    mockGenerateObjectWithTimeout.mockRejectedValueOnce(new Error('Structured intake generation failed'));
 
     const run = await createRun({
       projectId: testProject.id,
@@ -153,8 +152,8 @@ describe('Intake Service — executeIntake', () => {
       anotherExtra: 42,
     };
 
-    mockGenerateText.mockResolvedValueOnce({
-      text: JSON.stringify(responseWithExtras),
+    mockGenerateObjectWithTimeout.mockResolvedValueOnce({
+      object: responseWithExtras,
       usage: { inputTokens: 500, outputTokens: 300 },
     } as any);
 
@@ -188,8 +187,8 @@ describe('Intake Service — executeIntake', () => {
       },
     };
 
-    mockGenerateText.mockResolvedValueOnce({
-      text: JSON.stringify(driftedResponse),
+    mockGenerateObjectWithTimeout.mockResolvedValueOnce({
+      object: driftedResponse,
       usage: { inputTokens: 500, outputTokens: 200 },
     } as any);
 
@@ -218,8 +217,8 @@ describe('Intake Service — executeIntake', () => {
   });
 
   it('should record token usage on the artifact', async () => {
-    mockGenerateText.mockResolvedValueOnce({
-      text: JSON.stringify(VALID_AI_RESPONSE),
+    mockGenerateObjectWithTimeout.mockResolvedValueOnce({
+      object: VALID_AI_RESPONSE,
       usage: { inputTokens: 500, outputTokens: 300 },
     } as any);
 
@@ -238,8 +237,8 @@ describe('Intake Service — executeIntake', () => {
   });
 
   it('reuses the persisted intake artifact on replay instead of regenerating it', async () => {
-    mockGenerateText.mockResolvedValueOnce({
-      text: JSON.stringify(VALID_AI_RESPONSE),
+    mockGenerateObjectWithTimeout.mockResolvedValueOnce({
+      object: VALID_AI_RESPONSE,
       usage: { inputTokens: 500, outputTokens: 300 },
     } as any);
 
@@ -254,7 +253,7 @@ describe('Intake Service — executeIntake', () => {
 
     expect(second.artifactId).toBe(first.artifactId);
     expect(second.normalizedInput.title).toBe(first.normalizedInput.title);
-    expect(mockGenerateText).toHaveBeenCalledTimes(1);
+    expect(mockGenerateObjectWithTimeout).toHaveBeenCalledTimes(1);
 
     const artifacts = await prisma.generatedArtifact.findMany({
       where: { runId: run!.id, artifactType: 'project_profile' },

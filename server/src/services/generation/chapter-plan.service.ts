@@ -9,9 +9,8 @@ import type {
 } from '@dnd-booker/shared';
 import { prisma } from '../../config/database.js';
 import { publishGenerationEvent } from './pubsub.service.js';
-import { parseJsonResponse } from './parse-json.js';
 import { normalizeGenerationContentType } from './content-type-normalizer.js';
-import { generateTextWithTimeout } from './model-timeouts.js';
+import { generateObjectWithTimeout } from './model-timeouts.js';
 import {
   buildChapterPlanSystemPrompt,
   buildChapterPlanUserPrompt,
@@ -83,6 +82,17 @@ const ChapterPlanSchema = z.object({
   difficultyProgression: z.string().default(''),
 });
 
+const ChapterPlanCandidateSchema = z.object({
+  chapterSlug: z.string().optional().default(''),
+  chapterTitle: z.string().optional().default(''),
+  sections: z.array(z.record(z.unknown())).optional().default([]),
+  encounters: z.array(z.record(z.unknown())).optional().default([]),
+  entityReferences: z.array(z.string()).optional().default([]),
+  readAloudCount: z.union([z.number(), z.string()]).optional().default(0),
+  dmTipCount: z.union([z.number(), z.string()]).optional().default(0),
+  difficultyProgression: z.string().optional().default(''),
+}).passthrough();
+
 export interface ChapterPlanResult {
   plan: ChapterPlan;
   artifactId: string;
@@ -119,12 +129,15 @@ export async function executeChapterPlanGeneration(
   const system = buildChapterPlanSystemPrompt();
   const prompt = buildChapterPlanUserPrompt(chapter, bible, entitySummaries);
 
-  const { text, usage } = await generateTextWithTimeout(`Chapter plan generation for ${chapter.title}`, {
-    model, system, prompt, maxOutputTokens,
+  const { object, usage } = await generateObjectWithTimeout(`Chapter plan generation for ${chapter.title}`, {
+    model,
+    schema: ChapterPlanCandidateSchema,
+    system,
+    prompt,
+    maxOutputTokens,
   });
 
-  const parsed = parseJsonResponse(text);
-  const normalizedCandidate = coerceChapterPlanCandidate(chapter, parsed);
+  const normalizedCandidate = coerceChapterPlanCandidate(chapter, object);
   const plan = normalizeChapterPlan(
     chapter,
     ChapterPlanSchema.parse(normalizedCandidate) as ChapterPlan,
