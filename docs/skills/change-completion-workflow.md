@@ -31,6 +31,8 @@ Do not stop after code edits unless the user explicitly says not to ship.
 - active runtime AI/chat/wizard flows should use `/api/v1/ai/*` and `/api/v1/projects/:projectId/ai/*`
 - autonomous generation should start from locked interview sessions on `/api/v1/projects/:projectId/interview/sessions/*`; keep the `interview_brief` contract as the only input to the background generation run
 - long-running autonomous generation should use system-managed presets from `config/agents.yaml` instead of the user’s saved chat/image settings
+- prompt-only autonomous runs should still derive a concrete `qualityBudgetLane` from the requested run quality so `quick` runs stay on the fast routed lane
+- keep the art-direction stage on `agent.artist` for both provider credentials and prompt-planning model selection; layout routing should stop at the layout draft stage
 - active runtime template and asset flows should use `/api/v1/templates`, `/api/v1/projects/:projectId/assets`, and `/api/v1/assets/:id`
 - keep aggregate project content saves on `PATCH /api/v1/projects/:projectId` and manual layout saves on `PATCH /api/v1/projects/:projectId/documents/:docId/layout`; do not reintroduce runtime writes against the old project/document content endpoints
 - if a server-side change mutates `ProjectDocument.content`, keep `canonicalDocJson`, `editorProjectionJson`, `typstSource`, `layoutSnapshotJson`, `layoutEngineVersion`, and `layoutSnapshotUpdatedAt` in sync in the same write; prefer `buildResolvedPublicationDocumentWriteData(...)` over ad hoc update payloads

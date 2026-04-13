@@ -45,6 +45,14 @@ function mergeGraphState(existing: unknown, patch: Record<string, unknown>): Pri
   } as Prisma.InputJsonValue;
 }
 
+function qualityToBudgetLane(quality: GenerationQuality | undefined): QualityBudgetLane {
+  if (quality === 'polished') {
+    return 'high_quality';
+  }
+
+  return 'fast';
+}
+
 function serializeRun(run: any): GenerationRun {
   const graphStateJson = (run.graphStateJson as Record<string, unknown> | null) ?? null;
   const routedRewriteCounts = graphStateJson && typeof graphStateJson['routedRewriteCounts'] === 'object' && graphStateJson['routedRewriteCounts']
@@ -126,7 +134,7 @@ export async function createRun(input: CreateRunInput) {
   }
 
   const interviewBrief = (lockedInterview?.lockedBrief ?? null) as InterviewBrief | null;
-  const qualityBudgetLane = interviewBrief?.qualityBudgetLane ?? null;
+  const qualityBudgetLane = interviewBrief?.qualityBudgetLane ?? qualityToBudgetLane(input.quality);
   const inputPrompt = interviewBrief?.summary ?? input.prompt ?? '';
   const inputParameters = interviewBrief
     ? {

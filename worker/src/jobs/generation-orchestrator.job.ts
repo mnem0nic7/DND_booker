@@ -265,12 +265,21 @@ function readInterviewBrief(inputParameters: unknown): InterviewBrief | null {
   return isRecord(brief) ? brief as unknown as InterviewBrief : null;
 }
 
-function readQualityBudgetLane(inputParameters: unknown): QualityBudgetLane {
-  if (!isRecord(inputParameters)) return 'balanced';
-  const lane = inputParameters.qualityBudgetLane;
-  return lane === 'fast' || lane === 'balanced' || lane === 'high_quality'
-    ? lane
-    : 'balanced';
+function readQualityBudgetLane(inputParameters: unknown, runQuality: string | null | undefined): QualityBudgetLane {
+  const lane = isRecord(inputParameters) ? inputParameters.qualityBudgetLane : null;
+  if (lane === 'fast' || lane === 'balanced' || lane === 'high_quality') {
+    return lane;
+  }
+
+  if (runQuality === 'quick') {
+    return 'fast';
+  }
+
+  if (runQuality === 'polished') {
+    return 'high_quality';
+  }
+
+  return 'balanced';
 }
 
 async function waitForExportCompletion(exportJobId: string) {
@@ -377,7 +386,7 @@ export async function processGenerationJob(job: Job<GenerationJobData>): Promise
     where: { id: runId },
   });
   const interviewBrief = readInterviewBrief(fullRun.inputParameters);
-  const qualityBudgetLane = readQualityBudgetLane(fullRun.inputParameters);
+  const qualityBudgetLane = readQualityBudgetLane(fullRun.inputParameters, fullRun.quality);
   const runEnvelope = {
     id: runId,
     projectId,
@@ -974,7 +983,7 @@ export async function processGenerationJob(job: Job<GenerationJobData>): Promise
           });
           const { resolveSystemAgentRoute } = await import('../../../server/src/services/llm/system-router.js');
           const artistRoute = await resolveSystemAgentRoute('agent.artist', qualityBudgetLane);
-          const { model, maxOutputTokens } = await resolveModelForAgent('agent.layout_expert');
+          const { model, maxOutputTokens } = await resolveModelForAgent('agent.artist');
           const artResult = await dependencies.executeArtDirectionPass(
             runEnvelope,
             model,

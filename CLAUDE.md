@@ -154,6 +154,8 @@ The autonomous generation path is now interview-driven and stage-routed:
 - printer/export
 Keep agent-stage state in `graphStateJson` (`agentStage`, `criticCycle`, `qualityBudgetLane`, `routedRewriteCounts`, `imageGenerationStatus`, `finalEditorialStatus`) so the API and smoke checks can inspect real pipeline progress.
 Autonomous runs use system-managed model credentials from `config/agents.yaml`, not the user’s saved AI settings. For Google-backed autonomous stages, both web and worker Cloud Run services must have `SYSTEM_GOOGLE_API_KEY`.
+Prompt-only autonomous runs should still seed `qualityBudgetLane` from the run quality (`quick -> fast`, `polished -> high_quality`) so they follow the same routed presets as interview-driven runs.
+The `artist_requested` stage must resolve both provider credentials and prompt-planning model selection from `agent.artist`. Do not route that stage through `agent.layout_expert`.
 
 ### Authentication
 JWT access token (15min) + refresh token (7d, httpOnly cookie). Token version incremented on logout. Client axios interceptor auto-refreshes on 401.
