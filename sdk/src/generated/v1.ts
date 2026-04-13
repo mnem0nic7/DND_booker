@@ -30,6 +30,10 @@ import type {
   GraphInterrupt,
   GraphInterruptIdParams,
   GraphInterruptResolutionRequestBody,
+  InterviewSession,
+  InterviewSessionCreateRequest,
+  InterviewSessionLockRequest,
+  InterviewSessionMessageRequest,
   Problem,
   ProjectCreateRequest,
   ProjectDetail,
@@ -49,6 +53,12 @@ function buildPath(template: string, params?: Record<string, string | number | u
 }
 
 export interface V1Client {
+  interviews: {
+    createInterviewSession(params: ProjectIdParams, body: InterviewSessionCreateRequest, config?: AxiosRequestConfig): Promise<InterviewSession>;
+    getInterviewSession(params: ProjectIdParams & { sessionId: string }, config?: AxiosRequestConfig): Promise<InterviewSession>;
+    appendInterviewMessage(params: ProjectIdParams & { sessionId: string }, body: InterviewSessionMessageRequest, config?: AxiosRequestConfig): Promise<InterviewSession>;
+    lockInterviewSession(params: ProjectIdParams & { sessionId: string }, body: InterviewSessionLockRequest, config?: AxiosRequestConfig): Promise<InterviewSession>;
+  };
   auth: {
     login(body: AuthLoginRequest, config?: AxiosRequestConfig): Promise<AuthSessionResponse>;
     register(body: AuthRegisterRequest, config?: AxiosRequestConfig): Promise<AuthSessionResponse>;
@@ -114,6 +124,24 @@ export interface V1Client {
 
 export function createV1Client(axios: AxiosInstance): V1Client {
   return {
+    interviews: {
+      async createInterviewSession(params: ProjectIdParams, body: InterviewSessionCreateRequest, config?: AxiosRequestConfig) {
+        const { data } = await axios.post<InterviewSession>(buildPath('/v1/projects/{projectId}/interview/sessions', params as Record<string, string | number | undefined>), body, config);
+        return data;
+      },
+      async getInterviewSession(params: ProjectIdParams & { sessionId: string }, config?: AxiosRequestConfig) {
+        const { data } = await axios.get<InterviewSession>(buildPath('/v1/projects/{projectId}/interview/sessions/{sessionId}', params as Record<string, string | number | undefined>), config);
+        return data;
+      },
+      async appendInterviewMessage(params: ProjectIdParams & { sessionId: string }, body: InterviewSessionMessageRequest, config?: AxiosRequestConfig) {
+        const { data } = await axios.post<InterviewSession>(buildPath('/v1/projects/{projectId}/interview/sessions/{sessionId}/messages', params as Record<string, string | number | undefined>), body, config);
+        return data;
+      },
+      async lockInterviewSession(params: ProjectIdParams & { sessionId: string }, body: InterviewSessionLockRequest, config?: AxiosRequestConfig) {
+        const { data } = await axios.post<InterviewSession>(buildPath('/v1/projects/{projectId}/interview/sessions/{sessionId}/lock', params as Record<string, string | number | undefined>), body, config);
+        return data;
+      },
+    },
     auth: {
       async login(body: AuthLoginRequest, config?: AxiosRequestConfig) {
         const { data } = await axios.post<AuthSessionResponse>('/v1/auth/login', body, config);

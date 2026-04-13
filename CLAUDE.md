@@ -64,6 +64,7 @@ Project lifecycle now has a first-class `api/v1` surface (`/api/v1/projects`). N
 Project aggregate content saves also go through `PATCH /api/v1/projects/:projectId`, and manual document layout saves go through `PATCH /api/v1/projects/:projectId/documents/:docId/layout`.
 `api/v1` document snapshots now carry `layoutPlan` alongside canonical/editor/Typst fields. Client document loads should consume that v1 snapshot rather than stitching layout data from legacy document routes.
 Active client AI/chat/wizard traffic should use `/api/v1/ai/*` and `/api/v1/projects/:projectId/ai/*`.
+Autonomous generation now starts from interview sessions under `/api/v1/projects/:projectId/interview/sessions`. The long-running generation worker should only start after the interview is locked and a structured `interview_brief` artifact exists.
 Active template and asset traffic should use `/api/v1/templates`, `/api/v1/projects/:projectId/assets`, and `/api/v1/assets/:id`.
 Legacy runtime `/api/*` compatibility mounts have been removed. Keep `/api/health` for operational probes, but route all product traffic through `/api/v1/*`.
 
@@ -143,6 +144,16 @@ Agent checkpoint restore now carries canonical publication fields (`canonicalDoc
 
 Generation orchestration should resolve models per stage through `server/src/services/llm/router.ts`, not by inheriting the raw user-selected chat model for the whole worker run. This keeps structured nodes like `agent.outline` and `agent.chapter_draft` on the stable routed presets even when the user has a preview Gemini model saved for chat. Quick-mode Google runs intentionally downgrade the heavier generation stages (`agent.bible`, `agent.outline`, `agent.canon`, `agent.chapter_draft`, `agent.layout`) onto `gemini-2.5-flash` for reliability; polished runs keep the stronger preset lane.
 Core generation nodes now have a hard worker-side timeout via `withCoreStageTimeout(...)`. If intake, bible, outline, canon expansion, chapter planning, or chapter drafting hangs inside a provider call, fail the node and let BullMQ/checkpoint retry rather than leaving the run stuck on a stale `currentNode` forever.
+The autonomous generation path is now interview-driven and stage-routed:
+- interviewer session -> locked `interview_brief`
+- writer story packet
+- D&D expert insert bundles
+- layout draft + image briefs
+- critic loop with routed rewrites
+- final editor
+- printer/export
+Keep agent-stage state in `graphStateJson` (`agentStage`, `criticCycle`, `qualityBudgetLane`, `routedRewriteCounts`, `imageGenerationStatus`, `finalEditorialStatus`) so the API and smoke checks can inspect real pipeline progress.
+Autonomous runs use system-managed model credentials from `config/agents.yaml`, not the user’s saved AI settings. For Google-backed autonomous stages, both web and worker Cloud Run services must have `SYSTEM_GOOGLE_API_KEY`.
 
 ### Authentication
 JWT access token (15min) + refresh token (7d, httpOnly cookie). Token version incremented on logout. Client axios interceptor auto-refreshes on 401.
@@ -182,7 +193,7 @@ Unless the user explicitly says not to, treat this as the default after every co
    - `npm run verify:ship` for the normal shippable path.
    - `npm run verify` is the lighter build-only pass when you explicitly do not need the full ship checks.
    - If cloud-backed server integration is unavailable, record the exact blocker instead of silently skipping it.
-   - `verify:ship` now includes the worker `layout-visual-parity.test.ts` regression before the client and server suites, plus auth, AI, wizard apply, asset, template, document, v1 export, legacy-compatibility header, canon expansion, project, run, agent restore, and generation-route coverage through the local Cloud SQL Proxy + Redis harness; keep new `api/v1` route regressions in that path when they touch transport serialization or run orchestration APIs.
+   - `verify:ship` now includes the worker `layout-visual-parity.test.ts` regression before the client and server suites, plus auth, AI, wizard apply, asset, template, document, v1 export, legacy-compatibility header, canon expansion, project, run, interview, agent restore, and generation-route coverage through the local Cloud SQL Proxy + Redis harness; keep new `api/v1` route regressions in that path when they touch transport serialization or run orchestration APIs.
    - For runtime or infra work that can affect queue durability, add `npm run ops:redis:check` to the ship pass or incident triage.
 3. Update repo memory and docs when behavior, workflow, deployment steps, or architecture changed.
    - Memory: this file and any other standing repo guidance.

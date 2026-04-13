@@ -2,7 +2,9 @@ import type { Job } from 'bullmq';
 import type {
   BibleContent,
   ChapterOutline,
+  InterviewBrief,
   NormalizedInput,
+  QualityBudgetLane,
   RunStatus,
 } from '@dnd-booker/shared';
 import { prisma } from '../config/database.js';
@@ -18,10 +20,19 @@ export interface GenerationJobData {
 }
 
 interface GenerationGraphData extends Record<string, unknown> {
-  latestPreflight: StoredPreflightResult | null;
-  needsPreflightRecheck: boolean;
-  quickModeAccepted: boolean;
-  manualReviewRecheckPending: boolean;
+  criticCycle: number;
+  latestCriticReportId: string | null;
+  latestPreviewExportJobId: string | null;
+  latestPreviewExportReview: Record<string, unknown> | null;
+  finalEditorRewriteUsed: boolean;
+  imageGenerationStatus: 'not_requested' | 'requested' | 'processing' | 'completed' | 'failed';
+  qualityBudgetLane: QualityBudgetLane;
+  routedRewriteCounts: {
+    writer: number;
+    dndExpert: number;
+    layoutExpert: number;
+    artist: number;
+  };
 }
 
 interface StoredPreflightIssue {
@@ -36,6 +47,8 @@ interface StoredPreflightResult {
   issues: StoredPreflightIssue[];
 }
 
+const MAX_CRITIC_CYCLES = 4;
+
 const DEFAULT_OPTIONAL_STAGE_TIMEOUT_MS = 4 * 60 * 1000;
 const DEFAULT_CORE_STAGE_TIMEOUT_MS = 6 * 60 * 1000;
 const REVISION_ELIGIBLE_CATEGORIES = new Set(['written']);
@@ -49,6 +62,10 @@ const SUPPORTED_CANON_ENTITY_TYPES: Record<string, string> = {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function readResolutionNote(value: unknown) {
@@ -138,6 +155,9 @@ async function loadGenerationDependencies() {
   const artDirectionService = await import('../../../server/src/services/generation/art-direction.service.js');
   const layoutDirectorService = await import('../../../server/src/services/generation/layout-director.service.js');
   const intakeService = await import('../../../server/src/services/generation/intake.service.js');
+  const agenticArtifactsService = await import('../../../server/src/services/generation/agentic-artifacts.service.js');
+  const finalEditorService = await import('../../../server/src/services/generation/final-editor.service.js');
+  const exportService = await import('../../../server/src/services/export.service.js');
   const interruptService = await import('../../../server/src/services/graph/interrupt.service.js');
 
   return {
@@ -157,6 +177,9 @@ async function loadGenerationDependencies() {
     ...artDirectionService,
     ...layoutDirectorService,
     ...intakeService,
+    ...agenticArtifactsService,
+    ...finalEditorService,
+    ...exportService,
     ...interruptService,
   };
 }
@@ -236,6 +259,68 @@ async function loadGenerationControlState(runId: string) {
   return 'active' as const;
 }
 
+function readInterviewBrief(inputParameters: unknown): InterviewBrief | null {
+  if (!isRecord(inputParameters)) return null;
+  const brief = inputParameters.interviewBrief;
+  return isRecord(brief) ? brief as unknown as InterviewBrief : null;
+}
+
+function readQualityBudgetLane(inputParameters: unknown): QualityBudgetLane {
+  if (!isRecord(inputParameters)) return 'balanced';
+  const lane = inputParameters.qualityBudgetLane;
+  return lane === 'fast' || lane === 'balanced' || lane === 'high_quality'
+    ? lane
+    : 'balanced';
+}
+
+async function waitForExportCompletion(exportJobId: string) {
+  const timeoutAt = Date.now() + 20 * 60 * 1000;
+
+  while (Date.now() < timeoutAt) {
+    const exportJob = await prisma.exportJob.findUnique({
+      where: { id: exportJobId },
+      select: {
+        id: true,
+        status: true,
+        errorMessage: true,
+        reviewJson: true,
+        outputUrl: true,
+      },
+    });
+
+    if (!exportJob) {
+      throw new Error('Export job not found.');
+    }
+
+    if (exportJob.status === 'completed') {
+      return exportJob;
+    }
+
+    if (exportJob.status === 'failed') {
+      throw new Error(exportJob.errorMessage?.trim() || 'Export failed.');
+    }
+
+    await sleep(2000);
+  }
+
+  throw new Error('Timed out waiting for export completion.');
+}
+
+function selectRewriteOwner(routedRewriteCounts: GenerationGraphData['routedRewriteCounts']) {
+  const ordered = [
+    ['writer', routedRewriteCounts.writer],
+    ['dndExpert', routedRewriteCounts.dndExpert],
+    ['layoutExpert', routedRewriteCounts.layoutExpert],
+    ['artist', routedRewriteCounts.artist],
+  ] as const;
+
+  const next = ordered
+    .filter((entry) => entry[1] > 0)
+    .sort((left, right) => right[1] - left[1])[0];
+
+  return next?.[0] ?? null;
+}
+
 const QUICK_MODE_GOOGLE_FLASH_AGENT_KEYS = new Set([
   'agent.bible',
   'agent.outline',
@@ -248,10 +333,10 @@ export function shouldPreferQuickModeGoogleFlash(agentKey: string, isPolished: b
   return !isPolished && QUICK_MODE_GOOGLE_FLASH_AGENT_KEYS.has(agentKey);
 }
 
-async function resolveModelForUser(userId: string, projectId: string, isPolished: boolean) {
-  const { resolveAgentLanguageModel } = await import('../../../server/src/services/llm/router.js');
+async function resolveModelForRun(budgetLane: QualityBudgetLane) {
+  const { resolveSystemAgentLanguageModel } = await import('../../../server/src/services/llm/system-router.js');
 
-  const resolvedModels = new Map<string, Awaited<ReturnType<typeof resolveAgentLanguageModel>>>();
+  const resolvedModels = new Map<string, Awaited<ReturnType<typeof resolveSystemAgentLanguageModel>>>();
 
   return async (agentKey: string) => {
     const cached = resolvedModels.get(agentKey);
@@ -259,15 +344,7 @@ async function resolveModelForUser(userId: string, projectId: string, isPolished
       return cached;
     }
 
-    const useQuickModeGoogleFlash = shouldPreferQuickModeGoogleFlash(agentKey, isPolished);
-    const resolved = await resolveAgentLanguageModel({
-      userId,
-      projectId,
-      agentKey,
-      agentOverride: useQuickModeGoogleFlash
-        ? { model: 'gemini-2.5-flash' }
-        : undefined,
-    });
+    const resolved = await resolveSystemAgentLanguageModel(agentKey, budgetLane);
     console.info(`[generation.model] ${agentKey} -> ${resolved.selection.provider}/${resolved.selection.model ?? 'default'}`);
     resolvedModels.set(agentKey, resolved);
     return resolved;
@@ -299,6 +376,8 @@ export async function processGenerationJob(job: Job<GenerationJobData>): Promise
   const fullRun = await prisma.generationRun.findUniqueOrThrow({
     where: { id: runId },
   });
+  const interviewBrief = readInterviewBrief(fullRun.inputParameters);
+  const qualityBudgetLane = readQualityBudgetLane(fullRun.inputParameters);
   const runEnvelope = {
     id: runId,
     projectId,
@@ -309,11 +388,15 @@ export async function processGenerationJob(job: Job<GenerationJobData>): Promise
       ? fullRun.inputParameters as Record<string, unknown>
       : null,
   };
-  const isPolished = fullRun.quality === 'polished';
   const dependencies = await loadGenerationDependencies();
-  const resolveModelForAgent = await resolveModelForUser(userId, projectId, isPolished);
+  const resolveModelForAgent = await resolveModelForRun(qualityBudgetLane);
 
   async function publishProgress(status: RunStatus, progressPercent: number) {
+    const currentRun = await prisma.generationRun.findUnique({
+      where: { id: runId },
+      select: { graphStateJson: true },
+    });
+    const graphState = isRecord(currentRun?.graphStateJson) ? currentRun!.graphStateJson as Record<string, unknown> : null;
     const updated = await dependencies.updateRunProgress(runId, userId, status, progressPercent);
     await dependencies.publishGenerationEvent(runId, {
       type: 'run_status',
@@ -321,6 +404,14 @@ export async function processGenerationJob(job: Job<GenerationJobData>): Promise
       status,
       stage: status,
       progressPercent: updated?.progressPercent ?? progressPercent,
+      agentStage: typeof graphState?.agentStage === 'string' ? graphState.agentStage : null,
+      criticCycle: typeof graphState?.criticCycle === 'number' ? graphState.criticCycle : null,
+      qualityBudgetLane:
+        graphState?.qualityBudgetLane === 'fast'
+        || graphState?.qualityBudgetLane === 'balanced'
+        || graphState?.qualityBudgetLane === 'high_quality'
+          ? graphState.qualityBudgetLane
+          : qualityBudgetLane,
     });
   }
 
@@ -340,6 +431,20 @@ export async function processGenerationJob(job: Job<GenerationJobData>): Promise
     await publishProgress(status, progressPercent);
   }
 
+  async function setAgentStage(
+    agentStage: string,
+    status: RunStatus,
+    progressPercent: number,
+    patch: Record<string, unknown> = {},
+  ) {
+    await dependencies.updateRunGraphState(runId, userId, {
+      agentStage,
+      qualityBudgetLane,
+      ...patch,
+    });
+    await setRunStatus(status, progressPercent);
+  }
+
   async function ensureNormalizedInput() {
     const existing = await loadNormalizedInput(runId);
     if (existing) {
@@ -353,7 +458,44 @@ export async function processGenerationJob(job: Job<GenerationJobData>): Promise
       return existing;
     }
 
-    const { model, maxOutputTokens } = await resolveModelForAgent('agent.intake');
+    if (interviewBrief) {
+      const normalizedInput = dependencies.buildNormalizedInputFromInterviewBrief(interviewBrief);
+      const artifact = await prisma.generatedArtifact.create({
+        data: {
+          runId,
+          projectId,
+          artifactType: 'project_profile',
+          artifactKey: 'project-profile',
+          status: 'accepted',
+          version: 1,
+          title: normalizedInput.title,
+          summary: normalizedInput.summary,
+          jsonContent: normalizedInput as any,
+        },
+      });
+
+      await prisma.generationRun.update({
+        where: { id: runId },
+        data: {
+          mode: normalizedInput.inferredMode,
+          estimatedPages: normalizedInput.pageTarget,
+          actualTokens: { increment: 0 },
+        },
+      });
+
+      await dependencies.publishGenerationEvent(runId, {
+        type: 'artifact_created',
+        runId,
+        artifactId: artifact.id,
+        artifactType: 'project_profile',
+        title: artifact.title,
+        version: artifact.version,
+      });
+
+      return normalizedInput;
+    }
+
+    const { model, maxOutputTokens } = await resolveModelForAgent('agent.writer');
     const { normalizedInput } = await dependencies.executeIntake(runEnvelope, model, maxOutputTokens);
     return normalizedInput as NormalizedInput;
   }
@@ -439,6 +581,76 @@ export async function processGenerationJob(job: Job<GenerationJobData>): Promise
     return runRecord.mode === 'one_shot' ? 'art_direction' : 'layout_director';
   }
 
+  async function listLatestArtifacts() {
+    const artifacts = await prisma.generatedArtifact.findMany({
+      where: { runId },
+      orderBy: [{ artifactKey: 'asc' }, { version: 'desc' }, { createdAt: 'desc' }],
+      include: {
+        evaluations: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+        },
+      },
+    });
+
+    const latestByKey = new Map<string, typeof artifacts[number]>();
+    for (const artifact of artifacts) {
+      if (!latestByKey.has(artifact.artifactKey)) {
+        latestByKey.set(artifact.artifactKey, artifact);
+      }
+    }
+
+    return [...latestByKey.values()];
+  }
+
+  async function evaluateLatestArtifacts() {
+    const bibleContent = await ensureBibleContent();
+    const latestArtifacts = await listLatestArtifacts();
+    const evaluatorModel = await resolveModelForAgent('agent.critic');
+
+    for (const artifact of latestArtifacts) {
+      const latestEvaluation = artifact.evaluations[0];
+      if (latestEvaluation?.artifactVersion === artifact.version) {
+        continue;
+      }
+
+      await dependencies.evaluateArtifact(
+        { id: runId },
+        artifact.id,
+        bibleContent,
+        evaluatorModel.model,
+        evaluatorModel.maxOutputTokens,
+      );
+    }
+  }
+
+  async function findLatestArtifactForOwner(owner: 'writer' | 'dndExpert' | 'layoutExpert' | 'artist') {
+    const latestArtifacts = await listLatestArtifacts();
+    const matchesOwner = (artifactType: string) => {
+      if (owner === 'writer') {
+        return ['project_profile', 'campaign_bible', 'chapter_outline', 'chapter_plan', 'chapter_draft', 'front_matter_draft', 'writer_story_packet'].includes(artifactType);
+      }
+      if (owner === 'dndExpert') {
+        return ['npc_dossier', 'location_brief', 'faction_profile', 'encounter_bundle', 'item_bundle', 'read_aloud_bundle', 'sidebar_bundle', 'handout_bundle', 'random_table_bundle', 'stat_block_bundle', 'loot_bundle'].includes(artifactType);
+      }
+      if (owner === 'artist') {
+        return ['image_asset', 'image_brief_bundle', 'art_direction_plan'].includes(artifactType);
+      }
+      return ['layout_plan', 'layout_draft', 'assembly_manifest', 'art_direction_plan'].includes(artifactType);
+    };
+
+    const scored = latestArtifacts
+      .filter((artifact) => matchesOwner(artifact.artifactType))
+      .map((artifact) => ({
+        artifact,
+        evaluation: artifact.evaluations[0] ?? null,
+      }))
+      .filter((entry) => entry.evaluation && entry.evaluation.passed === false)
+      .sort((left, right) => (left.evaluation?.overallScore ?? 0) - (right.evaluation?.overallScore ?? 0));
+
+    return scored[0] ?? null;
+  }
+
   try {
     await dependencies.updateRunGraphState(runId, userId, {
       jobName: job.name,
@@ -448,12 +660,21 @@ export async function processGenerationJob(job: Job<GenerationJobData>): Promise
     });
 
     const graphResult = await runPersistedGraph<GenerationGraphData, undefined>({
-      startNode: 'intake',
+      startNode: 'interview_locked',
       initialData: {
-        latestPreflight: null,
-        needsPreflightRecheck: false,
-        quickModeAccepted: false,
-        manualReviewRecheckPending: false,
+        criticCycle: 0,
+        latestCriticReportId: null,
+        latestPreviewExportJobId: null,
+        latestPreviewExportReview: null,
+        finalEditorRewriteUsed: false,
+        imageGenerationStatus: 'not_requested',
+        qualityBudgetLane,
+        routedRewriteCounts: {
+          writer: 0,
+          dndExpert: 0,
+          layoutExpert: 0,
+          artist: 0,
+        },
       },
       loadSnapshot: () => readRuntimeState(fullRun.graphStateJson),
       externalContext: undefined,
@@ -466,42 +687,93 @@ export async function processGenerationJob(job: Job<GenerationJobData>): Promise
         ));
       },
       nodes: {
-        intake: async () => withCoreStageTimeout('Generation intake node', (async () => {
-          await setRunStatus('planning', 5);
+        interview_locked: async () => withCoreStageTimeout('Interview locked node', (async () => {
+          await setAgentStage('interview_locked', 'planning', 5, {
+            criticCycle: 0,
+            qualityBudgetLane,
+            imageGenerationStatus: 'not_requested',
+            finalEditorialStatus: 'pending',
+          });
           await ensureNormalizedInput();
-          await publishProgress('planning', 15);
-          return { nextNode: 'bible' };
+          await publishProgress('planning', 10);
+          return { nextNode: 'writer_story_packet' };
         })()),
 
-        bible: async () => withCoreStageTimeout('Generation bible node', (async () => {
-          await setRunStatus('planning', 15);
-          await ensureBibleContent();
-          await publishProgress('planning', 30);
-          return { nextNode: 'outline' };
-        })()),
+        writer_story_packet: async () => withCoreStageTimeout('Writer story packet node', (async () => {
+          await setAgentStage('writer_story_packet', 'planning', 10);
+          const [bibleContent, outline] = await Promise.all([
+            ensureBibleContent(),
+            ensureOutline(),
+          ]);
 
-        outline: async () => withCoreStageTimeout('Generation outline node', (async () => {
-          await setRunStatus('planning', 30);
-          await ensureOutline();
-          await publishProgress('planning', 40);
-          return { nextNode: 'front_matter' };
-        })()),
-
-        front_matter: async () => withCoreStageTimeout('Generation front matter node', (async () => {
-          await setRunStatus('planning', 40);
-          const existing = await loadArtifactByKey(runId, 'front-matter');
-          if (!existing) {
-            const [bibleContent, outline] = await Promise.all([
-              ensureBibleContent(),
-              ensureOutline(),
-            ]);
+          const frontMatter = await loadArtifactByKey(runId, 'front-matter');
+          if (!frontMatter) {
             await dependencies.executeFrontMatterGeneration(runEnvelope, bibleContent, outline);
           }
-          return { nextNode: 'canon_expansion' };
+
+          const existingPlanKeys = await loadArtifactKeySet(
+            runId,
+            outline.chapters.map((chapter) => `chapter-plan-${chapter.slug}`),
+          );
+          const enrichedEntities = await prisma.canonEntity.findMany({
+            where: { runId, projectId },
+            select: { slug: true, entityType: true, canonicalName: true, summary: true },
+          });
+
+          for (const chapter of outline.chapters) {
+            if (!existingPlanKeys.has(`chapter-plan-${chapter.slug}`)) {
+              const { model, maxOutputTokens } = await resolveModelForAgent('agent.writer');
+              await dependencies.executeChapterPlanGeneration(
+                runEnvelope,
+                chapter,
+                bibleContent,
+                enrichedEntities.map((entity) => ({
+                  slug: entity.slug,
+                  entityType: entity.entityType,
+                  name: entity.canonicalName,
+                  summary: entity.summary ?? '',
+                })),
+                model,
+                maxOutputTokens,
+              );
+            }
+          }
+
+          const existingDraftKeys = await loadArtifactKeySet(
+            runId,
+            outline.chapters.map((chapter) => `chapter-draft-${chapter.slug}`),
+          );
+          for (const chapter of outline.chapters) {
+            if (existingDraftKeys.has(`chapter-draft-${chapter.slug}`)) continue;
+
+            const planArtifact = await loadArtifactByKey(runId, `chapter-plan-${chapter.slug}`);
+            if (!planArtifact?.jsonContent) {
+              throw new Error(`No plan found for chapter ${chapter.slug}`);
+            }
+
+            const priorSlugs = outline.chapters
+              .slice(0, outline.chapters.findIndex((candidate) => candidate.slug === chapter.slug))
+              .map((candidate) => candidate.slug);
+
+            const { model, maxOutputTokens } = await resolveModelForAgent('agent.writer');
+            await dependencies.executeChapterDraftGeneration(
+              runEnvelope,
+              chapter,
+              planArtifact.jsonContent as any,
+              bibleContent,
+              priorSlugs,
+              model,
+              maxOutputTokens,
+            );
+          }
+
+          await dependencies.ensureWriterStoryPacketArtifact(runEnvelope);
+          await publishProgress('planning', 45);
+          return { nextNode: 'dnd_expert_inserts' };
         })()),
 
-        canon_expansion: async () => withCoreStageTimeout('Generation canon expansion node', (async () => {
-          await setRunStatus('generating_assets', 45);
+        dnd_expert_inserts: async () => withCoreStageTimeout('DND expert inserts node', (async () => {
+          await setAgentStage('dnd_expert_inserts', 'generating_assets', 45);
           const bibleContent = await ensureBibleContent();
           const entities = await prisma.canonEntity.findMany({
             where: { runId, projectId },
@@ -522,243 +794,30 @@ export async function processGenerationJob(job: Job<GenerationJobData>): Promise
             `${SUPPORTED_CANON_ENTITY_TYPES[entity.entityType]}-${entity.slug}`,
           );
           const existingKeys = await loadArtifactKeySet(runId, artifactKeys);
-          const nextEntity = eligibleEntities.find((entity) =>
-            !existingKeys.has(`${SUPPORTED_CANON_ENTITY_TYPES[entity.entityType]}-${entity.slug}`),
-          );
 
-          if (!nextEntity) {
-            await publishProgress('generating_assets', 55);
-            return { nextNode: 'chapter_plans' };
-          }
-
-          const seed = bibleContent.entities.find((candidate) => candidate.slug === nextEntity.slug);
-          if (!seed) {
-            return { nextNode: 'canon_expansion' };
-          }
-
-          const { model, maxOutputTokens } = await resolveModelForAgent('agent.canon');
-          await dependencies.expandCanonEntity(
-            runEnvelope,
-            nextEntity,
-            seed,
-            bibleContent,
-            model,
-            maxOutputTokens,
-          );
-
-          const completedCount = eligibleEntities.length === 0
-            ? 0
-            : eligibleEntities.length - 1;
-          const nextPercent = 45 + Math.round(((completedCount + 1) / Math.max(1, eligibleEntities.length)) * 10);
-          await publishProgress('generating_assets', nextPercent);
-
-          return { nextNode: 'canon_expansion' };
-        })()),
-
-        chapter_plans: async () => withCoreStageTimeout('Generation chapter plans node', (async () => {
-          await setRunStatus('generating_assets', 55);
-          const [outline, bibleContent, enrichedEntities] = await Promise.all([
-            ensureOutline(),
-            ensureBibleContent(),
-            prisma.canonEntity.findMany({
-              where: { runId, projectId },
-              select: { slug: true, entityType: true, canonicalName: true, summary: true },
-            }),
-          ]);
-
-          const planKeys = outline.chapters.map((chapter) => `chapter-plan-${chapter.slug}`);
-          const existingKeys = await loadArtifactKeySet(runId, planKeys);
-          const nextChapter = outline.chapters.find((chapter) => !existingKeys.has(`chapter-plan-${chapter.slug}`));
-
-          if (!nextChapter) {
-            await publishProgress('generating_assets', 65);
-            return { nextNode: 'chapter_drafts' };
-          }
-
-          const { model, maxOutputTokens } = await resolveModelForAgent('agent.chapter_plan');
-          await dependencies.executeChapterPlanGeneration(
-            runEnvelope,
-            nextChapter,
-            bibleContent,
-            enrichedEntities.map((entity) => ({
-              slug: entity.slug,
-              entityType: entity.entityType,
-              name: entity.canonicalName,
-              summary: entity.summary ?? '',
-            })),
-            model,
-            maxOutputTokens,
-          );
-
-          const completedCount = outline.chapters.filter((chapter) =>
-            existingKeys.has(`chapter-plan-${chapter.slug}`),
-          ).length + 1;
-          await publishProgress(
-            'generating_assets',
-            55 + Math.round((completedCount / Math.max(1, outline.chapters.length)) * 10),
-          );
-
-          return { nextNode: 'chapter_plans' };
-        })()),
-
-        chapter_drafts: async () => withCoreStageTimeout('Generation chapter drafts node', (async () => {
-          await setRunStatus('generating_prose', 65);
-          const [outline, bibleContent] = await Promise.all([
-            ensureOutline(),
-            ensureBibleContent(),
-          ]);
-
-          const draftKeys = outline.chapters.map((chapter) => `chapter-draft-${chapter.slug}`);
-          const existingDraftKeys = await loadArtifactKeySet(runId, draftKeys);
-          const nextChapter = outline.chapters.find((chapter) => !existingDraftKeys.has(`chapter-draft-${chapter.slug}`));
-
-          if (!nextChapter) {
-            await publishProgress('generating_prose', isPolished ? 80 : 88);
-            return { nextNode: isPolished ? 'evaluation' : 'assembly' };
-          }
-
-          const planArtifact = await loadArtifactByKey(runId, `chapter-plan-${nextChapter.slug}`);
-          if (!planArtifact?.jsonContent) {
-            throw new Error(`No plan found for chapter ${nextChapter.slug}`);
-          }
-
-          const priorSlugs = outline.chapters
-            .slice(0, outline.chapters.findIndex((chapter) => chapter.slug === nextChapter.slug))
-            .map((chapter) => chapter.slug);
-
-          const { model, maxOutputTokens } = await resolveModelForAgent('agent.chapter_draft');
-          await dependencies.executeChapterDraftGeneration(
-            runEnvelope,
-            nextChapter,
-            planArtifact.jsonContent as any,
-            bibleContent,
-            priorSlugs,
-            model,
-            maxOutputTokens,
-          );
-
-          const completedCount = outline.chapters.filter((chapter) =>
-            existingDraftKeys.has(`chapter-draft-${chapter.slug}`),
-          ).length + 1;
-          await publishProgress(
-            'generating_prose',
-            65 + Math.round((completedCount / Math.max(1, outline.chapters.length)) * 15),
-          );
-
-          return { nextNode: 'chapter_drafts' };
-        })()),
-
-        evaluation: async ({ data }) => {
-          if (!isPolished) {
-            if (!data.quickModeAccepted) {
-              await prisma.generatedArtifact.updateMany({
-                where: { runId, status: 'generated' },
-                data: { status: 'accepted' },
-              });
-            }
-            return {
-              nextNode: 'assembly',
-              data: { quickModeAccepted: true },
-            };
-          }
-
-          await setRunStatus('evaluating', 80);
-          const allArtifacts = await prisma.generatedArtifact.findMany({
-            where: { runId },
-            orderBy: [{ artifactKey: 'asc' }, { version: 'desc' }, { createdAt: 'desc' }],
-          });
-
-          const latestByKey = new Map<string, typeof allArtifacts[number]>();
-          for (const artifact of allArtifacts) {
-            if (!latestByKey.has(artifact.artifactKey)) {
-              latestByKey.set(artifact.artifactKey, artifact);
-            }
-          }
-
-          const nextArtifact = [...latestByKey.values()].find((artifact) =>
-            artifact.status === 'generated' || artifact.status === 'failed_evaluation',
-          );
-
-          if (!nextArtifact) {
-            return { nextNode: 'assembly' };
-          }
-
-          const bibleContent = await ensureBibleContent();
-          let currentArtifactId = nextArtifact.id;
-          const evaluatorModel = await resolveModelForAgent('agent.evaluator');
-          const reviserModel = await resolveModelForAgent('agent.reviser');
-          let evalResult = await dependencies.evaluateArtifact(
-            { id: runId },
-            currentArtifactId,
-            bibleContent,
-            evaluatorModel.model,
-            evaluatorModel.maxOutputTokens,
-          );
-          const artifactCategory = dependencies.getArtifactCategory(nextArtifact.artifactType);
-
-          if (!evalResult.passed && !REVISION_ELIGIBLE_CATEGORIES.has(artifactCategory)) {
-            await acceptNonBlockingArtifactIfSafe(
-              currentArtifactId,
-              evalResult.overallScore,
+          for (const entity of eligibleEntities) {
+            const artifactKey = `${SUPPORTED_CANON_ENTITY_TYPES[entity.entityType]}-${entity.slug}`;
+            if (existingKeys.has(artifactKey)) continue;
+            const seed = bibleContent.entities.find((candidate) => candidate.slug === entity.slug);
+            if (!seed) continue;
+            const { model, maxOutputTokens } = await resolveModelForAgent('agent.dnd_expert');
+            await dependencies.expandCanonEntity(
+              runEnvelope,
+              entity,
+              seed,
+              bibleContent,
+              model,
+              maxOutputTokens,
             );
-            return { nextNode: 'evaluation' };
           }
 
-          if (!evalResult.passed) {
-            await setRunStatus('revising', 84);
-              const revised = await dependencies.reviseArtifact(
-                { id: runId },
-                currentArtifactId,
-                evalResult.findings,
-                bibleContent,
-                reviserModel.model,
-                reviserModel.maxOutputTokens,
-              );
-              if (revised) {
-                currentArtifactId = revised.newArtifactId;
-                evalResult = await dependencies.evaluateArtifact(
-                  { id: runId },
-                  currentArtifactId,
-                  bibleContent,
-                  evaluatorModel.model,
-                  evaluatorModel.maxOutputTokens,
-                );
-                if (!evalResult.passed) {
-                  const revisedAgain = await dependencies.reviseArtifact(
-                    { id: runId },
-                    currentArtifactId,
-                    evalResult.findings,
-                    bibleContent,
-                    reviserModel.model,
-                    reviserModel.maxOutputTokens,
-                  );
-                  if (revisedAgain) {
-                    currentArtifactId = revisedAgain.newArtifactId;
-                    evalResult = await dependencies.evaluateArtifact(
-                      { id: runId },
-                      currentArtifactId,
-                      bibleContent,
-                      evaluatorModel.model,
-                      evaluatorModel.maxOutputTokens,
-                    );
-                  }
-                }
-            }
+          await dependencies.ensureInsertBundleArtifacts(runEnvelope);
+          await publishProgress('generating_assets', 60);
+          return { nextNode: 'layout_first_draft' };
+        })()),
 
-            if (!evalResult.passed) {
-              await acceptNonBlockingArtifactIfSafe(
-                currentArtifactId,
-                evalResult.overallScore,
-              );
-            }
-          }
-
-          await setRunStatus('evaluating', 88);
-          return { nextNode: 'evaluation' };
-        },
-
-        assembly: async () => {
-          await setRunStatus('assembling', 90);
+        layout_first_draft: async () => withCoreStageTimeout('Layout first draft node', (async () => {
+          await setAgentStage('layout_first_draft', 'assembling', 60);
           const [manifest, documentCount] = await Promise.all([
             prisma.assemblyManifest.findFirst({
               where: { runId, projectId, status: 'assembled' },
@@ -774,220 +833,344 @@ export async function processGenerationJob(job: Job<GenerationJobData>): Promise
             await dependencies.assembleDocuments(runEnvelope);
           }
 
-          await publishProgress('assembling', 90);
-          return { nextNode: 'preflight' };
-        },
-
-        preflight: async () => {
-          const preflight = await runAndValidatePreflight(92);
-          return {
-            nextNode: 'publication_polish',
-            data: {
-              latestPreflight: preflight,
-              needsPreflightRecheck: false,
-            },
-          };
-        },
-
-        publication_polish: async ({ data }) => {
-          await publishProgress('assembling', 94);
-          const preflight = data.latestPreflight ?? await runAndValidatePreflight(92);
+          const preflight = await runAndValidatePreflight(68);
           const polish = await dependencies.executePublicationPolish(runEnvelope, preflight);
-
-          if (polish.operationsApplied > 0) {
-            await dependencies.publishGenerationEvent(runId, {
-              type: 'run_warning',
-              runId,
-              message: `Publication polish applied ${polish.operationsApplied} structural fix(es) across ${polish.documentsUpdated} document(s).`,
-              severity: 'info',
-            });
-          } else if (polish.polishableIssuesSeen > 0) {
-            await dependencies.publishGenerationEvent(runId, {
-              type: 'run_warning',
-              runId,
-              message: `Publication polish found ${polish.polishableIssuesSeen} polishable issue(s) but no safe automatic fixes were available.`,
-              severity: 'warning',
-            });
+          if (polish.documentsUpdated > 0) {
+            await runAndValidatePreflight(70);
           }
 
-          return {
-            nextNode: polish.documentsUpdated > 0
-              ? 'preflight_recheck'
-              : 'publication_review_gate',
-            data: {
-              latestPreflight: preflight,
-              needsPreflightRecheck: polish.documentsUpdated > 0,
-            },
-          };
-        },
+          await withOptionalStageTimeout(
+            'Layout director pass',
+            dependencies.executeLayoutDirectorPass(runEnvelope),
+          );
+          await dependencies.ensureLayoutDraftArtifacts(runEnvelope);
+          await publishProgress('assembling', 72);
+          return { nextNode: 'critic_text_pass' };
+        })()),
 
-        preflight_recheck: async () => {
-          const preflight = await runAndValidatePreflight(97);
-
-          return {
-            nextNode: 'publication_review_gate',
-            data: {
-              latestPreflight: preflight,
-              needsPreflightRecheck: false,
-            },
-          };
-        },
-
-        publication_review_gate: async ({ data }) => {
-          await publishProgress('assembling', 98);
-
-          const interruptResult = await dependencies.ensureGenerationRunInterrupt({
+        critic_text_pass: async ({ data }) => withCoreStageTimeout('Critic text pass node', (async () => {
+          const cycle = (data.criticCycle ?? 0) + 1;
+          await setAgentStage('critic_text_pass', 'evaluating', 74, { criticCycle: cycle });
+          await evaluateLatestArtifacts();
+          const criticReportArtifact = await dependencies.createCriticReportArtifact({
             runId,
-            userId,
-            interruptKey: 'generation:publication-review',
-            kind: 'manual_review',
-            title: 'Review assembled draft before final presentation',
-            summary: 'Review the assembled draft before the final art and layout passes. Approve to continue, request edit to make manual document changes and then resume, or reject to stop the run.',
-            payload: {
-              stage: 'publication_review_gate',
-            },
+            projectId,
+            cycle,
+            stage: 'critic_text_pass',
+          });
+          const criticReport = criticReportArtifact.jsonContent as Record<string, unknown>;
+          const routedRewriteCounts = (criticReport.routedRewriteCounts ?? {
+            writer: 0,
+            dndExpert: 0,
+            layoutExpert: 0,
+            artist: 0,
+          }) as GenerationGraphData['routedRewriteCounts'];
+
+          await dependencies.updateRunGraphState(runId, userId, {
+            agentStage: 'critic_text_pass',
+            criticCycle: cycle,
+            latestCriticReportId: criticReportArtifact.id,
+            routedRewriteCounts,
           });
 
-          if (!interruptResult) {
-            throw new Error('Failed to persist publication review gate.');
-          }
-
-          if (interruptResult.interrupt.status === 'pending') {
-            const pausedRun = await dependencies.transitionRunStatus(runId, userId, 'paused');
-
-            if (interruptResult.created) {
-              await dependencies.publishGenerationEvent(runId, {
-                type: 'run_warning',
-                runId,
-                message: 'Awaiting manual review before final presentation passes.',
-                severity: 'info',
-              });
-            }
-
-            await dependencies.publishGenerationEvent(runId, {
-              type: 'run_status',
-              runId,
-              status: pausedRun?.status ?? 'paused',
-              stage: pausedRun?.currentStage ?? 'assembling',
-              progressPercent: pausedRun?.progressPercent ?? 98,
-            });
-
-            return { nextNode: 'publication_review_gate' };
-          }
-
-          if (interruptResult.interrupt.status === 'rejected') {
-            return { nextNode: null };
-          }
-
-          if (interruptResult.interrupt.status === 'edited' && !data.manualReviewRecheckPending) {
-            const note = readResolutionNote(interruptResult.interrupt.resolutionPayload);
-            if (note) {
-              await dependencies.publishGenerationEvent(runId, {
-                type: 'run_warning',
-                runId,
-                message: `Manual reviewer requested edits before completion: ${note}`,
-                severity: 'info',
-              });
-            }
-
+          if (criticReport.passed === true) {
             return {
-              nextNode: 'preflight',
+              nextNode: 'artist_requested',
               data: {
-                latestPreflight: null,
-                needsPreflightRecheck: false,
-                manualReviewRecheckPending: true,
+                ...data,
+                criticCycle: cycle,
+                latestCriticReportId: criticReportArtifact.id,
+                routedRewriteCounts,
               },
             };
           }
 
+          if (cycle >= MAX_CRITIC_CYCLES) {
+            if ((criticReport.blockingFindingCount as number ?? 0) === 0 && (criticReport.overallScore as number ?? 0) >= 75) {
+              return {
+                nextNode: 'final_editor',
+                data: {
+                  ...data,
+                  criticCycle: cycle,
+                  latestCriticReportId: criticReportArtifact.id,
+                  routedRewriteCounts,
+                },
+              };
+            }
+
+            throw new Error('Text critic loop exhausted before the draft reached printable quality.');
+          }
+
+          const owner = selectRewriteOwner(routedRewriteCounts);
           return {
-            nextNode: await resolveFinalPresentationNode(),
+            nextNode:
+              owner === 'writer' ? 'rewrite_writer'
+                : owner === 'dndExpert' ? 'rewrite_dnd_expert'
+                  : 'rewrite_layout',
             data: {
-              manualReviewRecheckPending: false,
+              ...data,
+              criticCycle: cycle,
+              latestCriticReportId: criticReportArtifact.id,
+              routedRewriteCounts,
             },
           };
-        },
+        })()),
 
-        art_direction: async () => {
-          await publishProgress('assembling', 99);
-
-          const existing = await loadArtifactByKey(runId, 'art-direction-plan');
-          if (!existing) {
-            try {
-              const artDirection = await withOptionalStageTimeout(
-                'Art direction pass',
-                (async () => {
-                  const { model, maxOutputTokens } = await resolveModelForAgent('agent.layout');
-                  return dependencies.executeArtDirectionPass(runEnvelope, model, maxOutputTokens);
-                })(),
-              );
-              if (artDirection.generatedImageCount > 0) {
-                await dependencies.publishGenerationEvent(runId, {
-                  type: 'run_warning',
-                  runId,
-                  message: `Art direction automatically generated ${artDirection.generatedImageCount} project image asset(s) across ${artDirection.placementCount} selected placement(s).`,
-                  severity: 'info',
-                });
-              } else if (artDirection.placementCount > 0 && artDirection.skippedImageGenerationReason) {
-                await dependencies.publishGenerationEvent(runId, {
-                  type: 'run_warning',
-                  runId,
-                  message: `Art direction selected ${artDirection.placementCount} image placement(s), but automatic image generation was skipped: ${artDirection.skippedImageGenerationReason}`,
-                  severity: 'warning',
-                });
-              } else if (artDirection.placementCount > 0 && artDirection.failedImageCount > 0) {
-                await dependencies.publishGenerationEvent(runId, {
-                  type: 'run_warning',
-                  runId,
-                  message: `Art direction planned ${artDirection.placementCount} image placement(s), but ${artDirection.failedImageCount} image generation attempt(s) failed.`,
-                  severity: 'warning',
-                });
-              }
-            } catch (artErr) {
-              const message = artErr instanceof Error ? artErr.message : String(artErr);
-              await dependencies.publishGenerationEvent(runId, {
-                type: 'run_warning',
-                runId,
-                message: `Art direction pass failed: ${message}`,
-                severity: 'warning',
-              });
-            }
+        rewrite_writer: async ({ data }) => withCoreStageTimeout('Writer rewrite node', (async () => {
+          await setAgentStage('rewrite_writer', 'revising', 76);
+          const failed = await findLatestArtifactForOwner('writer');
+          if (!failed?.evaluation) {
+            return { nextNode: 'layout_first_draft' };
           }
 
-          return { nextNode: 'layout_director' };
-        },
+          const bibleContent = await ensureBibleContent();
+          const { model, maxOutputTokens } = await resolveModelForAgent('agent.writer');
+          await dependencies.reviseArtifact(
+            { id: runId },
+            failed.artifact.id,
+            failed.evaluation.findings as any,
+            bibleContent,
+            model,
+            maxOutputTokens,
+          );
 
-        layout_director: async () => {
-          await publishProgress('assembling', 99);
-          const existing = await loadArtifactByKey(runId, 'layout-plan');
+          return { nextNode: 'dnd_expert_inserts', data };
+        })()),
 
-          if (!existing) {
-            try {
-              const layoutDirector = await withOptionalStageTimeout(
-                'Layout director pass',
-                dependencies.executeLayoutDirectorPass(runEnvelope),
-              );
-              if (layoutDirector.documentsUpdated > 0) {
-                await dependencies.publishGenerationEvent(runId, {
-                  type: 'run_warning',
-                  runId,
-                  message: `Layout director refreshed canonical presentation plans for ${layoutDirector.documentsUpdated} document(s).`,
-                  severity: 'info',
-                });
-              }
-            } catch (layoutErr) {
-              const message = layoutErr instanceof Error ? layoutErr.message : String(layoutErr);
-              await dependencies.publishGenerationEvent(runId, {
-                type: 'run_warning',
-                runId,
-                message: `Layout director pass failed: ${message}`,
-                severity: 'warning',
-              });
-            }
+        rewrite_dnd_expert: async ({ data }) => withCoreStageTimeout('DND expert rewrite node', (async () => {
+          await setAgentStage('rewrite_dnd_expert', 'revising', 77);
+          const failed = await findLatestArtifactForOwner('dndExpert');
+          if (failed?.evaluation) {
+            const bibleContent = await ensureBibleContent();
+            const { model, maxOutputTokens } = await resolveModelForAgent('agent.dnd_expert');
+            await dependencies.reviseArtifact(
+              { id: runId },
+              failed.artifact.id,
+              failed.evaluation.findings as any,
+              bibleContent,
+              model,
+              maxOutputTokens,
+            );
           }
 
+          await dependencies.ensureInsertBundleArtifacts(runEnvelope);
+          return { nextNode: 'layout_first_draft', data };
+        })()),
+
+        rewrite_layout: async ({ data }) => withCoreStageTimeout('Layout rewrite node', (async () => {
+          await setAgentStage('rewrite_layout', 'revising', 78);
+          await dependencies.executeLayoutDirectorPass(runEnvelope);
+          await dependencies.ensureLayoutDraftArtifacts(runEnvelope);
+
+          if (data.imageGenerationStatus === 'completed') {
+            return { nextNode: 'critic_image_pass', data };
+          }
+          return { nextNode: 'critic_text_pass', data };
+        })()),
+
+        artist_requested: async ({ data }) => withOptionalStageTimeout('Artist requested node', (async () => {
+          await setAgentStage('artist_requested', 'assembling', 82, {
+            imageGenerationStatus: 'processing',
+          });
+          const { resolveSystemAgentRoute } = await import('../../../server/src/services/llm/system-router.js');
+          const artistRoute = await resolveSystemAgentRoute('agent.artist', qualityBudgetLane);
+          const { model, maxOutputTokens } = await resolveModelForAgent('agent.layout_expert');
+          const artResult = await dependencies.executeArtDirectionPass(
+            runEnvelope,
+            model,
+            maxOutputTokens,
+            {
+              systemImageProvider: artistRoute.provider === 'google' || artistRoute.provider === 'openai'
+                ? artistRoute.provider
+                : null,
+              systemImageApiKey: process.env[artistRoute.credentialEnvName] ?? null,
+            },
+          );
+
+          await dependencies.ensureLayoutDraftArtifacts(runEnvelope);
+
+          await dependencies.updateRunGraphState(runId, userId, {
+            imageGenerationStatus: artResult.failedImageCount > 0 && artResult.generatedImageCount === 0 ? 'failed' : 'completed',
+          });
+
+          return {
+            nextNode: 'artist_completed',
+            data: {
+              ...data,
+              imageGenerationStatus: artResult.failedImageCount > 0 && artResult.generatedImageCount === 0 ? 'failed' : 'completed',
+            },
+          };
+        })()),
+
+        artist_completed: async ({ data }) => {
+          await setAgentStage('artist_completed', 'assembling', 86, {
+            imageGenerationStatus: data.imageGenerationStatus ?? 'completed',
+          });
+          return { nextNode: 'critic_image_pass', data };
+        },
+
+        critic_image_pass: async ({ data }) => withCoreStageTimeout('Critic image pass node', (async () => {
+          const cycle = (data.criticCycle ?? 0) + 1;
+          await setAgentStage('critic_image_pass', 'evaluating', 88, {
+            criticCycle: cycle,
+            imageGenerationStatus: data.imageGenerationStatus ?? 'completed',
+          });
+
+          const previewExport = await dependencies.createExportJob(projectId, userId, 'pdf', { priority: 20 });
+          if (!previewExport) {
+            throw new Error('Failed to create preview export job for image-aware critic pass.');
+          }
+
+          const completedExport = await waitForExportCompletion(previewExport.id);
+          const criticReportArtifact = await dependencies.createCriticReportArtifact({
+            runId,
+            projectId,
+            cycle,
+            stage: 'critic_image_pass',
+            exportReview: completedExport.reviewJson as Record<string, unknown> | null,
+          });
+          const criticReport = criticReportArtifact.jsonContent as Record<string, unknown>;
+          const routedRewriteCounts = (criticReport.routedRewriteCounts ?? {
+            writer: 0,
+            dndExpert: 0,
+            layoutExpert: 0,
+            artist: 0,
+          }) as GenerationGraphData['routedRewriteCounts'];
+
+          await dependencies.updateRunGraphState(runId, userId, {
+            latestPreviewExportJobId: previewExport.id,
+            latestPreviewExportReview: completedExport.reviewJson,
+            latestCriticReportId: criticReportArtifact.id,
+            routedRewriteCounts,
+            criticCycle: cycle,
+          });
+
+          if (criticReport.passed === true) {
+            return {
+              nextNode: 'final_editor',
+              data: {
+                ...data,
+                criticCycle: cycle,
+                latestCriticReportId: criticReportArtifact.id,
+                latestPreviewExportJobId: previewExport.id,
+                latestPreviewExportReview: completedExport.reviewJson as Record<string, unknown> | null,
+                routedRewriteCounts,
+              },
+            };
+          }
+
+          if (cycle >= MAX_CRITIC_CYCLES) {
+            if ((criticReport.blockingFindingCount as number ?? 0) === 0 && (criticReport.overallScore as number ?? 0) >= 75) {
+              return {
+                nextNode: 'final_editor',
+                data: {
+                  ...data,
+                  criticCycle: cycle,
+                  latestCriticReportId: criticReportArtifact.id,
+                  latestPreviewExportJobId: previewExport.id,
+                  latestPreviewExportReview: completedExport.reviewJson as Record<string, unknown> | null,
+                  routedRewriteCounts,
+                },
+              };
+            }
+
+            throw new Error('Image-aware critic loop exhausted before the draft reached printable quality.');
+          }
+
+          const owner = selectRewriteOwner(routedRewriteCounts);
+          return {
+            nextNode:
+              owner === 'artist' ? 'artist_requested'
+                : owner === 'dndExpert' ? 'rewrite_dnd_expert'
+                  : 'rewrite_layout',
+            data: {
+              ...data,
+              criticCycle: cycle,
+              latestCriticReportId: criticReportArtifact.id,
+              latestPreviewExportJobId: previewExport.id,
+              latestPreviewExportReview: completedExport.reviewJson as Record<string, unknown> | null,
+              routedRewriteCounts,
+            },
+          };
+        })()),
+
+        final_editor: async ({ data }) => withCoreStageTimeout('Final editor node', (async () => {
+          await setAgentStage('final_editor', 'evaluating', 92, {
+            finalEditorialStatus: 'pending',
+          });
+
+          const criticArtifact = data.latestCriticReportId
+            ? await prisma.generatedArtifact.findUnique({ where: { id: data.latestCriticReportId } })
+            : null;
+          const { model, maxOutputTokens } = await resolveModelForAgent('agent.final_editor');
+          const review = await dependencies.executeFinalEditorReview(
+            {
+              id: runId,
+              projectId,
+              title: interviewBrief?.title ?? fullRun.inputPrompt,
+            },
+            criticArtifact?.jsonContent ?? null,
+            data.latestPreviewExportReview ?? null,
+            model,
+            maxOutputTokens,
+          );
+
+          await dependencies.updateRunGraphState(runId, userId, {
+            finalEditorialStatus: review.decision.approved ? 'approved' : review.decision.targetedRewriteOwner ? 'rewrite_requested' : 'failed',
+          });
+
+          if (review.decision.approved) {
+            return {
+              nextNode: 'printer',
+              data: {
+                ...data,
+                finalEditorialStatus: 'approved',
+                latestEditorReportId: review.artifactId,
+              },
+            };
+          }
+
+          if (review.decision.targetedRewriteOwner && !data.finalEditorRewriteUsed) {
+            return {
+              nextNode:
+                review.decision.targetedRewriteOwner === 'writer' ? 'rewrite_writer'
+                  : review.decision.targetedRewriteOwner === 'dnd_expert' ? 'rewrite_dnd_expert'
+                    : review.decision.targetedRewriteOwner === 'artist' ? 'artist_requested'
+                      : 'rewrite_layout',
+              data: {
+                ...data,
+                finalEditorRewriteUsed: true,
+                latestEditorReportId: review.artifactId,
+              },
+            };
+          }
+
+          throw new Error(`Final editor rejected the draft: ${review.decision.summary}`);
+        })()),
+
+        printer: async ({ data }) => withCoreStageTimeout('Printer node', (async () => {
+          await setAgentStage('printer', 'assembling', 96);
+          const latestManifest = await prisma.assemblyManifest.findFirst({
+            where: { runId, projectId },
+            orderBy: [{ version: 'desc' }, { createdAt: 'desc' }],
+            select: { id: true },
+          });
+          await dependencies.createPrintManifestArtifact({
+            runId,
+            projectId,
+            sourceManifestId: latestManifest?.id ?? null,
+            latestCriticReportId: data.latestCriticReportId ?? null,
+            editorReportId: (data as Record<string, unknown>).latestEditorReportId as string | null ?? null,
+          });
+
+          const finalExport = await dependencies.createExportJob(projectId, userId, 'print_pdf', { priority: 25 });
+          if (!finalExport) {
+            throw new Error('Failed to create final print export.');
+          }
+          await waitForExportCompletion(finalExport.id);
+          await publishProgress('assembling', 99);
           return { nextNode: null };
-        },
+        })()),
       },
     });
 

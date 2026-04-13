@@ -5,6 +5,9 @@ import type {
   GenerationQuality,
   GenerationConstraints,
   GenerationRun,
+  InterviewBrief,
+  QualityBudgetLane,
+  GenerationRunInputParameters,
 } from '@dnd-booker/shared';
 import { RUN_STATUS_TRANSITIONS } from '@dnd-booker/shared';
 import { randomUUID } from 'node:crypto';
@@ -43,6 +46,11 @@ function mergeGraphState(existing: unknown, patch: Record<string, unknown>): Pri
 }
 
 function serializeRun(run: any): GenerationRun {
+  const graphStateJson = (run.graphStateJson as Record<string, unknown> | null) ?? null;
+  const routedRewriteCounts = graphStateJson && typeof graphStateJson['routedRewriteCounts'] === 'object' && graphStateJson['routedRewriteCounts']
+    ? graphStateJson['routedRewriteCounts'] as GenerationRun['routedRewriteCounts']
+    : null;
+
   return {
     id: run.id,
     projectId: run.projectId,
@@ -52,7 +60,7 @@ function serializeRun(run: any): GenerationRun {
     status: run.status,
     currentStage: run.currentStage ?? null,
     inputPrompt: run.inputPrompt,
-    inputParameters: (run.inputParameters as GenerationConstraints | null) ?? null,
+    inputParameters: (run.inputParameters as GenerationRunInputParameters | null) ?? null,
     progressPercent: run.progressPercent ?? 0,
     estimatedPages: run.estimatedPages ?? null,
     estimatedTokens: run.estimatedTokens ?? null,
@@ -60,9 +68,19 @@ function serializeRun(run: any): GenerationRun {
     actualTokens: run.actualTokens ?? 0,
     actualCost: run.actualCost ?? 0,
     failureReason: run.failureReason ?? null,
+    agentStage: typeof graphStateJson?.['agentStage'] === 'string' ? graphStateJson['agentStage'] as GenerationRun['agentStage'] : null,
+    criticCycle: typeof graphStateJson?.['criticCycle'] === 'number' ? graphStateJson['criticCycle'] as number : null,
+    qualityBudgetLane: typeof graphStateJson?.['qualityBudgetLane'] === 'string' ? graphStateJson['qualityBudgetLane'] as QualityBudgetLane : null,
+    routedRewriteCounts,
+    imageGenerationStatus: typeof graphStateJson?.['imageGenerationStatus'] === 'string'
+      ? graphStateJson['imageGenerationStatus'] as GenerationRun['imageGenerationStatus']
+      : null,
+    finalEditorialStatus: typeof graphStateJson?.['finalEditorialStatus'] === 'string'
+      ? graphStateJson['finalEditorialStatus'] as GenerationRun['finalEditorialStatus']
+      : null,
     graphThreadId: run.graphThreadId ?? null,
     graphCheckpointKey: run.graphCheckpointKey ?? null,
-    graphStateJson: (run.graphStateJson as Record<string, unknown> | null) ?? null,
+    graphStateJson,
     resumeToken: run.resumeToken ?? null,
     createdAt: run.createdAt.toISOString(),
     updatedAt: run.updatedAt.toISOString(),
@@ -74,7 +92,8 @@ function serializeRun(run: any): GenerationRun {
 interface CreateRunInput {
   projectId: string;
   userId: string;
-  prompt: string;
+  prompt?: string;
+  interviewSessionId?: string;
   mode?: GenerationMode;
   quality?: GenerationQuality;
   pageTarget?: number;
@@ -87,17 +106,82 @@ export async function createRun(input: CreateRunInput) {
   });
   if (!project) return null;
 
-  const run = await prisma.generationRun.create({
-    data: {
-      projectId: input.projectId,
-      userId: input.userId,
-      mode: input.mode ?? 'one_shot',
-      quality: input.quality ?? 'quick',
-      ...createGraphMetadata('generation'),
-      inputPrompt: input.prompt,
-      inputParameters: (input.constraints as any) ?? undefined,
-      estimatedPages: input.pageTarget ?? null,
-    },
+  const lockedInterview = input.interviewSessionId
+    ? await prisma.interviewSession.findFirst({
+      where: {
+        id: input.interviewSessionId,
+        projectId: input.projectId,
+        userId: input.userId,
+        status: 'locked',
+      },
+      select: {
+        id: true,
+        lockedBrief: true,
+      },
+    })
+    : null;
+
+  if (input.interviewSessionId && !lockedInterview) {
+    return null;
+  }
+
+  const interviewBrief = (lockedInterview?.lockedBrief ?? null) as InterviewBrief | null;
+  const qualityBudgetLane = interviewBrief?.qualityBudgetLane ?? null;
+  const inputPrompt = interviewBrief?.summary ?? input.prompt ?? '';
+  const inputParameters = interviewBrief
+    ? {
+      interviewSessionId: lockedInterview!.id,
+      qualityBudgetLane: interviewBrief.qualityBudgetLane,
+      interviewBrief,
+      autonomousFlowVersion: 'agentic_v1',
+    }
+    : (input.constraints as GenerationRunInputParameters | undefined);
+  const graphMetadata = createGraphMetadata('generation');
+
+  const run = await prisma.$transaction(async (tx) => {
+    const createdRun = await tx.generationRun.create({
+      data: {
+        projectId: input.projectId,
+        userId: input.userId,
+        mode: interviewBrief?.generationMode ?? input.mode ?? 'one_shot',
+        quality: input.quality ?? 'quick',
+        ...graphMetadata,
+        inputPrompt,
+        inputParameters: (inputParameters as any) ?? undefined,
+        estimatedPages: input.pageTarget ?? null,
+        graphStateJson: mergeGraphState(graphMetadata.graphStateJson, {
+          agentStage: interviewBrief ? 'interview_locked' : null,
+          criticCycle: 0,
+          qualityBudgetLane,
+          routedRewriteCounts: {
+            writer: 0,
+            dndExpert: 0,
+            layoutExpert: 0,
+            artist: 0,
+          },
+          imageGenerationStatus: 'not_requested',
+          finalEditorialStatus: 'pending',
+        }),
+      },
+    });
+
+    if (interviewBrief) {
+      await tx.generatedArtifact.create({
+        data: {
+          runId: createdRun.id,
+          projectId: input.projectId,
+          artifactType: 'interview_brief',
+          artifactKey: 'interview-brief',
+          status: 'accepted',
+          version: 1,
+          title: interviewBrief.title,
+          summary: interviewBrief.summary,
+          jsonContent: interviewBrief as any,
+        },
+      });
+    }
+
+    return createdRun;
   });
 
   return serializeRun(run);

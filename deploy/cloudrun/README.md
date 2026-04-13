@@ -66,6 +66,7 @@ Current WYSIWYG/export parity bar is page count, block order, page placement, an
 Generation orchestration also routes model selection per stage through the checked-in agent model presets. That prevents a user's experimental chat model from becoming the structured-output model for outline, canon, chapter draft, or evaluation nodes during the deploy smoke or live generation runs. Quick-mode Google generations intentionally use the Flash lane for the heavier structured stages so deploy smoke and invite-only one-shot generation do not depend on `gemini-2.5-pro` capacity being available in that moment.
 The worker also enforces a hard timeout on the core generation nodes. If a provider call hangs inside intake, bible, outline, canon expansion, chapter planning, or chapter drafting, the node now errors and retries from the last persisted checkpoint instead of leaving the run stuck indefinitely.
 Legacy product `/api/*` compatibility routes have been removed. Keep health and infra probes on `/api/health`, and use `/api/v1/*` for app traffic, smoke tests, and operator tooling.
+Autonomous generation uses a system-managed Gemini credential for the artist stage and any other system-routed Google model calls. Set `SYSTEM_GOOGLE_API_KEY` in both Cloud Run services with a Secret Manager secret named `dnd-booker-system-google-api-key`.
 
 ## Invite-Only Registration
 
@@ -170,6 +171,7 @@ If a container build starts failing on a missing workspace package such as `@dnd
    - bucket-level `roles/storage.objectAdmin`
 6. Configure Cloud Run VPC egress so it can reach Memorystore.
 7. Keep the Redis instance on `maxmemory-policy=noeviction`.
+8. Add the system-managed Gemini credential as `SYSTEM_GOOGLE_API_KEY` in both the web and worker Cloud Run services.
 
 For Redis, prefer Direct VPC egress unless you already standardize on Serverless VPC Access.
 BullMQ is not safe on `volatile-lru` or similar eviction modes. Validate the live instance with:
@@ -191,6 +193,7 @@ For this service, keep `run.googleapis.com/vpc-access-egress: private-ranges-onl
    - service account
    - `CLIENT_URL`
    - worker `SERVER_BASE_URL`
+   - `SYSTEM_GOOGLE_API_KEY` from Secret Manager on both services
 4. Deploy:
 
 ```bash

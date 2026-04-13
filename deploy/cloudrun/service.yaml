@@ -91,6 +91,11 @@ spec:
                 secretKeyRef:
                   name: dnd-booker-ai-key-encryption-secret
                   key: latest
+            - name: SYSTEM_GOOGLE_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: dnd-booker-system-google-api-key
+                  key: latest
           resources:
             limits:
               cpu: "1"

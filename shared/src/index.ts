@@ -5,6 +5,8 @@ export * from './types/asset.js';
 export * from './types/export.js';
 export * from './types/template.js';
 export * from './types/wizard.js';
+export * from './types/interview.js';
+export * from './types/agentic-flow.js';
 export * from './types/planner.js';
 export * from './types/ai-tools.js';
 export * from './constants/index.js';
@@ -89,11 +91,19 @@ export {
   GraphInterruptStatusSchema,
   GraphInterruptResolutionActionSchema,
   GraphInterruptResolutionRequestSchema,
+  InterviewSessionSchema,
+  InterviewSessionCreateRequestSchema,
+  InterviewSessionMessageRequestSchema,
+  InterviewSessionLockRequestSchema,
   type GraphInterrupt,
   type GraphInterruptStatus,
   type GraphInterruptResolutionAction,
   type GraphInterruptResolutionRequest,
   type GraphInterruptResolutionRequestBody,
+  type InterviewSession,
+  type InterviewSessionCreateRequest,
+  type InterviewSessionMessageRequest,
+  type InterviewSessionLockRequest,
   V1GenerationTaskSchema,
   type V1GenerationTask,
   V1GeneratedArtifactSchema,

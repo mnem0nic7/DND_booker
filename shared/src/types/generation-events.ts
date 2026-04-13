@@ -1,8 +1,18 @@
 import type { RunStatus } from './generation-run.js';
+import type { QualityBudgetLane } from './agentic-flow.js';
 import type { TaskStatus } from './generation-task.js';
 
 export type GenerationEvent =
-  | { type: 'run_status'; runId: string; status: RunStatus; stage: string | null; progressPercent: number }
+  | {
+    type: 'run_status';
+    runId: string;
+    status: RunStatus;
+    stage: string | null;
+    progressPercent: number;
+    agentStage?: string | null;
+    criticCycle?: number | null;
+    qualityBudgetLane?: QualityBudgetLane | null;
+  }
   | { type: 'task_started'; runId: string; taskId: string; taskType: string }
   | { type: 'task_completed'; runId: string; taskId: string; taskType: string; status: TaskStatus }
   | { type: 'artifact_created'; runId: string; artifactId: string; artifactType: string; title: string; version: number }

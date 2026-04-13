@@ -43,6 +43,7 @@ describe('Run API v1 serialization', () => {
   });
 
   afterAll(async () => {
+    await prisma.interviewSession.deleteMany({ where: { projectId } });
     await prisma.project.deleteMany({ where: { userId } });
     await prisma.user.deleteMany({ where: { id: userId } });
     await prisma.$disconnect();
@@ -89,6 +90,80 @@ describe('Run API v1 serialization', () => {
     expect(typeof listAgentRunsRes.body[0].createdAt).toBe('string');
     expect(typeof listAgentRunsRes.body[0].updatedAt).toBe('string');
     expect(listAgentRunsRes.body[0].goal).toBeUndefined();
+  });
+
+  it('creates a generation run from a locked interview session and rejects unlocked sessions', async () => {
+    const lockedBrief = {
+      title: 'The Bell of Rust',
+      summary: 'A short one-shot about a corroded cathedral bell that summons forgotten debts.',
+      generationMode: 'one_shot',
+      concept: "Stop a cursed bell from collecting the city's unpaid memories.",
+      theme: 'Debt, memory, and corrosion',
+      tone: 'Dark fantasy mystery',
+      levelRange: { min: 3, max: 4 },
+      scope: 'One-shot',
+      partyAssumptions: 'A balanced party of four level 3-4 adventurers.',
+      desiredComplexity: 'Medium',
+      qualityBudgetLane: 'fast',
+      mustHaveElements: ['Rust priests', 'Memory debtors'],
+      specialConstraints: ['SRD-safe'],
+      settings: {
+        includeHandouts: true,
+        includeMaps: false,
+        strict5e: true,
+      },
+    } as const;
+
+    const lockedSession = await prisma.interviewSession.create({
+      data: {
+        projectId,
+        userId,
+        status: 'locked',
+        turns: [],
+        briefDraft: lockedBrief as any,
+        lockedBrief: lockedBrief as any,
+        maxUserTurns: 8,
+        lockedAt: new Date(),
+      },
+    });
+
+    const generationRes = await request(app)
+      .post(`/api/v1/projects/${projectId}/generation-runs`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ interviewSessionId: lockedSession.id });
+
+    expect(generationRes.status).toBe(201);
+    expect(generationRes.body.inputPrompt).toBe(lockedBrief.summary);
+    expect(generationRes.body.agentStage).toBe('interview_locked');
+    expect(generationRes.body.qualityBudgetLane).toBe('fast');
+    expect(generationRes.body.inputParameters).toMatchObject({
+      interviewSessionId: lockedSession.id,
+      qualityBudgetLane: 'fast',
+      autonomousFlowVersion: 'agentic_v1',
+    });
+
+    await prisma.interviewSession.deleteMany({
+      where: { projectId, userId },
+    });
+
+    const unlockedSession = await prisma.interviewSession.create({
+      data: {
+        projectId,
+        userId,
+        status: 'collecting',
+        turns: [],
+        briefDraft: { title: 'Draft' } as any,
+        maxUserTurns: 8,
+      },
+    });
+
+    const rejectedRes = await request(app)
+      .post(`/api/v1/projects/${projectId}/generation-runs`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ interviewSessionId: unlockedSession.id });
+
+    expect(rejectedRes.status).toBe(409);
+    expect(rejectedRes.body.error).toBe('Project not found or interview session is not locked.');
   });
 
   it('serializes generation run resources with ISO timestamps', async () => {

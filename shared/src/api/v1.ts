@@ -173,6 +173,24 @@ export type DocumentLayout = z.infer<typeof LayoutPlanSchema>;
 
 export const GenerationModeSchema = z.enum(['one_shot', 'module', 'campaign', 'sourcebook']);
 export const GenerationQualitySchema = z.enum(['quick', 'polished']);
+export const QualityBudgetLaneSchema = z.enum(['fast', 'balanced', 'high_quality']);
+export const AgentStageSchema = z.enum([
+  'interview_locked',
+  'writer_story_packet',
+  'dnd_expert_inserts',
+  'layout_first_draft',
+  'artist_requested',
+  'critic_text_pass',
+  'rewrite_writer',
+  'rewrite_dnd_expert',
+  'rewrite_layout',
+  'artist_completed',
+  'critic_image_pass',
+  'final_editor',
+  'printer',
+  'completed',
+  'failed',
+]);
 export const RunStatusSchema = z.enum([
   'queued',
   'planning',
@@ -196,18 +214,91 @@ export const GenerationConstraintsSchema = z.object({
   strict5e: z.boolean().optional(),
 });
 
+export const InterviewTurnSchema = z.object({
+  id: z.string().min(1),
+  role: z.enum(['assistant', 'user']),
+  content: z.string().min(1).max(8000),
+  createdAt: z.string().datetime(),
+});
+
+export const InterviewBriefSchema = z.object({
+  title: z.string().min(1).max(200),
+  summary: z.string().min(1).max(4000),
+  generationMode: z.enum(['one_shot', 'module']),
+  concept: z.string().min(1).max(4000),
+  theme: z.string().min(1).max(500),
+  tone: z.string().min(1).max(500),
+  levelRange: z.object({
+    min: z.number().int().min(1).max(20),
+    max: z.number().int().min(1).max(20),
+  }).nullable(),
+  scope: z.string().min(1).max(500),
+  partyAssumptions: z.string().min(1).max(2000),
+  desiredComplexity: z.string().min(1).max(500),
+  qualityBudgetLane: QualityBudgetLaneSchema,
+  mustHaveElements: z.array(z.string().min(1).max(500)).max(20),
+  specialConstraints: z.array(z.string().min(1).max(500)).max(20),
+  settings: z.object({
+    includeHandouts: z.boolean(),
+    includeMaps: z.boolean(),
+    strict5e: z.boolean(),
+  }),
+});
+
+export const InterviewSessionStatusSchema = z.enum(['collecting', 'ready_to_lock', 'locked']);
+
+export const InterviewSessionSchema = z.object({
+  id: z.string().uuid(),
+  projectId: z.string().uuid(),
+  userId: z.string().uuid(),
+  status: InterviewSessionStatusSchema,
+  turns: z.array(InterviewTurnSchema),
+  briefDraft: InterviewBriefSchema.nullable(),
+  lockedBrief: InterviewBriefSchema.nullable(),
+  maxUserTurns: z.number().int().min(1).max(20),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+  lockedAt: z.string().datetime().nullable(),
+});
+
+export const InterviewSessionCreateRequestSchema = z.object({
+  initialPrompt: z.string().min(1).max(5000).optional(),
+});
+
+export const InterviewSessionMessageRequestSchema = z.object({
+  content: z.string().min(1).max(5000),
+});
+
+export const InterviewSessionLockRequestSchema = z.object({
+  force: z.boolean().optional(),
+});
+
+export const GenerationRunInputParametersSchema = z.union([
+  z.object({
+    interviewSessionId: z.string().uuid(),
+    qualityBudgetLane: QualityBudgetLaneSchema,
+    interviewBrief: InterviewBriefSchema,
+    autonomousFlowVersion: z.literal('agentic_v1'),
+  }),
+  GenerationConstraintsSchema,
+]);
+
 export const GraphStateSchema = z.record(z.unknown());
 export const GraphInterruptRunTypeSchema = z.enum(['generation', 'agent']);
 export const GraphInterruptStatusSchema = z.enum(['pending', 'approved', 'edited', 'rejected']);
 export const GraphInterruptResolutionActionSchema = z.enum(['approve', 'edit', 'reject']);
 
 export const V1CreateGenerationRunRequestSchema = z.object({
-  prompt: z.string().min(1).max(5000),
+  prompt: z.string().min(1).max(5000).optional(),
+  interviewSessionId: z.string().uuid().optional(),
   mode: GenerationModeSchema.optional(),
   quality: GenerationQualitySchema.optional(),
   pageTarget: z.number().int().min(1).max(500).optional(),
   constraints: GenerationConstraintsSchema.optional(),
-});
+}).refine(
+  (value) => Boolean(value.prompt?.trim()) || Boolean(value.interviewSessionId),
+  { message: 'Either prompt or interviewSessionId is required.' },
+);
 
 export const V1GenerationRunSchema = z.object({
   id: z.string().uuid(),
@@ -218,7 +309,7 @@ export const V1GenerationRunSchema = z.object({
   status: RunStatusSchema,
   currentStage: z.string().nullable(),
   inputPrompt: z.string(),
-  inputParameters: GenerationConstraintsSchema.nullable(),
+  inputParameters: GenerationRunInputParametersSchema.nullable(),
   progressPercent: z.number().int().min(0).max(100),
   estimatedPages: z.number().int().nullable(),
   estimatedTokens: z.number().int().nullable(),
@@ -226,6 +317,17 @@ export const V1GenerationRunSchema = z.object({
   actualTokens: z.number().int(),
   actualCost: z.number(),
   failureReason: z.string().nullable(),
+  agentStage: AgentStageSchema.nullable().optional(),
+  criticCycle: z.number().int().nullable().optional(),
+  qualityBudgetLane: QualityBudgetLaneSchema.nullable().optional(),
+  routedRewriteCounts: z.object({
+    writer: z.number().int(),
+    dndExpert: z.number().int(),
+    layoutExpert: z.number().int(),
+    artist: z.number().int(),
+  }).nullable().optional(),
+  imageGenerationStatus: z.enum(['not_requested', 'requested', 'processing', 'completed', 'failed']).nullable().optional(),
+  finalEditorialStatus: z.enum(['pending', 'approved', 'rewrite_requested', 'failed']).nullable().optional(),
   graphThreadId: z.string().nullable().optional(),
   graphCheckpointKey: z.string().nullable().optional(),
   graphStateJson: GraphStateSchema.nullable().optional(),
@@ -577,6 +679,7 @@ export const AgentConfigSchema = z.object({
   provider: z.enum(['openai', 'google', 'anthropic', 'ollama']),
   model: z.string().nullable().optional(),
   baseUrl: z.string().nullable().optional(),
+  budgetLane: QualityBudgetLaneSchema.optional(),
   enabled: z.boolean().default(true),
 });
 
@@ -585,6 +688,12 @@ export type GraphInterruptStatus = z.infer<typeof GraphInterruptStatusSchema>;
 export type GraphInterruptResolutionAction = z.infer<typeof GraphInterruptResolutionActionSchema>;
 export type GraphInterruptResolutionRequest = z.infer<typeof GraphInterruptResolutionRequestSchema>;
 export type AgentConfig = z.infer<typeof AgentConfigSchema>;
+export type InterviewTurn = z.infer<typeof InterviewTurnSchema>;
+export type InterviewBrief = z.infer<typeof InterviewBriefSchema>;
+export type InterviewSession = z.infer<typeof InterviewSessionSchema>;
+export type InterviewSessionCreateRequest = z.infer<typeof InterviewSessionCreateRequestSchema>;
+export type InterviewSessionMessageRequest = z.infer<typeof InterviewSessionMessageRequestSchema>;
+export type InterviewSessionLockRequest = z.infer<typeof InterviewSessionLockRequestSchema>;
 
 export const V1PublicationDocumentSummarySchema = z.object({
   id: z.string().uuid(),
@@ -834,7 +943,7 @@ export type AgentRunDetail = V1AgentRunDetail;
 export type GraphInterruptResolutionRequestBody = z.infer<typeof GraphInterruptResolutionRequestSchema>;
 
 export interface ApiV1RouteContract {
-  tag: 'auth' | 'projects' | 'documents' | 'generationRuns' | 'agentRuns' | 'graphInterrupts' | 'exports';
+  tag: 'auth' | 'projects' | 'documents' | 'generationRuns' | 'agentRuns' | 'graphInterrupts' | 'exports' | 'interviews';
   operationId: string;
   method: 'get' | 'post' | 'patch' | 'delete';
   path: string;
@@ -850,6 +959,57 @@ export interface ApiV1RouteContract {
 }
 
 export const V1_ROUTE_CONTRACTS: ApiV1RouteContract[] = [
+  {
+    tag: 'interviews',
+    operationId: 'createInterviewSession',
+    method: 'post',
+    path: '/api/v1/projects/{projectId}/interview/sessions',
+    summary: 'Create or reset an interview session for autonomous generation.',
+    paramsSchema: ProjectIdParamsSchema,
+    requestBodySchema: InterviewSessionCreateRequestSchema,
+    responseSchema: InterviewSessionSchema,
+    successStatusCode: 201,
+    paramsTypeName: 'ProjectIdParams',
+    requestTypeName: 'InterviewSessionCreateRequest',
+    responseTypeName: 'InterviewSession',
+  },
+  {
+    tag: 'interviews',
+    operationId: 'getInterviewSession',
+    method: 'get',
+    path: '/api/v1/projects/{projectId}/interview/sessions/{sessionId}',
+    summary: 'Get an interview session.',
+    paramsSchema: ProjectIdParamsSchema.extend({ sessionId: z.string().uuid() }),
+    responseSchema: InterviewSessionSchema,
+    paramsTypeName: 'ProjectIdParams & { sessionId: string }',
+    responseTypeName: 'InterviewSession',
+  },
+  {
+    tag: 'interviews',
+    operationId: 'appendInterviewMessage',
+    method: 'post',
+    path: '/api/v1/projects/{projectId}/interview/sessions/{sessionId}/messages',
+    summary: 'Append a user message and receive the next interviewer turn.',
+    paramsSchema: ProjectIdParamsSchema.extend({ sessionId: z.string().uuid() }),
+    requestBodySchema: InterviewSessionMessageRequestSchema,
+    responseSchema: InterviewSessionSchema,
+    paramsTypeName: 'ProjectIdParams & { sessionId: string }',
+    requestTypeName: 'InterviewSessionMessageRequest',
+    responseTypeName: 'InterviewSession',
+  },
+  {
+    tag: 'interviews',
+    operationId: 'lockInterviewSession',
+    method: 'post',
+    path: '/api/v1/projects/{projectId}/interview/sessions/{sessionId}/lock',
+    summary: 'Lock an interview session into a final structured brief.',
+    paramsSchema: ProjectIdParamsSchema.extend({ sessionId: z.string().uuid() }),
+    requestBodySchema: InterviewSessionLockRequestSchema,
+    responseSchema: InterviewSessionSchema,
+    paramsTypeName: 'ProjectIdParams & { sessionId: string }',
+    requestTypeName: 'InterviewSessionLockRequest',
+    responseTypeName: 'InterviewSession',
+  },
   {
     tag: 'auth',
     operationId: 'login',

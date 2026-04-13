@@ -11,6 +11,8 @@ export type RunStatus =
   | 'paused'
   | 'cancelled';
 
+import type { AgentStage, InterviewBrief, QualityBudgetLane } from './agentic-flow.js';
+
 export type GenerationMode = 'one_shot' | 'module' | 'campaign' | 'sourcebook';
 
 export type GenerationQuality = 'quick' | 'polished';
@@ -32,6 +34,15 @@ export interface GenerationConstraints {
   strict5e?: boolean;
 }
 
+export interface AgenticGenerationInputParameters {
+  interviewSessionId: string;
+  qualityBudgetLane: QualityBudgetLane;
+  interviewBrief: InterviewBrief;
+  autonomousFlowVersion: 'agentic_v1';
+}
+
+export type GenerationRunInputParameters = GenerationConstraints | AgenticGenerationInputParameters;
+
 export interface GenerationRun {
   id: string;
   projectId: string;
@@ -41,7 +52,7 @@ export interface GenerationRun {
   status: RunStatus;
   currentStage: string | null;
   inputPrompt: string;
-  inputParameters: GenerationConstraints | null;
+  inputParameters: GenerationRunInputParameters | null;
   progressPercent: number;
   estimatedPages: number | null;
   estimatedTokens: number | null;
@@ -49,6 +60,17 @@ export interface GenerationRun {
   actualTokens: number;
   actualCost: number;
   failureReason: string | null;
+  agentStage?: AgentStage | null;
+  criticCycle?: number | null;
+  qualityBudgetLane?: QualityBudgetLane | null;
+  routedRewriteCounts?: {
+    writer: number;
+    dndExpert: number;
+    layoutExpert: number;
+    artist: number;
+  } | null;
+  imageGenerationStatus?: 'not_requested' | 'requested' | 'processing' | 'completed' | 'failed' | null;
+  finalEditorialStatus?: 'pending' | 'approved' | 'rewrite_requested' | 'failed' | null;
   graphThreadId?: string | null;
   graphCheckpointKey?: string | null;
   graphStateJson?: Record<string, unknown> | null;
@@ -76,7 +98,8 @@ export interface GenerationRunSummary {
 }
 
 export interface CreateRunRequest {
-  prompt: string;
+  prompt?: string;
+  interviewSessionId?: string;
   mode?: GenerationMode;
   quality?: GenerationQuality;
   pageTarget?: number;

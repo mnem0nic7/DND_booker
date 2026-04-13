@@ -106,6 +106,7 @@ v1RunRoutes.post(
       projectId,
       userId: authReq.userId!,
       prompt: parsed.data.prompt,
+      interviewSessionId: parsed.data.interviewSessionId,
       mode: parsed.data.mode,
       quality: parsed.data.quality,
       pageTarget: parsed.data.pageTarget,
@@ -113,7 +114,11 @@ v1RunRoutes.post(
     });
 
     if (!run) {
-      res.status(404).json({ error: 'Project not found' });
+      res.status(parsed.data.interviewSessionId ? 409 : 404).json({
+        error: parsed.data.interviewSessionId
+          ? 'Project not found or interview session is not locked.'
+          : 'Project not found',
+      });
       return;
     }
 

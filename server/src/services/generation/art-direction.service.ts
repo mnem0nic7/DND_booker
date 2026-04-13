@@ -838,6 +838,8 @@ async function realizeArtPlacements(input: {
   userId: string;
   projectId: string;
   placements: ArtDirectionPlan['placements'];
+  systemProvider?: 'openai' | 'google' | null;
+  systemApiKey?: string | null;
 }): Promise<{
   successfulPlacements: RealizedImagePlacement[];
   failedPlacements: FailedImagePlacement[];
@@ -847,22 +849,28 @@ async function realizeArtPlacements(input: {
     return { successfulPlacements: [], failedPlacements: [], skippedReason: null };
   }
 
-  const settings = await getAiSettings(input.userId);
-  if (!settings?.provider || (settings.provider !== 'openai' && settings.provider !== 'google') || !settings.hasApiKey) {
-    return {
-      successfulPlacements: [],
-      failedPlacements: [],
-      skippedReason: 'Automatic image generation requires OpenAI or Google Gemini AI settings with a saved API key.',
-    };
-  }
+  let provider: 'openai' | 'google' | null = input.systemProvider ?? null;
+  let apiKey: string | null = input.systemApiKey?.trim() || null;
 
-  const apiKey = await getDecryptedApiKey(input.userId);
-  if (!apiKey) {
-    return {
-      successfulPlacements: [],
-      failedPlacements: [],
-      skippedReason: 'OpenAI API key could not be decrypted for automatic image generation.',
-    };
+  if (!provider || !apiKey) {
+    const settings = await getAiSettings(input.userId);
+    if (!settings?.provider || (settings.provider !== 'openai' && settings.provider !== 'google') || !settings.hasApiKey) {
+      return {
+        successfulPlacements: [],
+        failedPlacements: [],
+        skippedReason: 'Automatic image generation requires OpenAI or Google Gemini AI settings with a saved API key.',
+      };
+    }
+
+    provider = settings.provider;
+    apiKey = await getDecryptedApiKey(input.userId);
+    if (!apiKey) {
+      return {
+        successfulPlacements: [],
+        failedPlacements: [],
+        skippedReason: 'OpenAI API key could not be decrypted for automatic image generation.',
+      };
+    }
   }
 
   const successfulPlacements: RealizedImagePlacement[] = [];
@@ -871,7 +879,7 @@ async function realizeArtPlacements(input: {
   for (const placement of input.placements) {
     try {
       const image = await generateAiImage(apiKey, {
-        provider: settings.provider,
+        provider,
         prompt: placement.prompt,
         model: placement.model,
         size: placement.size,
@@ -1047,6 +1055,10 @@ export async function executeArtDirectionPass(
   },
   model: LanguageModel,
   maxOutputTokens: number,
+  options: {
+    systemImageProvider?: 'openai' | 'google' | null;
+    systemImageApiKey?: string | null;
+  } = {},
 ): Promise<ArtDirectionResult> {
   const [project, bible, documents] = await Promise.all([
     prisma.project.findUnique({
@@ -1176,6 +1188,8 @@ export async function executeArtDirectionPass(
     userId: run.userId,
     projectId: run.projectId,
     placements: applicablePlacements,
+    systemProvider: options.systemImageProvider ?? null,
+    systemApiKey: options.systemImageApiKey ?? null,
   });
 
   const fullyUpdatedDocuments = applyRealizedArtToDocuments(

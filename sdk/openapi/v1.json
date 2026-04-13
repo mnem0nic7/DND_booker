@@ -5,6 +5,1812 @@
     "version": "1.0.0-alpha"
   },
   "paths": {
+    "/api/v1/projects/{projectId}/interview/sessions": {
+      "post": {
+        "operationId": "createInterviewSession",
+        "summary": "Create or reset an interview session for autonomous generation.",
+        "tags": [
+          "interviews"
+        ],
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "projectId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "userId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "collecting",
+                        "ready_to_lock",
+                        "locked"
+                      ]
+                    },
+                    "turns": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "role": {
+                            "type": "string",
+                            "enum": [
+                              "assistant",
+                              "user"
+                            ]
+                          },
+                          "content": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 8000
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "role",
+                          "content",
+                          "createdAt"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "briefDraft": {
+                      "type": "object",
+                      "properties": {
+                        "title": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        },
+                        "summary": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 4000
+                        },
+                        "generationMode": {
+                          "type": "string",
+                          "enum": [
+                            "one_shot",
+                            "module"
+                          ]
+                        },
+                        "concept": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 4000
+                        },
+                        "theme": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 500
+                        },
+                        "tone": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 500
+                        },
+                        "levelRange": {
+                          "type": "object",
+                          "properties": {
+                            "min": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 20
+                            },
+                            "max": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 20
+                            }
+                          },
+                          "required": [
+                            "min",
+                            "max"
+                          ],
+                          "additionalProperties": false,
+                          "nullable": true
+                        },
+                        "scope": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 500
+                        },
+                        "partyAssumptions": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 2000
+                        },
+                        "desiredComplexity": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 500
+                        },
+                        "qualityBudgetLane": {
+                          "type": "string",
+                          "enum": [
+                            "fast",
+                            "balanced",
+                            "high_quality"
+                          ]
+                        },
+                        "mustHaveElements": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 500
+                          },
+                          "maxItems": 20
+                        },
+                        "specialConstraints": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 500
+                          },
+                          "maxItems": 20
+                        },
+                        "settings": {
+                          "type": "object",
+                          "properties": {
+                            "includeHandouts": {
+                              "type": "boolean"
+                            },
+                            "includeMaps": {
+                              "type": "boolean"
+                            },
+                            "strict5e": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "includeHandouts",
+                            "includeMaps",
+                            "strict5e"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "title",
+                        "summary",
+                        "generationMode",
+                        "concept",
+                        "theme",
+                        "tone",
+                        "levelRange",
+                        "scope",
+                        "partyAssumptions",
+                        "desiredComplexity",
+                        "qualityBudgetLane",
+                        "mustHaveElements",
+                        "specialConstraints",
+                        "settings"
+                      ],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "lockedBrief": {
+                      "type": "object",
+                      "properties": {
+                        "title": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        },
+                        "summary": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 4000
+                        },
+                        "generationMode": {
+                          "type": "string",
+                          "enum": [
+                            "one_shot",
+                            "module"
+                          ]
+                        },
+                        "concept": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 4000
+                        },
+                        "theme": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 500
+                        },
+                        "tone": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 500
+                        },
+                        "levelRange": {
+                          "type": "object",
+                          "properties": {
+                            "min": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 20
+                            },
+                            "max": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 20
+                            }
+                          },
+                          "required": [
+                            "min",
+                            "max"
+                          ],
+                          "additionalProperties": false,
+                          "nullable": true
+                        },
+                        "scope": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 500
+                        },
+                        "partyAssumptions": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 2000
+                        },
+                        "desiredComplexity": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 500
+                        },
+                        "qualityBudgetLane": {
+                          "type": "string",
+                          "enum": [
+                            "fast",
+                            "balanced",
+                            "high_quality"
+                          ]
+                        },
+                        "mustHaveElements": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 500
+                          },
+                          "maxItems": 20
+                        },
+                        "specialConstraints": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 500
+                          },
+                          "maxItems": 20
+                        },
+                        "settings": {
+                          "type": "object",
+                          "properties": {
+                            "includeHandouts": {
+                              "type": "boolean"
+                            },
+                            "includeMaps": {
+                              "type": "boolean"
+                            },
+                            "strict5e": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "includeHandouts",
+                            "includeMaps",
+                            "strict5e"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "title",
+                        "summary",
+                        "generationMode",
+                        "concept",
+                        "theme",
+                        "tone",
+                        "levelRange",
+                        "scope",
+                        "partyAssumptions",
+                        "desiredComplexity",
+                        "qualityBudgetLane",
+                        "mustHaveElements",
+                        "specialConstraints",
+                        "settings"
+                      ],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "maxUserTurns": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 20
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "lockedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "projectId",
+                    "userId",
+                    "status",
+                    "turns",
+                    "briefDraft",
+                    "lockedBrief",
+                    "maxUserTurns",
+                    "createdAt",
+                    "updatedAt",
+                    "lockedAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer"
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "instance": {
+                      "type": "string"
+                    },
+                    "errors": {
+                      "type": "object",
+                      "additionalProperties": {}
+                    }
+                  },
+                  "required": [
+                    "title",
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "initialPrompt": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 5000
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{projectId}/interview/sessions/{sessionId}": {
+      "get": {
+        "operationId": "getInterviewSession",
+        "summary": "Get an interview session.",
+        "tags": [
+          "interviews"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "projectId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "userId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "collecting",
+                        "ready_to_lock",
+                        "locked"
+                      ]
+                    },
+                    "turns": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "role": {
+                            "type": "string",
+                            "enum": [
+                              "assistant",
+                              "user"
+                            ]
+                          },
+                          "content": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 8000
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "role",
+                          "content",
+                          "createdAt"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "briefDraft": {
+                      "type": "object",
+                      "properties": {
+                        "title": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        },
+                        "summary": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 4000
+                        },
+                        "generationMode": {
+                          "type": "string",
+                          "enum": [
+                            "one_shot",
+                            "module"
+                          ]
+                        },
+                        "concept": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 4000
+                        },
+                        "theme": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 500
+                        },
+                        "tone": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 500
+                        },
+                        "levelRange": {
+                          "type": "object",
+                          "properties": {
+                            "min": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 20
+                            },
+                            "max": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 20
+                            }
+                          },
+                          "required": [
+                            "min",
+                            "max"
+                          ],
+                          "additionalProperties": false,
+                          "nullable": true
+                        },
+                        "scope": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 500
+                        },
+                        "partyAssumptions": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 2000
+                        },
+                        "desiredComplexity": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 500
+                        },
+                        "qualityBudgetLane": {
+                          "type": "string",
+                          "enum": [
+                            "fast",
+                            "balanced",
+                            "high_quality"
+                          ]
+                        },
+                        "mustHaveElements": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 500
+                          },
+                          "maxItems": 20
+                        },
+                        "specialConstraints": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 500
+                          },
+                          "maxItems": 20
+                        },
+                        "settings": {
+                          "type": "object",
+                          "properties": {
+                            "includeHandouts": {
+                              "type": "boolean"
+                            },
+                            "includeMaps": {
+                              "type": "boolean"
+                            },
+                            "strict5e": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "includeHandouts",
+                            "includeMaps",
+                            "strict5e"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "title",
+                        "summary",
+                        "generationMode",
+                        "concept",
+                        "theme",
+                        "tone",
+                        "levelRange",
+                        "scope",
+                        "partyAssumptions",
+                        "desiredComplexity",
+                        "qualityBudgetLane",
+                        "mustHaveElements",
+                        "specialConstraints",
+                        "settings"
+                      ],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "lockedBrief": {
+                      "type": "object",
+                      "properties": {
+                        "title": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        },
+                        "summary": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 4000
+                        },
+                        "generationMode": {
+                          "type": "string",
+                          "enum": [
+                            "one_shot",
+                            "module"
+                          ]
+                        },
+                        "concept": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 4000
+                        },
+                        "theme": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 500
+                        },
+                        "tone": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 500
+                        },
+                        "levelRange": {
+                          "type": "object",
+                          "properties": {
+                            "min": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 20
+                            },
+                            "max": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 20
+                            }
+                          },
+                          "required": [
+                            "min",
+                            "max"
+                          ],
+                          "additionalProperties": false,
+                          "nullable": true
+                        },
+                        "scope": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 500
+                        },
+                        "partyAssumptions": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 2000
+                        },
+                        "desiredComplexity": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 500
+                        },
+                        "qualityBudgetLane": {
+                          "type": "string",
+                          "enum": [
+                            "fast",
+                            "balanced",
+                            "high_quality"
+                          ]
+                        },
+                        "mustHaveElements": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 500
+                          },
+                          "maxItems": 20
+                        },
+                        "specialConstraints": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 500
+                          },
+                          "maxItems": 20
+                        },
+                        "settings": {
+                          "type": "object",
+                          "properties": {
+                            "includeHandouts": {
+                              "type": "boolean"
+                            },
+                            "includeMaps": {
+                              "type": "boolean"
+                            },
+                            "strict5e": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "includeHandouts",
+                            "includeMaps",
+                            "strict5e"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "title",
+                        "summary",
+                        "generationMode",
+                        "concept",
+                        "theme",
+                        "tone",
+                        "levelRange",
+                        "scope",
+                        "partyAssumptions",
+                        "desiredComplexity",
+                        "qualityBudgetLane",
+                        "mustHaveElements",
+                        "specialConstraints",
+                        "settings"
+                      ],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "maxUserTurns": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 20
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "lockedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "projectId",
+                    "userId",
+                    "status",
+                    "turns",
+                    "briefDraft",
+                    "lockedBrief",
+                    "maxUserTurns",
+                    "createdAt",
+                    "updatedAt",
+                    "lockedAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer"
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "instance": {
+                      "type": "string"
+                    },
+                    "errors": {
+                      "type": "object",
+                      "additionalProperties": {}
+                    }
+                  },
+                  "required": [
+                    "title",
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/projects/{projectId}/interview/sessions/{sessionId}/messages": {
+      "post": {
+        "operationId": "appendInterviewMessage",
+        "summary": "Append a user message and receive the next interviewer turn.",
+        "tags": [
+          "interviews"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "projectId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "userId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "collecting",
+                        "ready_to_lock",
+                        "locked"
+                      ]
+                    },
+                    "turns": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "role": {
+                            "type": "string",
+                            "enum": [
+                              "assistant",
+                              "user"
+                            ]
+                          },
+                          "content": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 8000
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "role",
+                          "content",
+                          "createdAt"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "briefDraft": {
+                      "type": "object",
+                      "properties": {
+                        "title": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        },
+                        "summary": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 4000
+                        },
+                        "generationMode": {
+                          "type": "string",
+                          "enum": [
+                            "one_shot",
+                            "module"
+                          ]
+                        },
+                        "concept": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 4000
+                        },
+                        "theme": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 500
+                        },
+                        "tone": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 500
+                        },
+                        "levelRange": {
+                          "type": "object",
+                          "properties": {
+                            "min": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 20
+                            },
+                            "max": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 20
+                            }
+                          },
+                          "required": [
+                            "min",
+                            "max"
+                          ],
+                          "additionalProperties": false,
+                          "nullable": true
+                        },
+                        "scope": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 500
+                        },
+                        "partyAssumptions": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 2000
+                        },
+                        "desiredComplexity": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 500
+                        },
+                        "qualityBudgetLane": {
+                          "type": "string",
+                          "enum": [
+                            "fast",
+                            "balanced",
+                            "high_quality"
+                          ]
+                        },
+                        "mustHaveElements": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 500
+                          },
+                          "maxItems": 20
+                        },
+                        "specialConstraints": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 500
+                          },
+                          "maxItems": 20
+                        },
+                        "settings": {
+                          "type": "object",
+                          "properties": {
+                            "includeHandouts": {
+                              "type": "boolean"
+                            },
+                            "includeMaps": {
+                              "type": "boolean"
+                            },
+                            "strict5e": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "includeHandouts",
+                            "includeMaps",
+                            "strict5e"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "title",
+                        "summary",
+                        "generationMode",
+                        "concept",
+                        "theme",
+                        "tone",
+                        "levelRange",
+                        "scope",
+                        "partyAssumptions",
+                        "desiredComplexity",
+                        "qualityBudgetLane",
+                        "mustHaveElements",
+                        "specialConstraints",
+                        "settings"
+                      ],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "lockedBrief": {
+                      "type": "object",
+                      "properties": {
+                        "title": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        },
+                        "summary": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 4000
+                        },
+                        "generationMode": {
+                          "type": "string",
+                          "enum": [
+                            "one_shot",
+                            "module"
+                          ]
+                        },
+                        "concept": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 4000
+                        },
+                        "theme": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 500
+                        },
+                        "tone": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 500
+                        },
+                        "levelRange": {
+                          "type": "object",
+                          "properties": {
+                            "min": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 20
+                            },
+                            "max": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 20
+                            }
+                          },
+                          "required": [
+                            "min",
+                            "max"
+                          ],
+                          "additionalProperties": false,
+                          "nullable": true
+                        },
+                        "scope": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 500
+                        },
+                        "partyAssumptions": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 2000
+                        },
+                        "desiredComplexity": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 500
+                        },
+                        "qualityBudgetLane": {
+                          "type": "string",
+                          "enum": [
+                            "fast",
+                            "balanced",
+                            "high_quality"
+                          ]
+                        },
+                        "mustHaveElements": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 500
+                          },
+                          "maxItems": 20
+                        },
+                        "specialConstraints": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 500
+                          },
+                          "maxItems": 20
+                        },
+                        "settings": {
+                          "type": "object",
+                          "properties": {
+                            "includeHandouts": {
+                              "type": "boolean"
+                            },
+                            "includeMaps": {
+                              "type": "boolean"
+                            },
+                            "strict5e": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "includeHandouts",
+                            "includeMaps",
+                            "strict5e"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "title",
+                        "summary",
+                        "generationMode",
+                        "concept",
+                        "theme",
+                        "tone",
+                        "levelRange",
+                        "scope",
+                        "partyAssumptions",
+                        "desiredComplexity",
+                        "qualityBudgetLane",
+                        "mustHaveElements",
+                        "specialConstraints",
+                        "settings"
+                      ],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "maxUserTurns": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 20
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "lockedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "projectId",
+                    "userId",
+                    "status",
+                    "turns",
+                    "briefDraft",
+                    "lockedBrief",
+                    "maxUserTurns",
+                    "createdAt",
+                    "updatedAt",
+                    "lockedAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer"
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "instance": {
+                      "type": "string"
+                    },
+                    "errors": {
+                      "type": "object",
+                      "additionalProperties": {}
+                    }
+                  },
+                  "required": [
+                    "title",
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "content": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 5000
+                  }
+                },
+                "required": [
+                  "content"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{projectId}/interview/sessions/{sessionId}/lock": {
+      "post": {
+        "operationId": "lockInterviewSession",
+        "summary": "Lock an interview session into a final structured brief.",
+        "tags": [
+          "interviews"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "projectId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "userId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "collecting",
+                        "ready_to_lock",
+                        "locked"
+                      ]
+                    },
+                    "turns": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "role": {
+                            "type": "string",
+                            "enum": [
+                              "assistant",
+                              "user"
+                            ]
+                          },
+                          "content": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 8000
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "role",
+                          "content",
+                          "createdAt"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "briefDraft": {
+                      "type": "object",
+                      "properties": {
+                        "title": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        },
+                        "summary": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 4000
+                        },
+                        "generationMode": {
+                          "type": "string",
+                          "enum": [
+                            "one_shot",
+                            "module"
+                          ]
+                        },
+                        "concept": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 4000
+                        },
+                        "theme": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 500
+                        },
+                        "tone": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 500
+                        },
+                        "levelRange": {
+                          "type": "object",
+                          "properties": {
+                            "min": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 20
+                            },
+                            "max": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 20
+                            }
+                          },
+                          "required": [
+                            "min",
+                            "max"
+                          ],
+                          "additionalProperties": false,
+                          "nullable": true
+                        },
+                        "scope": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 500
+                        },
+                        "partyAssumptions": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 2000
+                        },
+                        "desiredComplexity": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 500
+                        },
+                        "qualityBudgetLane": {
+                          "type": "string",
+                          "enum": [
+                            "fast",
+                            "balanced",
+                            "high_quality"
+                          ]
+                        },
+                        "mustHaveElements": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 500
+                          },
+                          "maxItems": 20
+                        },
+                        "specialConstraints": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 500
+                          },
+                          "maxItems": 20
+                        },
+                        "settings": {
+                          "type": "object",
+                          "properties": {
+                            "includeHandouts": {
+                              "type": "boolean"
+                            },
+                            "includeMaps": {
+                              "type": "boolean"
+                            },
+                            "strict5e": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "includeHandouts",
+                            "includeMaps",
+                            "strict5e"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "title",
+                        "summary",
+                        "generationMode",
+                        "concept",
+                        "theme",
+                        "tone",
+                        "levelRange",
+                        "scope",
+                        "partyAssumptions",
+                        "desiredComplexity",
+                        "qualityBudgetLane",
+                        "mustHaveElements",
+                        "specialConstraints",
+                        "settings"
+                      ],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "lockedBrief": {
+                      "type": "object",
+                      "properties": {
+                        "title": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        },
+                        "summary": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 4000
+                        },
+                        "generationMode": {
+                          "type": "string",
+                          "enum": [
+                            "one_shot",
+                            "module"
+                          ]
+                        },
+                        "concept": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 4000
+                        },
+                        "theme": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 500
+                        },
+                        "tone": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 500
+                        },
+                        "levelRange": {
+                          "type": "object",
+                          "properties": {
+                            "min": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 20
+                            },
+                            "max": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 20
+                            }
+                          },
+                          "required": [
+                            "min",
+                            "max"
+                          ],
+                          "additionalProperties": false,
+                          "nullable": true
+                        },
+                        "scope": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 500
+                        },
+                        "partyAssumptions": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 2000
+                        },
+                        "desiredComplexity": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 500
+                        },
+                        "qualityBudgetLane": {
+                          "type": "string",
+                          "enum": [
+                            "fast",
+                            "balanced",
+                            "high_quality"
+                          ]
+                        },
+                        "mustHaveElements": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 500
+                          },
+                          "maxItems": 20
+                        },
+                        "specialConstraints": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 500
+                          },
+                          "maxItems": 20
+                        },
+                        "settings": {
+                          "type": "object",
+                          "properties": {
+                            "includeHandouts": {
+                              "type": "boolean"
+                            },
+                            "includeMaps": {
+                              "type": "boolean"
+                            },
+                            "strict5e": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "includeHandouts",
+                            "includeMaps",
+                            "strict5e"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "title",
+                        "summary",
+                        "generationMode",
+                        "concept",
+                        "theme",
+                        "tone",
+                        "levelRange",
+                        "scope",
+                        "partyAssumptions",
+                        "desiredComplexity",
+                        "qualityBudgetLane",
+                        "mustHaveElements",
+                        "specialConstraints",
+                        "settings"
+                      ],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "maxUserTurns": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 20
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "lockedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "projectId",
+                    "userId",
+                    "status",
+                    "turns",
+                    "briefDraft",
+                    "lockedBrief",
+                    "maxUserTurns",
+                    "createdAt",
+                    "updatedAt",
+                    "lockedAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer"
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "instance": {
+                      "type": "string"
+                    },
+                    "errors": {
+                      "type": "object",
+                      "additionalProperties": {}
+                    }
+                  },
+                  "required": [
+                    "title",
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "force": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/auth/login": {
       "post": {
         "operationId": "login",
@@ -7813,28 +9619,198 @@
                       "type": "string"
                     },
                     "inputParameters": {
-                      "type": "object",
-                      "properties": {
-                        "tone": {
-                          "type": "string"
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "interviewSessionId": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "qualityBudgetLane": {
+                              "type": "string",
+                              "enum": [
+                                "fast",
+                                "balanced",
+                                "high_quality"
+                              ]
+                            },
+                            "interviewBrief": {
+                              "type": "object",
+                              "properties": {
+                                "title": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 200
+                                },
+                                "summary": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 4000
+                                },
+                                "generationMode": {
+                                  "type": "string",
+                                  "enum": [
+                                    "one_shot",
+                                    "module"
+                                  ]
+                                },
+                                "concept": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 4000
+                                },
+                                "theme": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 500
+                                },
+                                "tone": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 500
+                                },
+                                "levelRange": {
+                                  "type": "object",
+                                  "properties": {
+                                    "min": {
+                                      "type": "integer",
+                                      "minimum": 1,
+                                      "maximum": 20
+                                    },
+                                    "max": {
+                                      "type": "integer",
+                                      "minimum": 1,
+                                      "maximum": 20
+                                    }
+                                  },
+                                  "required": [
+                                    "min",
+                                    "max"
+                                  ],
+                                  "additionalProperties": false,
+                                  "nullable": true
+                                },
+                                "scope": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 500
+                                },
+                                "partyAssumptions": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 2000
+                                },
+                                "desiredComplexity": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 500
+                                },
+                                "qualityBudgetLane": {
+                                  "type": "string",
+                                  "enum": [
+                                    "fast",
+                                    "balanced",
+                                    "high_quality"
+                                  ]
+                                },
+                                "mustHaveElements": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 500
+                                  },
+                                  "maxItems": 20
+                                },
+                                "specialConstraints": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 500
+                                  },
+                                  "maxItems": 20
+                                },
+                                "settings": {
+                                  "type": "object",
+                                  "properties": {
+                                    "includeHandouts": {
+                                      "type": "boolean"
+                                    },
+                                    "includeMaps": {
+                                      "type": "boolean"
+                                    },
+                                    "strict5e": {
+                                      "type": "boolean"
+                                    }
+                                  },
+                                  "required": [
+                                    "includeHandouts",
+                                    "includeMaps",
+                                    "strict5e"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "required": [
+                                "title",
+                                "summary",
+                                "generationMode",
+                                "concept",
+                                "theme",
+                                "tone",
+                                "levelRange",
+                                "scope",
+                                "partyAssumptions",
+                                "desiredComplexity",
+                                "qualityBudgetLane",
+                                "mustHaveElements",
+                                "specialConstraints",
+                                "settings"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "autonomousFlowVersion": {
+                              "type": "string",
+                              "enum": [
+                                "agentic_v1"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "interviewSessionId",
+                            "qualityBudgetLane",
+                            "interviewBrief",
+                            "autonomousFlowVersion"
+                          ],
+                          "additionalProperties": false
                         },
-                        "levelRange": {
-                          "type": "string"
-                        },
-                        "settingPreference": {
-                          "type": "string"
-                        },
-                        "includeHandouts": {
-                          "type": "boolean"
-                        },
-                        "includeMaps": {
-                          "type": "boolean"
-                        },
-                        "strict5e": {
-                          "type": "boolean"
+                        {
+                          "type": "object",
+                          "properties": {
+                            "tone": {
+                              "type": "string"
+                            },
+                            "levelRange": {
+                              "type": "string"
+                            },
+                            "settingPreference": {
+                              "type": "string"
+                            },
+                            "includeHandouts": {
+                              "type": "boolean"
+                            },
+                            "includeMaps": {
+                              "type": "boolean"
+                            },
+                            "strict5e": {
+                              "type": "boolean"
+                            }
+                          },
+                          "additionalProperties": false
                         }
-                      },
-                      "additionalProperties": false,
+                      ],
                       "nullable": true
                     },
                     "progressPercent": {
@@ -7862,6 +9838,86 @@
                     },
                     "failureReason": {
                       "type": "string",
+                      "nullable": true
+                    },
+                    "agentStage": {
+                      "type": "string",
+                      "enum": [
+                        "interview_locked",
+                        "writer_story_packet",
+                        "dnd_expert_inserts",
+                        "layout_first_draft",
+                        "artist_requested",
+                        "critic_text_pass",
+                        "rewrite_writer",
+                        "rewrite_dnd_expert",
+                        "rewrite_layout",
+                        "artist_completed",
+                        "critic_image_pass",
+                        "final_editor",
+                        "printer",
+                        "completed",
+                        "failed"
+                      ],
+                      "nullable": true
+                    },
+                    "criticCycle": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "qualityBudgetLane": {
+                      "type": "string",
+                      "enum": [
+                        "fast",
+                        "balanced",
+                        "high_quality"
+                      ],
+                      "nullable": true
+                    },
+                    "routedRewriteCounts": {
+                      "type": "object",
+                      "properties": {
+                        "writer": {
+                          "type": "integer"
+                        },
+                        "dndExpert": {
+                          "type": "integer"
+                        },
+                        "layoutExpert": {
+                          "type": "integer"
+                        },
+                        "artist": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "writer",
+                        "dndExpert",
+                        "layoutExpert",
+                        "artist"
+                      ],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "imageGenerationStatus": {
+                      "type": "string",
+                      "enum": [
+                        "not_requested",
+                        "requested",
+                        "processing",
+                        "completed",
+                        "failed"
+                      ],
+                      "nullable": true
+                    },
+                    "finalEditorialStatus": {
+                      "type": "string",
+                      "enum": [
+                        "pending",
+                        "approved",
+                        "rewrite_requested",
+                        "failed"
+                      ],
                       "nullable": true
                     },
                     "graphThreadId": {
@@ -7987,6 +10043,10 @@
                     "minLength": 1,
                     "maxLength": 5000
                   },
+                  "interviewSessionId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
                   "mode": {
                     "type": "string",
                     "enum": [
@@ -8033,9 +10093,6 @@
                     "additionalProperties": false
                   }
                 },
-                "required": [
-                  "prompt"
-                ],
                 "additionalProperties": false
               }
             }
@@ -8110,28 +10167,198 @@
                         "type": "string"
                       },
                       "inputParameters": {
-                        "type": "object",
-                        "properties": {
-                          "tone": {
-                            "type": "string"
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "interviewSessionId": {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              "qualityBudgetLane": {
+                                "type": "string",
+                                "enum": [
+                                  "fast",
+                                  "balanced",
+                                  "high_quality"
+                                ]
+                              },
+                              "interviewBrief": {
+                                "type": "object",
+                                "properties": {
+                                  "title": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 200
+                                  },
+                                  "summary": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 4000
+                                  },
+                                  "generationMode": {
+                                    "type": "string",
+                                    "enum": [
+                                      "one_shot",
+                                      "module"
+                                    ]
+                                  },
+                                  "concept": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 4000
+                                  },
+                                  "theme": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 500
+                                  },
+                                  "tone": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 500
+                                  },
+                                  "levelRange": {
+                                    "type": "object",
+                                    "properties": {
+                                      "min": {
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "maximum": 20
+                                      },
+                                      "max": {
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "maximum": 20
+                                      }
+                                    },
+                                    "required": [
+                                      "min",
+                                      "max"
+                                    ],
+                                    "additionalProperties": false,
+                                    "nullable": true
+                                  },
+                                  "scope": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 500
+                                  },
+                                  "partyAssumptions": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 2000
+                                  },
+                                  "desiredComplexity": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 500
+                                  },
+                                  "qualityBudgetLane": {
+                                    "type": "string",
+                                    "enum": [
+                                      "fast",
+                                      "balanced",
+                                      "high_quality"
+                                    ]
+                                  },
+                                  "mustHaveElements": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 500
+                                    },
+                                    "maxItems": 20
+                                  },
+                                  "specialConstraints": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 500
+                                    },
+                                    "maxItems": 20
+                                  },
+                                  "settings": {
+                                    "type": "object",
+                                    "properties": {
+                                      "includeHandouts": {
+                                        "type": "boolean"
+                                      },
+                                      "includeMaps": {
+                                        "type": "boolean"
+                                      },
+                                      "strict5e": {
+                                        "type": "boolean"
+                                      }
+                                    },
+                                    "required": [
+                                      "includeHandouts",
+                                      "includeMaps",
+                                      "strict5e"
+                                    ],
+                                    "additionalProperties": false
+                                  }
+                                },
+                                "required": [
+                                  "title",
+                                  "summary",
+                                  "generationMode",
+                                  "concept",
+                                  "theme",
+                                  "tone",
+                                  "levelRange",
+                                  "scope",
+                                  "partyAssumptions",
+                                  "desiredComplexity",
+                                  "qualityBudgetLane",
+                                  "mustHaveElements",
+                                  "specialConstraints",
+                                  "settings"
+                                ],
+                                "additionalProperties": false
+                              },
+                              "autonomousFlowVersion": {
+                                "type": "string",
+                                "enum": [
+                                  "agentic_v1"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "interviewSessionId",
+                              "qualityBudgetLane",
+                              "interviewBrief",
+                              "autonomousFlowVersion"
+                            ],
+                            "additionalProperties": false
                           },
-                          "levelRange": {
-                            "type": "string"
-                          },
-                          "settingPreference": {
-                            "type": "string"
-                          },
-                          "includeHandouts": {
-                            "type": "boolean"
-                          },
-                          "includeMaps": {
-                            "type": "boolean"
-                          },
-                          "strict5e": {
-                            "type": "boolean"
+                          {
+                            "type": "object",
+                            "properties": {
+                              "tone": {
+                                "type": "string"
+                              },
+                              "levelRange": {
+                                "type": "string"
+                              },
+                              "settingPreference": {
+                                "type": "string"
+                              },
+                              "includeHandouts": {
+                                "type": "boolean"
+                              },
+                              "includeMaps": {
+                                "type": "boolean"
+                              },
+                              "strict5e": {
+                                "type": "boolean"
+                              }
+                            },
+                            "additionalProperties": false
                           }
-                        },
-                        "additionalProperties": false,
+                        ],
                         "nullable": true
                       },
                       "progressPercent": {
@@ -8159,6 +10386,86 @@
                       },
                       "failureReason": {
                         "type": "string",
+                        "nullable": true
+                      },
+                      "agentStage": {
+                        "type": "string",
+                        "enum": [
+                          "interview_locked",
+                          "writer_story_packet",
+                          "dnd_expert_inserts",
+                          "layout_first_draft",
+                          "artist_requested",
+                          "critic_text_pass",
+                          "rewrite_writer",
+                          "rewrite_dnd_expert",
+                          "rewrite_layout",
+                          "artist_completed",
+                          "critic_image_pass",
+                          "final_editor",
+                          "printer",
+                          "completed",
+                          "failed"
+                        ],
+                        "nullable": true
+                      },
+                      "criticCycle": {
+                        "type": "integer",
+                        "nullable": true
+                      },
+                      "qualityBudgetLane": {
+                        "type": "string",
+                        "enum": [
+                          "fast",
+                          "balanced",
+                          "high_quality"
+                        ],
+                        "nullable": true
+                      },
+                      "routedRewriteCounts": {
+                        "type": "object",
+                        "properties": {
+                          "writer": {
+                            "type": "integer"
+                          },
+                          "dndExpert": {
+                            "type": "integer"
+                          },
+                          "layoutExpert": {
+                            "type": "integer"
+                          },
+                          "artist": {
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "writer",
+                          "dndExpert",
+                          "layoutExpert",
+                          "artist"
+                        ],
+                        "additionalProperties": false,
+                        "nullable": true
+                      },
+                      "imageGenerationStatus": {
+                        "type": "string",
+                        "enum": [
+                          "not_requested",
+                          "requested",
+                          "processing",
+                          "completed",
+                          "failed"
+                        ],
+                        "nullable": true
+                      },
+                      "finalEditorialStatus": {
+                        "type": "string",
+                        "enum": [
+                          "pending",
+                          "approved",
+                          "rewrite_requested",
+                          "failed"
+                        ],
                         "nullable": true
                       },
                       "graphThreadId": {
@@ -8342,28 +10649,198 @@
                       "type": "string"
                     },
                     "inputParameters": {
-                      "type": "object",
-                      "properties": {
-                        "tone": {
-                          "type": "string"
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "interviewSessionId": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "qualityBudgetLane": {
+                              "type": "string",
+                              "enum": [
+                                "fast",
+                                "balanced",
+                                "high_quality"
+                              ]
+                            },
+                            "interviewBrief": {
+                              "type": "object",
+                              "properties": {
+                                "title": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 200
+                                },
+                                "summary": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 4000
+                                },
+                                "generationMode": {
+                                  "type": "string",
+                                  "enum": [
+                                    "one_shot",
+                                    "module"
+                                  ]
+                                },
+                                "concept": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 4000
+                                },
+                                "theme": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 500
+                                },
+                                "tone": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 500
+                                },
+                                "levelRange": {
+                                  "type": "object",
+                                  "properties": {
+                                    "min": {
+                                      "type": "integer",
+                                      "minimum": 1,
+                                      "maximum": 20
+                                    },
+                                    "max": {
+                                      "type": "integer",
+                                      "minimum": 1,
+                                      "maximum": 20
+                                    }
+                                  },
+                                  "required": [
+                                    "min",
+                                    "max"
+                                  ],
+                                  "additionalProperties": false,
+                                  "nullable": true
+                                },
+                                "scope": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 500
+                                },
+                                "partyAssumptions": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 2000
+                                },
+                                "desiredComplexity": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 500
+                                },
+                                "qualityBudgetLane": {
+                                  "type": "string",
+                                  "enum": [
+                                    "fast",
+                                    "balanced",
+                                    "high_quality"
+                                  ]
+                                },
+                                "mustHaveElements": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 500
+                                  },
+                                  "maxItems": 20
+                                },
+                                "specialConstraints": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 500
+                                  },
+                                  "maxItems": 20
+                                },
+                                "settings": {
+                                  "type": "object",
+                                  "properties": {
+                                    "includeHandouts": {
+                                      "type": "boolean"
+                                    },
+                                    "includeMaps": {
+                                      "type": "boolean"
+                                    },
+                                    "strict5e": {
+                                      "type": "boolean"
+                                    }
+                                  },
+                                  "required": [
+                                    "includeHandouts",
+                                    "includeMaps",
+                                    "strict5e"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "required": [
+                                "title",
+                                "summary",
+                                "generationMode",
+                                "concept",
+                                "theme",
+                                "tone",
+                                "levelRange",
+                                "scope",
+                                "partyAssumptions",
+                                "desiredComplexity",
+                                "qualityBudgetLane",
+                                "mustHaveElements",
+                                "specialConstraints",
+                                "settings"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "autonomousFlowVersion": {
+                              "type": "string",
+                              "enum": [
+                                "agentic_v1"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "interviewSessionId",
+                            "qualityBudgetLane",
+                            "interviewBrief",
+                            "autonomousFlowVersion"
+                          ],
+                          "additionalProperties": false
                         },
-                        "levelRange": {
-                          "type": "string"
-                        },
-                        "settingPreference": {
-                          "type": "string"
-                        },
-                        "includeHandouts": {
-                          "type": "boolean"
-                        },
-                        "includeMaps": {
-                          "type": "boolean"
-                        },
-                        "strict5e": {
-                          "type": "boolean"
+                        {
+                          "type": "object",
+                          "properties": {
+                            "tone": {
+                              "type": "string"
+                            },
+                            "levelRange": {
+                              "type": "string"
+                            },
+                            "settingPreference": {
+                              "type": "string"
+                            },
+                            "includeHandouts": {
+                              "type": "boolean"
+                            },
+                            "includeMaps": {
+                              "type": "boolean"
+                            },
+                            "strict5e": {
+                              "type": "boolean"
+                            }
+                          },
+                          "additionalProperties": false
                         }
-                      },
-                      "additionalProperties": false,
+                      ],
                       "nullable": true
                     },
                     "progressPercent": {
@@ -8391,6 +10868,86 @@
                     },
                     "failureReason": {
                       "type": "string",
+                      "nullable": true
+                    },
+                    "agentStage": {
+                      "type": "string",
+                      "enum": [
+                        "interview_locked",
+                        "writer_story_packet",
+                        "dnd_expert_inserts",
+                        "layout_first_draft",
+                        "artist_requested",
+                        "critic_text_pass",
+                        "rewrite_writer",
+                        "rewrite_dnd_expert",
+                        "rewrite_layout",
+                        "artist_completed",
+                        "critic_image_pass",
+                        "final_editor",
+                        "printer",
+                        "completed",
+                        "failed"
+                      ],
+                      "nullable": true
+                    },
+                    "criticCycle": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "qualityBudgetLane": {
+                      "type": "string",
+                      "enum": [
+                        "fast",
+                        "balanced",
+                        "high_quality"
+                      ],
+                      "nullable": true
+                    },
+                    "routedRewriteCounts": {
+                      "type": "object",
+                      "properties": {
+                        "writer": {
+                          "type": "integer"
+                        },
+                        "dndExpert": {
+                          "type": "integer"
+                        },
+                        "layoutExpert": {
+                          "type": "integer"
+                        },
+                        "artist": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "writer",
+                        "dndExpert",
+                        "layoutExpert",
+                        "artist"
+                      ],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "imageGenerationStatus": {
+                      "type": "string",
+                      "enum": [
+                        "not_requested",
+                        "requested",
+                        "processing",
+                        "completed",
+                        "failed"
+                      ],
+                      "nullable": true
+                    },
+                    "finalEditorialStatus": {
+                      "type": "string",
+                      "enum": [
+                        "pending",
+                        "approved",
+                        "rewrite_requested",
+                        "failed"
+                      ],
                       "nullable": true
                     },
                     "graphThreadId": {
@@ -8593,28 +11150,198 @@
                       "type": "string"
                     },
                     "inputParameters": {
-                      "type": "object",
-                      "properties": {
-                        "tone": {
-                          "type": "string"
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "interviewSessionId": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "qualityBudgetLane": {
+                              "type": "string",
+                              "enum": [
+                                "fast",
+                                "balanced",
+                                "high_quality"
+                              ]
+                            },
+                            "interviewBrief": {
+                              "type": "object",
+                              "properties": {
+                                "title": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 200
+                                },
+                                "summary": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 4000
+                                },
+                                "generationMode": {
+                                  "type": "string",
+                                  "enum": [
+                                    "one_shot",
+                                    "module"
+                                  ]
+                                },
+                                "concept": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 4000
+                                },
+                                "theme": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 500
+                                },
+                                "tone": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 500
+                                },
+                                "levelRange": {
+                                  "type": "object",
+                                  "properties": {
+                                    "min": {
+                                      "type": "integer",
+                                      "minimum": 1,
+                                      "maximum": 20
+                                    },
+                                    "max": {
+                                      "type": "integer",
+                                      "minimum": 1,
+                                      "maximum": 20
+                                    }
+                                  },
+                                  "required": [
+                                    "min",
+                                    "max"
+                                  ],
+                                  "additionalProperties": false,
+                                  "nullable": true
+                                },
+                                "scope": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 500
+                                },
+                                "partyAssumptions": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 2000
+                                },
+                                "desiredComplexity": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 500
+                                },
+                                "qualityBudgetLane": {
+                                  "type": "string",
+                                  "enum": [
+                                    "fast",
+                                    "balanced",
+                                    "high_quality"
+                                  ]
+                                },
+                                "mustHaveElements": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 500
+                                  },
+                                  "maxItems": 20
+                                },
+                                "specialConstraints": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 500
+                                  },
+                                  "maxItems": 20
+                                },
+                                "settings": {
+                                  "type": "object",
+                                  "properties": {
+                                    "includeHandouts": {
+                                      "type": "boolean"
+                                    },
+                                    "includeMaps": {
+                                      "type": "boolean"
+                                    },
+                                    "strict5e": {
+                                      "type": "boolean"
+                                    }
+                                  },
+                                  "required": [
+                                    "includeHandouts",
+                                    "includeMaps",
+                                    "strict5e"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "required": [
+                                "title",
+                                "summary",
+                                "generationMode",
+                                "concept",
+                                "theme",
+                                "tone",
+                                "levelRange",
+                                "scope",
+                                "partyAssumptions",
+                                "desiredComplexity",
+                                "qualityBudgetLane",
+                                "mustHaveElements",
+                                "specialConstraints",
+                                "settings"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "autonomousFlowVersion": {
+                              "type": "string",
+                              "enum": [
+                                "agentic_v1"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "interviewSessionId",
+                            "qualityBudgetLane",
+                            "interviewBrief",
+                            "autonomousFlowVersion"
+                          ],
+                          "additionalProperties": false
                         },
-                        "levelRange": {
-                          "type": "string"
-                        },
-                        "settingPreference": {
-                          "type": "string"
-                        },
-                        "includeHandouts": {
-                          "type": "boolean"
-                        },
-                        "includeMaps": {
-                          "type": "boolean"
-                        },
-                        "strict5e": {
-                          "type": "boolean"
+                        {
+                          "type": "object",
+                          "properties": {
+                            "tone": {
+                              "type": "string"
+                            },
+                            "levelRange": {
+                              "type": "string"
+                            },
+                            "settingPreference": {
+                              "type": "string"
+                            },
+                            "includeHandouts": {
+                              "type": "boolean"
+                            },
+                            "includeMaps": {
+                              "type": "boolean"
+                            },
+                            "strict5e": {
+                              "type": "boolean"
+                            }
+                          },
+                          "additionalProperties": false
                         }
-                      },
-                      "additionalProperties": false,
+                      ],
                       "nullable": true
                     },
                     "progressPercent": {
@@ -8642,6 +11369,86 @@
                     },
                     "failureReason": {
                       "type": "string",
+                      "nullable": true
+                    },
+                    "agentStage": {
+                      "type": "string",
+                      "enum": [
+                        "interview_locked",
+                        "writer_story_packet",
+                        "dnd_expert_inserts",
+                        "layout_first_draft",
+                        "artist_requested",
+                        "critic_text_pass",
+                        "rewrite_writer",
+                        "rewrite_dnd_expert",
+                        "rewrite_layout",
+                        "artist_completed",
+                        "critic_image_pass",
+                        "final_editor",
+                        "printer",
+                        "completed",
+                        "failed"
+                      ],
+                      "nullable": true
+                    },
+                    "criticCycle": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "qualityBudgetLane": {
+                      "type": "string",
+                      "enum": [
+                        "fast",
+                        "balanced",
+                        "high_quality"
+                      ],
+                      "nullable": true
+                    },
+                    "routedRewriteCounts": {
+                      "type": "object",
+                      "properties": {
+                        "writer": {
+                          "type": "integer"
+                        },
+                        "dndExpert": {
+                          "type": "integer"
+                        },
+                        "layoutExpert": {
+                          "type": "integer"
+                        },
+                        "artist": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "writer",
+                        "dndExpert",
+                        "layoutExpert",
+                        "artist"
+                      ],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "imageGenerationStatus": {
+                      "type": "string",
+                      "enum": [
+                        "not_requested",
+                        "requested",
+                        "processing",
+                        "completed",
+                        "failed"
+                      ],
+                      "nullable": true
+                    },
+                    "finalEditorialStatus": {
+                      "type": "string",
+                      "enum": [
+                        "pending",
+                        "approved",
+                        "rewrite_requested",
+                        "failed"
+                      ],
                       "nullable": true
                     },
                     "graphThreadId": {
@@ -8833,28 +11640,198 @@
                       "type": "string"
                     },
                     "inputParameters": {
-                      "type": "object",
-                      "properties": {
-                        "tone": {
-                          "type": "string"
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "interviewSessionId": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "qualityBudgetLane": {
+                              "type": "string",
+                              "enum": [
+                                "fast",
+                                "balanced",
+                                "high_quality"
+                              ]
+                            },
+                            "interviewBrief": {
+                              "type": "object",
+                              "properties": {
+                                "title": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 200
+                                },
+                                "summary": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 4000
+                                },
+                                "generationMode": {
+                                  "type": "string",
+                                  "enum": [
+                                    "one_shot",
+                                    "module"
+                                  ]
+                                },
+                                "concept": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 4000
+                                },
+                                "theme": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 500
+                                },
+                                "tone": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 500
+                                },
+                                "levelRange": {
+                                  "type": "object",
+                                  "properties": {
+                                    "min": {
+                                      "type": "integer",
+                                      "minimum": 1,
+                                      "maximum": 20
+                                    },
+                                    "max": {
+                                      "type": "integer",
+                                      "minimum": 1,
+                                      "maximum": 20
+                                    }
+                                  },
+                                  "required": [
+                                    "min",
+                                    "max"
+                                  ],
+                                  "additionalProperties": false,
+                                  "nullable": true
+                                },
+                                "scope": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 500
+                                },
+                                "partyAssumptions": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 2000
+                                },
+                                "desiredComplexity": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 500
+                                },
+                                "qualityBudgetLane": {
+                                  "type": "string",
+                                  "enum": [
+                                    "fast",
+                                    "balanced",
+                                    "high_quality"
+                                  ]
+                                },
+                                "mustHaveElements": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 500
+                                  },
+                                  "maxItems": 20
+                                },
+                                "specialConstraints": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 500
+                                  },
+                                  "maxItems": 20
+                                },
+                                "settings": {
+                                  "type": "object",
+                                  "properties": {
+                                    "includeHandouts": {
+                                      "type": "boolean"
+                                    },
+                                    "includeMaps": {
+                                      "type": "boolean"
+                                    },
+                                    "strict5e": {
+                                      "type": "boolean"
+                                    }
+                                  },
+                                  "required": [
+                                    "includeHandouts",
+                                    "includeMaps",
+                                    "strict5e"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "required": [
+                                "title",
+                                "summary",
+                                "generationMode",
+                                "concept",
+                                "theme",
+                                "tone",
+                                "levelRange",
+                                "scope",
+                                "partyAssumptions",
+                                "desiredComplexity",
+                                "qualityBudgetLane",
+                                "mustHaveElements",
+                                "specialConstraints",
+                                "settings"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "autonomousFlowVersion": {
+                              "type": "string",
+                              "enum": [
+                                "agentic_v1"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "interviewSessionId",
+                            "qualityBudgetLane",
+                            "interviewBrief",
+                            "autonomousFlowVersion"
+                          ],
+                          "additionalProperties": false
                         },
-                        "levelRange": {
-                          "type": "string"
-                        },
-                        "settingPreference": {
-                          "type": "string"
-                        },
-                        "includeHandouts": {
-                          "type": "boolean"
-                        },
-                        "includeMaps": {
-                          "type": "boolean"
-                        },
-                        "strict5e": {
-                          "type": "boolean"
+                        {
+                          "type": "object",
+                          "properties": {
+                            "tone": {
+                              "type": "string"
+                            },
+                            "levelRange": {
+                              "type": "string"
+                            },
+                            "settingPreference": {
+                              "type": "string"
+                            },
+                            "includeHandouts": {
+                              "type": "boolean"
+                            },
+                            "includeMaps": {
+                              "type": "boolean"
+                            },
+                            "strict5e": {
+                              "type": "boolean"
+                            }
+                          },
+                          "additionalProperties": false
                         }
-                      },
-                      "additionalProperties": false,
+                      ],
                       "nullable": true
                     },
                     "progressPercent": {
@@ -8882,6 +11859,86 @@
                     },
                     "failureReason": {
                       "type": "string",
+                      "nullable": true
+                    },
+                    "agentStage": {
+                      "type": "string",
+                      "enum": [
+                        "interview_locked",
+                        "writer_story_packet",
+                        "dnd_expert_inserts",
+                        "layout_first_draft",
+                        "artist_requested",
+                        "critic_text_pass",
+                        "rewrite_writer",
+                        "rewrite_dnd_expert",
+                        "rewrite_layout",
+                        "artist_completed",
+                        "critic_image_pass",
+                        "final_editor",
+                        "printer",
+                        "completed",
+                        "failed"
+                      ],
+                      "nullable": true
+                    },
+                    "criticCycle": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "qualityBudgetLane": {
+                      "type": "string",
+                      "enum": [
+                        "fast",
+                        "balanced",
+                        "high_quality"
+                      ],
+                      "nullable": true
+                    },
+                    "routedRewriteCounts": {
+                      "type": "object",
+                      "properties": {
+                        "writer": {
+                          "type": "integer"
+                        },
+                        "dndExpert": {
+                          "type": "integer"
+                        },
+                        "layoutExpert": {
+                          "type": "integer"
+                        },
+                        "artist": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "writer",
+                        "dndExpert",
+                        "layoutExpert",
+                        "artist"
+                      ],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "imageGenerationStatus": {
+                      "type": "string",
+                      "enum": [
+                        "not_requested",
+                        "requested",
+                        "processing",
+                        "completed",
+                        "failed"
+                      ],
+                      "nullable": true
+                    },
+                    "finalEditorialStatus": {
+                      "type": "string",
+                      "enum": [
+                        "pending",
+                        "approved",
+                        "rewrite_requested",
+                        "failed"
+                      ],
                       "nullable": true
                     },
                     "graphThreadId": {
@@ -9073,28 +12130,198 @@
                       "type": "string"
                     },
                     "inputParameters": {
-                      "type": "object",
-                      "properties": {
-                        "tone": {
-                          "type": "string"
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "interviewSessionId": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "qualityBudgetLane": {
+                              "type": "string",
+                              "enum": [
+                                "fast",
+                                "balanced",
+                                "high_quality"
+                              ]
+                            },
+                            "interviewBrief": {
+                              "type": "object",
+                              "properties": {
+                                "title": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 200
+                                },
+                                "summary": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 4000
+                                },
+                                "generationMode": {
+                                  "type": "string",
+                                  "enum": [
+                                    "one_shot",
+                                    "module"
+                                  ]
+                                },
+                                "concept": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 4000
+                                },
+                                "theme": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 500
+                                },
+                                "tone": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 500
+                                },
+                                "levelRange": {
+                                  "type": "object",
+                                  "properties": {
+                                    "min": {
+                                      "type": "integer",
+                                      "minimum": 1,
+                                      "maximum": 20
+                                    },
+                                    "max": {
+                                      "type": "integer",
+                                      "minimum": 1,
+                                      "maximum": 20
+                                    }
+                                  },
+                                  "required": [
+                                    "min",
+                                    "max"
+                                  ],
+                                  "additionalProperties": false,
+                                  "nullable": true
+                                },
+                                "scope": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 500
+                                },
+                                "partyAssumptions": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 2000
+                                },
+                                "desiredComplexity": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 500
+                                },
+                                "qualityBudgetLane": {
+                                  "type": "string",
+                                  "enum": [
+                                    "fast",
+                                    "balanced",
+                                    "high_quality"
+                                  ]
+                                },
+                                "mustHaveElements": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 500
+                                  },
+                                  "maxItems": 20
+                                },
+                                "specialConstraints": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 500
+                                  },
+                                  "maxItems": 20
+                                },
+                                "settings": {
+                                  "type": "object",
+                                  "properties": {
+                                    "includeHandouts": {
+                                      "type": "boolean"
+                                    },
+                                    "includeMaps": {
+                                      "type": "boolean"
+                                    },
+                                    "strict5e": {
+                                      "type": "boolean"
+                                    }
+                                  },
+                                  "required": [
+                                    "includeHandouts",
+                                    "includeMaps",
+                                    "strict5e"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "required": [
+                                "title",
+                                "summary",
+                                "generationMode",
+                                "concept",
+                                "theme",
+                                "tone",
+                                "levelRange",
+                                "scope",
+                                "partyAssumptions",
+                                "desiredComplexity",
+                                "qualityBudgetLane",
+                                "mustHaveElements",
+                                "specialConstraints",
+                                "settings"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "autonomousFlowVersion": {
+                              "type": "string",
+                              "enum": [
+                                "agentic_v1"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "interviewSessionId",
+                            "qualityBudgetLane",
+                            "interviewBrief",
+                            "autonomousFlowVersion"
+                          ],
+                          "additionalProperties": false
                         },
-                        "levelRange": {
-                          "type": "string"
-                        },
-                        "settingPreference": {
-                          "type": "string"
-                        },
-                        "includeHandouts": {
-                          "type": "boolean"
-                        },
-                        "includeMaps": {
-                          "type": "boolean"
-                        },
-                        "strict5e": {
-                          "type": "boolean"
+                        {
+                          "type": "object",
+                          "properties": {
+                            "tone": {
+                              "type": "string"
+                            },
+                            "levelRange": {
+                              "type": "string"
+                            },
+                            "settingPreference": {
+                              "type": "string"
+                            },
+                            "includeHandouts": {
+                              "type": "boolean"
+                            },
+                            "includeMaps": {
+                              "type": "boolean"
+                            },
+                            "strict5e": {
+                              "type": "boolean"
+                            }
+                          },
+                          "additionalProperties": false
                         }
-                      },
-                      "additionalProperties": false,
+                      ],
                       "nullable": true
                     },
                     "progressPercent": {
@@ -9122,6 +12349,86 @@
                     },
                     "failureReason": {
                       "type": "string",
+                      "nullable": true
+                    },
+                    "agentStage": {
+                      "type": "string",
+                      "enum": [
+                        "interview_locked",
+                        "writer_story_packet",
+                        "dnd_expert_inserts",
+                        "layout_first_draft",
+                        "artist_requested",
+                        "critic_text_pass",
+                        "rewrite_writer",
+                        "rewrite_dnd_expert",
+                        "rewrite_layout",
+                        "artist_completed",
+                        "critic_image_pass",
+                        "final_editor",
+                        "printer",
+                        "completed",
+                        "failed"
+                      ],
+                      "nullable": true
+                    },
+                    "criticCycle": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "qualityBudgetLane": {
+                      "type": "string",
+                      "enum": [
+                        "fast",
+                        "balanced",
+                        "high_quality"
+                      ],
+                      "nullable": true
+                    },
+                    "routedRewriteCounts": {
+                      "type": "object",
+                      "properties": {
+                        "writer": {
+                          "type": "integer"
+                        },
+                        "dndExpert": {
+                          "type": "integer"
+                        },
+                        "layoutExpert": {
+                          "type": "integer"
+                        },
+                        "artist": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "writer",
+                        "dndExpert",
+                        "layoutExpert",
+                        "artist"
+                      ],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "imageGenerationStatus": {
+                      "type": "string",
+                      "enum": [
+                        "not_requested",
+                        "requested",
+                        "processing",
+                        "completed",
+                        "failed"
+                      ],
+                      "nullable": true
+                    },
+                    "finalEditorialStatus": {
+                      "type": "string",
+                      "enum": [
+                        "pending",
+                        "approved",
+                        "rewrite_requested",
+                        "failed"
+                      ],
                       "nullable": true
                     },
                     "graphThreadId": {

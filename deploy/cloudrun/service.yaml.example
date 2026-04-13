@@ -91,6 +91,11 @@ spec:
                 secretKeyRef:
                   name: AI_KEY_ENCRYPTION_SECRET_SECRET
                   key: latest
+            - name: SYSTEM_GOOGLE_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: SYSTEM_GOOGLE_API_KEY_SECRET
+                  key: latest
           resources:
             limits:
               cpu: "1"

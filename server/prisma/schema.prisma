@@ -113,6 +113,7 @@ model User {
   templates       Template[]
   chatSessions    AiChatSession[]
   wizardSessions  AiWizardSession[]
+  interviewSessions InterviewSession[]
   workingMemories AiWorkingMemory[]
   memoryItems     AiMemoryItem[]
   taskPlans       AiTaskPlan[]
@@ -165,6 +166,7 @@ model Project {
   exportJobs       ExportJob[]
   chatSessions     AiChatSession[]
   wizardSessions   AiWizardSession[]
+  interviewSessions InterviewSession[]
   assets           Asset[]
   workingMemories  AiWorkingMemory[]
   memoryItems      AiMemoryItem[]
@@ -285,6 +287,28 @@ model AiWizardSession {
   @@index([projectId])
   @@index([userId])
   @@map("ai_wizard_sessions")
+}
+
+model InterviewSession {
+  id           String    @id @default(uuid())
+  projectId    String    @map("project_id")
+  userId       String    @map("user_id")
+  status       String    @default("collecting")
+  turns        Json      @default("[]")
+  briefDraft   Json?     @map("brief_draft")
+  lockedBrief  Json?     @map("locked_brief")
+  maxUserTurns Int       @default(8) @map("max_user_turns")
+  lockedAt     DateTime? @map("locked_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, userId])
+  @@index([projectId])
+  @@index([userId])
+  @@map("interview_sessions")
 }
 
 model AiChatMessage {

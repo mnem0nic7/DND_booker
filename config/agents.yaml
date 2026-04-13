@@ -1,0 +1,121 @@
+system:
+  defaultProvider: google
+  defaultBudgetLane: balanced
+  credentials:
+    googleEnv: SYSTEM_GOOGLE_API_KEY
+    openaiEnv: SYSTEM_OPENAI_API_KEY
+    anthropicEnv: SYSTEM_ANTHROPIC_API_KEY
+
+lanes:
+  fast:
+    defaultProvider: google
+  balanced:
+    defaultProvider: google
+  high_quality:
+    defaultProvider: google
+
+agents:
+  default:
+    fast:
+      provider: google
+      model: gemini-2.5-flash
+      maxOutputTokens: 8192
+    balanced:
+      provider: google
+      model: gemini-2.5-pro
+      maxOutputTokens: 16384
+    high_quality:
+      provider: google
+      model: gemini-2.5-pro
+      maxOutputTokens: 16384
+  agent.interviewer:
+    fast:
+      provider: google
+      model: gemini-2.5-flash
+      maxOutputTokens: 4096
+    balanced:
+      provider: google
+      model: gemini-2.5-pro
+      maxOutputTokens: 4096
+    high_quality:
+      provider: google
+      model: gemini-2.5-pro
+      maxOutputTokens: 4096
+  agent.writer:
+    fast:
+      provider: google
+      model: gemini-2.5-flash
+      maxOutputTokens: 12288
+    balanced:
+      provider: google
+      model: gemini-2.5-pro
+      maxOutputTokens: 16384
+    high_quality:
+      provider: google
+      model: gemini-2.5-pro
+      maxOutputTokens: 16384
+  agent.dnd_expert:
+    fast:
+      provider: google
+      model: gemini-2.5-flash
+      maxOutputTokens: 8192
+    balanced:
+      provider: google
+      model: gemini-2.5-pro
+      maxOutputTokens: 12288
+    high_quality:
+      provider: google
+      model: gemini-2.5-pro
+      maxOutputTokens: 12288
+  agent.layout_expert:
+    fast:
+      provider: google
+      model: gemini-2.5-flash
+      maxOutputTokens: 8192
+    balanced:
+      provider: google
+      model: gemini-2.5-pro
+      maxOutputTokens: 12288
+    high_quality:
+      provider: google
+      model: gemini-2.5-pro
+      maxOutputTokens: 12288
+  agent.critic:
+    fast:
+      provider: google
+      model: gemini-2.5-flash
+      maxOutputTokens: 8192
+    balanced:
+      provider: google
+      model: gemini-2.5-pro
+      maxOutputTokens: 12288
+    high_quality:
+      provider: google
+      model: gemini-2.5-pro
+      maxOutputTokens: 12288
+  agent.final_editor:
+    fast:
+      provider: google
+      model: gemini-2.5-flash
+      maxOutputTokens: 8192
+    balanced:
+      provider: google
+      model: gemini-2.5-pro
+      maxOutputTokens: 12288
+    high_quality:
+      provider: google
+      model: gemini-2.5-pro
+      maxOutputTokens: 12288
+  agent.artist:
+    fast:
+      provider: google
+      model: gemini-2.5-flash-image
+      maxOutputTokens: 2048
+    balanced:
+      provider: google
+      model: gemini-2.5-flash-image
+      maxOutputTokens: 2048
+    high_quality:
+      provider: google
+      model: gemini-3.1-flash-image-preview
+      maxOutputTokens: 2048

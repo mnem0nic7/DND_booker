@@ -40,6 +40,7 @@ describe('GenerationRun Service', () => {
   afterAll(async () => {
     const existing = await prisma.user.findUnique({ where: { email: TEST_USER.email } });
     if (existing) {
+      await prisma.interviewSession.deleteMany({ where: { projectId } });
       await prisma.project.deleteMany({ where: { userId: existing.id } });
       await prisma.user.delete({ where: { id: existing.id } });
     }
@@ -90,6 +91,93 @@ describe('GenerationRun Service', () => {
         prompt: 'Should fail',
       });
       expect(result).toBeNull();
+    });
+
+    it('should create an autonomous run from a locked interview session', async () => {
+      const interviewBrief = {
+        title: 'The Ash Clock',
+        summary: 'A short module about a city trapped in a one-hour time loop.',
+        generationMode: 'module',
+        concept: 'Break a clockwork time loop before the city burns itself out.',
+        theme: 'Temporal collapse',
+        tone: 'Urgent mystery',
+        levelRange: { min: 5, max: 7 },
+        scope: 'Short module, 3 chapters',
+        partyAssumptions: 'A party of four heroes who like mysteries and set-piece encounters.',
+        desiredComplexity: 'Moderate',
+        qualityBudgetLane: 'balanced',
+        mustHaveElements: ['Clock tower', 'Ash storm'],
+        specialConstraints: ['Keep it SRD-safe'],
+        settings: {
+          includeHandouts: true,
+          includeMaps: true,
+          strict5e: true,
+        },
+      } as const;
+
+      const session = await prisma.interviewSession.create({
+        data: {
+          projectId,
+          userId,
+          status: 'locked',
+          turns: [],
+          briefDraft: interviewBrief as any,
+          lockedBrief: interviewBrief as any,
+          maxUserTurns: 8,
+          lockedAt: new Date(),
+        },
+      });
+
+      const run = await createRun({
+        projectId,
+        userId,
+        interviewSessionId: session.id,
+      });
+
+      expect(run).not.toBeNull();
+      expect(run!.mode).toBe('module');
+      expect(run!.inputPrompt).toBe(interviewBrief.summary);
+      expect(run!.agentStage).toBe('interview_locked');
+      expect(run!.qualityBudgetLane).toBe('balanced');
+      expect(run!.inputParameters).toMatchObject({
+        interviewSessionId: session.id,
+        qualityBudgetLane: 'balanced',
+        autonomousFlowVersion: 'agentic_v1',
+      });
+
+      const artifact = await prisma.generatedArtifact.findFirst({
+        where: { runId: run!.id, artifactKey: 'interview-brief' },
+      });
+
+      expect(artifact).not.toBeNull();
+      expect(artifact!.artifactType).toBe('interview_brief');
+    });
+
+    it('should reject interview-driven creation when the interview is not locked', async () => {
+      await prisma.interviewSession.deleteMany({
+        where: { projectId, userId },
+      });
+
+      const session = await prisma.interviewSession.create({
+        data: {
+          projectId,
+          userId,
+          status: 'collecting',
+          turns: [],
+          briefDraft: {
+            title: 'Draft Brief',
+          } as any,
+          maxUserTurns: 8,
+        },
+      });
+
+      const run = await createRun({
+        projectId,
+        userId,
+        interviewSessionId: session.id,
+      });
+
+      expect(run).toBeNull();
     });
   });
 
