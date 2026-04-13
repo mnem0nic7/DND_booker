@@ -273,6 +273,35 @@ export const InterviewSessionLockRequestSchema = z.object({
   force: z.boolean().optional(),
 });
 
+export const ConsoleAgentStatusSchema = z.enum(['working', 'waiting', 'idle', 'error']);
+
+export const ConsoleAgentSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1).max(120),
+  role: z.string().min(1).max(160),
+  iconKey: z.string().min(1).max(60),
+  status: ConsoleAgentStatusSchema,
+  currentTask: z.string().max(500).nullable(),
+  progress: z.number().int().min(0).max(100),
+  queue: z.array(z.string().min(1).max(240)).max(8),
+  lastPing: z.string().min(1).max(60),
+});
+
+export const ConsoleChatRequestSchema = z.object({
+  agentId: z.string().min(1).max(64),
+  message: z.string().min(1).max(5000),
+});
+
+export const ConsoleChatReplySchema = z.object({
+  fromAgentId: z.string().min(1).max(64),
+  fromLabel: z.string().min(1).max(120),
+  reply: z.string().min(1).max(4000),
+});
+
+export const ConsoleChatResponseSchema = z.object({
+  replies: z.array(ConsoleChatReplySchema).min(1).max(8),
+});
+
 export const GenerationRunInputParametersSchema = z.union([
   z.object({
     interviewSessionId: z.string().uuid(),
@@ -933,6 +962,10 @@ export type PublicationDocumentTypst = z.infer<typeof PublicationDocumentTypstSc
 export type PublicationDocumentPatchRequest = z.infer<typeof V1PublicationDocumentPatchSchema>;
 export type ProjectCreateRequestBody = ProjectCreateRequest;
 export type ProjectUpdateRequestBody = ProjectUpdateRequest;
+export type ConsoleAgent = z.infer<typeof ConsoleAgentSchema>;
+export type ConsoleChatRequest = z.infer<typeof ConsoleChatRequestSchema>;
+export type ConsoleChatReply = z.infer<typeof ConsoleChatReplySchema>;
+export type ConsoleChatResponse = z.infer<typeof ConsoleChatResponseSchema>;
 export type GenerationRunCreateRequest = V1CreateGenerationRunRequest;
 export type GenerationRun = V1GenerationRun;
 export type GenerationRunDetail = V1GenerationRunDetail;
@@ -943,7 +976,7 @@ export type AgentRunDetail = V1AgentRunDetail;
 export type GraphInterruptResolutionRequestBody = z.infer<typeof GraphInterruptResolutionRequestSchema>;
 
 export interface ApiV1RouteContract {
-  tag: 'auth' | 'projects' | 'documents' | 'generationRuns' | 'agentRuns' | 'graphInterrupts' | 'exports' | 'interviews';
+  tag: 'auth' | 'projects' | 'documents' | 'generationRuns' | 'agentRuns' | 'graphInterrupts' | 'exports' | 'interviews' | 'console';
   operationId: string;
   method: 'get' | 'post' | 'patch' | 'delete';
   path: string;
@@ -959,6 +992,30 @@ export interface ApiV1RouteContract {
 }
 
 export const V1_ROUTE_CONTRACTS: ApiV1RouteContract[] = [
+  {
+    tag: 'console',
+    operationId: 'listConsoleAgents',
+    method: 'get',
+    path: '/api/v1/projects/{projectId}/console/agents',
+    summary: 'List the agent board state for the operator console.',
+    paramsSchema: ProjectIdParamsSchema,
+    responseSchema: ConsoleAgentSchema.array(),
+    paramsTypeName: 'ProjectIdParams',
+    responseTypeName: 'ConsoleAgent[]',
+  },
+  {
+    tag: 'console',
+    operationId: 'sendConsoleMessage',
+    method: 'post',
+    path: '/api/v1/projects/{projectId}/console/chat',
+    summary: 'Send an operator message to one console agent or broadcast to the hall.',
+    paramsSchema: ProjectIdParamsSchema,
+    requestBodySchema: ConsoleChatRequestSchema,
+    responseSchema: ConsoleChatResponseSchema,
+    paramsTypeName: 'ProjectIdParams',
+    requestTypeName: 'ConsoleChatRequest',
+    responseTypeName: 'ConsoleChatResponse',
+  },
   {
     tag: 'interviews',
     operationId: 'createInterviewSession',

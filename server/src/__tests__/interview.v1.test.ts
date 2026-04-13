@@ -166,6 +166,58 @@ describe('Interview API v1', () => {
     expect(afterLockRes.body.error).toContain('already locked');
   });
 
+  it('falls back to a seeded interview brief when the interviewer model is overloaded on create', async () => {
+    const overloadedError = new Error(
+      'Failed after 3 attempts. Last error: This model is currently experiencing high demand. Please try again later.',
+    );
+    overloadedError.name = 'AI_RetryError';
+    mockGenerateObjectWithTimeout.mockRejectedValueOnce(overloadedError);
+
+    const res = await request(app)
+      .post(`/api/v1/projects/${projectId}/interview/sessions`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        initialPrompt: 'Create a polished one-shot for levels 4-5 about a haunted clockwork conservatory with one memorable NPC and a puzzle lock.',
+      });
+
+    expect(res.status).toBe(201);
+    expect(res.body.briefDraft).toBeTruthy();
+    expect(res.body.briefDraft.generationMode).toBe('one_shot');
+    expect(res.body.briefDraft.qualityBudgetLane).toBe('high_quality');
+    expect(res.body.briefDraft.levelRange).toEqual({ min: 4, max: 5 });
+    expect(res.body.turns).toHaveLength(2);
+    expect(res.body.turns[1].content).toContain('seeded');
+  });
+
+  it('locks with the seeded brief when force-lock hits a transient interviewer overload', async () => {
+    const overloadedError = new Error(
+      'Failed after 3 attempts. Last error: This model is currently experiencing high demand. Please try again later.',
+    );
+    overloadedError.name = 'AI_RetryError';
+    mockGenerateObjectWithTimeout.mockRejectedValueOnce(overloadedError);
+    mockGenerateObjectWithTimeout.mockRejectedValueOnce(overloadedError);
+
+    const createRes = await request(app)
+      .post(`/api/v1/projects/${projectId}/interview/sessions`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        initialPrompt: 'Build a balanced short module for levels 6-7 with wilderness travel, maps, and three set-piece encounters.',
+      });
+
+    expect(createRes.status).toBe(201);
+
+    const lockRes = await request(app)
+      .post(`/api/v1/projects/${projectId}/interview/sessions/${createRes.body.id}/lock`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ force: true });
+
+    expect(lockRes.status).toBe(200);
+    expect(lockRes.body.status).toBe('locked');
+    expect(lockRes.body.lockedBrief).toBeTruthy();
+    expect(lockRes.body.lockedBrief.generationMode).toBe('module');
+    expect(lockRes.body.lockedBrief.levelRange).toEqual({ min: 6, max: 7 });
+  });
+
   it('returns 404 when a session does not belong to the project or user', async () => {
     const res = await request(app)
       .get(`/api/v1/projects/${projectId}/interview/sessions/00000000-0000-0000-0000-000000000000`)

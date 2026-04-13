@@ -11,6 +11,7 @@ import { generateObjectWithTimeout } from './generation/model-timeouts.js';
 import { resolveSystemAgentLanguageModel } from './llm/system-router.js';
 
 const MAX_USER_TURNS = 8;
+const DEFAULT_PARTY_ASSUMPTIONS = 'A standard four-character adventuring party with balanced combat, exploration, and social capabilities.';
 
 const InterviewBriefSchema = z.object({
   title: z.string().min(1).max(200),
@@ -141,6 +142,300 @@ function buildInterviewPrompt(input: {
   ].join('\n');
 }
 
+function truncate(value: string, maxLength: number) {
+  if (value.length <= maxLength) return value;
+  return `${value.slice(0, Math.max(0, maxLength - 1)).trimEnd()}…`;
+}
+
+function collapseWhitespace(value: string) {
+  return value.replace(/\s+/g, ' ').trim();
+}
+
+function titleCaseFromPhrase(value: string) {
+  return value
+    .split(/[\s-]+/)
+    .filter(Boolean)
+    .slice(0, 6)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
+function collectUserRequestText(input: {
+  initialPrompt?: string | null;
+  turns: InterviewTurn[];
+}) {
+  const userTurns = input.turns
+    .filter((turn) => turn.role === 'user')
+    .map((turn) => collapseWhitespace(turn.content))
+    .filter(Boolean);
+
+  const seeded = collapseWhitespace(input.initialPrompt ?? '');
+  return [seeded, ...userTurns].filter(Boolean).join('\n\n').trim();
+}
+
+function inferGenerationMode(text: string, existingBrief: InterviewBrief | null): InterviewBrief['generationMode'] {
+  if (existingBrief?.generationMode) return existingBrief.generationMode;
+  if (/\bone[\s-]?shot\b|\bsingle session\b|\bone evening\b/i.test(text)) {
+    return 'one_shot';
+  }
+  if (/\bmodule\b|\bshort adventure\b|\bmini campaign\b|\bchapter\b/i.test(text)) {
+    return 'module';
+  }
+  return 'one_shot';
+}
+
+function inferQualityBudgetLane(text: string, existingBrief: InterviewBrief | null): InterviewBrief['qualityBudgetLane'] {
+  if (existingBrief?.qualityBudgetLane) return existingBrief.qualityBudgetLane;
+  if (/\bhigh[_ -]?quality\b|\bpolished\b|\bpremium\b/i.test(text)) return 'high_quality';
+  if (/\bfast\b|\bquick\b|\blow cost\b/i.test(text)) return 'fast';
+  return 'balanced';
+}
+
+function inferTone(text: string, existingBrief: InterviewBrief | null) {
+  if (existingBrief?.tone) return existingBrief.tone;
+  if (/\bhorror\b|\bcreepy\b|\bdread\b|\bgrim\b|\bdark\b/i.test(text)) return 'dark fantasy suspense';
+  if (/\bcomedy\b|\bfunny\b|\bwhimsical\b|\blighthearted\b/i.test(text)) return 'lighthearted adventure';
+  if (/\bintrigue\b|\bpolitic/i.test(text)) return 'tense political intrigue';
+  if (/\bmystery\b|\binvestigation\b/i.test(text)) return 'mysterious and investigative';
+  return 'heroic fantasy adventure';
+}
+
+function inferTheme(text: string, existingBrief: InterviewBrief | null) {
+  if (existingBrief?.theme) return existingBrief.theme;
+  if (/\bunderdark\b/i.test(text)) return 'underdark survival and intrigue';
+  if (/\bclockwork\b|\bautomaton\b|\bworkshop\b/i.test(text)) return 'clockwork mystery';
+  if (/\bwilderness\b|\bforest\b|\bjungle\b|\btravel\b/i.test(text)) return 'wilderness exploration';
+  if (/\bdungeon\b|\bmegadungeon\b|\bdelve\b/i.test(text)) return 'dungeon exploration';
+  if (/\bcity\b|\burban\b/i.test(text)) return 'urban intrigue';
+  return 'original D&D-compatible fantasy adventure';
+}
+
+function inferDesiredComplexity(text: string, existingBrief: InterviewBrief | null) {
+  if (existingBrief?.desiredComplexity) return existingBrief.desiredComplexity;
+  if (/\bcomplex\b|\badvanced\b|\bexperienced players\b/i.test(text)) return 'high';
+  if (/\bsimple\b|\bbeginner\b|\bstraightforward\b/i.test(text)) return 'light';
+  return 'balanced';
+}
+
+function inferLevelRange(text: string, existingBrief: InterviewBrief | null): InterviewBrief['levelRange'] {
+  if (existingBrief?.levelRange) return existingBrief.levelRange;
+
+  const rangeMatch = text.match(/\blevels?\s*(\d{1,2})\s*(?:-|to|through)\s*(\d{1,2})\b/i)
+    ?? text.match(/\bfor levels?\s*(\d{1,2})\s*(?:-|to|through)\s*(\d{1,2})\b/i);
+  if (rangeMatch) {
+    const min = Number.parseInt(rangeMatch[1]!, 10);
+    const max = Number.parseInt(rangeMatch[2]!, 10);
+    if (Number.isFinite(min) && Number.isFinite(max) && min >= 1 && max <= 20 && min <= max) {
+      return { min, max };
+    }
+  }
+
+  const singleMatch = text.match(/\blevel\s*(\d{1,2})\b/i)
+    ?? text.match(/\b(?:for|at)\s*(\d{1,2})(?:st|nd|rd|th)\s*level\b/i);
+  if (singleMatch) {
+    const level = Number.parseInt(singleMatch[1]!, 10);
+    if (Number.isFinite(level) && level >= 1 && level <= 20) {
+      return { min: level, max: level };
+    }
+  }
+
+  return null;
+}
+
+function inferScope(
+  text: string,
+  generationMode: InterviewBrief['generationMode'],
+  existingBrief: InterviewBrief | null,
+) {
+  if (existingBrief?.scope) return existingBrief.scope;
+  if (/8\s*-\s*12\s*pages?|short one-shot|single session/i.test(text)) return 'compact one-shot';
+  if (/20\s*-\s*40\s*pages?|short module|two chapters|three chapters/i.test(text)) return 'short module';
+  return generationMode === 'module' ? 'short module' : 'compact one-shot';
+}
+
+function inferPartyAssumptions(text: string, existingBrief: InterviewBrief | null) {
+  if (existingBrief?.partyAssumptions) return existingBrief.partyAssumptions;
+  const explicit = text.match(/\bparty assumptions?:?\s*(.+)$/im)?.[1]?.trim();
+  return explicit ? truncate(explicit, 2000) : DEFAULT_PARTY_ASSUMPTIONS;
+}
+
+function inferSettings(text: string, existingBrief: InterviewBrief | null): InterviewBrief['settings'] {
+  if (existingBrief?.settings) return existingBrief.settings;
+  const lowercase = text.toLowerCase();
+  return {
+    includeHandouts: !/\bno handouts?\b/.test(lowercase),
+    includeMaps: !/\bno maps?\b/.test(lowercase),
+    strict5e: !/\b5\.5e\b|\b2024 rules\b|\bhomebrew rules\b/.test(lowercase),
+  };
+}
+
+function extractTaggedItems(text: string, patterns: RegExp[]) {
+  const items = new Set<string>();
+
+  for (const pattern of patterns) {
+    const matches = text.matchAll(pattern);
+    for (const match of matches) {
+      const raw = match[1]?.trim();
+      if (!raw) continue;
+      raw
+        .split(/\s*(?:,|;|\band\b)\s*/i)
+        .map((part) => collapseWhitespace(part))
+        .filter(Boolean)
+        .forEach((part) => items.add(truncate(part, 500)));
+    }
+  }
+
+  return Array.from(items).slice(0, 20);
+}
+
+function inferMustHaveElements(text: string, existingBrief: InterviewBrief | null) {
+  if (existingBrief?.mustHaveElements?.length) return existingBrief.mustHaveElements;
+  const inferred = extractTaggedItems(text, [
+    /\bmust[- ]have(?: elements?)?:?\s*(.+)$/gim,
+    /\binclude(?: at least)?\s+(.+)$/gim,
+  ]);
+  return inferred;
+}
+
+function inferSpecialConstraints(text: string, existingBrief: InterviewBrief | null, generationMode: InterviewBrief['generationMode']) {
+  const seeded = new Set(existingBrief?.specialConstraints ?? []);
+
+  extractTaggedItems(text, [
+    /\bconstraint(?:s)?:?\s*(.+)$/gim,
+    /\bavoid(?:ing)?\s+(.+)$/gim,
+    /\bno\s+(.+)$/gim,
+  ]).forEach((item) => seeded.add(item));
+
+  if (/\bcampaign\b|\bsourcebook\b/i.test(text)) {
+    seeded.add('Compress the requested scope into a one-shot or short module for the current autonomous pipeline.');
+  }
+
+  if (generationMode === 'one_shot' && !Array.from(seeded).some((item) => /single session|one evening/i.test(item))) {
+    seeded.add('Target a single session or one evening of play.');
+  }
+
+  return Array.from(seeded).slice(0, 20);
+}
+
+function inferSummary(text: string, existingBrief: InterviewBrief | null, generationMode: InterviewBrief['generationMode']) {
+  if (existingBrief?.summary) return existingBrief.summary;
+  if (!text) {
+    return generationMode === 'module'
+      ? 'Create a short D&D-compatible adventure module.'
+      : 'Create a compact D&D-compatible one-shot adventure.';
+  }
+  return truncate(collapseWhitespace(text), 4000);
+}
+
+function inferTitle(text: string, existingBrief: InterviewBrief | null, theme: string) {
+  if (existingBrief?.title) return existingBrief.title;
+
+  const explicit = text.match(/\btitle:?["“]?([^"\n”]+)["”]?/i)?.[1]?.trim();
+  if (explicit) return truncate(explicit, 200);
+
+  const aboutMatch = text.match(/\babout\s+([^.!\n]+)/i)?.[1];
+  if (aboutMatch) {
+    return truncate(titleCaseFromPhrase(collapseWhitespace(aboutMatch)), 200);
+  }
+
+  return truncate(titleCaseFromPhrase(theme || 'Adventure Brief'), 200);
+}
+
+function inferConcept(text: string, existingBrief: InterviewBrief | null, summary: string) {
+  if (existingBrief?.concept) return existingBrief.concept;
+  return truncate(text || summary, 4000);
+}
+
+function detectMissingFields(text: string, brief: InterviewBrief) {
+  const missing: string[] = [];
+  if (!text) {
+    return ['concept', 'tone', 'scope', 'must-have elements'];
+  }
+
+  if (!/\bone[\s-]?shot\b|\bmodule\b|\bshort adventure\b|\bchapter\b/i.test(text)) {
+    missing.push('scope');
+  }
+  if (!/\bgrim\b|\bdark\b|\bhorror\b|\blighthearted\b|\bheroic\b|\bmystery\b|\bintrigue\b|\bcomedy\b|\btone\b/i.test(text)) {
+    missing.push('tone');
+  }
+  if (!/\blevel\b|\blevels\b|\btier\b/i.test(text) && !brief.levelRange) {
+    missing.push('level range');
+  }
+  if (!/\bparty\b|\bcharacters\b|\bplayers\b/i.test(text)) {
+    missing.push('party assumptions');
+  }
+  if (!/\bmust[- ]have\b|\binclude\b|\bconstraint\b|\bavoid\b/i.test(text)
+    && brief.mustHaveElements.length === 0
+    && brief.specialConstraints.length === 0) {
+    missing.push('must-have elements');
+  }
+  if (!/\bfast\b|\bquick\b|\bbalanced\b|\bhigh[_ -]?quality\b|\bpolished\b/i.test(text)) {
+    missing.push('quality budget lane');
+  }
+
+  return missing.slice(0, 8);
+}
+
+function buildFallbackInterviewStep(input: {
+  initialPrompt?: string | null;
+  turns: InterviewTurn[];
+  existingBrief: InterviewBrief | null;
+  maxUserTurns: number;
+}): InterviewAgentResponse | null {
+  const requestText = collectUserRequestText(input);
+  if (!requestText && !input.existingBrief) {
+    return null;
+  }
+
+  const generationMode = inferGenerationMode(requestText, input.existingBrief);
+  const summary = inferSummary(requestText, input.existingBrief, generationMode);
+  const theme = inferTheme(requestText, input.existingBrief);
+  const brief: InterviewBrief = {
+    title: inferTitle(requestText, input.existingBrief, theme),
+    summary,
+    generationMode,
+    concept: inferConcept(requestText, input.existingBrief, summary),
+    theme,
+    tone: inferTone(requestText, input.existingBrief),
+    levelRange: inferLevelRange(requestText, input.existingBrief),
+    scope: inferScope(requestText, generationMode, input.existingBrief),
+    partyAssumptions: inferPartyAssumptions(requestText, input.existingBrief),
+    desiredComplexity: inferDesiredComplexity(requestText, input.existingBrief),
+    qualityBudgetLane: inferQualityBudgetLane(requestText, input.existingBrief),
+    mustHaveElements: inferMustHaveElements(requestText, input.existingBrief),
+    specialConstraints: inferSpecialConstraints(requestText, input.existingBrief, generationMode),
+    settings: inferSettings(requestText, input.existingBrief),
+  };
+
+  const userTurnCount = input.turns.filter((turn) => turn.role === 'user').length;
+  const missingFields = detectMissingFields(requestText, brief);
+  const readyToLock = requestText.length >= 180
+    || missingFields.length <= 1
+    || userTurnCount >= Math.min(2, input.maxUserTurns);
+
+  const nextQuestion = missingFields[0];
+  return {
+    assistantMessage: readyToLock
+      ? 'I seeded a production-ready brief from your request. You can lock it now or add any final must-have encounters, NPCs, or constraints.'
+      : `I seeded a workable brief. Before locking, confirm the ${nextQuestion ?? 'remaining details'} you want emphasized.`,
+    readyToLock,
+    brief,
+    missingFields,
+  };
+}
+
+function isRetriableInterviewStepError(error: unknown) {
+  if (!(error instanceof Error)) return false;
+  const message = error.message.toLowerCase();
+  return error.name === 'AI_RetryError'
+    || message.includes('high demand')
+    || message.includes('try again later')
+    || message.includes('rate limit')
+    || message.includes('temporarily unavailable')
+    || message.includes('overloaded')
+    || message.includes('service unavailable');
+}
+
 async function generateInterviewStep(input: {
   initialPrompt?: string | null;
   turns: InterviewTurn[];
@@ -157,6 +452,28 @@ async function generateInterviewStep(input: {
   });
 
   return InterviewAgentResponseSchema.parse(object) as InterviewAgentResponse;
+}
+
+async function generateInterviewStepWithFallback(input: {
+  initialPrompt?: string | null;
+  turns: InterviewTurn[];
+  existingBrief: InterviewBrief | null;
+  maxUserTurns: number;
+}) {
+  try {
+    return await generateInterviewStep(input);
+  } catch (error) {
+    if (!isRetriableInterviewStepError(error)) {
+      throw error;
+    }
+
+    const fallback = buildFallbackInterviewStep(input);
+    if (!fallback) {
+      throw error;
+    }
+
+    return fallback;
+  }
 }
 
 async function getSessionRecord(projectId: string, userId: string) {
@@ -186,7 +503,7 @@ export async function createInterviewSession(
     });
   }
 
-  const step = await generateInterviewStep({
+  const step = await generateInterviewStepWithFallback({
     initialPrompt: initialPrompt?.trim() || null,
     turns,
     existingBrief: null,
@@ -249,7 +566,7 @@ export async function appendInterviewMessage(
   });
 
   const userTurnCount = nextTurns.filter((turn) => turn.role === 'user').length;
-  const step = await generateInterviewStep({
+  const step = await generateInterviewStepWithFallback({
     turns: nextTurns,
     existingBrief: parseInterviewBrief(session.briefDraft),
     maxUserTurns: session.maxUserTurns,
@@ -293,7 +610,7 @@ export async function lockInterviewSession(
   let brief = parseInterviewBrief(session.briefDraft);
 
   if (!brief || force) {
-    const step = await generateInterviewStep({
+    const step = await generateInterviewStepWithFallback({
       turns,
       existingBrief: brief,
       maxUserTurns: session.maxUserTurns,

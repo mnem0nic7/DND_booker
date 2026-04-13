@@ -15,6 +15,9 @@ import type {
   AuthRegisterRequest,
   AuthSessionResponse,
   CanonEntity,
+  ConsoleAgent,
+  ConsoleChatRequest,
+  ConsoleChatResponse,
   DocumentIdParams,
   DocumentLayout,
   ExportJob,
@@ -53,6 +56,10 @@ function buildPath(template: string, params?: Record<string, string | number | u
 }
 
 export interface V1Client {
+  console: {
+    listConsoleAgents(params: ProjectIdParams, config?: AxiosRequestConfig): Promise<ConsoleAgent[]>;
+    sendConsoleMessage(params: ProjectIdParams, body: ConsoleChatRequest, config?: AxiosRequestConfig): Promise<ConsoleChatResponse>;
+  };
   interviews: {
     createInterviewSession(params: ProjectIdParams, body: InterviewSessionCreateRequest, config?: AxiosRequestConfig): Promise<InterviewSession>;
     getInterviewSession(params: ProjectIdParams & { sessionId: string }, config?: AxiosRequestConfig): Promise<InterviewSession>;
@@ -124,6 +131,16 @@ export interface V1Client {
 
 export function createV1Client(axios: AxiosInstance): V1Client {
   return {
+    console: {
+      async listConsoleAgents(params: ProjectIdParams, config?: AxiosRequestConfig) {
+        const { data } = await axios.get<ConsoleAgent[]>(buildPath('/v1/projects/{projectId}/console/agents', params as Record<string, string | number | undefined>), config);
+        return data;
+      },
+      async sendConsoleMessage(params: ProjectIdParams, body: ConsoleChatRequest, config?: AxiosRequestConfig) {
+        const { data } = await axios.post<ConsoleChatResponse>(buildPath('/v1/projects/{projectId}/console/chat', params as Record<string, string | number | undefined>), body, config);
+        return data;
+      },
+    },
     interviews: {
       async createInterviewSession(params: ProjectIdParams, body: InterviewSessionCreateRequest, config?: AxiosRequestConfig) {
         const { data } = await axios.post<InterviewSession>(buildPath('/v1/projects/{projectId}/interview/sessions', params as Record<string, string | number | undefined>), body, config);

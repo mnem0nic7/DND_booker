@@ -11,6 +11,7 @@ const canonicalProjectSelect = {
   id: true,
   userId: true,
   title: true,
+  description: true,
   type: true,
   settings: true,
   content: true,

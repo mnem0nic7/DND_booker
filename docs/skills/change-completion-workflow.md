@@ -24,10 +24,11 @@ Do not stop after code edits unless the user explicitly says not to ship.
   - `npm run verify`
   - `npm run test --workspace=worker -- layout-visual-parity.test.ts`
   - `npm run test:unit --workspace=client`
-  - `npm run test:server:local -- auth.test.ts agent-model-routing.test.ts ai-routes.test.ts ai-wizard.test.ts assets.test.ts templates.test.ts documents.v1.test.ts projects.v1.test.ts runs.v1.test.ts interview.v1.test.ts agent-runs.test.ts src/__tests__/exports.v1.test.ts src/__tests__/legacy-routes.test.ts src/__tests__/generation/agentic-artifacts.test.ts src/__tests__/generation/canon.test.ts src/__tests__/generation/evaluator.test.ts src/__tests__/generation/routes.test.ts src/__tests__/generation/run.test.ts`
+  - `npm run test:server:local -- auth.test.ts agent-model-routing.test.ts ai-routes.test.ts ai-wizard.test.ts assets.test.ts templates.test.ts documents.v1.test.ts projects.v1.test.ts runs.v1.test.ts interview.v1.test.ts console.v1.test.ts agent-runs.test.ts src/__tests__/exports.v1.test.ts src/__tests__/legacy-routes.test.ts src/__tests__/generation/agentic-artifacts.test.ts src/__tests__/generation/canon.test.ts src/__tests__/generation/evaluator.test.ts src/__tests__/generation/routes.test.ts src/__tests__/generation/run.test.ts`
 - when `api/v1` routes validate responses against schemas with ISO timestamps, normalize transport DTOs before schema parsing instead of feeding raw Prisma rows directly into the validator
 - keep list endpoints on summary schemas and detail endpoints on detail schemas; summary payloads should never be parsed with full-detail contracts
 - when project lifecycle work changes, use `/api/v1/projects` plus the generated SDK; do not reintroduce runtime `/api/*` product routes
+- the authenticated dashboard at `/` is the Forge Console operator shell; keep its live board/chat contract on `/api/v1/projects/:projectId/console/*` and keep console transport changes covered by `console.v1.test.ts`
 - active runtime AI/chat/wizard flows should use `/api/v1/ai/*` and `/api/v1/projects/:projectId/ai/*`
 - autonomous generation should start from locked interview sessions on `/api/v1/projects/:projectId/interview/sessions/*`; keep the `interview_brief` contract as the only input to the background generation run
 - runtime callers should honor that same contract: client start flows, smoke/e2e helpers, and project-chat generation tools should create and lock an interview session before they enqueue a run

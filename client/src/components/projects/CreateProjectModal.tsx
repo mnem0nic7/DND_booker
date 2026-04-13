@@ -39,11 +39,18 @@ const projectTypes = [
 interface CreateProjectModalProps {
   open: boolean;
   onClose: () => void;
+  navigateOnCreate?: boolean;
+  onCreated?: (project: { id: string; title: string }) => void;
 }
 
 type Step = 'template' | 'details';
 
-export default function CreateProjectModal({ open, onClose }: CreateProjectModalProps) {
+export default function CreateProjectModal({
+  open,
+  onClose,
+  navigateOnCreate = true,
+  onCreated,
+}: CreateProjectModalProps) {
   const navigate = useNavigate();
   const createProject = useProjectStore((s) => s.createProject);
 
@@ -100,7 +107,10 @@ export default function CreateProjectModal({ open, onClose }: CreateProjectModal
         templateId: selectedTemplate?.id,
       });
       handleClose();
-      navigate(`/projects/${project.id}`);
+      onCreated?.(project);
+      if (navigateOnCreate) {
+        navigate(`/projects/${project.id}`);
+      }
     } catch {
       setError('Failed to create project. Please try again.');
       setIsCreating(false);

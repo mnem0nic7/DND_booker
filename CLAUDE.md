@@ -61,6 +61,7 @@ Routes export named routers (`authRoutes`, `aiSettingsRoutes`, `aiChatRoutes`, e
 The `api/v1` contract validates transport DTOs, not raw Prisma records. If a route parses against a Zod schema with ISO timestamp strings, normalize Prisma `Date` fields before schema validation instead of feeding database rows directly into the response schema. Also keep list routes on their true summary schemas; validating summary payloads against full detail shapes will fail in production even when the underlying data is correct.
 
 Project lifecycle now has a first-class `api/v1` surface (`/api/v1/projects`). New runtime work should use the generated SDK for project list/create/get/update/delete instead of adding more calls against the legacy `/api/projects` routes.
+The authenticated dashboard at `/` is now the Forge Console operator shell, not a passive project grid. Keep project selection, agent-board polling, and operator chat on the `/api/v1/projects/:projectId/console/*` contract and treat the standalone `dm-forge-console` prototype as retired.
 Project aggregate content saves also go through `PATCH /api/v1/projects/:projectId`, and manual document layout saves go through `PATCH /api/v1/projects/:projectId/documents/:docId/layout`.
 `api/v1` document snapshots now carry `layoutPlan` alongside canonical/editor/Typst fields. Client document loads should consume that v1 snapshot rather than stitching layout data from legacy document routes.
 Active client AI/chat/wizard traffic should use `/api/v1/ai/*` and `/api/v1/projects/:projectId/ai/*`.
@@ -154,6 +155,7 @@ The autonomous generation path is now interview-driven and stage-routed:
 - final editor
 - printer/export
 Keep agent-stage state in `graphStateJson` (`agentStage`, `criticCycle`, `qualityBudgetLane`, `routedRewriteCounts`, `imageGenerationStatus`, `finalEditorialStatus`) so the API and smoke checks can inspect real pipeline progress.
+The Forge Console agent board should synthesize those same autonomous-flow signals into the operator roster: interviewer, writer, D&D expert, layout expert, artist, critic, final editor, printer, plus the Forgemaster coordinator. Console chat is advisory/operator-facing and should use system-managed agent personas, not the user’s saved chat model settings.
 Autonomous runs use system-managed model credentials from `config/agents.yaml`, not the user’s saved AI settings. For Google-backed autonomous stages, both web and worker Cloud Run services must have `SYSTEM_GOOGLE_API_KEY`.
 Prompt-only autonomous runs should still seed `qualityBudgetLane` from the run quality (`quick -> fast`, `polished -> high_quality`) so they follow the same routed presets as interview-driven runs.
 The `artist_requested` stage must resolve both provider credentials and prompt-planning model selection from `agent.artist`. Do not route that stage through `agent.layout_expert`.
@@ -205,6 +207,7 @@ Unless the user explicitly says not to, treat this as the default after every co
    - `npm run verify` is the lighter build-only pass when you explicitly do not need the full ship checks.
    - If cloud-backed server integration is unavailable, record the exact blocker instead of silently skipping it.
    - `verify:ship` now includes the worker `layout-visual-parity.test.ts` regression before the client and server suites, plus auth, AI, wizard apply, asset, template, document, v1 export, legacy-compatibility header, agentic artifact versioning, intake, bible, chapter plan, golden prompt pipeline, canon expansion, evaluator, project, run, interview, agent restore, and generation-route coverage through the local Cloud SQL Proxy + Redis harness; keep new `api/v1` route regressions in that path when they touch transport serialization or run orchestration APIs.
+   - Console route coverage lives in `server/src/__tests__/console.v1.test.ts`; keep it in `verify:ship` whenever the dashboard shell, system-managed console chat, or `/api/v1/projects/:projectId/console/*` transport changes.
    - For runtime or infra work that can affect queue durability, add `npm run ops:redis:check` to the ship pass or incident triage.
 3. Update repo memory and docs when behavior, workflow, deployment steps, or architecture changed.
    - Memory: this file and any other standing repo guidance.

@@ -119,3 +119,29 @@ agents:
       provider: google
       model: gemini-3.1-flash-image-preview
       maxOutputTokens: 2048
+  agent.artist_console:
+    fast:
+      provider: google
+      model: gemini-2.5-flash
+      maxOutputTokens: 4096
+    balanced:
+      provider: google
+      model: gemini-2.5-pro
+      maxOutputTokens: 4096
+    high_quality:
+      provider: google
+      model: gemini-2.5-pro
+      maxOutputTokens: 4096
+  agent.printer:
+    fast:
+      provider: google
+      model: gemini-2.5-flash
+      maxOutputTokens: 4096
+    balanced:
+      provider: google
+      model: gemini-2.5-pro
+      maxOutputTokens: 4096
+    high_quality:
+      provider: google
+      model: gemini-2.5-pro
+      maxOutputTokens: 4096
