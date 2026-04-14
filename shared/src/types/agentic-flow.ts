@@ -58,6 +58,7 @@ export interface InterviewSession {
   turns: InterviewTurn[];
   briefDraft: InterviewBrief | null;
   lockedBrief: InterviewBrief | null;
+  missingFields: string[];
   maxUserTurns: number;
   createdAt: string;
   updatedAt: string;

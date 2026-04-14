@@ -255,11 +255,14 @@ export const InterviewSessionSchema = z.object({
   turns: z.array(InterviewTurnSchema),
   briefDraft: InterviewBriefSchema.nullable(),
   lockedBrief: InterviewBriefSchema.nullable(),
+  missingFields: z.array(z.string().min(1).max(100)).max(8),
   maxUserTurns: z.number().int().min(1).max(20),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
   lockedAt: z.string().datetime().nullable(),
 });
+
+export const LatestInterviewSessionResponseSchema = InterviewSessionSchema.nullable();
 
 export const InterviewSessionCreateRequestSchema = z.object({
   initialPrompt: z.string().min(1).max(5000).optional(),
@@ -296,6 +299,7 @@ export const ConsoleChatReplySchema = z.object({
   fromAgentId: z.string().min(1).max(64),
   fromLabel: z.string().min(1).max(120),
   reply: z.string().min(1).max(4000),
+  responseMode: z.enum(['model', 'fallback']),
 });
 
 export const ConsoleChatResponseSchema = z.object({
@@ -966,6 +970,7 @@ export type ConsoleAgent = z.infer<typeof ConsoleAgentSchema>;
 export type ConsoleChatRequest = z.infer<typeof ConsoleChatRequestSchema>;
 export type ConsoleChatReply = z.infer<typeof ConsoleChatReplySchema>;
 export type ConsoleChatResponse = z.infer<typeof ConsoleChatResponseSchema>;
+export type LatestInterviewSessionResponse = z.infer<typeof LatestInterviewSessionResponseSchema>;
 export type GenerationRunCreateRequest = V1CreateGenerationRunRequest;
 export type GenerationRun = V1GenerationRun;
 export type GenerationRunDetail = V1GenerationRunDetail;
@@ -1015,6 +1020,17 @@ export const V1_ROUTE_CONTRACTS: ApiV1RouteContract[] = [
     paramsTypeName: 'ProjectIdParams',
     requestTypeName: 'ConsoleChatRequest',
     responseTypeName: 'ConsoleChatResponse',
+  },
+  {
+    tag: 'interviews',
+    operationId: 'getLatestInterviewSession',
+    method: 'get',
+    path: '/api/v1/projects/{projectId}/interview/sessions/latest',
+    summary: 'Get the latest interview session for the project, if one exists.',
+    paramsSchema: ProjectIdParamsSchema,
+    responseSchema: LatestInterviewSessionResponseSchema,
+    paramsTypeName: 'ProjectIdParams',
+    responseTypeName: 'InterviewSession | null',
   },
   {
     tag: 'interviews',

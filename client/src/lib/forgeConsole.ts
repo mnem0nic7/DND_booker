@@ -1,4 +1,4 @@
-import type { ConsoleAgent } from '@dnd-booker/shared';
+import type { ConsoleAgent, ConsoleChatReply, InterviewSession } from '@dnd-booker/shared';
 
 export type ConsoleChatTargetId = string | 'broadcast';
 export type ConsoleMessageKind = 'user' | 'agent' | 'system';
@@ -11,6 +11,7 @@ export interface ConsoleMessage {
   targetAgentId: ConsoleChatTargetId | null;
   fromAgentId: string | 'system' | null;
   fromLabel: string;
+  responseMode: ConsoleChatReply['responseMode'] | null;
 }
 
 export function formatConsoleClock(date: Date) {
@@ -20,15 +21,19 @@ export function formatConsoleClock(date: Date) {
   }).format(date);
 }
 
-export function buildConsoleSystemMessage(text: string): ConsoleMessage {
+export function buildConsoleSystemMessage(
+  text: string,
+  targetAgentId: ConsoleChatTargetId | null = null,
+): ConsoleMessage {
   return {
     id: crypto.randomUUID(),
     kind: 'system',
     text,
     timestamp: formatConsoleClock(new Date()),
-    targetAgentId: null,
+    targetAgentId,
     fromAgentId: 'system',
     fromLabel: 'System',
+    responseMode: null,
   };
 }
 
@@ -41,6 +46,7 @@ export function buildConsoleUserMessage(text: string, targetAgentId: ConsoleChat
     targetAgentId,
     fromAgentId: null,
     fromLabel: 'You',
+    responseMode: null,
   };
 }
 
@@ -49,6 +55,7 @@ export function buildConsoleAgentMessage(
   fromAgentId: string,
   fromLabel: string,
   targetAgentId: ConsoleChatTargetId,
+  responseMode: ConsoleChatReply['responseMode'] | null = null,
 ): ConsoleMessage {
   return {
     id: crypto.randomUUID(),
@@ -58,7 +65,26 @@ export function buildConsoleAgentMessage(
     targetAgentId,
     fromAgentId,
     fromLabel,
+    responseMode,
   };
+}
+
+export function buildInterviewThreadMessages(
+  session: InterviewSession | null,
+  interviewerLabel = 'The Interviewer',
+): ConsoleMessage[] {
+  if (!session) return [];
+
+  return session.turns.map((turn) => ({
+    id: turn.id,
+    kind: turn.role === 'user' ? 'user' : 'agent',
+    text: turn.content,
+    timestamp: formatConsoleClock(new Date(turn.createdAt)),
+    targetAgentId: 'interviewer',
+    fromAgentId: turn.role === 'assistant' ? 'interviewer' : null,
+    fromLabel: turn.role === 'assistant' ? interviewerLabel : 'You',
+    responseMode: null,
+  }));
 }
 
 export function filterConsoleMessages(messages: ConsoleMessage[], selectedTargetId: ConsoleChatTargetId) {
@@ -67,7 +93,13 @@ export function filterConsoleMessages(messages: ConsoleMessage[], selectedTarget
   }
 
   return messages.filter((message) => {
-    if (message.kind === 'system') return true;
+    if (message.kind === 'system') {
+      if (message.targetAgentId === null) return true;
+      if (selectedTargetId === 'broadcast') {
+        return message.targetAgentId === 'broadcast';
+      }
+      return message.targetAgentId === selectedTargetId;
+    }
     if (message.targetAgentId === 'broadcast') {
       return message.kind === 'user' || message.fromAgentId === selectedTargetId;
     }

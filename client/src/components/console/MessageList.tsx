@@ -16,7 +16,11 @@ export function MessageList({ messages, thinkingLabel }: MessageListProps) {
   useEffect(() => {
     const node = listRef.current;
     if (!node) return;
-    node.scrollTo({ top: node.scrollHeight, behavior: 'smooth' });
+    if (typeof node.scrollTo === 'function') {
+      node.scrollTo({ top: node.scrollHeight, behavior: 'smooth' });
+      return;
+    }
+    node.scrollTop = node.scrollHeight;
   }, [signature]);
 
   return (
@@ -40,6 +44,9 @@ export function MessageList({ messages, thinkingLabel }: MessageListProps) {
           >
             <article className={`forge-message-bubble${isUser ? ' forge-message-bubble--user' : ' forge-message-bubble--agent'}`}>
               {!isUser ? <p className="forge-message-sender">{message.fromLabel}</p> : null}
+              {!isUser && message.responseMode === 'fallback' ? (
+                <p className="forge-message-mode">Fallback reply</p>
+              ) : null}
               <p className="forge-message-text">{message.text}</p>
               <span className="forge-message-timestamp">{message.timestamp}</span>
             </article>

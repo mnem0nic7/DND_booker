@@ -174,6 +174,7 @@ describe('Console API v1', () => {
     expect(singleRes.status).toBe(200);
     expect(singleRes.body.replies).toHaveLength(1);
     expect(singleRes.body.replies[0].fromAgentId).toBe('forgemaster');
+    expect(singleRes.body.replies[0].responseMode).toBe('model');
     expect(mockGenerateTextWithTimeout).toHaveBeenCalledTimes(1);
 
     mockGenerateTextWithTimeout.mockResolvedValue({
@@ -191,6 +192,28 @@ describe('Console API v1', () => {
     expect(broadcastRes.status).toBe(200);
     expect(Array.isArray(broadcastRes.body.replies)).toBe(true);
     expect(broadcastRes.body.replies.length).toBeGreaterThan(1);
+    expect(broadcastRes.body.replies.every((reply: { responseMode: string }) => reply.responseMode === 'model')).toBe(true);
+  });
+
+  it('marks fallback console replies explicitly', async () => {
+    const overloadedError = new Error(
+      'Failed after 3 attempts. Last error: This model is currently experiencing high demand. Please try again later.',
+    );
+    overloadedError.name = 'AI_RetryError';
+    mockGenerateTextWithTimeout.mockRejectedValueOnce(overloadedError);
+
+    const res = await request(app)
+      .post(`/api/v1/projects/${projectId}/console/chat`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        agentId: 'writer',
+        message: 'Status?',
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body.replies).toHaveLength(1);
+    expect(res.body.replies[0].fromAgentId).toBe('writer');
+    expect(res.body.replies[0].responseMode).toBe('fallback');
   });
 
   it('returns 400 for an unknown console agent', async () => {

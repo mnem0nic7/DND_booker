@@ -402,6 +402,31 @@
   line-height: 1.4;
 }
 
+.forge-interview-meta,
+.forge-interview-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.forge-interview-meta {
+  margin-top: 14px;
+}
+
+.forge-interview-meta__chip {
+  padding: 5px 8px;
+  border: 1px solid var(--forge-border);
+  color: var(--forge-text-secondary);
+  font-family: var(--forge-font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.forge-interview-actions {
+  margin-top: 16px;
+}
+
 .forge-message-list {
   flex: 1;
   min-height: 0;
@@ -464,6 +489,15 @@
   color: var(--forge-text-secondary);
   font-family: var(--forge-font-mono);
   font-size: 0.7rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.forge-message-mode {
+  margin: -2px 0 8px;
+  color: var(--forge-text-tertiary);
+  font-family: var(--forge-font-mono);
+  font-size: 0.64rem;
   letter-spacing: 0.18em;
   text-transform: uppercase;
 }

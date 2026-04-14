@@ -176,12 +176,20 @@
                             "type": "string",
                             "minLength": 1,
                             "maxLength": 4000
+                          },
+                          "responseMode": {
+                            "type": "string",
+                            "enum": [
+                              "model",
+                              "fallback"
+                            ]
                           }
                         },
                         "required": [
                           "fromAgentId",
                           "fromLabel",
-                          "reply"
+                          "reply",
+                          "responseMode"
                         ],
                         "additionalProperties": false
                       },
@@ -272,6 +280,448 @@
             }
           }
         }
+      }
+    },
+    "/api/v1/projects/{projectId}/interview/sessions/latest": {
+      "get": {
+        "operationId": "getLatestInterviewSession",
+        "summary": "Get the latest interview session for the project, if one exists.",
+        "tags": [
+          "interviews"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "projectId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "userId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "collecting",
+                        "ready_to_lock",
+                        "locked"
+                      ]
+                    },
+                    "turns": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "role": {
+                            "type": "string",
+                            "enum": [
+                              "assistant",
+                              "user"
+                            ]
+                          },
+                          "content": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 8000
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "role",
+                          "content",
+                          "createdAt"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "briefDraft": {
+                      "type": "object",
+                      "properties": {
+                        "title": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        },
+                        "summary": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 4000
+                        },
+                        "generationMode": {
+                          "type": "string",
+                          "enum": [
+                            "one_shot",
+                            "module"
+                          ]
+                        },
+                        "concept": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 4000
+                        },
+                        "theme": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 500
+                        },
+                        "tone": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 500
+                        },
+                        "levelRange": {
+                          "type": "object",
+                          "properties": {
+                            "min": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 20
+                            },
+                            "max": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 20
+                            }
+                          },
+                          "required": [
+                            "min",
+                            "max"
+                          ],
+                          "additionalProperties": false,
+                          "nullable": true
+                        },
+                        "scope": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 500
+                        },
+                        "partyAssumptions": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 2000
+                        },
+                        "desiredComplexity": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 500
+                        },
+                        "qualityBudgetLane": {
+                          "type": "string",
+                          "enum": [
+                            "fast",
+                            "balanced",
+                            "high_quality"
+                          ]
+                        },
+                        "mustHaveElements": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 500
+                          },
+                          "maxItems": 20
+                        },
+                        "specialConstraints": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 500
+                          },
+                          "maxItems": 20
+                        },
+                        "settings": {
+                          "type": "object",
+                          "properties": {
+                            "includeHandouts": {
+                              "type": "boolean"
+                            },
+                            "includeMaps": {
+                              "type": "boolean"
+                            },
+                            "strict5e": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "includeHandouts",
+                            "includeMaps",
+                            "strict5e"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "title",
+                        "summary",
+                        "generationMode",
+                        "concept",
+                        "theme",
+                        "tone",
+                        "levelRange",
+                        "scope",
+                        "partyAssumptions",
+                        "desiredComplexity",
+                        "qualityBudgetLane",
+                        "mustHaveElements",
+                        "specialConstraints",
+                        "settings"
+                      ],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "lockedBrief": {
+                      "type": "object",
+                      "properties": {
+                        "title": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        },
+                        "summary": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 4000
+                        },
+                        "generationMode": {
+                          "type": "string",
+                          "enum": [
+                            "one_shot",
+                            "module"
+                          ]
+                        },
+                        "concept": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 4000
+                        },
+                        "theme": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 500
+                        },
+                        "tone": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 500
+                        },
+                        "levelRange": {
+                          "type": "object",
+                          "properties": {
+                            "min": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 20
+                            },
+                            "max": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 20
+                            }
+                          },
+                          "required": [
+                            "min",
+                            "max"
+                          ],
+                          "additionalProperties": false,
+                          "nullable": true
+                        },
+                        "scope": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 500
+                        },
+                        "partyAssumptions": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 2000
+                        },
+                        "desiredComplexity": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 500
+                        },
+                        "qualityBudgetLane": {
+                          "type": "string",
+                          "enum": [
+                            "fast",
+                            "balanced",
+                            "high_quality"
+                          ]
+                        },
+                        "mustHaveElements": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 500
+                          },
+                          "maxItems": 20
+                        },
+                        "specialConstraints": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 500
+                          },
+                          "maxItems": 20
+                        },
+                        "settings": {
+                          "type": "object",
+                          "properties": {
+                            "includeHandouts": {
+                              "type": "boolean"
+                            },
+                            "includeMaps": {
+                              "type": "boolean"
+                            },
+                            "strict5e": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "includeHandouts",
+                            "includeMaps",
+                            "strict5e"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "title",
+                        "summary",
+                        "generationMode",
+                        "concept",
+                        "theme",
+                        "tone",
+                        "levelRange",
+                        "scope",
+                        "partyAssumptions",
+                        "desiredComplexity",
+                        "qualityBudgetLane",
+                        "mustHaveElements",
+                        "specialConstraints",
+                        "settings"
+                      ],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "missingFields": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 100
+                      },
+                      "maxItems": 8
+                    },
+                    "maxUserTurns": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 20
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "lockedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "projectId",
+                    "userId",
+                    "status",
+                    "turns",
+                    "briefDraft",
+                    "lockedBrief",
+                    "missingFields",
+                    "maxUserTurns",
+                    "createdAt",
+                    "updatedAt",
+                    "lockedAt"
+                  ],
+                  "additionalProperties": false,
+                  "nullable": true
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer"
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "instance": {
+                      "type": "string"
+                    },
+                    "errors": {
+                      "type": "object",
+                      "additionalProperties": {}
+                    }
+                  },
+                  "required": [
+                    "title",
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
       }
     },
     "/api/v1/projects/{projectId}/interview/sessions": {
@@ -618,6 +1068,15 @@
                       "additionalProperties": false,
                       "nullable": true
                     },
+                    "missingFields": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 100
+                      },
+                      "maxItems": 8
+                    },
                     "maxUserTurns": {
                       "type": "integer",
                       "minimum": 1,
@@ -645,6 +1104,7 @@
                     "turns",
                     "briefDraft",
                     "lockedBrief",
+                    "missingFields",
                     "maxUserTurns",
                     "createdAt",
                     "updatedAt",
@@ -1067,6 +1527,15 @@
                       "additionalProperties": false,
                       "nullable": true
                     },
+                    "missingFields": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 100
+                      },
+                      "maxItems": 8
+                    },
                     "maxUserTurns": {
                       "type": "integer",
                       "minimum": 1,
@@ -1094,6 +1563,7 @@
                     "turns",
                     "briefDraft",
                     "lockedBrief",
+                    "missingFields",
                     "maxUserTurns",
                     "createdAt",
                     "updatedAt",
@@ -1507,6 +1977,15 @@
                       "additionalProperties": false,
                       "nullable": true
                     },
+                    "missingFields": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 100
+                      },
+                      "maxItems": 8
+                    },
                     "maxUserTurns": {
                       "type": "integer",
                       "minimum": 1,
@@ -1534,6 +2013,7 @@
                     "turns",
                     "briefDraft",
                     "lockedBrief",
+                    "missingFields",
                     "maxUserTurns",
                     "createdAt",
                     "updatedAt",
@@ -1968,6 +2448,15 @@
                       "additionalProperties": false,
                       "nullable": true
                     },
+                    "missingFields": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 100
+                      },
+                      "maxItems": 8
+                    },
                     "maxUserTurns": {
                       "type": "integer",
                       "minimum": 1,
@@ -1995,6 +2484,7 @@
                     "turns",
                     "briefDraft",
                     "lockedBrief",
+                    "missingFields",
                     "maxUserTurns",
                     "createdAt",
                     "updatedAt",

@@ -89,14 +89,21 @@ function serializeSession(session: {
   updatedAt: Date;
   lockedAt: Date | null;
 }): InterviewSession {
+  const turns = parseInterviewTurns(session.turns);
+  const briefDraft = parseInterviewBrief(session.briefDraft);
+  const lockedBrief = parseInterviewBrief(session.lockedBrief);
+
   return {
     id: session.id,
     projectId: session.projectId,
     userId: session.userId,
     status: session.status as InterviewSession['status'],
-    turns: parseInterviewTurns(session.turns),
-    briefDraft: parseInterviewBrief(session.briefDraft),
-    lockedBrief: parseInterviewBrief(session.lockedBrief),
+    turns,
+    briefDraft,
+    lockedBrief,
+    missingFields: session.status === 'locked' || !briefDraft
+      ? []
+      : detectMissingFields(collectUserRequestText({ turns }), briefDraft),
     maxUserTurns: session.maxUserTurns,
     createdAt: session.createdAt.toISOString(),
     updatedAt: session.updatedAt.toISOString(),

@@ -94,12 +94,13 @@ describe('Interview API v1', () => {
     });
   });
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
     mockResolveSystemAgentLanguageModel.mockResolvedValue({
       model: {} as any,
       maxOutputTokens: 4096,
     });
+    await prisma.interviewSession.deleteMany({ where: { projectId } });
   });
 
   afterAll(async () => {
@@ -164,6 +165,33 @@ describe('Interview API v1', () => {
 
     expect(afterLockRes.status).toBe(409);
     expect(afterLockRes.body.error).toContain('already locked');
+  });
+
+  it('returns the latest interview session or null', async () => {
+    const emptyRes = await request(app)
+      .get(`/api/v1/projects/${projectId}/interview/sessions/latest`)
+      .set('Authorization', `Bearer ${accessToken}`);
+
+    expect(emptyRes.status).toBe(200);
+    expect(emptyRes.body).toBeNull();
+
+    mockInterviewStep('What level range should the party cover?', false);
+
+    const createRes = await request(app)
+      .post(`/api/v1/projects/${projectId}/interview/sessions`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ initialPrompt: 'I want an Underdark one-shot.' });
+
+    expect(createRes.status).toBe(201);
+
+    const latestRes = await request(app)
+      .get(`/api/v1/projects/${projectId}/interview/sessions/latest`)
+      .set('Authorization', `Bearer ${accessToken}`);
+
+    expect(latestRes.status).toBe(200);
+    expect(latestRes.body.id).toBe(createRes.body.id);
+    expect(latestRes.body.status).toBe('collecting');
+    expect(Array.isArray(latestRes.body.missingFields)).toBe(true);
   });
 
   it('falls back to a seeded interview brief when the interviewer model is overloaded on create', async () => {

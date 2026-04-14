@@ -61,6 +61,7 @@ export interface V1Client {
     sendConsoleMessage(params: ProjectIdParams, body: ConsoleChatRequest, config?: AxiosRequestConfig): Promise<ConsoleChatResponse>;
   };
   interviews: {
+    getLatestInterviewSession(params: ProjectIdParams, config?: AxiosRequestConfig): Promise<InterviewSession | null>;
     createInterviewSession(params: ProjectIdParams, body: InterviewSessionCreateRequest, config?: AxiosRequestConfig): Promise<InterviewSession>;
     getInterviewSession(params: ProjectIdParams & { sessionId: string }, config?: AxiosRequestConfig): Promise<InterviewSession>;
     appendInterviewMessage(params: ProjectIdParams & { sessionId: string }, body: InterviewSessionMessageRequest, config?: AxiosRequestConfig): Promise<InterviewSession>;
@@ -142,6 +143,10 @@ export function createV1Client(axios: AxiosInstance): V1Client {
       },
     },
     interviews: {
+      async getLatestInterviewSession(params: ProjectIdParams, config?: AxiosRequestConfig) {
+        const { data } = await axios.get<InterviewSession | null>(buildPath('/v1/projects/{projectId}/interview/sessions/latest', params as Record<string, string | number | undefined>), config);
+        return data;
+      },
       async createInterviewSession(params: ProjectIdParams, body: InterviewSessionCreateRequest, config?: AxiosRequestConfig) {
         const { data } = await axios.post<InterviewSession>(buildPath('/v1/projects/{projectId}/interview/sessions', params as Record<string, string | number | undefined>), body, config);
         return data;

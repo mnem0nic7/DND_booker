@@ -1,11 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { BookOpen, Circle, LogOut, Plus, Signal, Users } from 'lucide-react';
-import type { ConsoleAgent } from '@dnd-booker/shared';
+import type { ConsoleAgent, GenerationRun, InterviewSession } from '@dnd-booker/shared';
 import { v1Client } from '../lib/api';
 import {
   buildConsoleAgentMessage,
   buildConsoleSystemMessage,
+  buildInterviewThreadMessages,
   buildConsoleUserMessage,
   buildProjectWelcomeMessage,
   filterConsoleMessages,
@@ -29,6 +30,19 @@ function sortProjects(projects: Project[]) {
   ));
 }
 
+function getInterviewSessionRun(runs: GenerationRun[], sessionId: string | null) {
+  if (!sessionId) return null;
+  return runs.find((run) => {
+    const inputParameters = run.inputParameters;
+    return Boolean(
+      inputParameters
+      && typeof inputParameters === 'object'
+      && 'interviewSessionId' in inputParameters
+      && inputParameters.interviewSessionId === sessionId,
+    );
+  }) ?? null;
+}
+
 export default function DashboardPage() {
   const { user, logout } = useAuthStore();
   const { projects, isLoading, fetchError, fetchProjects } = useProjectStore();
@@ -38,8 +52,13 @@ export default function DashboardPage() {
   const [connectionState, setConnectionState] = useState<ConnectionState>('live');
   const [selectedTargetsByProject, setSelectedTargetsByProject] = useState<Record<string, ConsoleChatTargetId>>({});
   const [messagesByProject, setMessagesByProject] = useState<Record<string, ConsoleMessage[]>>({});
+  const [interviewsByProject, setInterviewsByProject] = useState<Record<string, InterviewSession | null>>({});
+  const [runsByProject, setRunsByProject] = useState<Record<string, GenerationRun[]>>({});
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
+  const [lockingInterview, setLockingInterview] = useState(false);
+  const [launchingMission, setLaunchingMission] = useState(false);
+  const [startingInterview, setStartingInterview] = useState(false);
   const thinkingTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -79,6 +98,29 @@ export default function DashboardPage() {
     });
   }, [selectedProject]);
 
+  const loadProjectState = useCallback(async (projectId: string) => {
+    try {
+      const [nextAgents, interview, runs] = await Promise.all([
+        v1Client.console.listConsoleAgents({ projectId }),
+        v1Client.interviews.getLatestInterviewSession({ projectId }),
+        v1Client.generationRuns.listGenerationRuns({ projectId }),
+      ]);
+
+      setAgents(nextAgents);
+      setInterviewsByProject((current) => ({
+        ...current,
+        [projectId]: interview,
+      }));
+      setRunsByProject((current) => ({
+        ...current,
+        [projectId]: runs,
+      }));
+      setConnectionState('live');
+    } catch {
+      setConnectionState('reconnecting');
+    }
+  }, []);
+
   useEffect(() => {
     if (!selectedProjectId) {
       setAgents([]);
@@ -87,30 +129,20 @@ export default function DashboardPage() {
 
     const projectId = selectedProjectId;
     setAgents([]);
-    let active = true;
 
-    async function pollAgents() {
-      try {
-        const data = await v1Client.console.listConsoleAgents({ projectId });
-        if (!active) return;
-        setAgents(data);
-        setConnectionState('live');
-      } catch {
-        if (!active) return;
-        setConnectionState('reconnecting');
-      }
+    async function pollProjectState() {
+      await loadProjectState(projectId);
     }
 
-    void pollAgents();
+    void pollProjectState();
     const poller = window.setInterval(() => {
-      void pollAgents();
+      void pollProjectState();
     }, 5_000);
 
     return () => {
-      active = false;
       window.clearInterval(poller);
     };
-  }, [selectedProjectId]);
+  }, [loadProjectState, selectedProjectId]);
 
   useEffect(() => () => {
     if (thinkingTimeoutRef.current) {
@@ -122,30 +154,65 @@ export default function DashboardPage() {
     () => agents.find((agent) => agent.id === selectedTargetId) ?? null,
     [agents, selectedTargetId],
   );
+  const selectedInterview = useMemo(
+    () => selectedProjectId ? (interviewsByProject[selectedProjectId] ?? null) : null,
+    [interviewsByProject, selectedProjectId],
+  );
+  const selectedProjectRuns = useMemo(
+    () => selectedProjectId ? (runsByProject[selectedProjectId] ?? []) : [],
+    [runsByProject, selectedProjectId],
+  );
+  const interviewRun = useMemo(
+    () => getInterviewSessionRun(selectedProjectRuns, selectedInterview?.id ?? null),
+    [selectedInterview?.id, selectedProjectRuns],
+  );
 
   useEffect(() => {
     setDraft('');
   }, [selectedProjectId, selectedTargetId]);
 
+  const baseMessages = messagesByProject[selectedProjectId ?? ''] ?? [];
   const visibleMessages = useMemo(
-    () => filterConsoleMessages(messagesByProject[selectedProjectId ?? ''] ?? [], selectedTargetId),
-    [messagesByProject, selectedProjectId, selectedTargetId],
+    () => selectedTargetId === 'interviewer'
+      ? [
+        ...baseMessages.filter((message) => message.kind === 'system' && (message.targetAgentId === null || message.targetAgentId === 'interviewer')),
+        ...buildInterviewThreadMessages(selectedInterview),
+      ]
+      : filterConsoleMessages(baseMessages, selectedTargetId),
+    [baseMessages, selectedInterview, selectedTargetId],
   );
 
   const activeAgentCount = useMemo(() => getActiveConsoleAgentCount(agents), [agents]);
 
-  const chatTitle = selectedTargetId === 'broadcast' ? 'All Agents' : selectedAgent?.name ?? 'The Forgemaster';
+  const chatTitle = selectedTargetId === 'broadcast'
+    ? 'All Agents'
+    : selectedTargetId === 'interviewer'
+      ? 'The Interviewer'
+      : selectedAgent?.name ?? 'The Forgemaster';
   const chatTask = selectedTargetId === 'broadcast'
     ? `${activeAgentCount} agents active in the hall`
-    : selectedAgent?.currentTask ?? 'Awaiting instruction.';
+    : selectedTargetId === 'interviewer'
+      ? selectedAgent?.currentTask ?? (selectedInterview ? 'Gathering the brief.' : 'Ready to gather the brief.')
+      : selectedAgent?.currentTask ?? 'Awaiting instruction.';
   const composerPlaceholder = selectedTargetId === 'broadcast'
     ? 'Address all agents in the hall...'
-    : `Send word to ${selectedAgent?.name ?? 'the selected agent'}...`;
+    : selectedTargetId === 'interviewer'
+      ? selectedInterview?.status === 'locked'
+        ? 'Start a new interview to revise the brief...'
+        : 'Tell the interviewer what you want to create...'
+      : `Send word to ${selectedAgent?.name ?? 'the selected agent'}...`;
   const thinkingLabel = sending
     ? selectedTargetId === 'broadcast'
       ? 'The hall is considering your command...'
+      : selectedTargetId === 'interviewer'
+        ? 'The interviewer is refining the brief...'
       : `${selectedAgent?.name ?? 'The agent'} is thinking...`
     : null;
+  const interviewerUserTurnCount = selectedInterview?.turns.filter((turn) => turn.role === 'user').length ?? 0;
+  const interviewerBudgetLane = selectedInterview?.lockedBrief?.qualityBudgetLane
+    ?? selectedInterview?.briefDraft?.qualityBudgetLane
+    ?? null;
+  const interviewerComposerDisabled = !selectedProjectId || selectedInterview?.status === 'locked';
 
   function setSelectedTarget(targetId: ConsoleChatTargetId) {
     if (!selectedProjectId) return;
@@ -155,18 +222,114 @@ export default function DashboardPage() {
     }));
   }
 
+  async function handleStartNewInterview() {
+    if (!selectedProjectId || startingInterview) return;
+    setStartingInterview(true);
+    try {
+      const session = await v1Client.interviews.createInterviewSession({ projectId: selectedProjectId }, {});
+      setInterviewsByProject((current) => ({
+        ...current,
+        [selectedProjectId]: session,
+      }));
+      setMessagesByProject((current) => ({
+        ...current,
+        [selectedProjectId]: [
+          ...(current[selectedProjectId] ?? []).filter((message) => message.kind === 'system' && message.targetAgentId === null),
+        ],
+      }));
+      await loadProjectState(selectedProjectId);
+    } catch {
+      setMessagesByProject((current) => ({
+        ...current,
+        [selectedProjectId]: [
+          ...(current[selectedProjectId] ?? []),
+          buildConsoleSystemMessage('Failed to start a new interview.', 'interviewer'),
+        ],
+      }));
+    } finally {
+      setStartingInterview(false);
+    }
+  }
+
+  async function handleLockBrief() {
+    if (!selectedProjectId || !selectedInterview || lockingInterview) return;
+    setLockingInterview(true);
+    try {
+      const session = await v1Client.interviews.lockInterviewSession(
+        { projectId: selectedProjectId, sessionId: selectedInterview.id },
+        {},
+      );
+      setInterviewsByProject((current) => ({
+        ...current,
+        [selectedProjectId]: session,
+      }));
+      setMessagesByProject((current) => ({
+        ...current,
+        [selectedProjectId]: [
+          ...(current[selectedProjectId] ?? []),
+          buildConsoleSystemMessage('Interview brief locked.', 'interviewer'),
+        ],
+      }));
+      await loadProjectState(selectedProjectId);
+    } catch (error: unknown) {
+      const message =
+        error && typeof error === 'object' && 'response' in error
+          ? (error as { response?: { data?: { error?: string } } }).response?.data?.error
+          : undefined;
+      setMessagesByProject((current) => ({
+        ...current,
+        [selectedProjectId]: [
+          ...(current[selectedProjectId] ?? []),
+          buildConsoleSystemMessage(message || 'Failed to lock the interview brief.', 'interviewer'),
+        ],
+      }));
+    } finally {
+      setLockingInterview(false);
+    }
+  }
+
+  async function handleLaunchMission() {
+    if (!selectedProjectId || !selectedInterview || launchingMission || interviewRun) return;
+    setLaunchingMission(true);
+    try {
+      const run = await v1Client.generationRuns.createGenerationRun(
+        { projectId: selectedProjectId },
+        { interviewSessionId: selectedInterview.id },
+      );
+      setRunsByProject((current) => ({
+        ...current,
+        [selectedProjectId]: [run, ...(current[selectedProjectId] ?? [])],
+      }));
+      setMessagesByProject((current) => ({
+        ...current,
+        [selectedProjectId]: [
+          ...(current[selectedProjectId] ?? []),
+          buildConsoleSystemMessage('Autonomous mission launched from the locked brief.', 'interviewer'),
+        ],
+      }));
+      await loadProjectState(selectedProjectId);
+    } catch (error: unknown) {
+      const message =
+        error && typeof error === 'object' && 'response' in error
+          ? (error as { response?: { data?: { error?: string } } }).response?.data?.error
+          : undefined;
+      setMessagesByProject((current) => ({
+        ...current,
+        [selectedProjectId]: [
+          ...(current[selectedProjectId] ?? []),
+          buildConsoleSystemMessage(message || 'Failed to launch the autonomous mission.', 'interviewer'),
+        ],
+      }));
+    } finally {
+      setLaunchingMission(false);
+    }
+  }
+
   async function handleSend() {
     const trimmed = draft.trim();
     if (!trimmed || sending || !selectedProjectId) return;
 
     const targetId = selectedTargetId;
-    setMessagesByProject((current) => ({
-      ...current,
-      [selectedProjectId]: [
-        ...(current[selectedProjectId] ?? []),
-        buildConsoleUserMessage(trimmed, targetId),
-      ],
-    }));
     setDraft('');
     setSending(true);
 
@@ -180,13 +343,52 @@ export default function DashboardPage() {
         ...current,
         [selectedProjectId]: [
           ...(current[selectedProjectId] ?? []),
-          buildConsoleSystemMessage('No reply from the hall.'),
+          buildConsoleSystemMessage(
+            targetId === 'broadcast'
+              ? 'No reply from the hall.'
+              : targetId === 'interviewer'
+                ? 'The interviewer did not answer in time.'
+                : `No reply from ${selectedAgent?.name ?? 'the selected agent'}.`,
+            targetId === 'broadcast' ? 'broadcast' : targetId,
+          ),
         ],
       }));
       thinkingTimeoutRef.current = null;
     }, 30_000);
 
     try {
+      if (targetId === 'interviewer') {
+        const session = selectedInterview
+          ? await v1Client.interviews.appendInterviewMessage(
+            { projectId: selectedProjectId, sessionId: selectedInterview.id },
+            { content: trimmed },
+          )
+          : await v1Client.interviews.createInterviewSession(
+            { projectId: selectedProjectId },
+            { initialPrompt: trimmed },
+          );
+
+        if (thinkingTimeoutRef.current) {
+          window.clearTimeout(thinkingTimeoutRef.current);
+          thinkingTimeoutRef.current = null;
+        }
+
+        setInterviewsByProject((current) => ({
+          ...current,
+          [selectedProjectId]: session,
+        }));
+        await loadProjectState(selectedProjectId);
+        return;
+      }
+
+      setMessagesByProject((current) => ({
+        ...current,
+        [selectedProjectId]: [
+          ...(current[selectedProjectId] ?? []),
+          buildConsoleUserMessage(trimmed, targetId),
+        ],
+      }));
+
       const data = await v1Client.console.sendConsoleMessage(
         { projectId: selectedProjectId },
         { agentId: targetId, message: trimmed },
@@ -206,6 +408,7 @@ export default function DashboardPage() {
             reply.fromAgentId,
             reply.fromLabel,
             targetId,
+            reply.responseMode,
           )),
         ],
       }));
@@ -221,7 +424,9 @@ export default function DashboardPage() {
           ...(current[selectedProjectId] ?? []),
           buildConsoleSystemMessage(targetId === 'broadcast'
             ? 'The hall did not answer cleanly.'
-            : `No clean reply from ${selectedAgent?.name ?? 'the selected agent'}.`),
+            : targetId === 'interviewer'
+              ? 'The interviewer did not accept that turn.'
+              : `No clean reply from ${selectedAgent?.name ?? 'the selected agent'}.`, targetId),
         ],
       }));
     } finally {
@@ -380,17 +585,61 @@ export default function DashboardPage() {
                 <p className="forge-eyebrow">{selectedTargetId === 'broadcast' ? 'Broadcast' : 'Counsel With'}</p>
                 <h2>{chatTitle}</h2>
                 <p className="forge-chat-pane__subheader">Currently: {chatTask}</p>
+                {selectedTargetId === 'interviewer' ? (
+                  <div className="forge-interview-meta" data-testid="interview-meta">
+                    <span className="forge-interview-meta__chip">
+                      Status: {selectedInterview?.status ?? 'not started'}
+                    </span>
+                    <span className="forge-interview-meta__chip">
+                      Turns: {interviewerUserTurnCount}/{selectedInterview?.maxUserTurns ?? 8}
+                    </span>
+                    <span className="forge-interview-meta__chip">
+                      Budget: {interviewerBudgetLane ?? 'unset'}
+                    </span>
+                    <span className="forge-interview-meta__chip">
+                      Missing: {selectedInterview?.missingFields.length ? selectedInterview.missingFields.join(', ') : 'none'}
+                    </span>
+                  </div>
+                ) : null}
               </div>
               <div className="forge-chat-pane__task-chip">
                 <span>{selectedProject?.type?.replace('_', ' ') ?? 'project'}</span>
               </div>
             </div>
+            {selectedTargetId === 'interviewer' ? (
+              <div className="forge-interview-actions">
+                <button
+                  className="forge-console-button"
+                  disabled={startingInterview}
+                  onClick={() => void handleStartNewInterview()}
+                  type="button"
+                >
+                  {startingInterview ? 'Starting…' : 'Start New Interview'}
+                </button>
+                <button
+                  className="forge-console-button"
+                  disabled={!selectedInterview || selectedInterview.status === 'locked' || lockingInterview}
+                  onClick={() => void handleLockBrief()}
+                  type="button"
+                >
+                  {lockingInterview ? 'Locking…' : 'Lock Brief'}
+                </button>
+                <button
+                  className="forge-console-button forge-console-button--accent"
+                  disabled={!selectedInterview || selectedInterview.status !== 'locked' || Boolean(interviewRun) || launchingMission}
+                  onClick={() => void handleLaunchMission()}
+                  type="button"
+                >
+                  {launchingMission ? 'Launching…' : interviewRun ? 'Mission Launched' : 'Launch Mission'}
+                </button>
+              </div>
+            ) : null}
           </header>
 
           <MessageList messages={visibleMessages} thinkingLabel={thinkingLabel} />
 
           <Composer
-            disabled={!selectedProjectId}
+            disabled={selectedTargetId === 'interviewer' ? interviewerComposerDisabled : !selectedProjectId}
             onChange={setDraft}
             onSend={() => void handleSend()}
             placeholder={composerPlaceholder}

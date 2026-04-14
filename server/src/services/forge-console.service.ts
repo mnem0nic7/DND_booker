@@ -372,6 +372,47 @@ function buildArtifactSummary(artifactCounts: Array<{ artifactType: string; _cou
     .join(', ');
 }
 
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
+}
+
+function describeArtifactRecord(artifact: {
+  title: string | null;
+  summary: string | null;
+} | null | undefined) {
+  if (!artifact) return 'none';
+  const title = artifact.title?.trim() || 'untitled';
+  const summary = artifact.summary?.trim();
+  return summary ? `${title}: ${summary}` : title;
+}
+
+function buildRewriteSummary(run: GenerationRun | null) {
+  if (!run?.routedRewriteCounts) return 'none';
+  return `writer=${run.routedRewriteCounts.writer}, dnd=${run.routedRewriteCounts.dndExpert}, layout=${run.routedRewriteCounts.layoutExpert}, artist=${run.routedRewriteCounts.artist}`;
+}
+
+function summarizeCriticReport(artifact: { jsonContent: unknown } | null | undefined) {
+  const record = asRecord(artifact?.jsonContent);
+  if (!record) return 'none';
+  const overallScore = typeof record.overallScore === 'number' ? record.overallScore : null;
+  const blockingFindingCount = typeof record.blockingFindingCount === 'number' ? record.blockingFindingCount : 0;
+  const majorFindingCount = typeof record.majorFindingCount === 'number' ? record.majorFindingCount : 0;
+  const passed = record.passed === true ? 'passed' : 'not passed';
+  return `critic ${passed}; score=${overallScore ?? 'n/a'}; blocking=${blockingFindingCount}; major=${majorFindingCount}`;
+}
+
+function summarizeAssemblyManifest(manifest: {
+  version: number;
+  status: string;
+  documents: unknown;
+} | null | undefined) {
+  if (!manifest) return 'none';
+  const documentCount = Array.isArray(manifest.documents) ? manifest.documents.length : 0;
+  return `version ${manifest.version}, ${documentCount} document${documentCount === 1 ? '' : 's'}, status=${manifest.status}`;
+}
+
 function buildConsoleSystemPrompt(definition: ConsoleAgentDefinition, context: {
   projectTitle: string;
   projectType: string;
@@ -382,6 +423,11 @@ function buildConsoleSystemPrompt(definition: ConsoleAgentDefinition, context: {
   run: GenerationRun | null;
   exportStatus: string | null;
   artifactSummary: string;
+  writerStoryPacketSummary: string;
+  layoutDraftSummary: string;
+  imageBriefSummary: string;
+  assemblySummary: string;
+  criticSummary: string;
 }) {
   return [
     `You are ${definition.name}, the ${definition.role.toLowerCase()} agent in DND Booker.`,
@@ -402,8 +448,14 @@ function buildConsoleSystemPrompt(definition: ConsoleAgentDefinition, context: {
     `Critic cycle: ${context.run?.criticCycle ?? 0}`,
     `Image generation status: ${context.run?.imageGenerationStatus ?? 'not_requested'}`,
     `Final editorial status: ${context.run?.finalEditorialStatus ?? 'pending'}`,
+    `Routed rewrites: ${buildRewriteSummary(context.run)}`,
     `Export status: ${context.exportStatus ?? 'none'}`,
     `Artifacts: ${context.artifactSummary}`,
+    `Writer story packet: ${context.writerStoryPacketSummary}`,
+    `Layout draft: ${context.layoutDraftSummary}`,
+    `Image briefs: ${context.imageBriefSummary}`,
+    `Assembly: ${context.assemblySummary}`,
+    `Critic: ${context.criticSummary}`,
     `Document outline: ${context.documentOutline ?? 'No outline yet.'}`,
     `Document text sample: ${context.documentTextSample ?? 'No prose draft yet.'}`,
   ].join('\n');
@@ -413,6 +465,10 @@ function buildFallbackReply(definition: ConsoleAgentDefinition, context: {
   interview: InterviewSession | null;
   run: GenerationRun | null;
   exportStatus: string | null;
+  writerStoryPacketSummary: string;
+  layoutDraftSummary: string;
+  imageBriefSummary: string;
+  criticSummary: string;
 }) {
   if (definition.id === 'interviewer') {
     if (context.interview?.status === 'locked') {
@@ -422,15 +478,15 @@ function buildFallbackReply(definition: ConsoleAgentDefinition, context: {
   }
 
   if (definition.id === 'writer') {
-    return `My current lane is ${context.run?.agentStage === 'writer_story_packet' || context.run?.agentStage === 'rewrite_writer' ? 'active' : 'waiting'}. Latest run stage: ${context.run?.agentStage ?? 'none'}.`;
+    return `Writer lane is ${context.run?.agentStage === 'writer_story_packet' || context.run?.agentStage === 'rewrite_writer' ? 'active' : 'waiting'}. Story packet: ${context.writerStoryPacketSummary}.`;
   }
 
   if (definition.id === 'dnd_expert') {
-    return `I am tracking insert and rules work. Latest autonomous stage is ${context.run?.agentStage ?? 'not started'}.`;
+    return `Insert and rules lane is tracking routed findings ${buildRewriteSummary(context.run)}. Latest autonomous stage is ${context.run?.agentStage ?? 'not started'}.`;
   }
 
   if (definition.id === 'layout_expert') {
-    return `I am responsible for assembly and placement. Latest run stage is ${context.run?.agentStage ?? 'not started'}.`;
+    return `Layout is tracking ${context.layoutDraftSummary}. Image briefs: ${context.imageBriefSummary}.`;
   }
 
   if (definition.id === 'artist') {
@@ -438,7 +494,7 @@ function buildFallbackReply(definition: ConsoleAgentDefinition, context: {
   }
 
   if (definition.id === 'critic') {
-    return `Critic cycle is ${context.run?.criticCycle ?? 0}. Latest review stage is ${context.run?.agentStage ?? 'not started'}.`;
+    return `Critic cycle is ${context.run?.criticCycle ?? 0}. ${context.criticSummary}.`;
   }
 
   if (definition.id === 'final_editor') {
@@ -465,6 +521,11 @@ async function generateConsoleReply(
     run: GenerationRun | null;
     exportStatus: string | null;
     artifactSummary: string;
+    writerStoryPacketSummary: string;
+    layoutDraftSummary: string;
+    imageBriefSummary: string;
+    assemblySummary: string;
+    criticSummary: string;
     qualityBudgetLane: QualityBudgetLane;
   },
 ): Promise<ConsoleChatReply> {
@@ -484,6 +545,7 @@ async function generateConsoleReply(
       fromAgentId: definition.id,
       fromLabel: definition.name,
       reply: truncate(result.text || buildFallbackReply(definition, context)),
+      responseMode: 'model',
     };
   } catch (error) {
     if (!shouldFallbackConsoleReply(error)) {
@@ -495,6 +557,7 @@ async function generateConsoleReply(
       fromAgentId: definition.id,
       fromLabel: definition.name,
       reply: buildFallbackReply(definition, context),
+      responseMode: 'fallback',
     };
   }
 }
@@ -540,11 +603,46 @@ export async function sendForgeConsoleMessage(
   ]);
 
   const run = runs?.[0] ?? null;
-  const artifactCounts = await prisma.generatedArtifact.groupBy({
-    by: ['artifactType'],
-    where: run ? { runId: run.id, projectId } : { projectId },
-    _count: { artifactType: true },
-  });
+  const artifactWhere = run ? { runId: run.id, projectId } : { projectId };
+  const [
+    artifactCounts,
+    writerStoryPacket,
+    layoutDraft,
+    imageBriefBundle,
+    criticReport,
+    assemblyManifest,
+  ] = await Promise.all([
+    prisma.generatedArtifact.groupBy({
+      by: ['artifactType'],
+      where: artifactWhere,
+      _count: { artifactType: true },
+    }),
+    prisma.generatedArtifact.findFirst({
+      where: { ...artifactWhere, artifactType: 'writer_story_packet' },
+      orderBy: [{ version: 'desc' }, { createdAt: 'desc' }],
+      select: { title: true, summary: true },
+    }),
+    prisma.generatedArtifact.findFirst({
+      where: { ...artifactWhere, artifactType: 'layout_draft' },
+      orderBy: [{ version: 'desc' }, { createdAt: 'desc' }],
+      select: { title: true, summary: true },
+    }),
+    prisma.generatedArtifact.findFirst({
+      where: { ...artifactWhere, artifactType: 'image_brief_bundle' },
+      orderBy: [{ version: 'desc' }, { createdAt: 'desc' }],
+      select: { title: true, summary: true },
+    }),
+    prisma.generatedArtifact.findFirst({
+      where: { ...artifactWhere, artifactType: 'critic_report' },
+      orderBy: [{ version: 'desc' }, { createdAt: 'desc' }],
+      select: { jsonContent: true, title: true, summary: true },
+    }),
+    prisma.assemblyManifest.findFirst({
+      where: artifactWhere,
+      orderBy: [{ version: 'desc' }, { createdAt: 'desc' }],
+      select: { version: true, status: true, documents: true },
+    }),
+  ]);
   const context = {
     projectTitle: project.project.title,
     projectType: project.project.type,
@@ -555,6 +653,11 @@ export async function sendForgeConsoleMessage(
     run,
     exportStatus: exportJob?.status ?? null,
     artifactSummary: buildArtifactSummary(artifactCounts),
+    writerStoryPacketSummary: describeArtifactRecord(writerStoryPacket),
+    layoutDraftSummary: describeArtifactRecord(layoutDraft),
+    imageBriefSummary: describeArtifactRecord(imageBriefBundle),
+    assemblySummary: summarizeAssemblyManifest(assemblyManifest),
+    criticSummary: summarizeCriticReport(criticReport),
     qualityBudgetLane: run?.qualityBudgetLane ?? interview?.lockedBrief?.qualityBudgetLane ?? 'balanced',
   } satisfies {
     projectTitle: string;
@@ -566,6 +669,11 @@ export async function sendForgeConsoleMessage(
     run: GenerationRun | null;
     exportStatus: string | null;
     artifactSummary: string;
+    writerStoryPacketSummary: string;
+    layoutDraftSummary: string;
+    imageBriefSummary: string;
+    assemblySummary: string;
+    criticSummary: string;
     qualityBudgetLane: QualityBudgetLane;
   };
 

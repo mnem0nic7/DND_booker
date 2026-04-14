@@ -3,6 +3,7 @@ import {
   InterviewSessionCreateRequestSchema,
   InterviewSessionLockRequestSchema,
   InterviewSessionMessageRequestSchema,
+  LatestInterviewSessionResponseSchema,
   InterviewSessionSchema,
 } from '@dnd-booker/shared';
 import { prisma } from '../../config/database.js';
@@ -46,6 +47,24 @@ v1InterviewRoutes.post(
 
     const session = await createInterviewSession(projectId, authReq.userId!, parsed.data.initialPrompt);
     res.status(201).json(InterviewSessionSchema.parse(session));
+  }),
+);
+
+v1InterviewRoutes.get(
+  '/interview/sessions/latest',
+  requireAuth,
+  validateUuid('projectId'),
+  asyncHandler(async (req, res) => {
+    const authReq = req as AuthRequest;
+    const projectId = req.params.projectId as string;
+    const project = await ensureOwnedProject(projectId, authReq.userId!);
+    if (!project) {
+      res.status(404).json({ error: 'Project not found' });
+      return;
+    }
+
+    const session = await getInterviewSession(projectId, authReq.userId!);
+    res.json(LatestInterviewSessionResponseSchema.parse(session));
   }),
 );
 
