@@ -41,4 +41,12 @@ describe('AgentSwitcher', () => {
     await userEvent.click(screen.getByRole('option', { name: /critic/i }));
     expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
   });
+
+  it('closes the dropdown when clicking outside the component', async () => {
+    render(<AgentSwitcher agents={agents} selectedAgentId="writer" onSelectAgent={() => {}} />);
+    await userEvent.click(screen.getByRole('button', { name: /writer/i }));
+    expect(screen.getByRole('listbox')).toBeInTheDocument();
+    await userEvent.click(document.body);
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+  });
 });

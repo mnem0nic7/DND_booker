@@ -11,7 +11,7 @@ export function AgentSwitcher({ agents, selectedAgentId, onSelectAgent }: AgentS
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const selectedAgent = agents.find((a) => a.id === selectedAgentId) ?? agents[0];
+  const selectedAgent = agents.find((a) => a.id === selectedAgentId);
 
   useEffect(() => {
     function handleMouseDown(event: MouseEvent) {
