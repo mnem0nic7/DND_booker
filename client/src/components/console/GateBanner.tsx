@@ -12,7 +12,7 @@ export function GateBanner({ gate, onApprove, onRequestChanges }: GateBannerProp
       <span className="forge-gate-banner__icon" aria-hidden="true">⚑</span>
       <div className="forge-gate-banner__text">
         <span className="forge-gate-banner__title">{gate.title}</span>
-        {gate.summary !== null && (
+        {gate.summary != null && (
           <p className="forge-gate-banner__summary">{gate.summary}</p>
         )}
       </div>

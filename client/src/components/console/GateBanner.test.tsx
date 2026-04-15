@@ -31,21 +31,25 @@ describe('GateBanner', () => {
 
   it('calls onApprove when Approve button is clicked', async () => {
     const onApprove = vi.fn();
-    render(<GateBanner gate={buildGate()} onApprove={onApprove} onRequestChanges={() => {}} />);
+    const onRequestChanges = vi.fn();
+    render(<GateBanner gate={buildGate()} onApprove={onApprove} onRequestChanges={onRequestChanges} />);
     await userEvent.click(screen.getByRole('button', { name: /approve/i }));
     expect(onApprove).toHaveBeenCalledOnce();
+    expect(onRequestChanges).not.toHaveBeenCalled();
   });
 
   it('calls onRequestChanges when Request changes button is clicked', async () => {
     const onRequestChanges = vi.fn();
-    render(<GateBanner gate={buildGate()} onApprove={() => {}} onRequestChanges={onRequestChanges} />);
+    const onApprove = vi.fn();
+    render(<GateBanner gate={buildGate()} onApprove={onApprove} onRequestChanges={onRequestChanges} />);
     await userEvent.click(screen.getByRole('button', { name: /request changes/i }));
     expect(onRequestChanges).toHaveBeenCalledOnce();
+    expect(onApprove).not.toHaveBeenCalled();
   });
 
   it('omits the summary line when summary is null', () => {
     render(<GateBanner gate={buildGate({ summary: null })} onApprove={() => {}} onRequestChanges={() => {}} />);
     expect(screen.getByText('Outline approval gate')).toBeInTheDocument();
-    expect(screen.queryByRole('paragraph')).not.toBeInTheDocument();
+    expect(screen.queryByText('6 chapters ready · Critic score 87/100')).not.toBeInTheDocument();
   });
 });
