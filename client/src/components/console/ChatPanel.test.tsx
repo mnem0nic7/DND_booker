@@ -68,4 +68,26 @@ describe('ChatPanel', () => {
     await userEvent.click(screen.getByRole('button', { name: /send/i }));
     expect(onSend).toHaveBeenCalledOnce();
   });
+
+  it('calls onRequestChanges when the Request changes button is clicked', async () => {
+    const onRequestChanges = vi.fn();
+    renderPanel({ pendingGate: buildGate(), onRequestChanges });
+    await userEvent.click(screen.getByRole('button', { name: /request changes/i }));
+    expect(onRequestChanges).toHaveBeenCalledOnce();
+  });
+
+  it('calls onSelectAgent when an agent option is selected in the switcher', async () => {
+    const onSelectAgent = vi.fn();
+    renderPanel({ onSelectAgent });
+    // Open the AgentSwitcher dropdown — click the trigger button showing current agent
+    await userEvent.click(screen.getByRole('button', { name: /interviewer/i }));
+    // Click the Writer option
+    await userEvent.click(screen.getByRole('option', { name: /writer/i }));
+    expect(onSelectAgent).toHaveBeenCalledWith('writer');
+  });
+
+  it('shows the gate-active placeholder when a gate is pending', () => {
+    renderPanel({ pendingGate: buildGate() });
+    expect(screen.getByPlaceholderText('Approve the gate above to continue...')).toBeInTheDocument();
+  });
 });

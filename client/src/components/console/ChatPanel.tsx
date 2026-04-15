@@ -32,8 +32,7 @@ export function ChatPanel({
   onApproveGate,
   onRequestChanges,
 }: ChatPanelProps) {
-  const gateActive = pendingGate !== null;
-  const composerPlaceholder = gateActive
+  const composerPlaceholder = pendingGate !== null
     ? 'Approve the gate above to continue...'
     : 'Message the agent…';
 
@@ -50,7 +49,7 @@ export function ChatPanel({
 
       <MessageList messages={messages} thinkingLabel={null} />
 
-      {gateActive && (
+      {pendingGate !== null && (
         <GateBanner
           gate={pendingGate}
           onApprove={onApproveGate}
@@ -62,7 +61,7 @@ export function ChatPanel({
         value={draft}
         placeholder={composerPlaceholder}
         sending={sending}
-        disabled={gateActive}
+        disabled={pendingGate !== null}
         onChange={onDraftChange}
         onSend={onSend}
       />
