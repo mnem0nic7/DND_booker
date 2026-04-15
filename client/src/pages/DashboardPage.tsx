@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { LogOut, Plus } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
 import { useProjectStore, type Project } from '../stores/projectStore';
@@ -20,6 +20,12 @@ export default function DashboardPage() {
     sorted[0]?.id ?? null,
   );
   const [showCreateModal, setShowCreateModal] = useState(false);
+
+  useEffect(() => {
+    if (selectedProjectId === null && sorted.length > 0) {
+      setSelectedProjectId(sorted[0].id);
+    }
+  }, [sorted, selectedProjectId]);
 
   return (
     <div className="forge-page">

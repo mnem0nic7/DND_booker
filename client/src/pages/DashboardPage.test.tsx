@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useProjectStore } from '../stores/projectStore';
 import { useAuthStore } from '../stores/authStore';
@@ -64,6 +64,27 @@ describe('DashboardPage', () => {
 
     expect(shadowveilTab.className).toContain('forge-topbar__project--active');
     expect(dungeonTab.className).not.toContain('forge-topbar__project--active');
+  });
+
+  it('auto-selects the most recently updated project when projects load asynchronously', async () => {
+    // Start with no projects
+    useProjectStore.setState({ projects: [] });
+    renderWithProviders(<DashboardPage />);
+    // Empty state shown first
+    expect(screen.getByText('Create a project to get started.')).toBeInTheDocument();
+
+    // Projects arrive asynchronously
+    act(() => {
+      useProjectStore.setState({
+        projects: [
+          { id: 'proj-1', title: 'Shadowveil Campaign', createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-04-01T00:00:00.000Z' },
+        ],
+      });
+    });
+
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /shadowveil/i })).toHaveClass('forge-topbar__project--active'),
+    );
   });
 
   it('switches the active tab when a project is clicked', async () => {
