@@ -24,3 +24,6 @@ e2e-*.png
 evaluation-*.png
 ai-panel-state.png
 dump.rdb
+
+# Superpowers brainstorming session artifacts
+.superpowers/
