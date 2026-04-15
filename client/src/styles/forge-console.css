@@ -228,6 +228,10 @@
   background: rgba(27, 22, 16, 0.98);
 }
 
+.forge-agent-card.is-idle {
+  opacity: 0.45;
+}
+
 .forge-agent-card__header,
 .forge-agent-card__footer,
 .forge-agent-card__name-row,

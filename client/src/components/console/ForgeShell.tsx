@@ -85,7 +85,7 @@ export function ForgeShell({ projectId }: ForgeShellProps) {
   const allAgents = useMemo<ConsoleAgent[]>(() => {
     const interviewer: ConsoleAgent = {
       ...SYNTHETIC_INTERVIEWER,
-      status: interview?.status === 'locked' ? 'idle' : 'working',
+      status: (!interview || interview.status === 'locked') ? 'idle' : 'working',
     };
     return [interviewer, ...agents];
   }, [agents, interview]);

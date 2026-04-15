@@ -28,7 +28,7 @@ export default function DashboardPage() {
   }, [sorted, selectedProjectId]);
 
   return (
-    <div className="forge-page">
+    <div className="forge-console-page forge-page">
       <div className="forge-topbar">
         <div className="forge-topbar__projects">
           {sorted.map(p => (

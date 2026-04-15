@@ -12,7 +12,7 @@ export function AgentBoard({ agents, selectedAgentId, onSelectAgent, runStatus }
   return (
     <aside className="forge-board">
       <div className="forge-board__header">
-        <span className="forge-board__label">AGENTS</span>
+        <span className="forge-board__label">AGENTS {agents.length}</span>
         {runStatus !== null && (
           <span className={`forge-board__run-status forge-board__run-status--${runStatus}`}>
             {runStatus}

@@ -41,7 +41,7 @@ export function AgentCard({ agent, selected, onSelect, broadcast = false }: Agen
 
   return (
     <button
-      className={`forge-agent-card${selected ? ' is-selected' : ''}${broadcast ? ' is-broadcast' : ''}`}
+      className={`forge-agent-card${selected ? ' is-selected' : ''}${broadcast ? ' is-broadcast' : ''}${agent.status === 'idle' ? ' is-idle' : ''}`}
       onClick={onSelect}
       type="button"
       title={agent.queue.length > 0 ? `Queue:\n${agent.queue.slice(0, 2).join('\n')}` : undefined}
