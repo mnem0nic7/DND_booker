@@ -135,4 +135,40 @@ describe('ForgeShell', () => {
       expect(capturedBody).toMatchObject({ agentId: 'writer', message: 'Add more traps' });
     });
   });
+
+  it('shows interviewer as idle when interview session is locked', async () => {
+    server.use(
+      http.get('/api/v1/projects/proj-1/interview/sessions/latest', () =>
+        HttpResponse.json(buildSession({ status: 'locked' })),
+      ),
+    );
+
+    renderWithProviders(<ForgeShell projectId="proj-1" />);
+
+    // Wait for the interviewer card to render (multiple elements may have "Interviewer" text)
+    await waitFor(() => expect(screen.getAllByText(/Interviewer/i).length).toBeGreaterThan(0));
+
+    // The interviewer card should show 'idle' status in the status pill / footer label
+    // AgentCard renders the status text in forge-status-pill and forge-agent-card__status-label
+    const statusLabels = await screen.findAllByText('idle');
+    // At least one element should be showing 'idle' for the interviewer
+    expect(statusLabels.length).toBeGreaterThan(0);
+  });
+
+  it('shows interviewer as working when interview session is not locked', async () => {
+    server.use(
+      http.get('/api/v1/projects/proj-1/interview/sessions/latest', () =>
+        HttpResponse.json(buildSession({ status: 'collecting' })),
+      ),
+    );
+
+    renderWithProviders(<ForgeShell projectId="proj-1" />);
+
+    // Wait for the interviewer card to render (multiple elements may have "Interviewer" text)
+    await waitFor(() => expect(screen.getAllByText(/Interviewer/i).length).toBeGreaterThan(0));
+
+    // The interviewer card should show 'working' status
+    const statusLabels = await screen.findAllByText('working');
+    expect(statusLabels.length).toBeGreaterThan(0);
+  });
 });

@@ -83,8 +83,12 @@ export function ForgeShell({ projectId }: ForgeShellProps) {
   }, [loadData]);
 
   const allAgents = useMemo<ConsoleAgent[]>(() => {
-    return [SYNTHETIC_INTERVIEWER, ...agents];
-  }, [agents]);
+    const interviewer: ConsoleAgent = {
+      ...SYNTHETIC_INTERVIEWER,
+      status: interview?.status === 'locked' ? 'idle' : 'working',
+    };
+    return [interviewer, ...agents];
+  }, [agents, interview]);
 
   const pendingGate = useMemo(() => {
     if (!activeRun) return null;
