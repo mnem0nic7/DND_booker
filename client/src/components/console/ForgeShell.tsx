@@ -12,6 +12,24 @@ import { useGenerationStore } from '../../stores/generationStore';
 import { AgentBoard } from './AgentBoard';
 import { ChatPanel } from './ChatPanel';
 
+// Maps AgentStage values to the ConsoleAgent.id that should show status: 'working'.
+// Mirrors AGENT_STAGE_TO_AGENT_ID in server/src/services/forge-console.service.ts.
+const AGENT_STAGE_MAP: Partial<Record<string, string>> = {
+  interview_locked: 'interviewer',
+  writer_story_packet: 'writer',
+  rewrite_writer: 'writer',
+  dnd_expert_inserts: 'dnd_expert',
+  rewrite_dnd_expert: 'dnd_expert',
+  layout_first_draft: 'layout_expert',
+  rewrite_layout: 'layout_expert',
+  artist_requested: 'artist',
+  artist_completed: 'artist',
+  critic_text_pass: 'critic',
+  critic_image_pass: 'critic',
+  final_editor: 'final_editor',
+  printer: 'printer',
+};
+
 const SYNTHETIC_INTERVIEWER: ConsoleAgent = {
   id: 'interviewer',
   name: 'Interviewer',
@@ -38,8 +56,14 @@ export function ForgeShell({ projectId }: ForgeShellProps) {
   const [messagesByAgent, setMessagesByAgent] = useState<Record<string, ConsoleMessage[]>>({});
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
+  const [pollMs, setPollMs] = useState(5000);
 
   const resolveInterrupt = useGenerationStore((s) => s.resolveInterrupt);
+  const subscribeToRun = useGenerationStore((s) => s.subscribeToRun);
+  const unsubscribe = useGenerationStore((s) => s.unsubscribe);
+  const storeEvents = useGenerationStore((s) => s.events);
+
+  const subscribedRunIdRef = useRef<string | null>(null);
 
   const loadData = useCallback(async () => {
     const [fetchedAgents, fetchedInterview, fetchedRuns] = await Promise.allSettled([
@@ -68,19 +92,81 @@ export function ForgeShell({ projectId }: ForgeShellProps) {
     void loadData();
   }, [loadData]);
 
-  // Polling every 5 seconds
+  // Polling — interval is adaptive: 5s when idle, 30s when SSE is active (heartbeat only)
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   useEffect(() => {
     pollIntervalRef.current = setInterval(() => {
       void loadData();
-    }, 5000);
+    }, pollMs);
 
     return () => {
       if (pollIntervalRef.current !== null) {
         clearInterval(pollIntervalRef.current);
       }
     };
-  }, [loadData]);
+  }, [loadData, pollMs]);
+
+  // Subscribe to SSE when an active run is detected; fall back to polling when idle
+  useEffect(() => {
+    const isActive = activeRun !== null && !TERMINAL_STATUSES.has(activeRun.status);
+
+    if (!isActive) {
+      if (subscribedRunIdRef.current !== null) {
+        unsubscribe();
+        subscribedRunIdRef.current = null;
+      }
+      setPollMs(5000);
+      return;
+    }
+
+    if (subscribedRunIdRef.current === activeRun.id) return; // already subscribed
+
+    subscribeToRun(projectId, activeRun.id);
+    subscribedRunIdRef.current = activeRun.id;
+    setPollMs(30000);
+  }, [activeRun, projectId, subscribeToRun, unsubscribe]);
+
+  // Tear down SSE subscription when projectId changes
+  useEffect(() => {
+    return () => {
+      if (subscribedRunIdRef.current !== null) {
+        unsubscribe();
+        subscribedRunIdRef.current = null;
+      }
+    };
+  }, [projectId, unsubscribe]);
+
+  // React to SSE events: update run status, agent working state, and handle run end
+  useEffect(() => {
+    const last = storeEvents[storeEvents.length - 1];
+    if (!last || !activeRun || last.runId !== activeRun.id) return;
+
+    if (last.type === 'run_status') {
+      setActiveRun((prev) => (prev ? { ...prev, status: last.status } : prev));
+
+      if (last.agentStage) {
+        const workingId = AGENT_STAGE_MAP[last.agentStage] ?? null;
+        setAgents((prev) =>
+          prev.map((a) => ({
+            ...a,
+            status:
+              a.id === workingId
+                ? 'working'
+                : a.status === 'working'
+                  ? 'idle'
+                  : a.status,
+          }))
+        );
+      }
+    }
+
+    if (last.type === 'run_completed' || last.type === 'run_failed') {
+      unsubscribe();
+      subscribedRunIdRef.current = null;
+      setPollMs(5000);
+      void loadData();
+    }
+  }, [storeEvents, activeRun, unsubscribe, loadData]);
 
   const allAgents = useMemo<ConsoleAgent[]>(() => {
     const interviewer: ConsoleAgent = {
