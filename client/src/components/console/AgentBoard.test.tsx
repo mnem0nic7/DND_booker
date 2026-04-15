@@ -25,13 +25,21 @@ describe('AgentBoard', () => {
   it('calls onSelectAgent with the clicked agent id', async () => {
     const onSelectAgent = vi.fn();
     render(<AgentBoard agents={agents} selectedAgentId="interviewer" onSelectAgent={onSelectAgent} runStatus={null} />);
-    await userEvent.click(screen.getByText('Critic'));
+    await userEvent.click(screen.getByRole('button', { name: /critic/i }));
     expect(onSelectAgent).toHaveBeenCalledWith('critic');
+  });
+
+  it('applies the selected class to the card matching selectedAgentId', () => {
+    render(<AgentBoard agents={agents} selectedAgentId="writer" onSelectAgent={() => {}} runStatus={null} />);
+    expect(screen.getByRole('button', { name: /writer/i })).toHaveClass('is-selected');
+    expect(screen.getByRole('button', { name: /critic/i })).not.toHaveClass('is-selected');
   });
 
   it('renders the run status in the board header', () => {
     render(<AgentBoard agents={agents} selectedAgentId="writer" onSelectAgent={() => {}} runStatus="running" />);
-    expect(screen.getByText('running')).toBeInTheDocument();
+    const badge = screen.getByText('running');
+    expect(badge).toBeInTheDocument();
+    expect(badge).toHaveClass('forge-board__run-status--running');
   });
 
   it('renders nothing in the header status when runStatus is null', () => {
