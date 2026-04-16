@@ -47,8 +47,8 @@ setup('authenticate', async ({ page }) => {
     await page.locator('input[type="password"]').fill(TEST_PASSWORD);
     await page.locator('button[type="submit"]').click();
 
-    // Wait for dashboard
-    await expect(page.locator('text=New Project').first()).toBeVisible({ timeout: 10_000 });
+    // Wait for dashboard — the topbar "+" new-project button is always present
+    await expect(page.getByRole('button', { name: 'New project' })).toBeVisible({ timeout: 10_000 });
 
     // Save auth state (localStorage with JWT token)
     await page.context().storageState({ path: AUTH_FILE });

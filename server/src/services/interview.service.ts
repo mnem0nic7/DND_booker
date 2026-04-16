@@ -440,7 +440,11 @@ function isRetriableInterviewStepError(error: unknown) {
     || message.includes('rate limit')
     || message.includes('temporarily unavailable')
     || message.includes('overloaded')
-    || message.includes('service unavailable');
+    || message.includes('service unavailable')
+    // Schema-mismatch errors from small local models — fall back to rule-based brief
+    || message.includes('did not match schema')
+    || message.includes('response did not match')
+    || message.includes('timed out');
 }
 
 async function generateInterviewStep(input: {
@@ -499,19 +503,45 @@ export async function createInterviewSession(
   userId: string,
   initialPrompt?: string,
 ) {
-  let turns: InterviewTurn[] = [];
+  const trimmedPrompt = initialPrompt?.trim();
 
-  if (initialPrompt?.trim()) {
-    turns.push({
-      id: randomUUID(),
-      role: 'user',
-      content: initialPrompt.trim(),
-      createdAt: new Date().toISOString(),
+  // When no initialPrompt is supplied (e.g. ChatProjectCreation shows its own
+  // welcome message), skip the LLM call entirely and return an empty session.
+  // The first real user message will be processed in appendInterviewMessage.
+  if (!trimmedPrompt) {
+    const session = await prisma.interviewSession.upsert({
+      where: { projectId_userId: { projectId, userId } },
+      create: {
+        projectId,
+        userId,
+        status: 'collecting',
+        turns: [] as any,
+        briefDraft: Prisma.JsonNull,
+        maxUserTurns: MAX_USER_TURNS,
+      },
+      update: {
+        status: 'collecting',
+        turns: [] as any,
+        briefDraft: Prisma.JsonNull,
+        lockedBrief: Prisma.JsonNull,
+        lockedAt: null,
+        maxUserTurns: MAX_USER_TURNS,
+      },
     });
+    return serializeSession(session);
   }
 
+  let turns: InterviewTurn[] = [
+    {
+      id: randomUUID(),
+      role: 'user',
+      content: trimmedPrompt,
+      createdAt: new Date().toISOString(),
+    },
+  ];
+
   const step = await generateInterviewStepWithFallback({
-    initialPrompt: initialPrompt?.trim() || null,
+    initialPrompt: trimmedPrompt,
     turns,
     existingBrief: null,
     maxUserTurns: MAX_USER_TURNS,
