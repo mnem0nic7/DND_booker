@@ -1,6 +1,30 @@
 import { http, HttpResponse } from 'msw';
 
 export const handlers = [
+  // Projects
+  http.get('/api/v1/projects', () => HttpResponse.json([])),
+  http.post('/api/v1/projects', () =>
+    HttpResponse.json({
+      id: 'proj-default',
+      userId: 'user-1',
+      title: 'New Project',
+      description: '',
+      type: 'campaign',
+      status: 'draft',
+      coverImageUrl: null,
+      settings: {
+        pageSize: 'letter',
+        margins: { top: 1, right: 1, bottom: 1, left: 1 },
+        columns: 1,
+        theme: 'classic-parchment',
+        fonts: { heading: 'serif', body: 'serif' },
+        textLayoutFallbacks: {},
+      },
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }),
+  ),
+
   http.get('/api/v1/projects/:projectId/export-jobs', () => HttpResponse.json([])),
 
   // Console
