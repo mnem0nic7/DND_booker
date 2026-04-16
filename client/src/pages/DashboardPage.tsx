@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { LogOut, Plus } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
 import { useProjectStore, type Project } from '../stores/projectStore';
-import CreateProjectModal from '../components/projects/CreateProjectModal';
+import { ChatProjectCreation } from '../components/projects/ChatProjectCreation';
 import { ForgeShell } from '../components/console/ForgeShell';
 import '../styles/forge-console.css';
 
@@ -19,7 +19,7 @@ export default function DashboardPage() {
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
     sorted[0]?.id ?? null,
   );
-  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [isCreatingProject, setIsCreatingProject] = useState(false);
 
   useEffect(() => {
     if (selectedProjectId === null && sorted.length > 0) {
@@ -43,7 +43,7 @@ export default function DashboardPage() {
           <button
             className="forge-topbar__new"
             aria-label="New project"
-            onClick={() => setShowCreateModal(true)}
+            onClick={() => setIsCreatingProject(true)}
           >
             <Plus size={14} />
           </button>
@@ -57,22 +57,15 @@ export default function DashboardPage() {
         </button>
       </div>
 
-      {selectedProjectId ? (
-        <ForgeShell key={selectedProjectId} projectId={selectedProjectId} />
-      ) : (
-        <div className="forge-empty">Create a project to get started.</div>
-      )}
-
-      {showCreateModal && (
-        <CreateProjectModal
-          open={showCreateModal}
-          onClose={() => setShowCreateModal(false)}
-          navigateOnCreate={false}
+      {isCreatingProject || !selectedProjectId ? (
+        <ChatProjectCreation
           onCreated={(project) => {
             setSelectedProjectId(project.id);
-            setShowCreateModal(false);
+            setIsCreatingProject(false);
           }}
         />
+      ) : (
+        <ForgeShell key={selectedProjectId} projectId={selectedProjectId} />
       )}
     </div>
   );

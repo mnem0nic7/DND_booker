@@ -70,8 +70,8 @@ describe('DashboardPage', () => {
     // Start with no projects
     useProjectStore.setState({ projects: [] });
     renderWithProviders(<DashboardPage />);
-    // Empty state shown first
-    expect(screen.getByText('Create a project to get started.')).toBeInTheDocument();
+    // Chat creation panel shown first (no projects yet)
+    expect(screen.getByRole('textbox')).toBeInTheDocument();
 
     // Projects arrive asynchronously
     act(() => {
