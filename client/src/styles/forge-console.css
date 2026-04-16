@@ -270,6 +270,12 @@
   animation: forge-spin 2s linear infinite;
 }
 
+/* Issue 1 fix: name block must shrink with the flex container */
+.forge-agent-card__name-block {
+  min-width: 0;
+  overflow: hidden;
+}
+
 .forge-agent-card__name-row {
   gap: 8px;
 }
@@ -279,6 +285,9 @@
   font-size: 1.1rem;
   font-weight: 600;
   line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .forge-agent-card__role,
@@ -291,6 +300,9 @@
 .forge-agent-card__role {
   color: var(--forge-text-secondary);
   font-size: 0.88rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .forge-agent-card__task {
@@ -436,6 +448,9 @@
   min-height: 0;
   overflow-y: auto;
   padding: 22px 28px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
 }
 
 .forge-message-row {
@@ -725,8 +740,9 @@
 }
 
 .forge-chat-panel__hint {
-  color: #2d2d4a;
-  font-size: 9px;
+  margin-left: auto;
+  color: var(--forge-text-tertiary, #6b7280);
+  font-size: 0.7rem;
 }
 
 /* ── GATE BANNER ───────────────────────────────────────────────── */
@@ -886,7 +902,7 @@
 /* ── AGENT BOARD (right) ───────────────────────────────────────── */
 
 .forge-board {
-  width: 220px;
+  width: 260px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
@@ -923,6 +939,7 @@
 .forge-board__cards {
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 8px;
   display: flex;
   flex-direction: column;

@@ -51,7 +51,7 @@ export function AgentCard({ agent, selected, onSelect, broadcast = false }: Agen
           <div className="forge-agent-card__icon-shell">
             <Icon className="forge-agent-card__icon" size={18} strokeWidth={1.9} />
           </div>
-          <div>
+          <div className="forge-agent-card__name-block">
             <div className="forge-agent-card__name-row">
               <span className="forge-agent-card__name">{agent.name}</span>
               {agent.status === 'working' ? (
