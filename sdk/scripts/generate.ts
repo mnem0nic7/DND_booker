@@ -1,9 +1,13 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { zodToJsonSchema } from 'zod-to-json-schema';
-import * as V1 from '../../shared/src/api/v1.ts';
+import * as V1Namespace from '../../shared/src/api/v1.ts';
 
-type ApiV1RouteContract = V1.ApiV1RouteContract;
+// `shared/package.json` is CJS-by-default while `sdk/package.json` is `"type": "module"`.
+// tsx loads shared/src/api/v1.ts as CJS, so the ESM namespace import wraps the real
+// exports under `.default`. Unwrap here so downstream code can use the named exports.
+type ApiV1RouteContract = V1Namespace.ApiV1RouteContract;
+const V1 = (V1Namespace as unknown as { default?: typeof V1Namespace }).default ?? V1Namespace;
 const { ProblemSchema, V1_ROUTE_CONTRACTS } = V1;
 
 function toOpenApiSchema(schema: ApiV1RouteContract['responseSchema']) {
