@@ -50,6 +50,9 @@ services:
       - OLLAMA_MAX_RESPONSE_TOKENS=${OLLAMA_MAX_RESPONSE_TOKENS:-256}
       - EXPORT_OUTPUT_DIR=/app/worker/output
       - ASSET_STORAGE_DIR=/app/uploads
+      - SYSTEM_GOOGLE_API_KEY=${SYSTEM_GOOGLE_API_KEY:-}
+      - SYSTEM_OPENAI_API_KEY=${SYSTEM_OPENAI_API_KEY:-}
+      - SYSTEM_ANTHROPIC_API_KEY=${SYSTEM_ANTHROPIC_API_KEY:-}
     volumes:
       - export-output:/app/worker/output
       - project-assets:/app/uploads
@@ -80,6 +83,9 @@ services:
       - GENERATION_TEXT_TIMEOUT_MS=${GENERATION_TEXT_TIMEOUT_MS:-900000}
       - NODE_ENV=production
       - ASSET_STORAGE_DIR=/app/uploads
+      - SYSTEM_GOOGLE_API_KEY=${SYSTEM_GOOGLE_API_KEY:-}
+      - SYSTEM_OPENAI_API_KEY=${SYSTEM_OPENAI_API_KEY:-}
+      - SYSTEM_ANTHROPIC_API_KEY=${SYSTEM_ANTHROPIC_API_KEY:-}
     volumes:
       - export-output:/app/worker/output
       - project-assets:/app/uploads

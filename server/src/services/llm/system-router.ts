@@ -94,7 +94,9 @@ function resolveCredentialEnvName(provider: AiProvider, credentials: SystemCrede
 }
 
 async function readConfigFile(): Promise<AgentConfigFile> {
-  const filePath = path.resolve(process.cwd(), 'config', 'agents.yaml');
+  // Resolve relative to this file so the path works in both local dev (tsx from
+  // repo root) and Docker (compiled to /app/server/dist/services/llm/).
+  const filePath = path.resolve(__dirname, '../../../../config/agents.yaml');
   const file = await fs.readFile(filePath, 'utf8');
   return YAML.parse(file) as AgentConfigFile;
 }

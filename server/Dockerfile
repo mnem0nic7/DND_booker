@@ -8,6 +8,7 @@ COPY shared/package.json shared/
 COPY text-layout/package.json text-layout/
 RUN npm ci
 COPY tsconfig.json ./
+COPY config/ config/
 COPY sdk/ sdk/
 COPY shared/ shared/
 COPY text-layout/ text-layout/

@@ -12,6 +12,7 @@ COPY text-layout/package.json text-layout/
 COPY server/package.json server/
 RUN npm ci
 COPY tsconfig.json ./
+COPY config/ config/
 COPY sdk/ sdk/
 COPY shared/ shared/
 COPY text-layout/ text-layout/
