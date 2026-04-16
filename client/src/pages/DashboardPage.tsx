@@ -35,7 +35,7 @@ export default function DashboardPage() {
             <button
               key={p.id}
               className={`forge-topbar__project${p.id === selectedProjectId ? ' forge-topbar__project--active' : ''}`}
-              onClick={() => setSelectedProjectId(p.id)}
+              onClick={() => { setSelectedProjectId(p.id); setIsCreatingProject(false); }}
             >
               {p.title}
             </button>

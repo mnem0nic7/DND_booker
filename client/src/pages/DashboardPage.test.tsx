@@ -85,6 +85,29 @@ describe('DashboardPage', () => {
     );
   });
 
+  it('clicking "+" opens the chat creation panel', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<DashboardPage />);
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Shadowveil' })).toBeInTheDocument());
+    // Initially showing ForgeShell (has a selected project)
+    await user.click(screen.getByRole('button', { name: 'New project' }));
+    // Chat creation panel now visible
+    expect(screen.getByRole('textbox')).toBeInTheDocument();
+  });
+
+  it('clicking a project tab while in creation mode cancels creation', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<DashboardPage />);
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Shadowveil' })).toBeInTheDocument());
+    // Enter creation mode
+    await user.click(screen.getByRole('button', { name: 'New project' }));
+    expect(screen.getByRole('textbox')).toBeInTheDocument();
+    // Click an existing project tab
+    await user.click(screen.getByRole('button', { name: 'Dungeon' }));
+    // Creation panel gone — Dungeon is now active
+    expect(screen.getByRole('button', { name: 'Dungeon' })).toHaveClass('forge-topbar__project--active');
+  });
+
   it('switches the active tab when a project is clicked', async () => {
     const user = userEvent.setup();
     renderWithProviders(<DashboardPage />);
