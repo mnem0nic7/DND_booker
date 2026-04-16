@@ -1,5 +1,6 @@
 import { generateObject, generateText, type LanguageModel } from 'ai';
 import { z } from 'zod';
+import { zodToJsonSchema } from 'zod-to-json-schema';
 
 const DEFAULT_GENERATION_TEXT_TIMEOUT_MS = 240_000;
 const DEFAULT_GENERATION_TEXT_ATTEMPTS = 2;
@@ -105,7 +106,11 @@ async function generateObjectViaText<T>(
   options: Parameters<typeof generateObject>[0] & { schema: z.ZodType<T> },
   timeoutMs: number,
 ): Promise<{ object: T }> {
-  const systemPrompt = `You are a helpful assistant. You MUST respond with ONLY valid JSON that matches the required schema. Do not include any explanation, markdown, or text outside the JSON object.`;
+  const jsonSchema = zodToJsonSchema(options.schema, { $refStrategy: 'none' });
+  const systemPrompt = `You are a helpful assistant. You MUST respond with ONLY valid JSON. Do not include any explanation, markdown, or text outside the JSON object.
+
+Your response must conform to this JSON Schema:
+${JSON.stringify(jsonSchema, null, 2)}`;
 
   const messages = Array.isArray((options as any).messages)
     ? (options as any).messages
