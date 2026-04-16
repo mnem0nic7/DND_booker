@@ -18,113 +18,113 @@ agents:
   default:
     fast:
       provider: ollama
-      model: qwen3.5:9b
+      model: qwen2.5:3b
       baseUrl: http://host.docker.internal:11434
       maxOutputTokens: 8192
     balanced:
       provider: ollama
-      model: qwen3.5:9b
+      model: qwen2.5:3b
       baseUrl: http://host.docker.internal:11434
       maxOutputTokens: 8192
     high_quality:
       provider: ollama
-      model: qwen3.5:9b
+      model: qwen2.5:3b
       baseUrl: http://host.docker.internal:11434
       maxOutputTokens: 8192
   agent.interviewer:
     fast:
       provider: ollama
-      model: qwen3.5:9b
+      model: qwen2.5:3b
       baseUrl: http://host.docker.internal:11434
       maxOutputTokens: 4096
     balanced:
       provider: ollama
-      model: qwen3.5:9b
+      model: qwen2.5:3b
       baseUrl: http://host.docker.internal:11434
       maxOutputTokens: 4096
     high_quality:
       provider: ollama
-      model: qwen3.5:9b
+      model: qwen2.5:3b
       baseUrl: http://host.docker.internal:11434
       maxOutputTokens: 4096
   agent.writer:
     fast:
       provider: ollama
-      model: qwen3.5:9b
+      model: qwen2.5:3b
       baseUrl: http://host.docker.internal:11434
       maxOutputTokens: 8192
     balanced:
       provider: ollama
-      model: qwen3.5:9b
+      model: qwen2.5:3b
       baseUrl: http://host.docker.internal:11434
       maxOutputTokens: 8192
     high_quality:
       provider: ollama
-      model: qwen3.5:9b
+      model: qwen2.5:3b
       baseUrl: http://host.docker.internal:11434
       maxOutputTokens: 8192
   agent.dnd_expert:
     fast:
       provider: ollama
-      model: qwen3.5:9b
+      model: qwen2.5:3b
       baseUrl: http://host.docker.internal:11434
       maxOutputTokens: 8192
     balanced:
       provider: ollama
-      model: qwen3.5:9b
+      model: qwen2.5:3b
       baseUrl: http://host.docker.internal:11434
       maxOutputTokens: 8192
     high_quality:
       provider: ollama
-      model: qwen3.5:9b
+      model: qwen2.5:3b
       baseUrl: http://host.docker.internal:11434
       maxOutputTokens: 8192
   agent.layout_expert:
     fast:
       provider: ollama
-      model: qwen3.5:9b
+      model: qwen2.5:3b
       baseUrl: http://host.docker.internal:11434
       maxOutputTokens: 8192
     balanced:
       provider: ollama
-      model: qwen3.5:9b
+      model: qwen2.5:3b
       baseUrl: http://host.docker.internal:11434
       maxOutputTokens: 8192
     high_quality:
       provider: ollama
-      model: qwen3.5:9b
+      model: qwen2.5:3b
       baseUrl: http://host.docker.internal:11434
       maxOutputTokens: 8192
   agent.critic:
     fast:
       provider: ollama
-      model: qwen3.5:9b
+      model: qwen2.5:3b
       baseUrl: http://host.docker.internal:11434
       maxOutputTokens: 8192
     balanced:
       provider: ollama
-      model: qwen3.5:9b
+      model: qwen2.5:3b
       baseUrl: http://host.docker.internal:11434
       maxOutputTokens: 8192
     high_quality:
       provider: ollama
-      model: qwen3.5:9b
+      model: qwen2.5:3b
       baseUrl: http://host.docker.internal:11434
       maxOutputTokens: 8192
   agent.final_editor:
     fast:
       provider: ollama
-      model: qwen3.5:9b
+      model: qwen2.5:3b
       baseUrl: http://host.docker.internal:11434
       maxOutputTokens: 8192
     balanced:
       provider: ollama
-      model: qwen3.5:9b
+      model: qwen2.5:3b
       baseUrl: http://host.docker.internal:11434
       maxOutputTokens: 8192
     high_quality:
       provider: ollama
-      model: qwen3.5:9b
+      model: qwen2.5:3b
       baseUrl: http://host.docker.internal:11434
       maxOutputTokens: 8192
   # Artist stays on Gemini — Ollama has no image generation capability
@@ -144,32 +144,32 @@ agents:
   agent.artist_console:
     fast:
       provider: ollama
-      model: qwen3.5:9b
+      model: qwen2.5:3b
       baseUrl: http://host.docker.internal:11434
       maxOutputTokens: 4096
     balanced:
       provider: ollama
-      model: qwen3.5:9b
+      model: qwen2.5:3b
       baseUrl: http://host.docker.internal:11434
       maxOutputTokens: 4096
     high_quality:
       provider: ollama
-      model: qwen3.5:9b
+      model: qwen2.5:3b
       baseUrl: http://host.docker.internal:11434
       maxOutputTokens: 4096
   agent.printer:
     fast:
       provider: ollama
-      model: qwen3.5:9b
+      model: qwen2.5:3b
       baseUrl: http://host.docker.internal:11434
       maxOutputTokens: 4096
     balanced:
       provider: ollama
-      model: qwen3.5:9b
+      model: qwen2.5:3b
       baseUrl: http://host.docker.internal:11434
       maxOutputTokens: 4096
     high_quality:
       provider: ollama
-      model: qwen3.5:9b
+      model: qwen2.5:3b
       baseUrl: http://host.docker.internal:11434
       maxOutputTokens: 4096
