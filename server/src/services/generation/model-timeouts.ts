@@ -97,10 +97,16 @@ export async function generateObjectWithTimeout(
   const timeoutMs = resolveTimeoutMs(fallbackMs);
   let lastError: unknown = null;
 
+  // Ollama (provider 'ollama.chat') crashes in tool-call mode; force JSON mode.
+  const modelProvider = (options.model as Record<string, unknown>).provider;
+  const resolvedOptions = typeof modelProvider === 'string' && modelProvider.startsWith('ollama')
+    ? { ...options, mode: 'json' as const }
+    : options;
+
   for (let attempt = 1; attempt <= DEFAULT_GENERATION_OBJECT_ATTEMPTS; attempt += 1) {
     try {
       return await withHardTextTimeout(label, timeoutMs, async (signal) => generateObject({
-        ...options,
+        ...resolvedOptions,
         abortSignal: signal,
       }));
     } catch (error) {
