@@ -1,4 +1,5 @@
-import { generateObject, generateText } from 'ai';
+import { generateObject, generateText, type LanguageModel } from 'ai';
+import { z } from 'zod';
 
 const DEFAULT_GENERATION_TEXT_TIMEOUT_MS = 240_000;
 const DEFAULT_GENERATION_TEXT_ATTEMPTS = 2;
@@ -89,6 +90,56 @@ export async function generateTextWithTimeout(
   throw lastError instanceof Error ? lastError : new Error(`${label} failed`);
 }
 
+function isOllamaModel(model: LanguageModel): boolean {
+  return typeof (model as Record<string, unknown>).provider === 'string'
+    && ((model as Record<string, unknown>).provider as string).startsWith('ollama');
+}
+
+/**
+ * Ollama compiles Zod schemas into ABNF grammar for constrained sampling,
+ * which crashes llama.cpp on complex schemas. For Ollama, use generateText
+ * with a JSON instruction and parse/validate the result manually.
+ */
+async function generateObjectViaText<T>(
+  label: string,
+  options: Parameters<typeof generateObject>[0] & { schema: z.ZodType<T> },
+  timeoutMs: number,
+): Promise<{ object: T }> {
+  const systemPrompt = `You are a helpful assistant. You MUST respond with ONLY valid JSON that matches the required schema. Do not include any explanation, markdown, or text outside the JSON object.`;
+
+  const messages = Array.isArray((options as any).messages)
+    ? (options as any).messages
+    : [{ role: 'user' as const, content: (options as any).prompt ?? '' }];
+
+  for (let attempt = 1; attempt <= DEFAULT_GENERATION_OBJECT_ATTEMPTS; attempt += 1) {
+    const result = await withHardTextTimeout(label, timeoutMs, async (signal) =>
+      generateText({
+        model: options.model,
+        system: systemPrompt,
+        messages,
+        maxOutputTokens: (options as any).maxOutputTokens,
+        abortSignal: signal,
+      }),
+    );
+
+    const raw = result.text.trim();
+    // Strip markdown code fences if present
+    const json = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+
+    try {
+      const parsed = JSON.parse(json);
+      const validated = options.schema.parse(parsed) as T;
+      return { object: validated };
+    } catch {
+      if (attempt >= DEFAULT_GENERATION_OBJECT_ATTEMPTS) {
+        throw new Error(`${label}: response did not match schema after ${attempt} attempts`);
+      }
+    }
+  }
+
+  throw new Error(`${label} failed`);
+}
+
 export async function generateObjectWithTimeout(
   label: string,
   options: Parameters<typeof generateObject>[0],
@@ -97,16 +148,16 @@ export async function generateObjectWithTimeout(
   const timeoutMs = resolveTimeoutMs(fallbackMs);
   let lastError: unknown = null;
 
-  // Ollama (provider 'ollama.chat') crashes in tool-call mode; force JSON mode.
-  const modelProvider = (options.model as Record<string, unknown>).provider;
-  const resolvedOptions = typeof modelProvider === 'string' && modelProvider.startsWith('ollama')
-    ? { ...options, mode: 'json' as const }
-    : options;
+  // Ollama crashes when generateObject compiles complex schemas to ABNF grammar.
+  // Use generateText + manual JSON parse instead.
+  if (isOllamaModel(options.model)) {
+    return generateObjectViaText(label, options as any, timeoutMs);
+  }
 
   for (let attempt = 1; attempt <= DEFAULT_GENERATION_OBJECT_ATTEMPTS; attempt += 1) {
     try {
       return await withHardTextTimeout(label, timeoutMs, async (signal) => generateObject({
-        ...resolvedOptions,
+        ...options,
         abortSignal: signal,
       }));
     } catch (error) {
