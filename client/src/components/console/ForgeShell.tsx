@@ -39,7 +39,7 @@ const SYNTHETIC_INTERVIEWER: ConsoleAgent = {
   currentTask: null,
   progress: 0,
   queue: [],
-  lastPing: new Date().toISOString(),
+  lastPing: 'just now',
 };
 
 const TERMINAL_STATUSES = new Set(['completed', 'failed', 'cancelled']);
