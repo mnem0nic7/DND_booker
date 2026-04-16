@@ -162,6 +162,60 @@ describe('ChatProjectCreation', () => {
     });
   });
 
+  it('shows an error message and allows retry if project creation fails', async () => {
+    server.use(
+      http.post('/api/v1/projects', () => HttpResponse.json({ error: 'Server error' }, { status: 500 })),
+    );
+    const onCreated = vi.fn();
+    renderWithProviders(<ChatProjectCreation onCreated={onCreated} />);
+    await userEvent.type(screen.getByRole('textbox'), 'A dungeon crawl');
+    await userEvent.click(screen.getByRole('button', { name: /send/i }));
+    await waitFor(() => expect(screen.getByRole('textbox')).not.toBeDisabled());
+    expect(onCreated).not.toHaveBeenCalled();
+    // Composer re-enabled after error (hasCreated remains false)
+    expect(screen.getByRole('textbox')).not.toBeDisabled();
+  });
+
+  it('keeps the composer disabled after a successful send', async () => {
+    const onCreated = vi.fn();
+    const projectId = 'proj-success';
+    const sessionId = 'sess-success';
+
+    server.use(
+      http.post('/api/v1/projects', async () => {
+        return HttpResponse.json(buildProjectSummary({ id: projectId }));
+      }),
+      http.post(`/api/v1/projects/${projectId}/interview/sessions`, async () => {
+        return HttpResponse.json(buildSession({ id: sessionId, projectId }));
+      }),
+      http.post(
+        `/api/v1/projects/${projectId}/interview/sessions/${sessionId}/messages`,
+        async () => {
+          return HttpResponse.json(
+            buildSession({
+              id: sessionId,
+              projectId,
+              turns: [
+                {
+                  id: 'turn-1',
+                  role: 'assistant',
+                  content: 'Excellent choice!',
+                  createdAt: '2026-04-15T00:00:00.000Z',
+                },
+              ],
+            }),
+          );
+        },
+      ),
+    );
+
+    renderWithProviders(<ChatProjectCreation onCreated={onCreated} />);
+    await userEvent.type(screen.getByRole('textbox'), 'A gothic horror campaign');
+    await userEvent.click(screen.getByRole('button', { name: /send/i }));
+    await waitFor(() => expect(onCreated).toHaveBeenCalled());
+    expect(screen.getByRole('textbox')).toBeDisabled();
+  });
+
   it('disables the composer while sending', async () => {
     const onCreated = vi.fn();
 
