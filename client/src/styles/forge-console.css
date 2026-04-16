@@ -450,7 +450,14 @@
   padding: 22px 28px;
   display: flex;
   flex-direction: column;
-  justify-content: flex-end;
+}
+
+/* Pushes messages toward the bottom when there are only a few,
+   without the flex-end overflow antipattern that makes top messages
+   unreachable by scroll in older browsers. */
+.forge-message-list::before {
+  content: "";
+  flex: 1;
 }
 
 .forge-message-row {

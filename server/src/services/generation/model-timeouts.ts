@@ -121,7 +121,8 @@ function buildJsonTemplate(schema: Record<string, unknown>): unknown {
     );
   }
   if (type === 'array') {
-    return [];
+    const items = schema.items as Record<string, unknown> | undefined;
+    return items ? [buildJsonTemplate(items)] : [];
   }
   if (type === 'boolean') return false;
   if (type === 'integer' || type === 'number') return 0;
@@ -148,6 +149,8 @@ function coerceForSchema(value: unknown, schema: z.ZodType): unknown {
   ) {
     if (inner instanceof z.ZodEffects) {
       inner = inner.innerType();
+    } else if (inner instanceof z.ZodDefault) {
+      inner = (inner as z.ZodDefault<z.ZodType>).removeDefault();
     } else {
       inner = (inner as z.ZodOptional<z.ZodType> | z.ZodNullable<z.ZodType>).unwrap();
     }
@@ -187,10 +190,6 @@ function coerceForSchema(value: unknown, schema: z.ZodType): unknown {
   }
 
   if (inner instanceof z.ZodString) {
-    // Small models output null/undefined for fields they "don't know yet".
-    // Replace with a placeholder so .min(1) passes; the model fills it on retry
-    // or the caller's fallback path normalises it later.
-    if (value === null || value === undefined) return 'TBD';
     return value;
   }
 
@@ -208,15 +207,14 @@ function coerceForSchema(value: unknown, schema: z.ZodType): unknown {
     return value;
   }
 
-  // ZodUnion / ZodDiscriminatedUnion — try each branch
+  // ZodUnion — coerce with each branch; return the first that validates
   if (inner instanceof z.ZodUnion) {
-    for (const option of (inner as z.ZodUnion<[z.ZodType, ...z.ZodType[]]>).options) {
-      try {
-        return coerceForSchema(value, option);
-      } catch {
-        // try next
-      }
+    const options = (inner as z.ZodUnion<[z.ZodType, ...z.ZodType[]]>).options;
+    for (const option of options) {
+      const coerced = coerceForSchema(value, option);
+      if (option.safeParse(coerced).success) return coerced;
     }
+    // No branch validated — return value as-is and let the caller's parse fail
   }
 
   return value;
@@ -246,9 +244,11 @@ async function generateObjectViaText<T>(
     ? (options as any).messages
     : [{ role: 'user' as const, content: (options as any).prompt ?? '' }];
 
-  // Cap output tokens: JSON responses don't need more than 600 tokens.
-  // Passing maxOutputTokens=4096 lets small models fill their context (2-4 min/call).
-  const MAX_OLLAMA_OUTPUT_TOKENS = 600;
+  // Cap output tokens to prevent small models from filling their entire context window.
+  // 600 is enough for the compact InterviewAgentResponseSchema but too tight for complex
+  // schemas like BibleContentCandidateSchema (needs 1000-2000+ tokens). 2048 prevents
+  // worst-case 4-minute calls while leaving room for deeply nested generation schemas.
+  const MAX_OLLAMA_OUTPUT_TOKENS = 2048;
   const callerMaxOutput: number | undefined = (options as any).maxOutputTokens;
   const cappedMaxOutput = callerMaxOutput
     ? Math.min(callerMaxOutput, MAX_OLLAMA_OUTPUT_TOKENS)
