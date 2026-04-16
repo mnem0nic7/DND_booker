@@ -90,6 +90,7 @@ function resolveCredentialEnvName(provider: AiProvider, credentials: SystemCrede
   if (provider === 'google') return credentials.googleEnv || 'SYSTEM_GOOGLE_API_KEY';
   if (provider === 'openai') return credentials.openaiEnv || 'SYSTEM_OPENAI_API_KEY';
   if (provider === 'anthropic') return credentials.anthropicEnv || 'SYSTEM_ANTHROPIC_API_KEY';
+  if (provider === 'ollama') return ''; // Ollama is local — no API key required
   throw new Error(`System-managed credentials are not supported for provider "${provider}".`);
 }
 
@@ -164,7 +165,10 @@ export async function resolveSystemAgentLanguageModel(
   budgetLane: QualityBudgetLane = 'balanced',
 ): Promise<ResolvedSystemAgentModel> {
   const selection = await resolveSystemAgentRoute(agentKey, budgetLane);
-  const apiKey = process.env[selection.credentialEnvName]?.trim();
+  // Ollama is local — no API key required
+  const apiKey = selection.provider === 'ollama'
+    ? 'ollama'
+    : process.env[selection.credentialEnvName]?.trim();
 
   if (!apiKey) {
     throw new Error(`Missing system-managed API key env var "${selection.credentialEnvName}" for ${selection.agentKey}.`);

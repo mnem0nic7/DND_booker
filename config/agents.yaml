@@ -1,5 +1,5 @@
 system:
-  defaultProvider: google
+  defaultProvider: ollama
   defaultBudgetLane: balanced
   credentials:
     googleEnv: SYSTEM_GOOGLE_API_KEY
@@ -8,104 +8,126 @@ system:
 
 lanes:
   fast:
-    defaultProvider: google
+    defaultProvider: ollama
   balanced:
-    defaultProvider: google
+    defaultProvider: ollama
   high_quality:
-    defaultProvider: google
+    defaultProvider: ollama
 
 agents:
   default:
     fast:
-      provider: google
-      model: gemini-2.5-flash
+      provider: ollama
+      model: qwen3.5:9b
+      baseUrl: http://host.docker.internal:11434
       maxOutputTokens: 8192
     balanced:
-      provider: google
-      model: gemini-2.5-pro
-      maxOutputTokens: 16384
+      provider: ollama
+      model: qwen3.5:9b
+      baseUrl: http://host.docker.internal:11434
+      maxOutputTokens: 8192
     high_quality:
-      provider: google
-      model: gemini-2.5-pro
-      maxOutputTokens: 16384
+      provider: ollama
+      model: qwen3.5:9b
+      baseUrl: http://host.docker.internal:11434
+      maxOutputTokens: 8192
   agent.interviewer:
     fast:
-      provider: google
-      model: gemini-2.5-flash
+      provider: ollama
+      model: qwen3.5:9b
+      baseUrl: http://host.docker.internal:11434
       maxOutputTokens: 4096
     balanced:
-      provider: google
-      model: gemini-2.5-pro
+      provider: ollama
+      model: qwen3.5:9b
+      baseUrl: http://host.docker.internal:11434
       maxOutputTokens: 4096
     high_quality:
-      provider: google
-      model: gemini-2.5-pro
+      provider: ollama
+      model: qwen3.5:9b
+      baseUrl: http://host.docker.internal:11434
       maxOutputTokens: 4096
   agent.writer:
     fast:
-      provider: google
-      model: gemini-2.5-flash
-      maxOutputTokens: 12288
+      provider: ollama
+      model: qwen3.5:9b
+      baseUrl: http://host.docker.internal:11434
+      maxOutputTokens: 8192
     balanced:
-      provider: google
-      model: gemini-2.5-pro
-      maxOutputTokens: 16384
+      provider: ollama
+      model: qwen3.5:9b
+      baseUrl: http://host.docker.internal:11434
+      maxOutputTokens: 8192
     high_quality:
-      provider: google
-      model: gemini-2.5-pro
-      maxOutputTokens: 16384
+      provider: ollama
+      model: qwen3.5:9b
+      baseUrl: http://host.docker.internal:11434
+      maxOutputTokens: 8192
   agent.dnd_expert:
     fast:
-      provider: google
-      model: gemini-2.5-flash
+      provider: ollama
+      model: qwen3.5:9b
+      baseUrl: http://host.docker.internal:11434
       maxOutputTokens: 8192
     balanced:
-      provider: google
-      model: gemini-2.5-pro
-      maxOutputTokens: 12288
+      provider: ollama
+      model: qwen3.5:9b
+      baseUrl: http://host.docker.internal:11434
+      maxOutputTokens: 8192
     high_quality:
-      provider: google
-      model: gemini-2.5-pro
-      maxOutputTokens: 12288
+      provider: ollama
+      model: qwen3.5:9b
+      baseUrl: http://host.docker.internal:11434
+      maxOutputTokens: 8192
   agent.layout_expert:
     fast:
-      provider: google
-      model: gemini-2.5-flash
+      provider: ollama
+      model: qwen3.5:9b
+      baseUrl: http://host.docker.internal:11434
       maxOutputTokens: 8192
     balanced:
-      provider: google
-      model: gemini-2.5-pro
-      maxOutputTokens: 12288
+      provider: ollama
+      model: qwen3.5:9b
+      baseUrl: http://host.docker.internal:11434
+      maxOutputTokens: 8192
     high_quality:
-      provider: google
-      model: gemini-2.5-pro
-      maxOutputTokens: 12288
+      provider: ollama
+      model: qwen3.5:9b
+      baseUrl: http://host.docker.internal:11434
+      maxOutputTokens: 8192
   agent.critic:
     fast:
-      provider: google
-      model: gemini-2.5-flash
+      provider: ollama
+      model: qwen3.5:9b
+      baseUrl: http://host.docker.internal:11434
       maxOutputTokens: 8192
     balanced:
-      provider: google
-      model: gemini-2.5-pro
-      maxOutputTokens: 12288
+      provider: ollama
+      model: qwen3.5:9b
+      baseUrl: http://host.docker.internal:11434
+      maxOutputTokens: 8192
     high_quality:
-      provider: google
-      model: gemini-2.5-pro
-      maxOutputTokens: 12288
+      provider: ollama
+      model: qwen3.5:9b
+      baseUrl: http://host.docker.internal:11434
+      maxOutputTokens: 8192
   agent.final_editor:
     fast:
-      provider: google
-      model: gemini-2.5-flash
+      provider: ollama
+      model: qwen3.5:9b
+      baseUrl: http://host.docker.internal:11434
       maxOutputTokens: 8192
     balanced:
-      provider: google
-      model: gemini-2.5-pro
-      maxOutputTokens: 12288
+      provider: ollama
+      model: qwen3.5:9b
+      baseUrl: http://host.docker.internal:11434
+      maxOutputTokens: 8192
     high_quality:
-      provider: google
-      model: gemini-2.5-pro
-      maxOutputTokens: 12288
+      provider: ollama
+      model: qwen3.5:9b
+      baseUrl: http://host.docker.internal:11434
+      maxOutputTokens: 8192
+  # Artist stays on Gemini — Ollama has no image generation capability
   agent.artist:
     fast:
       provider: google
@@ -121,27 +143,33 @@ agents:
       maxOutputTokens: 2048
   agent.artist_console:
     fast:
-      provider: google
-      model: gemini-2.5-flash
+      provider: ollama
+      model: qwen3.5:9b
+      baseUrl: http://host.docker.internal:11434
       maxOutputTokens: 4096
     balanced:
-      provider: google
-      model: gemini-2.5-pro
+      provider: ollama
+      model: qwen3.5:9b
+      baseUrl: http://host.docker.internal:11434
       maxOutputTokens: 4096
     high_quality:
-      provider: google
-      model: gemini-2.5-pro
+      provider: ollama
+      model: qwen3.5:9b
+      baseUrl: http://host.docker.internal:11434
       maxOutputTokens: 4096
   agent.printer:
     fast:
-      provider: google
-      model: gemini-2.5-flash
+      provider: ollama
+      model: qwen3.5:9b
+      baseUrl: http://host.docker.internal:11434
       maxOutputTokens: 4096
     balanced:
-      provider: google
-      model: gemini-2.5-pro
+      provider: ollama
+      model: qwen3.5:9b
+      baseUrl: http://host.docker.internal:11434
       maxOutputTokens: 4096
     high_quality:
-      provider: google
-      model: gemini-2.5-pro
+      provider: ollama
+      model: qwen3.5:9b
+      baseUrl: http://host.docker.internal:11434
       maxOutputTokens: 4096
