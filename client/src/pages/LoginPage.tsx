@@ -3,6 +3,27 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import { AxiosError } from 'axios';
 
+/** Turn an auth failure into a message that tells the user what to do next. */
+function describeLoginError(err: unknown): string {
+  if (err instanceof AxiosError) {
+    // No response = request never completed (server down, network, or CORS).
+    if (!err.response) {
+      return "Can’t reach the server. Make sure it’s running, then try again.";
+    }
+    const status = err.response.status;
+    if (status === 401 || status === 400 || status === 403) {
+      return 'Invalid email or password.';
+    }
+    if (status === 429) {
+      return 'Too many attempts. Please wait a moment and try again.';
+    }
+    if (status >= 500) {
+      return 'Something went wrong on our end. Please try again in a moment.';
+    }
+  }
+  return 'Couldn’t sign you in. Please try again.';
+}
+
 export default function LoginPage() {
   const navigate = useNavigate();
   const { login } = useAuthStore();
@@ -21,11 +42,7 @@ export default function LoginPage() {
       await login(email, password);
       navigate('/');
     } catch (err) {
-      if (err instanceof AxiosError && err.response?.data?.error) {
-        setError(err.response.data.error);
-      } else {
-        setError('Invalid email or password.');
-      }
+      setError(describeLoginError(err));
     } finally {
       setIsSubmitting(false);
     }

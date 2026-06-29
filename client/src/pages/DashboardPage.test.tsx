@@ -43,7 +43,14 @@ const dungeon = makeProject({
 });
 
 beforeEach(() => {
-  useProjectStore.setState({ projects: [shadowveil, dungeon], isLoading: false, fetchError: null });
+  // DashboardPage fetches projects on mount; stub it so it doesn't hit the
+  // network or flip isLoading, and tests drive state directly via setState.
+  useProjectStore.setState({
+    projects: [shadowveil, dungeon],
+    isLoading: false,
+    fetchError: null,
+    fetchProjects: async () => {},
+  });
   useAuthStore.setState({ user: null, isLoading: false });
 });
 

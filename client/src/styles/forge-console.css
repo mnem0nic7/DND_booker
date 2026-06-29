@@ -691,22 +691,66 @@
   background: #1a1a2e;
 }
 
+.forge-brand {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #c7a449;
+  white-space: nowrap;
+  padding-right: 12px;
+  margin-right: 4px;
+  border-right: 1px solid #1e1e2e;
+  flex-shrink: 0;
+}
+
+.forge-topbar__hint {
+  font-size: 11px;
+  color: #475569;
+  padding: 0 6px;
+}
+
 .forge-topbar__new,
 .forge-topbar__logout {
   background: transparent;
   border: 1px solid #2d2d3d;
   border-radius: 4px;
-  padding: 4px 7px;
-  color: #475569;
+  padding: 4px 9px;
+  color: #94a3b8;
   cursor: pointer;
   display: flex;
   align-items: center;
-  transition: color 0.15s;
+  gap: 5px;
+  font-size: 11px;
+  white-space: nowrap;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
 }
 
-.forge-topbar__new:hover,
+.forge-topbar__new {
+  color: #c7a449;
+  border-color: #3a3320;
+}
+
+.forge-topbar__new:hover {
+  color: #e6c766;
+  border-color: #5c5230;
+  background: #1a1709;
+}
+
 .forge-topbar__logout:hover {
-  color: #94a3b8;
+  color: #cbd5e1;
+  border-color: #3d3d4d;
+}
+
+.forge-banner {
+  font-size: 12px;
+  padding: 8px 14px;
+  flex-shrink: 0;
+}
+
+.forge-banner--error {
+  background: #2a1416;
+  color: #fca5a5;
+  border-bottom: 1px solid #4c1d1d;
 }
 
 .forge-empty {
