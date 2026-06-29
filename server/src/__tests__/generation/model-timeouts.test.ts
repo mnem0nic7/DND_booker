@@ -134,4 +134,24 @@ describe('generateObjectWithTimeout (Ollama text path)', () => {
 
     expect(result.object).toEqual({ title: 'X', pages: 12, strict: true });
   });
+
+  it('lists all allowed enum values in the prompt so the model is not biased to the first option', async () => {
+    const enumSchema = z.object({
+      mode: z.enum(['one_shot', 'module']),
+      tags: z.array(z.enum(['combat', 'puzzle', 'social'])),
+    });
+    mockGenerateText.mockResolvedValueOnce({
+      text: '{"mode": "module", "tags": ["puzzle"]}',
+    });
+
+    await generateObjectWithTimeout('Brief', {
+      model: ollamaModel,
+      schema: enumSchema,
+      prompt: 'make a brief',
+    });
+
+    const systemPrompt = mockGenerateText.mock.calls[0]![0].system as string;
+    expect(systemPrompt).toContain('one_shot | module');
+    expect(systemPrompt).toContain('combat | puzzle | social');
+  });
 });

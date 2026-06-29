@@ -276,6 +276,47 @@ function extractJsonCandidate(raw: string): string {
   return stripped.slice(start);
 }
 
+/**
+ * Walk a JSON Schema and collect every multi-option enum with its dotted path
+ * and allowed values. The JSON template shows only ONE representative value per
+ * enum, which biases small models into always copying the first option (e.g.
+ * tagging a "module" request as "one_shot"). Listing the full allowed set per
+ * field in the prompt removes that bias and improves field-level correctness.
+ */
+function collectEnumConstraints(
+  schema: Record<string, unknown>,
+  path = '',
+): Array<{ path: string; values: unknown[] }> {
+  const out: Array<{ path: string; values: unknown[] }> = [];
+
+  const anyOf = schema.anyOf as Array<Record<string, unknown>> | undefined;
+  if (anyOf) {
+    for (const variant of anyOf) out.push(...collectEnumConstraints(variant, path));
+    return out;
+  }
+
+  const enumVals = schema.enum as unknown[] | undefined;
+  if (Array.isArray(enumVals) && enumVals.length > 1) {
+    out.push({ path: path || '(root)', values: enumVals });
+    return out;
+  }
+
+  if (schema.type === 'object') {
+    const props = schema.properties as Record<string, Record<string, unknown>> | undefined;
+    if (props) {
+      for (const [key, val] of Object.entries(props)) {
+        out.push(...collectEnumConstraints(val, path ? `${path}.${key}` : key));
+      }
+    }
+  }
+  if (schema.type === 'array') {
+    const items = schema.items as Record<string, unknown> | undefined;
+    if (items) out.push(...collectEnumConstraints(items, `${path}[]`));
+  }
+
+  return out;
+}
+
 /** Render a parse/validation failure compactly for feeding back to the model. */
 function describeSchemaError(error: unknown): string {
   if (error instanceof z.ZodError) {
@@ -302,7 +343,14 @@ async function generateObjectViaText<T>(
   // Dotted-path hints confuse small models into generating flat keys ("brief.title" instead of nested).
   const template = buildJsonTemplate(jsonSchema as Record<string, unknown>);
   const callerSystem: string = (options as any).system ?? '';
-  const schemaInstruction = `IMPORTANT: Respond with ONLY a valid JSON object — no markdown, no explanation, no preamble. Keep all string values concise (1-3 sentences max). Use this exact structure (fill in appropriate values):\n${JSON.stringify(template)}`;
+  // List allowed enum values per field so the model picks the right one instead
+  // of copying the single representative value shown in the template.
+  const enumConstraints = collectEnumConstraints(jsonSchema as Record<string, unknown>);
+  const enumHint = enumConstraints.length > 0
+    ? `\nFor these fields, use EXACTLY one of the allowed values (choose the best fit, do not copy the example):\n${
+      enumConstraints.map((c) => `- ${c.path}: ${c.values.join(' | ')}`).join('\n')}`
+    : '';
+  const schemaInstruction = `IMPORTANT: Respond with ONLY a valid JSON object — no markdown, no explanation, no preamble. Keep all string values concise (1-3 sentences max). Use this exact structure (fill in appropriate values):\n${JSON.stringify(template)}${enumHint}`;
   const systemPrompt = callerSystem
     ? `${callerSystem}\n\n${schemaInstruction}`
     : schemaInstruction;
