@@ -76,6 +76,23 @@ describe('generateObjectWithTimeout (Ollama text path)', () => {
     expect(mockGenerateObject).not.toHaveBeenCalled();
   });
 
+  it('extracts the first object when the model appends trailing content after it', async () => {
+    // Real qwen2.5:3b behavior: a valid object immediately followed by more text
+    // (a second object, a repeat, or notes). Must trim to the first balanced
+    // object rather than feeding the whole string to JSON.parse.
+    mockGenerateText.mockResolvedValueOnce({
+      text: '{"title": "First", "summary": "The real one."}\n{"title": "Second", "summary": "junk"}\nThanks!',
+    });
+
+    const result = await generateObjectWithTimeout('Brief', {
+      model: ollamaModel,
+      schema: briefSchema,
+      prompt: 'make a brief',
+    });
+
+    expect(result.object).toEqual({ title: 'First', summary: 'The real one.' });
+  });
+
   it('does not silently fill missing required strings with a placeholder', async () => {
     // Every attempt returns null for `summary`. The model path must NOT invent
     // placeholder text (e.g. "TBD") to force validation — it must surface the

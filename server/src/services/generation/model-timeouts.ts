@@ -242,10 +242,10 @@ function extractJsonCandidate(raw: string): string {
     .replace(/\s*```$/i, '')
     .trim();
 
-  if (stripped.startsWith('{') || stripped.startsWith('[')) {
-    return stripped;
-  }
-
+  // Always brace-match (even when the text already starts with `{`/`[`) so that
+  // trailing content after the first complete object — a second object, a repeat,
+  // or notes, all common from small models — is dropped instead of breaking
+  // JSON.parse with "non-whitespace after JSON".
   const objIdx = stripped.indexOf('{');
   const arrIdx = stripped.indexOf('[');
   const candidates = [objIdx, arrIdx].filter((i) => i >= 0);
