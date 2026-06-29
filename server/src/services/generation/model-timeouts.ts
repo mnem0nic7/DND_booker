@@ -190,6 +190,13 @@ function coerceForSchema(value: unknown, schema: z.ZodType): unknown {
   }
 
   if (inner instanceof z.ZodString) {
+    // Intentionally do NOT invent placeholder text for null/undefined here.
+    // coerceForSchema runs for every Ollama structured call (bible, outline,
+    // canon, chapter drafts, evaluator, interview), so filling a missing string
+    // with a placeholder would leak literal placeholder text into published
+    // content and mask a real generation failure. Let strict validation fail
+    // instead — the repair loop retries with feedback, and callers that have a
+    // higher-quality recovery path (e.g. the interview's rule-based brief) take it.
     return value;
   }
 
@@ -218,6 +225,66 @@ function coerceForSchema(value: unknown, schema: z.ZodType): unknown {
   }
 
   return value;
+}
+
+/**
+ * Extract the first balanced JSON object/array from a model response.
+ * Small models routinely wrap JSON in prose ("Sure! Here is the brief: {...}")
+ * or markdown fences. Stripping fences alone misses the prose case, so we scan
+ * for the first `{`/`[` and walk to its matching close, respecting string
+ * literals. Returns the original (fence-stripped) text when no object is found,
+ * letting JSON.parse produce a meaningful error.
+ */
+function extractJsonCandidate(raw: string): string {
+  const stripped = raw
+    .trim()
+    .replace(/^```(?:json)?\s*/i, '')
+    .replace(/\s*```$/i, '')
+    .trim();
+
+  if (stripped.startsWith('{') || stripped.startsWith('[')) {
+    return stripped;
+  }
+
+  const objIdx = stripped.indexOf('{');
+  const arrIdx = stripped.indexOf('[');
+  const candidates = [objIdx, arrIdx].filter((i) => i >= 0);
+  if (candidates.length === 0) return stripped;
+  const start = Math.min(...candidates);
+
+  const open = stripped[start]!;
+  const close = open === '{' ? '}' : ']';
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  for (let i = start; i < stripped.length; i += 1) {
+    const ch = stripped[i]!;
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (ch === '\\') escaped = true;
+      else if (ch === '"') inString = false;
+      continue;
+    }
+    if (ch === '"') inString = true;
+    else if (ch === open) depth += 1;
+    else if (ch === close) {
+      depth -= 1;
+      if (depth === 0) return stripped.slice(start, i + 1);
+    }
+  }
+
+  return stripped.slice(start);
+}
+
+/** Render a parse/validation failure compactly for feeding back to the model. */
+function describeSchemaError(error: unknown): string {
+  if (error instanceof z.ZodError) {
+    return error.issues
+      .slice(0, 6)
+      .map((issue) => `${issue.path.join('.') || '(root)'}: ${issue.message}`)
+      .join('; ');
+  }
+  return error instanceof Error ? error.message : String(error);
 }
 
 /**
@@ -254,28 +321,51 @@ async function generateObjectViaText<T>(
     ? Math.min(callerMaxOutput, MAX_OLLAMA_OUTPUT_TOKENS)
     : MAX_OLLAMA_OUTPUT_TOKENS;
 
+  let lastError: unknown = null;
+  let lastRaw = '';
+
   for (let attempt = 1; attempt <= DEFAULT_GENERATION_OBJECT_ATTEMPTS; attempt += 1) {
+    // On retries, feed the prior failure back so the model repairs rather than
+    // blindly repeating the same mistake — the single biggest reliability lever
+    // for small local models, which often need only a targeted nudge.
+    const attemptMessages = attempt === 1
+      ? messages
+      : [
+        ...messages,
+        {
+          role: 'user' as const,
+          content: `Your previous response could not be used. Error: ${describeSchemaError(lastError)}.\n`
+            + `Your previous output was:\n${lastRaw.slice(0, 1200)}\n\n`
+            + 'Return ONLY corrected JSON matching the required structure — no prose, no markdown, no preamble.',
+        },
+      ];
+
     const result = await withHardTextTimeout(label, timeoutMs, async (signal) =>
       generateText({
         model: options.model,
         system: systemPrompt,
-        messages,
+        messages: attemptMessages,
         maxOutputTokens: cappedMaxOutput,
         abortSignal: signal,
       }),
     );
 
-    const raw = result.text.trim();
-    // Strip markdown code fences if present
-    const json = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+    lastRaw = result.text.trim();
+    const json = extractJsonCandidate(lastRaw);
 
     try {
       const parsed = JSON.parse(json);
       const coerced = coerceForSchema(parsed, options.schema);
       const validated = options.schema.parse(coerced) as T;
       return { object: validated };
-    } catch {
+    } catch (error) {
+      lastError = error;
       if (attempt >= DEFAULT_GENERATION_OBJECT_ATTEMPTS) {
+        // Surface the underlying reason instead of swallowing it — these failures
+        // were previously invisible, making local-model regressions hard to debug.
+        console.warn(
+          `[generateObjectViaText] ${label} failed after ${attempt} attempts: ${describeSchemaError(error)}`,
+        );
         throw new Error(`${label}: response did not match schema after ${attempt} attempts`);
       }
     }

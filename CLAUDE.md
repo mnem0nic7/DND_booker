@@ -42,6 +42,12 @@ npm run test --workspace=worker -- layout-visual-parity.test.ts  # Single worker
 npm run test:server:local -- documents.v1.test.ts           # Server integration test (needs Cloud SQL Proxy + Redis)
 cd server && npm test -- src/__tests__/auth.test.ts         # Single server test file
 
+# Playwright E2E (client/e2e/, run against a live stack; auth.setup.ts seeds a session)
+npm run test:e2e --workspace=client                         # All E2E specs
+npm run test:e2e:one-shot:local --workspace=client          # Local one-shot generation flow
+npm run test:e2e:ui --workspace=client                      # Interactive Playwright UI runner
+cd client && npx playwright test e2e/interviewer.spec.ts    # Single E2E spec
+
 # SDK / type generation
 npm run generate:sdk                  # Regenerate OpenAPI spec + typed client (run after api/v1 route changes)
 
@@ -111,7 +117,7 @@ For deeper layout rules see `docs/skills/change-completion-workflow.md`.
 ### Autonomous generation pipeline
 Generation starts from a **locked interview session** (`interview_brief` artifact must exist) before enqueuing a worker run. The pipeline stages are: interviewer → writer story packet → D&D expert inserts → layout draft + image briefs → critic loop with routed rewrites → final editor → printer/export.
 
-Models resolve per-stage through `server/src/services/llm/router.ts` against `config/agents.yaml`, not from the user's saved chat model. `config/agents.yaml` defines system-managed credential env vars (`SYSTEM_GOOGLE_API_KEY`, etc.) and per-lane model presets (`fast`, `balanced`, `high_quality`). Quick-mode runs downgrade heavy stages (`agent.bible`, `agent.outline`, `agent.canon`, `agent.chapter_draft`, `agent.layout`) to the Flash lane.
+Models resolve per-stage through `server/src/services/llm/router.ts` against `config/agents.yaml`, not from the user's saved chat model. `config/agents.yaml` declares each stage's per-lane preset (`fast`, `balanced`, `high_quality`) with an explicit `provider` and `model`. The checked-in config defaults every lane to local **Ollama** (`qwen2.5:3b` at `http://host.docker.internal:11434`) for offline/local dev; cloud lanes instead point at system-managed providers via credential env vars (`SYSTEM_GOOGLE_API_KEY`, `SYSTEM_OPENAI_API_KEY`, `SYSTEM_ANTHROPIC_API_KEY`). Small Ollama models need the JSON-Schema-in-prompt + text-repair path in `generateObjectViaText` — see `cb9e3ed`/`e3af11d` before touching structured-output calls in those lanes. Quick-mode runs downgrade heavy stages (`agent.bible`, `agent.outline`, `agent.canon`, `agent.chapter_draft`, `agent.layout`) to the Flash lane.
 
 Run state tracked in `graphStateJson`: `agentStage`, `criticCycle`, `qualityBudgetLane`, `routedRewriteCounts`, `imageGenerationStatus`, `finalEditorialStatus`.
 
