@@ -135,6 +135,22 @@ describe('generateObjectWithTimeout (Ollama text path)', () => {
     expect(result.object).toEqual({ title: 'X', pages: 12, strict: true });
   });
 
+  it('returns token usage so run accounting works on the local path', async () => {
+    const schema = z.object({ title: z.string().min(1) });
+    mockGenerateText.mockResolvedValueOnce({
+      text: '{"title": "X"}',
+      usage: { inputTokens: 800, outputTokens: 1200 },
+    });
+
+    const result = await generateObjectWithTimeout('Brief', {
+      model: ollamaModel,
+      schema,
+      prompt: 'make a brief',
+    });
+
+    expect(result.usage).toEqual({ inputTokens: 800, outputTokens: 1200 });
+  });
+
   it('lists all allowed enum values in the prompt so the model is not biased to the first option', async () => {
     const enumSchema = z.object({
       mode: z.enum(['one_shot', 'module']),

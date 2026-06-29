@@ -1,85 +1,66 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Fully-local server integration test harness.
+# Brings up the docker-compose Postgres + Redis, provisions a dedicated test
+# database, runs migrations, and executes the server vitest suite against them.
+# No gcloud / Cloud SQL Proxy — everything runs on the local Docker stack.
+
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-TMP_DIR="$ROOT_DIR/tmp/test-services"
-PROXY_BIN="$TMP_DIR/cloud-sql-proxy"
-REDIS_LOG="$TMP_DIR/redis.log"
-PROXY_LOG="$TMP_DIR/cloud-sql-proxy.log"
-INSTANCE_CONNECTION_NAME="${INSTANCE_CONNECTION_NAME:-dnd-booker:us-west4:dnd-booker-db}"
-TEST_DB_NAME="${TEST_DB_NAME:-dnd_booker_test}"
-REDIS_PORT="${REDIS_PORT:-6380}"
+COMPOSE_FILE="$ROOT_DIR/docker-compose.yml"
+
+# Local docker-compose defaults (override via env if you customized compose).
+PG_USER="${TEST_PG_USER:-dnd_booker}"
+PG_PASSWORD="${TEST_PG_PASSWORD:-dnd_booker_dev}"
+PG_HOST="${TEST_PG_HOST:-localhost}"
 POSTGRES_PORT="${POSTGRES_PORT:-5433}"
+TEST_DB_NAME="${TEST_DB_NAME:-dnd_booker_test}"
+REDIS_HOST_LOCAL="${TEST_REDIS_HOST:-localhost}"
+REDIS_PORT="${REDIS_PORT:-6380}"
+TEST_REDIS_PASSWORD="${REDIS_PASSWORD:-dev-redis-password}"
 
-mkdir -p "$TMP_DIR"
+if ! command -v docker >/dev/null 2>&1; then
+  echo "docker is required for local integration tests but was not found on PATH." >&2
+  exit 1
+fi
 
-cleanup() {
-  local exit_code=$?
-  if [[ -n "${REDIS_PID:-}" ]] && kill -0 "$REDIS_PID" 2>/dev/null; then
-    kill "$REDIS_PID" 2>/dev/null || true
-    wait "$REDIS_PID" 2>/dev/null || true
-  fi
-  if [[ -n "${PROXY_PID:-}" ]] && kill -0 "$PROXY_PID" 2>/dev/null; then
-    kill "$PROXY_PID" 2>/dev/null || true
-    wait "$PROXY_PID" 2>/dev/null || true
-  fi
-  exit "$exit_code"
-}
+compose() { docker compose -f "$COMPOSE_FILE" "$@"; }
 
-trap cleanup EXIT INT TERM
-
-wait_for_port() {
-  local host=$1
-  local port=$2
-  local name=$3
+wait_for_health() {
+  local service=$1
   for _ in $(seq 1 60); do
-    if (echo >/dev/tcp/"$host"/"$port") >/dev/null 2>&1; then
+    local status
+    status="$(compose ps --format '{{.Health}}' "$service" 2>/dev/null | head -n1 || true)"
+    if [[ "$status" == "healthy" ]]; then
       return 0
     fi
-    sleep 1
+    sleep 2
   done
-
-  echo "Timed out waiting for $name on $host:$port" >&2
+  echo "Timed out waiting for docker service '$service' to become healthy." >&2
+  compose logs --tail 30 "$service" >&2 || true
   return 1
 }
 
-if [[ ! -x "$PROXY_BIN" ]]; then
-  curl -fsSL "https://storage.googleapis.com/cloud-sql-connectors/cloud-sql-proxy/v2.18.2/cloud-sql-proxy.linux.amd64" -o "$PROXY_BIN"
-  chmod +x "$PROXY_BIN"
+echo "Starting local Postgres + Redis (docker compose)…"
+REDIS_PASSWORD="$TEST_REDIS_PASSWORD" compose up -d postgres redis >/dev/null
+wait_for_health postgres
+wait_for_health redis
+
+echo "Ensuring test database '$TEST_DB_NAME' exists…"
+if ! compose exec -T -e PGPASSWORD="$PG_PASSWORD" postgres \
+    psql -U "$PG_USER" -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname='$TEST_DB_NAME'" \
+    | grep -qx 1; then
+  compose exec -T -e PGPASSWORD="$PG_PASSWORD" postgres \
+    createdb -U "$PG_USER" "$TEST_DB_NAME"
 fi
 
-if ! gcloud sql databases list --instance dnd-booker-db --project dnd-booker --format='value(name)' | grep -qx "$TEST_DB_NAME"; then
-  gcloud sql databases create "$TEST_DB_NAME" --instance dnd-booker-db --project dnd-booker >/dev/null
-fi
-
-REDISMS_DISABLE_POSTINSTALL=true REDISMS_PORT="$REDIS_PORT" npx --yes redis-memory-server@"0.16.0" >"$REDIS_LOG" 2>&1 &
-REDIS_PID=$!
-wait_for_port 127.0.0.1 "$REDIS_PORT" "Redis"
-
-"$PROXY_BIN" --port "$POSTGRES_PORT" "$INSTANCE_CONNECTION_NAME" >"$PROXY_LOG" 2>&1 &
-PROXY_PID=$!
-wait_for_port 127.0.0.1 "$POSTGRES_PORT" "Cloud SQL Proxy"
-
-TEST_DATABASE_URL="$(
-  gcloud secrets versions access latest --secret=dnd-booker-database-url --project dnd-booker \
-  | node -e '
-      let raw = "";
-      process.stdin.setEncoding("utf8");
-      process.stdin.on("data", (chunk) => { raw += chunk; });
-      process.stdin.on("end", () => {
-        const url = new URL(raw.trim());
-        url.hostname = "127.0.0.1";
-        url.port = process.env.POSTGRES_PORT || "5433";
-        url.pathname = `/${process.env.TEST_DB_NAME || "dnd_booker_test"}`;
-        console.log(url.toString());
-      });
-    '
-)"
-
-export DATABASE_URL="$TEST_DATABASE_URL"
-export REDIS_HOST="127.0.0.1"
+export DATABASE_URL="postgresql://${PG_USER}:${PG_PASSWORD}@${PG_HOST}:${POSTGRES_PORT}/${TEST_DB_NAME}?schema=public"
+export REDIS_HOST="$REDIS_HOST_LOCAL"
 export REDIS_PORT="$REDIS_PORT"
-unset REDIS_PASSWORD
+export REDIS_PASSWORD="$TEST_REDIS_PASSWORD"
 
+echo "Applying migrations to test database…"
 (cd "$ROOT_DIR/server" && npx prisma migrate deploy --schema=prisma/schema.prisma >/dev/null)
+
+echo "Running server vitest suite…"
 (cd "$ROOT_DIR/server" && npm run test -- run "$@")

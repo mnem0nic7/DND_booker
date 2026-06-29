@@ -25,10 +25,17 @@ describe('Generation Queue Service', () => {
     const jobId = await enqueueGenerationRun('run-123', 'user-456', 'proj-789');
 
     expect(jobId).toBe('mock-job-id');
+    // Lock in the generation queue's reliability config: BullMQ retries with
+    // exponential backoff (not a single attempt) so transient failures during
+    // a multi-stage run resume instead of dying. See QUEUE_DEFAULTS.generation.
     expect(mockAdd).toHaveBeenCalledWith(
       'orchestrate',
       { runId: 'run-123', userId: 'user-456', projectId: 'proj-789' },
-      expect.objectContaining({ attempts: 1 }),
+      expect.objectContaining({
+        attempts: 3,
+        priority: 20,
+        backoff: { type: 'exponential', delay: 2500 },
+      }),
     );
   });
 });

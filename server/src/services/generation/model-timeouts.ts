@@ -337,7 +337,7 @@ async function generateObjectViaText<T>(
   label: string,
   options: Parameters<typeof generateObject>[0] & { schema: z.ZodType<T> },
   timeoutMs: number,
-): Promise<{ object: T }> {
+): Promise<{ object: T; usage?: unknown }> {
   const jsonSchema = zodToJsonSchema(options.schema, { $refStrategy: 'none' });
   // Build a compact example JSON showing the exact nested structure.
   // Dotted-path hints confuse small models into generating flat keys ("brief.title" instead of nested).
@@ -405,7 +405,9 @@ async function generateObjectViaText<T>(
       const parsed = JSON.parse(json);
       const coerced = coerceForSchema(parsed, options.schema);
       const validated = options.schema.parse(coerced) as T;
-      return { object: validated };
+      // Preserve token usage so run accounting works on the local path too — the
+      // cloud generateObject path returns it, and callers destructure `usage`.
+      return { object: validated, usage: result.usage };
     } catch (error) {
       lastError = error;
       if (attempt >= DEFAULT_GENERATION_OBJECT_ATTEMPTS) {

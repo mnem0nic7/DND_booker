@@ -101,6 +101,12 @@ afterAll(async () => {
 
 beforeEach(() => { vi.clearAllMocks(); });
 
+// The outline stage runs on the local Ollama text path (generateObjectViaText),
+// which only triggers when isOllamaModel(model) is true. Stub a model whose
+// provider marks it as Ollama so the suite exercises the real local path and
+// the mocked generateText is actually used.
+const OLLAMA_MODEL = { provider: 'ollama.chat' } as any;
+
 describe('Outline Service — executeOutlineGeneration', () => {
   it('should create a chapter_outline artifact from valid AI response', async () => {
     mockGenerateText.mockResolvedValueOnce({
@@ -112,7 +118,7 @@ describe('Outline Service — executeOutlineGeneration', () => {
       projectId: testProject.id, userId: testUser.id, prompt: 'test',
     });
 
-    const result = await executeOutlineGeneration(run!, SAMPLE_BIBLE, {} as any, 8192);
+    const result = await executeOutlineGeneration(run!, SAMPLE_BIBLE, OLLAMA_MODEL, 8192);
 
     expect(result.outline.chapters.length).toBe(3);
     expect(result.outline.totalPageEstimate).toBe(12);
@@ -135,12 +141,14 @@ describe('Outline Service — executeOutlineGeneration', () => {
       projectId: testProject.id, userId: testUser.id, prompt: 'test',
     });
 
-    await executeOutlineGeneration(run!, SAMPLE_BIBLE, {} as any, 8192);
+    await executeOutlineGeneration(run!, SAMPLE_BIBLE, OLLAMA_MODEL, 8192);
 
-    const call = mockGenerateText.mock.calls[0][0];
-    expect(call.prompt).toContain('The Goblin Caves');
-    expect(call.prompt).toContain('ch-1');
-    expect(call.prompt).toContain('chief-gnarltooth');
+    // On the Ollama text path the prompt is delivered as a user message.
+    const call = mockGenerateText.mock.calls[0][0] as { prompt?: string; messages?: Array<{ content: unknown }> };
+    const promptText = call.prompt ?? call.messages?.map((m) => String(m.content)).join('\n') ?? '';
+    expect(promptText).toContain('The Goblin Caves');
+    expect(promptText).toContain('ch-1');
+    expect(promptText).toContain('chief-gnarltooth');
   });
 
   it('should update run token count', async () => {
@@ -153,7 +161,7 @@ describe('Outline Service — executeOutlineGeneration', () => {
       projectId: testProject.id, userId: testUser.id, prompt: 'test',
     });
 
-    await executeOutlineGeneration(run!, SAMPLE_BIBLE, {} as any, 8192);
+    await executeOutlineGeneration(run!, SAMPLE_BIBLE, OLLAMA_MODEL, 8192);
 
     const updated = await prisma.generationRun.findUnique({ where: { id: run!.id } });
     expect(updated!.actualTokens).toBe(2000);
@@ -168,7 +176,7 @@ describe('Outline Service — executeOutlineGeneration', () => {
       projectId: testProject.id, userId: testUser.id, prompt: 'test',
     });
 
-    await expect(executeOutlineGeneration(run!, SAMPLE_BIBLE, {} as any, 8192)).rejects.toThrow();
+    await expect(executeOutlineGeneration(run!, SAMPLE_BIBLE, OLLAMA_MODEL, 8192)).rejects.toThrow();
   });
 
   it('should handle appendices in the outline', async () => {
@@ -189,7 +197,7 @@ describe('Outline Service — executeOutlineGeneration', () => {
       projectId: testProject.id, userId: testUser.id, prompt: 'test',
     });
 
-    const result = await executeOutlineGeneration(run!, SAMPLE_BIBLE, {} as any, 8192);
+    const result = await executeOutlineGeneration(run!, SAMPLE_BIBLE, OLLAMA_MODEL, 8192);
     expect(result.outline.appendices.length).toBe(1);
     expect(result.outline.appendices[0].slug).toBe('appendix-a-npcs');
   });
@@ -222,7 +230,7 @@ describe('Outline Service — executeOutlineGeneration', () => {
       projectId: testProject.id, userId: testUser.id, prompt: 'test',
     });
 
-    const result = await executeOutlineGeneration(run!, SAMPLE_BIBLE, {} as any, 8192);
+    const result = await executeOutlineGeneration(run!, SAMPLE_BIBLE, OLLAMA_MODEL, 8192);
 
     expect(result.outline.chapters[0].sections[0].contentType).toBe('narrative');
     expect(result.outline.chapters[0].sections[1].contentType).toBe('social');
@@ -256,7 +264,7 @@ describe('Outline Service — executeOutlineGeneration', () => {
       projectId: testProject.id, userId: testUser.id, prompt: 'test',
     });
 
-    const result = await executeOutlineGeneration(run!, SAMPLE_BIBLE, {} as any, 8192);
+    const result = await executeOutlineGeneration(run!, SAMPLE_BIBLE, OLLAMA_MODEL, 8192);
 
     expect(result.outline.chapters[0].sections[0].contentType).toBe('exploration');
     expect(result.outline.chapters[0].sections[1].contentType).toBe('encounter');
@@ -272,8 +280,8 @@ describe('Outline Service — executeOutlineGeneration', () => {
       projectId: testProject.id, userId: testUser.id, prompt: 'test',
     });
 
-    const first = await executeOutlineGeneration(run!, SAMPLE_BIBLE, {} as any, 8192);
-    const second = await executeOutlineGeneration(run!, SAMPLE_BIBLE, {} as any, 8192);
+    const first = await executeOutlineGeneration(run!, SAMPLE_BIBLE, OLLAMA_MODEL, 8192);
+    const second = await executeOutlineGeneration(run!, SAMPLE_BIBLE, OLLAMA_MODEL, 8192);
 
     expect(second.artifactId).toBe(first.artifactId);
     expect(second.outline.totalPageEstimate).toBe(first.outline.totalPageEstimate);
