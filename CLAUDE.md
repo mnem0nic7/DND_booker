@@ -39,7 +39,7 @@ npm run dev --workspace=worker     # Export + orchestration worker
 npm run test:unit --workspace=client                        # Client unit tests
 npm test --workspace=server                                 # All server tests
 npm run test --workspace=worker -- layout-visual-parity.test.ts  # Single worker test
-npm run test:server:local -- documents.v1.test.ts           # Server integration test (needs Cloud SQL Proxy + Redis)
+npm run test:server:local -- documents.v1.test.ts           # Server integration test (uses local docker-compose Postgres + Redis; no gcloud)
 cd server && npm test -- src/__tests__/auth.test.ts         # Single server test file
 
 # Playwright E2E (client/e2e/, run against a live stack; auth.setup.ts seeds a session)
@@ -182,7 +182,7 @@ Unless the user explicitly says not to, treat this as the default after every co
 2. Run the repo verification flow:
    - `npm run verify:ship` for the normal shippable path.
    - `npm run verify` is the lighter build-only pass when you explicitly do not need the full ship checks.
-   - If cloud-backed server integration is unavailable, record the exact blocker instead of silently skipping it.
+   - The server integration suite runs against the local docker-compose Postgres + Redis (no gcloud). Ensure Docker is running; the harness brings up the services, provisions a `dnd_booker_test` database, and applies migrations. If Docker itself is unavailable, record the exact blocker instead of silently skipping it.
    - `verify:ship` covers worker layout regression, client unit tests, and the full server integration suite (auth, AI, wizard apply, assets, templates, documents, v1 export, legacy-compat headers, agentic artifacts, intake, bible, chapter plan, golden prompts, canon expansion, evaluator, projects, runs, interview, agent restore, generation routes, console). Keep new `api/v1` regressions in this path when they touch transport serialization or run orchestration.
    - For queue-durability work, add `npm run ops:redis:check` to the ship pass.
 3. Update repo memory and docs when behavior, workflow, deployment steps, or architecture changed.
