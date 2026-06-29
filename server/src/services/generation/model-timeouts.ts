@@ -91,9 +91,29 @@ export async function generateTextWithTimeout(
   throw lastError instanceof Error ? lastError : new Error(`${label} failed`);
 }
 
+function modelProvider(model: LanguageModel): string {
+  const provider = (model as Record<string, unknown>).provider;
+  return typeof provider === 'string' ? provider : '';
+}
+
 function isOllamaModel(model: LanguageModel): boolean {
-  return typeof (model as Record<string, unknown>).provider === 'string'
-    && ((model as Record<string, unknown>).provider as string).startsWith('ollama');
+  return modelProvider(model).startsWith('ollama');
+}
+
+/**
+ * Anthropic's strict structured-output API rejects the pipeline's
+ * passthrough/sloppy-tolerant candidate schemas ("additionalProperties: true is
+ * not supported"). Those schemas were designed for the manual parse+coerce path,
+ * so route Anthropic through it too — same repair loop, JSON extraction, enum
+ * hints, and coercion that the schemas expect.
+ */
+function isAnthropicModel(model: LanguageModel): boolean {
+  return modelProvider(model).startsWith('anthropic');
+}
+
+/** Providers that go through generateText + manual JSON parse instead of native generateObject. */
+function usesManualObjectPath(model: LanguageModel): boolean {
+  return isOllamaModel(model) || isAnthropicModel(model);
 }
 
 /**
@@ -350,7 +370,12 @@ async function generateObjectViaText<T>(
     ? `\nFor these fields, use EXACTLY one of the allowed values (choose the best fit, do not copy the example):\n${
       enumConstraints.map((c) => `- ${c.path}: ${c.values.join(' | ')}`).join('\n')}`
     : '';
-  const schemaInstruction = `IMPORTANT: Respond with ONLY a valid JSON object — no markdown, no explanation, no preamble. Keep all string values concise (1-3 sentences max). Use this exact structure (fill in appropriate values):\n${JSON.stringify(template)}${enumHint}`;
+  const isOllama = isOllamaModel(options.model);
+  // Small local models need a brevity nudge to avoid runaway output; capable
+  // cloud models (Anthropic) should be free to produce richer, higher-quality
+  // prose, so only add the brevity constraint for Ollama.
+  const brevity = isOllama ? ' Keep all string values concise (1-3 sentences max).' : '';
+  const schemaInstruction = `IMPORTANT: Respond with ONLY a valid JSON object — no markdown, no explanation, no preamble.${brevity} Use this exact structure (fill in appropriate values):\n${JSON.stringify(template)}${enumHint}`;
   const systemPrompt = callerSystem
     ? `${callerSystem}\n\n${schemaInstruction}`
     : schemaInstruction;
@@ -359,15 +384,14 @@ async function generateObjectViaText<T>(
     ? (options as any).messages
     : [{ role: 'user' as const, content: (options as any).prompt ?? '' }];
 
-  // Cap output tokens to prevent small models from filling their entire context window.
-  // 600 is enough for the compact InterviewAgentResponseSchema but too tight for complex
-  // schemas like BibleContentCandidateSchema (needs 1000-2000+ tokens). 2048 prevents
-  // worst-case 4-minute calls while leaving room for deeply nested generation schemas.
+  // Cap output tokens to prevent small Ollama models from filling their entire
+  // context window (worst-case multi-minute calls). Capable cloud models get the
+  // caller's full budget so large schemas (bible, outline) are not truncated.
   const MAX_OLLAMA_OUTPUT_TOKENS = 2048;
   const callerMaxOutput: number | undefined = (options as any).maxOutputTokens;
-  const cappedMaxOutput = callerMaxOutput
-    ? Math.min(callerMaxOutput, MAX_OLLAMA_OUTPUT_TOKENS)
-    : MAX_OLLAMA_OUTPUT_TOKENS;
+  const cappedMaxOutput = isOllama
+    ? Math.min(callerMaxOutput ?? MAX_OLLAMA_OUTPUT_TOKENS, MAX_OLLAMA_OUTPUT_TOKENS)
+    : (callerMaxOutput ?? 8192);
 
   let lastError: unknown = null;
   let lastRaw = '';
@@ -432,9 +456,10 @@ export async function generateObjectWithTimeout(
   const timeoutMs = resolveTimeoutMs(fallbackMs);
   let lastError: unknown = null;
 
-  // Ollama crashes when generateObject compiles complex schemas to ABNF grammar.
-  // Use generateText + manual JSON parse instead.
-  if (isOllamaModel(options.model)) {
+  // Ollama crashes when generateObject compiles complex schemas to ABNF grammar,
+  // and Anthropic's strict structured-output API rejects the pipeline's
+  // passthrough schemas. Both use generateText + manual JSON parse instead.
+  if (usesManualObjectPath(options.model)) {
     return generateObjectViaText(label, options as any, timeoutMs);
   }
 

@@ -15,6 +15,9 @@ import { generateObjectWithTimeout } from '../../services/generation/model-timeo
 
 // A model object the isOllamaModel() guard recognizes (provider starts with "ollama").
 const ollamaModel = { provider: 'ollama.chat' } as never;
+// Anthropic models also use the manual text path (their strict structured-output
+// API rejects the pipeline's passthrough/sloppy-tolerant schemas).
+const anthropicModel = { provider: 'anthropic.messages' } as never;
 
 describe('generateObjectWithTimeout', () => {
   afterEach(() => {
@@ -186,5 +189,51 @@ describe('generateObjectWithTimeout (Ollama text path)', () => {
     const systemPrompt = mockGenerateText.mock.calls[0]![0].system as string;
     expect(systemPrompt).toContain('one_shot | module');
     expect(systemPrompt).toContain('combat | puzzle | social');
+  });
+
+  it('routes Anthropic models through the text path (not native generateObject)', async () => {
+    const schema = z.object({ title: z.string().min(1) });
+    mockGenerateText.mockResolvedValueOnce({
+      text: '{"title": "Sonnet output"}',
+      usage: { inputTokens: 100, outputTokens: 50 },
+    });
+
+    const result = await generateObjectWithTimeout('Brief', {
+      model: anthropicModel,
+      schema,
+      prompt: 'make a brief',
+    });
+
+    expect(result.object).toEqual({ title: 'Sonnet output' });
+    expect(mockGenerateText).toHaveBeenCalledTimes(1);
+    expect(mockGenerateObject).not.toHaveBeenCalled();
+  });
+
+  it('does not cap Anthropic output tokens to the small Ollama limit', async () => {
+    const schema = z.object({ title: z.string().min(1) });
+    mockGenerateText.mockResolvedValueOnce({ text: '{"title": "X"}' });
+
+    await generateObjectWithTimeout('Brief', {
+      model: anthropicModel,
+      schema,
+      prompt: 'make a brief',
+      maxOutputTokens: 16384,
+    });
+
+    expect(mockGenerateText.mock.calls[0]![0].maxOutputTokens).toBe(16384);
+  });
+
+  it('still caps Ollama output tokens at the small-model limit', async () => {
+    const schema = z.object({ title: z.string().min(1) });
+    mockGenerateText.mockResolvedValueOnce({ text: '{"title": "X"}' });
+
+    await generateObjectWithTimeout('Brief', {
+      model: ollamaModel,
+      schema,
+      prompt: 'make a brief',
+      maxOutputTokens: 16384,
+    });
+
+    expect(mockGenerateText.mock.calls[0]![0].maxOutputTokens).toBe(2048);
   });
 });
